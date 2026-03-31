@@ -47,36 +47,32 @@ That's it. Kanna opens in your browser at [`localhost:3210`](http://localhost:32
 ## Features
 
 - **Multi-provider support** — switch between Claude and Codex (OpenAI) from the chat input, with per-provider model selection, reasoning effort controls, and Codex fast mode
+- **NATS messaging backbone** — embedded NATS server with pub/sub snapshots, JetStream event persistence, and request-reply commands replacing raw WebSocket routing
 - **Project-first sidebar** — chats grouped under projects, with live status indicators (idle, running, waiting, failed)
 - **Drag-and-drop project ordering** — reorder project groups in the sidebar with persistent ordering
 - **Local project discovery** — auto-discovers projects from both Claude and Codex local history
 - **Rich transcript rendering** — hydrated tool calls, collapsible tool groups, plan mode dialogs, and interactive prompts with full result display
-- **Quick responses** — lightweight structured queries (e.g. title generation) via Haiku with automatic Codex fallback
+- **Embedded terminals** — Bun native PTY with xterm.js rendering, streamed via NATS JetStream
 - **Plan mode** — review and approve agent plans before execution
 - **Persistent local history** — refresh-safe routes backed by JSONL event logs and compacted snapshots
 - **Auto-generated titles** — chat titles generated in the background via Claude Haiku
 - **Session resumption** — resume agent sessions with full context preservation
-- **WebSocket-driven** — real-time subscription model with reactive state broadcasting
 
 ## Architecture
 
-```
-Browser (React + Zustand)
-    ↕  WebSocket
-Bun Server (HTTP + WS)
-    ├── WSRouter ─── subscription & command routing
-    ├── AgentCoordinator ─── multi-provider turn management
-    ├── ProviderCatalog ─── provider/model/effort normalization
-    ├── QuickResponseAdapter ─── structured queries with provider fallback
-    ├── EventStore ─── JSONL persistence + snapshot compaction
-    └── ReadModels ─── derived views (sidebar, chat, projects)
-    ↕  stdio
-Claude Agent SDK / Codex App Server (local processes)
-    ↕
-Local File System (~/.kanna/data/, project dirs)
-```
+[![Architecture diagram](https://diashort.apps.quickable.co/e/e69a07ad)](https://diashort.apps.quickable.co/d/e69a07ad)
 
-**Key patterns:** Event sourcing for all state mutations. CQRS with separate write (event log) and read (derived snapshots) paths. Reactive broadcasting — subscribers get pushed fresh snapshots on every state change. Multi-provider agent coordination with tool gating for user-approval flows. Provider-agnostic transcript hydration for unified rendering.
+The browser connects directly to an **embedded NATS server** over WebSocket (token-authenticated). All communication flows through three NATS subject namespaces:
+
+| Namespace | Pattern | Purpose |
+|-----------|---------|---------|
+| **Snapshots** | `kanna.snap.*` | Push-based state broadcasts (sidebar, chat, terminal, settings). Cached in a KV bucket for late-join recovery. |
+| **Events** | `kanna.evt.*` | Persistent streams via JetStream — terminal output (5 min retention) and chat messages (30 min retention). Clients replay on reconnect. |
+| **Commands** | `kanna.cmd.*` | Request-reply from browser → server. All mutations (send message, create terminal, open project) go through here. |
+
+[![Message flow](https://diashort.apps.quickable.co/e/63f362f2)](https://diashort.apps.quickable.co/d/63f362f2)
+
+**Key patterns:** Event sourcing (JSONL append-only logs + snapshot compaction). CQRS with separate write (event log) and read (derived snapshots) paths. Reactive broadcasting — the publisher pushes fresh snapshots on every state change, with dedup to skip unchanged payloads. Multi-provider agent coordination with tool gating for user-approval flows.
 
 ## Requirements
 
@@ -195,30 +191,41 @@ bun run dev:server   # http://localhost:5175
 
 ```
 src/
-├── client/          React UI layer
-│   ├── app/         App router, pages, central state hook, socket client
-│   ├── components/  Messages, chat chrome, dialogs, buttons, inputs
-│   ├── hooks/       Theme, standalone mode detection
-│   ├── stores/      Zustand stores (chat input, preferences, project order)
-│   └── lib/         Formatters, path utils, transcript parsing
-├── server/          Bun backend
-│   ├── cli.ts       CLI entry point & browser launcher
-│   ├── server.ts    HTTP/WS server setup & static serving
-│   ├── agent.ts     AgentCoordinator (multi-provider turn management)
+├── client/                React 19 UI layer
+│   ├── app/               App router, pages, central state hook
+│   │   ├── nats-socket.ts   NATS WebSocket client (subscribe, command, reconnect)
+│   │   ├── socket-interface.ts  KannaTransport abstraction
+│   │   └── useKannaState.ts     Central state hook wiring socket → React
+│   ├── components/        Messages, chat chrome, terminals, sidebar, UI primitives
+│   ├── hooks/             Theme, standalone mode detection
+│   ├── stores/            Zustand stores (preferences, layout, input — localStorage-persisted)
+│   └── lib/               Formatters, path utils, transcript hydration
+├── server/                Bun backend
+│   ├── cli.ts             CLI entry point & browser launcher
+│   ├── cli-supervisor.ts  Process supervisor (restart loop for updates)
+│   ├── cli-runtime.ts     CLI parsing, self-update, version detection
+│   ├── server.ts          HTTP server + NATS initialization
+│   ├── nats-bridge.ts     Embedded NATS server (TCP + WebSocket + JetStream)
+│   ├── nats-auth.ts       Token generation for NATS authentication
+│   ├── nats-publisher.ts  Snapshot broadcasting + JetStream event publishing
+│   ├── nats-responders.ts Command handler (subscribes to kanna.cmd.>)
+│   ├── nats-streams.ts    JetStream stream configuration (terminal + chat)
+│   ├── agent.ts           AgentCoordinator (multi-provider turn management)
 │   ├── codex-app-server.ts  Codex App Server JSON-RPC client
 │   ├── provider-catalog.ts  Provider/model/effort normalization
-│   ├── quick-response.ts    Structured queries with provider fallback
-│   ├── ws-router.ts WebSocket message routing & subscriptions
-│   ├── event-store.ts  JSONL persistence, replay & compaction
-│   ├── discovery.ts Auto-discover projects from Claude and Codex local state
-│   ├── read-models.ts  Derive view models from event state
-│   └── events.ts    Event type definitions
-└── shared/          Shared between client & server
-    ├── types.ts     Core data types, provider catalog, transcript entries
-    ├── tools.ts     Tool call normalization and hydration
-    ├── protocol.ts  WebSocket message protocol
-    ├── ports.ts     Port configuration
-    └── branding.ts  App name, data directory paths
+│   ├── event-store.ts     JSONL persistence, replay & compaction
+│   ├── read-models.ts     CQRS derived views (sidebar, chat, projects)
+│   ├── terminal-manager.ts  Bun PTY + xterm.js serialization
+│   ├── discovery.ts       Auto-discover projects from Claude & Codex history
+│   └── events.ts          Event type definitions
+└── shared/                Shared between client & server
+    ├── types.ts           Core data types, transcript entries, provider catalog
+    ├── protocol.ts        Command & subscription topic types
+    ├── nats-subjects.ts   Subject naming (kanna.snap.* / kanna.evt.* / kanna.cmd.*)
+    ├── compression.ts     gzip compress/decompress for NATS payloads
+    ├── tools.ts           Tool call normalization and hydration
+    ├── ports.ts           Port configuration
+    └── branding.ts        App name, data directory paths
 ```
 
 ## Data Storage
