@@ -103,7 +103,7 @@ curl -fsSL https://bun.sh/install | bash
 Or clone and build from source:
 
 ```bash
-git clone https://github.com/jakemor/kanna.git
+git clone https://github.com/lagz0ne/kanna.git
 cd kanna
 bun install
 bun run build
@@ -235,15 +235,11 @@ All state is stored locally at `~/.kanna/data/`:
 
 Event logs are append-only JSONL. On startup, Kanna replays the log tail after the last snapshot, then compacts if the logs exceed 2 MB.
 
-## Star History
+## Acknowledgments
 
-<a href="https://www.star-history.com/?repos=jakemor%2Fkanna&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=jakemor/kanna&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=jakemor/kanna&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=jakemor/kanna&type=date&legend=top-left" />
- </picture>
-</a>
+This project is a fork of [**jakemor/kanna**](https://github.com/jakemor/kanna) — the original beautiful web UI for Claude Code. Huge thanks to [@jakemor](https://github.com/jakemor) for creating and open-sourcing it.
+
+This fork diverges by integrating [NATS](https://nats.io) as the messaging backbone for real-time state distribution, which represents a fundamentally different architectural direction from the original WebSocket-only approach. Because of the scope of these changes, contributing them upstream wasn't practical — so this lives as a separate fork instead.
 
 ## License
 
