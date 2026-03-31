@@ -56,10 +56,10 @@ Examples:
 
 ```markdown
 ## New Features
-**Scheduled Automations** — Create automated recurring chats. [jane](https://github.com/jakemor/kanna/pull/123)
+**Scheduled Automations** — Create automated recurring chats. [jane](https://github.com/lagz0ne/kanna/pull/123)
 
 ## Improvements
-**Mobile Layout Fix** — Improved small-screen layout. [alex](https://github.com/jakemor/kanna/commit/abcdef1)
+**Mobile Layout Fix** — Improved small-screen layout. [alex](https://github.com/lagz0ne/kanna/commit/abcdef1)
 ```
 
 If there are no changes at all, use: `No changes this release.`
