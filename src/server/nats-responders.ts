@@ -47,6 +47,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "chat.getMessages",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
+  "sessions.refresh",
 ])
 
 export function registerCommandResponders(args: RegisterRespondersArgs): { dispose: () => void } {
@@ -231,6 +232,21 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       case "snapshot.unsubscribe": {
         publisher.removeSubscription(command.subscriptionId)
         return undefined
+      }
+
+      case "sessions.refresh": {
+        const project = store.getProject(command.projectId)
+        if (project) {
+          publisher.refreshSessions(command.projectId, project.localPath)
+        }
+        return undefined
+      }
+
+      case "sessions.resume": {
+        const chat = await store.createChat(command.projectId)
+        await store.setSessionToken(chat.id, command.sessionId)
+        await store.setChatProvider(chat.id, command.provider)
+        return { chatId: chat.id }
       }
 
       default: {
