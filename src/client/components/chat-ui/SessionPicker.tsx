@@ -36,37 +36,70 @@ function SourceIcon({ source }: { source: "kanna" | "cli" }) {
 
 interface SessionPickerContentProps {
   sessions: DiscoveredSession[]
+  windowDays: number
   searchQuery: string
   onSelectSession: (session: DiscoveredSession) => void
   onRefresh: () => void
   onSearchChange: (query: string) => void
   onShowMore: () => void
-  hasMore: boolean
   isRefreshing: boolean
+}
+
+interface VisibleSessionsOptions {
+  sessions: DiscoveredSession[]
+  searchQuery: string
+  windowDays: number
+  now?: number
+}
+
+export function getVisibleSessions({
+  sessions,
+  searchQuery,
+  windowDays,
+  now = Date.now(),
+}: VisibleSessionsOptions): {
+  sessions: DiscoveredSession[]
+  hasMore: boolean
+} {
+  const cutoff = now - windowDays * 24 * 60 * 60 * 1000
+  const recentSessions = sessions.filter((session) => session.modifiedAt >= cutoff)
+
+  if (!searchQuery) {
+    return {
+      sessions: recentSessions.slice(0, 25),
+      hasMore: sessions.some((session) => session.modifiedAt < cutoff),
+    }
+  }
+
+  const lower = searchQuery.toLowerCase()
+  return {
+    sessions: sessions.filter((session) => {
+      const title = sessionDisplayTitle(session).toLowerCase()
+      const question = (session.lastExchange?.question ?? "").toLowerCase()
+      return title.includes(lower) || question.includes(lower)
+    }),
+    hasMore: false,
+  }
 }
 
 export const SessionPickerContent = memo(function SessionPickerContent({
   sessions,
+  windowDays,
   searchQuery,
   onSelectSession,
   onRefresh,
   onSearchChange,
   onShowMore,
-  hasMore,
   isRefreshing,
 }: SessionPickerContentProps) {
   const [activeIndex, setActiveIndex] = useState(-1)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const filtered = useMemo(() => {
-    if (!searchQuery) return sessions
-    const lower = searchQuery.toLowerCase()
-    return sessions.filter((s) => {
-      const title = sessionDisplayTitle(s).toLowerCase()
-      const question = (s.lastExchange?.question ?? "").toLowerCase()
-      return title.includes(lower) || question.includes(lower)
-    })
-  }, [sessions, searchQuery])
+  const visible = useMemo(
+    () => getVisibleSessions({ sessions, searchQuery, windowDays }),
+    [sessions, searchQuery, windowDays]
+  )
+  const filtered = visible.sessions
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -162,7 +195,7 @@ export const SessionPickerContent = memo(function SessionPickerContent({
       </div>
 
       {/* Show more button */}
-      {hasMore && !searchQuery ? (
+      {visible.hasMore ? (
         <button
           onClick={onShowMore}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center py-1"
@@ -179,7 +212,7 @@ export const SessionPickerContent = memo(function SessionPickerContent({
 interface SessionPickerProps {
   sessions: DiscoveredSession[]
   isLoading: boolean
-  hasMore: boolean
+  windowDays: number
   onSelectSession: (session: DiscoveredSession) => void
   onRefresh: () => void
   onShowMore: () => void
@@ -190,7 +223,7 @@ interface SessionPickerProps {
 export const SessionPicker = memo(function SessionPicker({
   sessions,
   isLoading,
-  hasMore,
+  windowDays,
   onSelectSession,
   onRefresh,
   onShowMore,
@@ -231,12 +264,12 @@ export const SessionPicker = memo(function SessionPicker({
       >
         <SessionPickerContent
           sessions={sessions}
+          windowDays={windowDays}
           searchQuery={searchQuery}
           onSelectSession={handleSelectSession}
           onRefresh={onRefresh}
           onSearchChange={setSearchQuery}
           onShowMore={onShowMore}
-          hasMore={hasMore}
           isRefreshing={isLoading}
         />
       </PopoverContent>

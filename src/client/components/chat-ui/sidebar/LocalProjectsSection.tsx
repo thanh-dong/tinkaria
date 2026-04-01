@@ -92,12 +92,6 @@ function SortableProjectGroup({
 }: SortableProjectGroupProps) {
   const { groupKey, localPath, chats: pathChats } = group
 
-  const windowMs = (sessionsWindowDays ?? 7) * 24 * 60 * 60 * 1000
-  const cutoff = Date.now() - windowMs
-  const filteredSessions = useMemo(() => {
-    return (sessions ?? []).filter((s) => s.modifiedAt >= cutoff).slice(0, 25)
-  }, [sessions, cutoff])
-  const hasMoreSessions = (sessions ?? []).some((s) => s.modifiedAt < cutoff)
   const isExpanded = expandedGroups.has(groupKey)
   const displayChats = isExpanded ? pathChats : pathChats.slice(0, chatsPerProject)
   const hasMore = pathChats.length > chatsPerProject
@@ -153,9 +147,9 @@ function SortableProjectGroup({
       <div className="absolute right-2 flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
         {onOpenSessionPicker && (
           <SessionPicker
-            sessions={filteredSessions}
+            sessions={sessions ?? []}
             isLoading={false}
-            hasMore={hasMoreSessions}
+            windowDays={sessionsWindowDays ?? 7}
             onSelectSession={(session) => {
               if (session.kannaChatId) {
                 onNavigateToChat?.(session.kannaChatId)
