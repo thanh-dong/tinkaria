@@ -2,7 +2,37 @@ import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { createMarkdownComponents, markdownComponents, OpenLocalLinkProvider } from "./shared"
+import { createMarkdownComponents, markdownComponents, OpenLocalLinkProvider, extractLanguageFromChildren, extractText } from "./shared"
+
+describe("extractLanguageFromChildren", () => {
+  test("returns language from code element className", () => {
+    const children = <code className="language-typescript">const x = 1</code>
+    expect(extractLanguageFromChildren(children)).toBe("typescript")
+  })
+
+  test("returns null for code element without language class", () => {
+    const children = <code>plain code</code>
+    expect(extractLanguageFromChildren(children)).toBeNull()
+  })
+
+  test("returns null for non-element children", () => {
+    expect(extractLanguageFromChildren("text")).toBeNull()
+  })
+})
+
+describe("extractText", () => {
+  test("extracts text from string", () => {
+    expect(extractText("hello")).toBe("hello")
+  })
+
+  test("extracts text from number", () => {
+    expect(extractText(42)).toBe("42")
+  })
+
+  test("extracts text from nested elements", () => {
+    expect(extractText(<span>hello <b>world</b></span>)).toBe("hello world")
+  })
+})
 
 describe("markdownComponents", () => {
   test("renders markdown headings with transcript-specific sizes and no bold weight", () => {

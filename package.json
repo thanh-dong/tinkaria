@@ -62,6 +62,7 @@
     "cloudflared": "^0.7.1",
     "default-shell": "^2.2.0",
     "diff": "^8.0.4",
+    "mermaid": "^11.13.0",
     "qrcode": "^1.5.4",
     "react-resizable-panels": "^4.7.3"
   },

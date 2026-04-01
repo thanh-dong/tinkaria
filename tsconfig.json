@@ -67,6 +67,12 @@
     "src/client/components/messages/TodoWriteMessage.tsx",
     "src/client/components/messages/EnvChangedMessage.tsx",
     "src/client/components/messages/EditDiffView.tsx",
-    "src/client/components/messages/ProcessingMessage.tsx"
+    "src/client/components/messages/ProcessingMessage.tsx",
+    "src/client/components/rich-content/types.ts",
+    "src/client/components/rich-content/ContentOverlay.tsx",
+    "src/client/components/rich-content/RichContentBlock.tsx",
+    "src/client/components/rich-content/EmbedRenderer.tsx",
+    "src/client/components/rich-content/remarkRichContentHint.ts",
+    "src/client/components/messages/FileContentView.tsx"
   ]
 }
