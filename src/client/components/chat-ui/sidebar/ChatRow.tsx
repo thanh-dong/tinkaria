@@ -57,7 +57,6 @@ export function ChatRow({
   return (
     <ChatRowMenu onRename={startEditing} onDelete={() => onDeleteChat(chat.chatId)}>
       <div
-        key={chat._id}
         data-chat-id={normalizeChatId(chat.chatId)}
         className={cn(
           "group flex items-center gap-2 pl-2.5 pr-0.5 py-0.5 rounded-lg cursor-pointer border-border/0 hover:border-border hover:bg-muted/20 active:scale-[0.985] border transition-all",
