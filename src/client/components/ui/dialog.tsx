@@ -28,12 +28,13 @@ const sizeClasses = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-lg",
+  xl: "max-w-4xl",
 }
 
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
-    size?: "sm" | "md" | "lg"
+    size?: "sm" | "md" | "lg" | "xl"
   }
 >(({ className, children, size = "md", ...props }, ref) => (
   <DialogPortal>
