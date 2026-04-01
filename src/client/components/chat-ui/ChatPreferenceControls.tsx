@@ -1,4 +1,4 @@
-import { useState, type ComponentType, type SVGProps } from "react"
+import { memo, useState, type ComponentType, type SVGProps } from "react"
 import { Box, Brain, Gauge, ListTodo, LockOpen, SquareMenu, SquareMinus } from "lucide-react"
 import {
   CLAUDE_CONTEXT_WINDOW_OPTIONS,
@@ -153,7 +153,7 @@ interface ChatPreferenceControlsProps {
   className?: string
 }
 
-export function ChatPreferenceControls({
+export const ChatPreferenceControls = memo(function ChatPreferenceControls({
   availableProviders,
   selectedProvider,
   showProviderPicker = true,
@@ -377,4 +377,4 @@ export function ChatPreferenceControls({
       ) : null}
     </div>
   )
-}
+})

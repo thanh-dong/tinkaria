@@ -106,16 +106,31 @@ describeIfSupported("TerminalManager", () => {
 
   test("ctrl+d preserves eof behavior", async () => {
     const terminalId = "terminal-ctrl-d"
-    const { manager } = await createSession(terminalId)
-
+    // Use ZDOTDIR with a minimal .zshrc to bypass user prompt config
+    // (starship, powerline). Complex async prompts make ctrl+d unreliable
+    // under parallel test load. The empty .zshrc also prevents the
+    // zsh-newuser-install wizard from triggering.
+    const originalZdotdir = process.env.ZDOTDIR
+    process.env.ZDOTDIR = tempProjectPath
+    await Bun.write(path.join(tempProjectPath, ".zshrc"), "# minimal test shell\n")
     try {
-      manager.write(terminalId, "\x04")
+      const { manager } = await createSession(terminalId)
 
-      await waitFor(() => manager.getSnapshot(terminalId)?.status === "exited", COMMAND_TIMEOUT_MS)
+      try {
+        manager.write(terminalId, "\x04")
 
-      expect(manager.getSnapshot(terminalId)?.exitCode).toBe(0)
+        await waitFor(() => manager.getSnapshot(terminalId)?.status === "exited", COMMAND_TIMEOUT_MS)
+
+        expect(manager.getSnapshot(terminalId)?.exitCode).toBe(0)
+      } finally {
+        manager.close(terminalId)
+      }
     } finally {
-      manager.close(terminalId)
+      if (originalZdotdir === undefined) {
+        delete process.env.ZDOTDIR
+      } else {
+        process.env.ZDOTDIR = originalZdotdir
+      }
     }
   })
 

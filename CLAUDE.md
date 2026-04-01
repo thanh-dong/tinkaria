@@ -27,7 +27,7 @@ File lookup: `c3x lookup <file-or-glob>` maps files/directories to components + 
 ## Coding Rules
 
 - **Error extraction**: `error instanceof Error ? error.message : String(error)` in all catch blocks — `rule-error-extraction`
-- **Testing**: Bun test, `describe`/`test`, `afterEach` cleanup, typed helpers, no jest — `rule-bun-test-conventions`
+- **Testing**: Bun test, `describe`/`test`, `afterEach` cleanup, typed helpers, no jest, env var isolation (save/clear/restore), isolated ZDOTDIR for PTY tests — `rule-bun-test-conventions`
 - **Type guards**: `is*()` predicates, `normalize*()` coercers, `require*`/`get*` duality — `rule-type-guards`
 - **Logging**: `LOG_PREFIX` constant, `console.warn` for recoverable, never bare `console.error` — `rule-prefixed-logging`
 - **Fallbacks**: Normalize external input, handle ENOENT/SyntaxError, never crash on bad data — `rule-graceful-fallbacks`

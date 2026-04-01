@@ -164,23 +164,34 @@ export interface IncrementalHydrator {
 export function createIncrementalHydrator(): IncrementalHydrator {
   let pendingToolCalls = new Map<string, { hydrated: HydratedToolCall; normalized: NormalizedToolCall }>()
   let messages: HydratedTranscriptMessage[] = []
+  let dirty = false
 
   return {
     hydrate(entry: TranscriptEntry): HydratedTranscriptMessage | null {
       const msg = hydrateEntry(entry, pendingToolCalls)
       if (msg) {
-        messages = [...messages, msg]
+        messages.push(msg)
+        dirty = true
+      } else if (entry.kind === "tool_result") {
+        // tool_result mutates an existing tool call in-place — mark dirty
+        // so getMessages() returns a new reference for React's identity check
+        dirty = true
       }
       return msg
     },
 
     getMessages(): HydratedTranscriptMessage[] {
+      if (dirty) {
+        messages = [...messages] // snapshot for React identity check
+        dirty = false
+      }
       return messages
     },
 
     reset(): void {
       pendingToolCalls = new Map()
       messages = []
+      dirty = false
     },
   }
 }

@@ -19,8 +19,7 @@ import { StatusMessage } from "../components/messages/StatusMessage"
 import { CollapsedToolGroup } from "../components/messages/CollapsedToolGroup"
 import { OpenLocalLinkProvider } from "../components/messages/shared"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
-
-const SPECIAL_TOOL_NAMES = new Set(["AskUserQuestion", "ExitPlanMode", "TodoWrite"])
+import { SPECIAL_TOOL_NAMES } from "./derived"
 
 type RenderItem =
   | { type: "single"; message: HydratedTranscriptMessage; index: number }
@@ -86,6 +85,18 @@ export function KannaTranscript({
   onAskUserQuestionSubmit,
   onExitPlanModeConfirm,
 }: KannaTranscriptProps) {
+  // Precompute first-occurrence indices to avoid O(n) findIndex per render
+  const firstIndices = useMemo(() => {
+    let systemInit = -1
+    let accountInfo = -1
+    for (let i = 0; i < messages.length; i++) {
+      if (systemInit === -1 && messages[i].kind === "system_init") systemInit = i
+      if (accountInfo === -1 && messages[i].kind === "account_info") accountInfo = i
+      if (systemInit !== -1 && accountInfo !== -1) break
+    }
+    return { systemInit, accountInfo }
+  }, [messages])
+
   const renderItems = useMemo(() => groupMessages(messages), [messages])
 
   const virtualizer = useVirtualizer({
@@ -103,14 +114,14 @@ export function KannaTranscript({
     switch (message.kind) {
       case "unknown":
         return <RawJsonMessage key={message.id} json={message.json} />
-      case "system_init": {
-        const isFirst = messages.findIndex((entry) => entry.kind === "system_init") === index
-        return isFirst ? <SystemMessage key={message.id} message={message} rawJson={message.debugRaw} /> : null
-      }
-      case "account_info": {
-        const isFirst = messages.findIndex((entry) => entry.kind === "account_info") === index
-        return isFirst ? <AccountInfoMessage key={message.id} message={message} /> : null
-      }
+      case "system_init":
+        return firstIndices.systemInit === index
+          ? <SystemMessage key={message.id} message={message} rawJson={message.debugRaw} />
+          : null
+      case "account_info":
+        return firstIndices.accountInfo === index
+          ? <AccountInfoMessage key={message.id} message={message} />
+          : null
       case "assistant_text":
         return <TextMessage key={message.id} message={message} />
       case "tool":

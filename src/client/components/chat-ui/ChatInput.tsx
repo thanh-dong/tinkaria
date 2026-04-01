@@ -2,9 +2,6 @@ import { forwardRef, memo, useCallback, useEffect, useLayoutEffect, useRef, useS
 import { ArrowUp } from "lucide-react"
 import {
   type AgentProvider,
-  type ClaudeContextWindow,
-  type ClaudeReasoningEffort,
-  type CodexReasoningEffort,
   type ModelOptions,
   type ProviderCatalogEntry,
   normalizeClaudeContextWindow,
@@ -16,7 +13,7 @@ import { useIsStandalone } from "../../hooks/useIsStandalone"
 import { useChatInputStore } from "../../stores/chatInputStore"
 import { type ComposerState, useChatPreferencesStore } from "../../stores/chatPreferencesStore"
 import { CHAT_INPUT_ATTRIBUTE, focusNextChatInput } from "../../app/chatFocusPolicy"
-import { ChatPreferenceControls } from "./ChatPreferenceControls"
+import { ChatPreferenceControls, type ModelOptionChange } from "./ChatPreferenceControls"
 
 interface Props {
   onSubmit: (
@@ -131,15 +128,15 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   activeProvider,
   availableProviders,
 }, forwardedRef) {
-  const { getDraft, setDraft, clearDraft } = useChatInputStore()
-  const {
-    composerState,
-    providerDefaults,
-    setComposerModel,
-    setComposerModelOptions,
-    setComposerPlanMode,
-    resetComposerFromProvider,
-  } = useChatPreferencesStore()
+  const getDraft = useChatInputStore((s) => s.getDraft)
+  const setDraft = useChatInputStore((s) => s.setDraft)
+  const clearDraft = useChatInputStore((s) => s.clearDraft)
+  const composerState = useChatPreferencesStore((s) => s.composerState)
+  const providerDefaults = useChatPreferencesStore((s) => s.providerDefaults)
+  const setComposerModel = useChatPreferencesStore((s) => s.setComposerModel)
+  const setComposerModelOptions = useChatPreferencesStore((s) => s.setComposerModelOptions)
+  const setComposerPlanMode = useChatPreferencesStore((s) => s.setComposerPlanMode)
+  const resetComposerFromProvider = useChatPreferencesStore((s) => s.resetComposerFromProvider)
   const [value, setValue] = useState(() => (chatId ? getDraft(chatId) : ""))
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isStandalone = useIsStandalone()
@@ -200,59 +197,71 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     setLockedComposerState(createLockedComposerState(activeProvider, composerState, providerDefaults))
   }, [activeProvider, chatId])
 
-  useEffect(() => {
-    logChatInput("resolved provider state", {
-      chatId: chatId ?? null,
-      activeProvider,
-      composerProvider: composerState.provider,
-      composerModel: composerState.model,
-      effectiveProvider: providerPrefs.provider,
-      effectiveModel: providerPrefs.model,
-      selectedProvider,
-      providerLocked,
-      lockedComposerProvider: lockedComposerState?.provider ?? null,
-    })
-  }, [activeProvider, chatId, composerState.model, composerState.provider, lockedComposerState?.provider, providerLocked, providerPrefs.model, providerPrefs.provider, selectedProvider])
+  const handleProviderChange = useCallback((provider: AgentProvider) => {
+    if (providerLocked) return
+    resetComposerFromProvider(provider)
+  }, [providerLocked, resetComposerFromProvider])
 
-  function updateLockedOrComposer(
-    transform: (state: ComposerState) => ComposerState,
-    fallback: () => void
-  ) {
+  const handleModelChange = useCallback((_: AgentProvider, model: string) => {
     if (providerLocked) {
       setLockedComposerState((current) => {
         const next = current ?? createLockedComposerState(selectedProvider, composerState, providerDefaults)
-        return transform(next)
+        return withNormalizedContextWindow(next, model)
       })
       return
     }
-    fallback()
-  }
+    setComposerModel(model)
+  }, [providerLocked, selectedProvider, composerState, providerDefaults, setComposerModel])
 
-  function setReasoningEffort(reasoningEffort: string) {
-    updateLockedOrComposer(
-      (state) => ({
-        ...state,
-        modelOptions: { ...state.modelOptions, reasoningEffort: reasoningEffort as ClaudeReasoningEffort & CodexReasoningEffort },
-      } as ComposerState),
-      () => selectedProvider === "claude"
-        ? setComposerModelOptions({ reasoningEffort: reasoningEffort as ClaudeReasoningEffort })
-        : setComposerModelOptions({ reasoningEffort: reasoningEffort as CodexReasoningEffort })
-    )
-  }
+  const handleModelOptionChange = useCallback((change: ModelOptionChange) => {
+    const doUpdate = (
+      transform: (s: ComposerState) => ComposerState,
+      fallback: () => void
+    ) => {
+      if (providerLocked) {
+        setLockedComposerState((current) => {
+          const next = current ?? createLockedComposerState(selectedProvider, composerState, providerDefaults)
+          return transform(next)
+        })
+        return
+      }
+      fallback()
+    }
 
-  function setClaudeContextWindow(contextWindow: ClaudeContextWindow) {
-    updateLockedOrComposer(
-      (state) => state.provider !== "claude"
-        ? state
-        : withNormalizedContextWindow(
-            { ...state, modelOptions: { ...state.modelOptions, contextWindow } },
-            state.model
-          ),
-      () => setComposerModelOptions({ contextWindow })
-    )
-  }
+    switch (change.type) {
+      case "claudeReasoningEffort":
+      case "codexReasoningEffort":
+        doUpdate(
+          (state) => ({
+            ...state,
+            modelOptions: { ...state.modelOptions, reasoningEffort: change.effort },
+          } as ComposerState),
+          () => setComposerModelOptions({ reasoningEffort: change.effort })
+        )
+        break
+      case "contextWindow":
+        doUpdate(
+          (state) => state.provider !== "claude"
+            ? state
+            : withNormalizedContextWindow(
+                { ...state, modelOptions: { ...state.modelOptions, contextWindow: change.contextWindow } },
+                state.model
+              ),
+          () => setComposerModelOptions({ contextWindow: change.contextWindow })
+        )
+        break
+      case "fastMode":
+        doUpdate(
+          (state) => state.provider === "claude"
+            ? state
+            : { ...state, modelOptions: { ...state.modelOptions, fastMode: change.fastMode } },
+          () => setComposerModelOptions({ fastMode: change.fastMode })
+        )
+        break
+    }
+  }, [providerLocked, selectedProvider, composerState, providerDefaults, setComposerModelOptions])
 
-  function setEffectivePlanMode(planMode: boolean) {
+  const handlePlanModeChange = useCallback((planMode: boolean) => {
     const nextState = resolvePlanModeState({
       providerLocked,
       planMode,
@@ -268,11 +277,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     if (nextState.composerPlanMode !== composerState.planMode) {
       setComposerPlanMode(nextState.composerPlanMode)
     }
-  }
-
-  function toggleEffectivePlanMode() {
-    setEffectivePlanMode(!providerPrefs.planMode)
-  }
+  }, [providerLocked, selectedProvider, composerState, providerDefaults, lockedComposerState, setComposerPlanMode])
 
   async function handleSubmit() {
     if (!value.trim()) return
@@ -318,7 +323,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
 
     if (event.key === "Tab" && event.shiftKey && showPlanMode) {
       event.preventDefault()
-      toggleEffectivePlanMode()
+      handlePlanModeChange(!providerPrefs.planMode)
       return
     }
 
@@ -390,39 +395,11 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
             providerLocked={providerLocked}
             model={providerPrefs.model}
             modelOptions={providerPrefs.modelOptions}
-            onProviderChange={(provider) => {
-              if (providerLocked) return
-              resetComposerFromProvider(provider)
-            }}
-            onModelChange={(_, model) => {
-              updateLockedOrComposer(
-                (state) => withNormalizedContextWindow(state, model),
-                () => setComposerModel(model)
-              )
-            }}
-            onModelOptionChange={(change) => {
-              switch (change.type) {
-                case "claudeReasoningEffort":
-                  setReasoningEffort(change.effort)
-                  break
-                case "codexReasoningEffort":
-                  setReasoningEffort(change.effort)
-                  break
-                case "contextWindow":
-                  setClaudeContextWindow(change.contextWindow)
-                  break
-                case "fastMode":
-                  updateLockedOrComposer(
-                    (state) => state.provider === "claude"
-                      ? state
-                      : { ...state, modelOptions: { ...state.modelOptions, fastMode: change.fastMode } },
-                    () => setComposerModelOptions({ fastMode: change.fastMode })
-                  )
-                  break
-              }
-            }}
+            onProviderChange={handleProviderChange}
+            onModelChange={handleModelChange}
+            onModelOptionChange={handleModelOptionChange}
             planMode={providerPrefs.planMode}
-            onPlanModeChange={setEffectivePlanMode}
+            onPlanModeChange={handlePlanModeChange}
             includePlanMode={showPlanMode}
             className="max-w-[840px] mx-auto"
           />

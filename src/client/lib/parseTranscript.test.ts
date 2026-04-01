@@ -396,6 +396,46 @@ describe("createIncrementalHydrator", () => {
     }
   })
 
+  test("getMessages returns a new reference after tool_result mutates existing tool call", () => {
+    const hydrator = createIncrementalHydrator()
+
+    hydrator.hydrate(entry({
+      kind: "tool_call",
+      tool: {
+        kind: "tool",
+        toolKind: "bash",
+        toolName: "Bash",
+        toolId: "tool-dirty-1",
+        input: { command: "pwd" },
+      },
+    }))
+
+    // Snapshot before tool_result
+    const refBefore = hydrator.getMessages()
+    expect(refBefore).toHaveLength(1)
+    if (refBefore[0]?.kind !== "tool") throw new Error("expected tool")
+    expect(refBefore[0].result).toBeUndefined()
+
+    // tool_result mutates the tool call in-place, returns null
+    const resultMsg = hydrator.hydrate(entry({
+      kind: "tool_result",
+      toolId: "tool-dirty-1",
+      content: "/home/user\n",
+    }))
+    expect(resultMsg).toBeNull()
+
+    // getMessages must return a NEW reference so React detects the change
+    const refAfter = hydrator.getMessages()
+    expect(refAfter).not.toBe(refBefore) // different identity
+    expect(refAfter).toHaveLength(1)
+    if (refAfter[0]?.kind !== "tool") throw new Error("expected tool")
+    expect(refAfter[0].result).toBe("/home/user\n")
+
+    // Subsequent call without changes should be stable again
+    const refStable = hydrator.getMessages()
+    expect(refStable).toBe(refAfter)
+  })
+
   test("reset clears all state", () => {
     const hydrator = createIncrementalHydrator()
     hydrator.hydrate(entry({ kind: "user_prompt", content: "Hello" }))

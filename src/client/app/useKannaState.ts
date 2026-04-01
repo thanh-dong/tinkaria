@@ -330,28 +330,21 @@ export function useKannaState(activeChatId: string | null): KannaState {
 
     // Fetch initial messages, then merge any buffered live events
     const hydrator = hydratorRef.current
+
+    function bulkHydrate(entries: TranscriptEntry[]) {
+      initialFetchDone = true
+      const allEntries = buffer.length > 0 ? [...entries, ...buffer] : entries
+      buffer.length = 0
+      hydrator.reset()
+      for (const entry of allEntries) {
+        hydrator.hydrate(entry)
+      }
+      setMessages(hydrator.getMessages())
+    }
+
     socket.command<TranscriptEntry[]>({ type: "chat.getMessages", chatId: activeChatId })
-      .then((initial) => {
-        initialFetchDone = true
-        const allEntries = buffer.length > 0 ? [...initial, ...buffer] : initial
-        buffer.length = 0
-        // Bulk hydrate initial + buffered entries
-        hydrator.reset()
-        for (const entry of allEntries) {
-          hydrator.hydrate(entry)
-        }
-        setMessages(hydrator.getMessages())
-      })
-      .catch(() => {
-        initialFetchDone = true
-        const entries = [...buffer]
-        buffer.length = 0
-        hydrator.reset()
-        for (const entry of entries) {
-          hydrator.hydrate(entry)
-        }
-        setMessages(hydrator.getMessages())
-      })
+      .then(bulkHydrate)
+      .catch(() => bulkHydrate([]))
 
     return unsub
   }, [activeChatId, socket])
