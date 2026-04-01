@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, mkdir, writeFile, rm, utimes } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { scanClaudeSessions, scanCodexSessions, resolveTitle, formatDateTitle, mergeSessions } from "./session-discovery"
+import { scanClaudeSessions, scanCodexSessions, resolveTitle, formatDateTitle, mergeSessions, discoverSessions } from "./session-discovery"
+import { EventStore } from "./event-store"
 import type { DiscoveredSession } from "../shared/types"
 
 const tempDirs: string[] = []
@@ -173,5 +174,122 @@ describe("mergeSessions", () => {
 
     const merged = mergeSessions(sessions, [])
     expect(merged.map((s) => s.sessionId)).toEqual(["new", "mid", "old"])
+  })
+})
+
+describe("discoverSessions", () => {
+  test("merges Claude CLI + EventStore chats for a project", async () => {
+    const tempDir = await makeTempDir()
+    const store = new EventStore(tempDir)
+    await store.initialize()
+
+    // Create a Kanna chat with sessionToken
+    const project = await store.openProject("/home/user/dev/kanna", "kanna")
+    const chat = await store.createChat(project.id)
+    await store.setSessionToken(chat.id, "kanna-session-token")
+    await store.setChatProvider(chat.id, "claude")
+
+    // Create a mock Claude projects dir
+    const claudeDir = join(tempDir, "claude-projects")
+    await mkdir(claudeDir, { recursive: true })
+
+    // A CLI-only session
+    await writeFile(
+      join(claudeDir, "cli-only-session.jsonl"),
+      JSON.stringify({ type: "user", message: { content: "Hello CLI" } }) + "\n"
+    )
+
+    const snapshot = await discoverSessions({
+      projectId: project.id,
+      projectPath: "/home/user/dev/kanna",
+      store,
+      claudeProjectDir: claudeDir,
+      codexSessionsDir: "/nonexistent",
+    })
+
+    expect(snapshot.projectId).toBe(project.id)
+    expect(snapshot.sessions.length).toBeGreaterThanOrEqual(2) // 1 kanna + 1 cli
+    expect(snapshot.sessions.some((s) => s.source === "kanna")).toBe(true)
+    expect(snapshot.sessions.some((s) => s.source === "cli")).toBe(true)
+  })
+
+  test("returns only CLI sessions when no Kanna chats have sessionToken", async () => {
+    const tempDir = await makeTempDir()
+    const store = new EventStore(tempDir)
+    await store.initialize()
+
+    const project = await store.openProject("/home/user/dev/myapp", "myapp")
+    // Chat without sessionToken
+    await store.createChat(project.id)
+
+    const claudeDir = join(tempDir, "claude-projects")
+    await mkdir(claudeDir, { recursive: true })
+    await writeFile(
+      join(claudeDir, "sess-abc.jsonl"),
+      JSON.stringify({ type: "user", message: { content: "Hi" } }) + "\n"
+    )
+
+    const snapshot = await discoverSessions({
+      projectId: project.id,
+      projectPath: "/home/user/dev/myapp",
+      store,
+      claudeProjectDir: claudeDir,
+      codexSessionsDir: null,
+    })
+
+    expect(snapshot.sessions).toHaveLength(1)
+    expect(snapshot.sessions[0].source).toBe("cli")
+    expect(snapshot.sessions[0].sessionId).toBe("sess-abc")
+  })
+
+  test("deduplicates when Kanna sessionToken matches CLI session ID", async () => {
+    const tempDir = await makeTempDir()
+    const store = new EventStore(tempDir)
+    await store.initialize()
+
+    const project = await store.openProject("/home/user/dev/dedup", "dedup")
+    const chat = await store.createChat(project.id)
+    await store.setSessionToken(chat.id, "shared-session-id")
+    await store.setChatProvider(chat.id, "claude")
+
+    const claudeDir = join(tempDir, "claude-projects")
+    await mkdir(claudeDir, { recursive: true })
+    // CLI session with same ID as Kanna sessionToken
+    await writeFile(
+      join(claudeDir, "shared-session-id.jsonl"),
+      JSON.stringify({ type: "user", message: { content: "Shared" } }) + "\n"
+    )
+
+    const snapshot = await discoverSessions({
+      projectId: project.id,
+      projectPath: "/home/user/dev/dedup",
+      store,
+      claudeProjectDir: claudeDir,
+      codexSessionsDir: null,
+    })
+
+    // Should be deduped: Kanna wins over CLI
+    expect(snapshot.sessions).toHaveLength(1)
+    expect(snapshot.sessions[0].source).toBe("kanna")
+    expect(snapshot.sessions[0].kannaChatId).toBe(chat.id)
+  })
+
+  test("returns empty sessions when no dirs and no chats with tokens", async () => {
+    const tempDir = await makeTempDir()
+    const store = new EventStore(tempDir)
+    await store.initialize()
+
+    const project = await store.openProject("/home/user/dev/empty", "empty")
+
+    const snapshot = await discoverSessions({
+      projectId: project.id,
+      projectPath: "/home/user/dev/empty",
+      store,
+      claudeProjectDir: null,
+      codexSessionsDir: null,
+    })
+
+    expect(snapshot.projectId).toBe(project.id)
+    expect(snapshot.sessions).toEqual([])
   })
 })

@@ -1,6 +1,7 @@
 import { readdir, stat, open } from "node:fs/promises"
 import { join, basename, extname } from "node:path"
-import type { AgentProvider, DiscoveredSession } from "../shared/types"
+import type { AgentProvider, DiscoveredSession, SessionsSnapshot } from "../shared/types"
+import type { EventStore } from "./event-store"
 
 const TAIL_BYTES = 32 * 1024
 const TITLE_SCAN_LINES = 5
@@ -225,4 +226,44 @@ export function mergeSessions(
   }
 
   return [...bySessionId.values()].sort((a, b) => b.modifiedAt - a.modifiedAt)
+}
+
+interface DiscoverSessionsOptions {
+  projectId: string
+  projectPath: string
+  store: EventStore
+  claudeProjectDir: string | null
+  codexSessionsDir: string | null
+}
+
+export async function discoverSessions(
+  options: DiscoverSessionsOptions
+): Promise<SessionsSnapshot> {
+  const { projectId, projectPath, store, claudeProjectDir, codexSessionsDir } = options
+
+  // 1. Scan CLI sessions in parallel
+  const [claudeCliSessions, codexCliSessions] = await Promise.all([
+    claudeProjectDir ? scanClaudeSessions(claudeProjectDir) : Promise.resolve([]),
+    codexSessionsDir ? scanCodexSessions(codexSessionsDir, projectPath) : Promise.resolve([]),
+  ])
+
+  // 2. Collect Kanna chats with sessionToken
+  const kannaChats = store.listChatsByProject(projectId)
+  const kannaSessions: DiscoveredSession[] = kannaChats
+    .filter((chat) => chat.sessionToken !== null)
+    .map((chat) => ({
+      sessionId: chat.sessionToken!,
+      provider: (chat.provider ?? "claude") as AgentProvider,
+      source: "kanna" as const,
+      title: resolveTitle(chat.title, "kanna", null, chat.lastMessageAt ?? chat.updatedAt),
+      lastExchange: null,
+      modifiedAt: chat.lastMessageAt ?? chat.updatedAt,
+      kannaChatId: chat.id,
+    }))
+
+  // 3. Merge + dedup (Kanna wins over CLI)
+  const allCliSessions = [...claudeCliSessions, ...codexCliSessions]
+  const sessions = mergeSessions(allCliSessions, kannaSessions)
+
+  return { projectId, projectPath, sessions }
 }
