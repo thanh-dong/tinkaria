@@ -226,3 +226,61 @@ describe("computeTailOffset", () => {
     expect(TRANSCRIPT_TAIL_SIZE).toBe(200)
   })
 })
+
+describe("appendQueuedText", () => {
+  test("uses the incoming text when the queue is empty", async () => {
+    const module = await import("./useKannaState")
+    const append = (module as Record<string, unknown>).appendQueuedText
+
+    expect(typeof append).toBe("function")
+    if (typeof append !== "function") throw new Error("appendQueuedText export missing")
+
+    expect(append("", "Check layout")).toBe("Check layout")
+    expect(append("   ", "Check layout")).toBe("Check layout")
+  })
+
+  test("uses the current text when the incoming text is blank", async () => {
+    const module = await import("./useKannaState")
+    const append = (module as Record<string, unknown>).appendQueuedText
+
+    expect(typeof append).toBe("function")
+    if (typeof append !== "function") throw new Error("appendQueuedText export missing")
+
+    expect(append("Check layout", "   ")).toBe("Check layout")
+  })
+
+  test("appends a blank line between queued paragraphs", async () => {
+    const module = await import("./useKannaState")
+    const append = (module as Record<string, unknown>).appendQueuedText
+
+    expect(typeof append).toBe("function")
+    if (typeof append !== "function") throw new Error("appendQueuedText export missing")
+
+    expect(append("  Check layout  ", "  Verify sidebar  ")).toBe("Check layout\n\nVerify sidebar")
+    expect(append("Check layout", "Verify sidebar")).toBe("Check layout\n\nVerify sidebar")
+  })
+})
+
+describe("shouldQueueChatSubmit", () => {
+  test("returns false when runtime is idle and no queue exists", async () => {
+    const module = await import("./useKannaState")
+    const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
+
+    expect(typeof shouldQueue).toBe("function")
+    if (typeof shouldQueue !== "function") throw new Error("shouldQueueChatSubmit export missing")
+
+    expect(shouldQueue(false, "")).toBe(false)
+    expect(shouldQueue(false, "   ")).toBe(false)
+  })
+
+  test("returns true when the runtime is busy", async () => {
+    const module = await import("./useKannaState")
+    const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
+
+    expect(typeof shouldQueue).toBe("function")
+    if (typeof shouldQueue !== "function") throw new Error("shouldQueueChatSubmit export missing")
+
+    expect(shouldQueue(true, "")).toBe(true)
+    expect(shouldQueue(false, "  queued  ")).toBe(true)
+  })
+})

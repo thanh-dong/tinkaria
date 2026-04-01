@@ -73,6 +73,20 @@ export function computeTailOffset(messageCount: number, tailSize = TRANSCRIPT_TA
   return Math.max(0, messageCount - tailSize)
 }
 
+export function appendQueuedText(currentQueuedText: string, nextContent: string): string {
+  const current = currentQueuedText.trim()
+  const next = nextContent.trim()
+
+  if (!current) return next
+  if (!next) return current
+
+  return `${current}\n\n${next}`
+}
+
+export function shouldQueueChatSubmit(isProcessing: boolean, queuedText: string): boolean {
+  return isProcessing || queuedText.trim().length > 0
+}
+
 const FIXED_TRANSCRIPT_PADDING_BOTTOM = 320
 const UI_UPDATE_RESTART_STORAGE_KEY = "kanna:ui-update-restart"
 
