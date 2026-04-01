@@ -3,6 +3,7 @@ import type {
   ChatSnapshot,
   KannaStatus,
   LocalProjectsSnapshot,
+  SessionsSnapshot,
   SidebarChatRow,
   SidebarData,
   SidebarProjectGroup,
@@ -121,4 +122,10 @@ export function deriveChatSnapshot(
     messageCount,
     availableProviders: [...SERVER_PROVIDERS],
   }
+}
+
+export function deriveSessionsSnapshot(
+  cachedSnapshot: SessionsSnapshot | null
+): SessionsSnapshot | null {
+  return cachedSnapshot
 }
