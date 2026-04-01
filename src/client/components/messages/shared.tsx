@@ -34,6 +34,17 @@ import { cn } from "../../lib/utils"
 import { parseLocalFileLink } from "../../lib/pathUtils"
 import { RichContentBlock } from "../rich-content/RichContentBlock"
 import { EmbedRenderer, isEmbedLanguage } from "../rich-content/EmbedRenderer"
+import { highlight } from "sugar-high"
+import { python as pythonPreset, rust as rustPreset, css as cssPreset } from "sugar-high/presets"
+
+const languagePresets: Record<string, Parameters<typeof highlight>[1]> = {
+  python: pythonPreset,
+  py: pythonPreset,
+  rust: rustPreset,
+  rs: rustPreset,
+  css: cssPreset,
+  scss: cssPreset,
+}
 
 type OpenLocalLinkTarget = { path: string; line?: number; column?: number }
 type OpenLocalLinkHandler = (target: OpenLocalLinkTarget) => void
@@ -296,10 +307,20 @@ export const markdownComponents = {
     if (isInline) {
       return <code className="break-all px-1 bg-border/60 dark:[.no-pre-highlight_&]:bg-background dark:[.text-pretty_&]:bg-neutral [.no-code-highlight_&]:!bg-transparent py-0.5 rounded text-sm whitespace-wrap" {...props}>{children}</code>
     }
+
+    const language = typeof className === "string"
+      ? className.match(/language-(\S+)/)?.[1] ?? null
+      : null
+    const rawText = extractText(children)
+    const preset = language ? languagePresets[language] : undefined
+    const highlighted = highlight(rawText, preset)
+
     return (
-      <code className="block text-xs whitespace-pre" {...props}>
-        {children}
-      </code>
+      <code
+        className="block text-xs whitespace-pre"
+        {...props}
+        dangerouslySetInnerHTML={{ __html: highlighted }}
+      />
     )
   },
 

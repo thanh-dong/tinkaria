@@ -64,7 +64,8 @@
     "diff": "^8.0.4",
     "mermaid": "^11.13.0",
     "qrcode": "^1.5.4",
-    "react-resizable-panels": "^4.7.3"
+    "react-resizable-panels": "^4.7.3",
+    "sugar-high": "^1.0.0"
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.3.1",
