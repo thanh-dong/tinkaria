@@ -33,6 +33,7 @@ import {
 import { cn } from "../../lib/utils"
 import { parseLocalFileLink } from "../../lib/pathUtils"
 import { RichContentBlock } from "../rich-content/RichContentBlock"
+import { EmbedRenderer, isEmbedLanguage } from "../rich-content/EmbedRenderer"
 
 type OpenLocalLinkTarget = { path: string; line?: number; column?: number }
 type OpenLocalLinkHandler = (target: OpenLocalLinkTarget) => void
@@ -269,17 +270,22 @@ export const markdownComponents = {
   pre: ({ children, ...props }: ComponentPropsWithoutRef<"pre">) => {
     const textContent = extractText(children)
     const language = extractLanguageFromChildren(children)
+    const isEmbed = isEmbedLanguage(language)
 
     return (
       <RichContentBlock
-        type="code"
+        type={isEmbed ? "embed" : "code"}
         title={language ?? "Code"}
         rawContent={textContent}
         defaultExpanded
       >
-        <div className="relative overflow-x-auto max-w-full min-w-0 no-code-highlight group/pre">
-          <pre className="min-w-0 rounded-none py-2.5 px-3.5 [.no-pre-highlight_&]:bg-background" {...props}>{children}</pre>
-        </div>
+        {isEmbed && language ? (
+          <EmbedRenderer format={language} source={textContent} />
+        ) : (
+          <div className="relative overflow-x-auto max-w-full min-w-0 no-code-highlight group/pre">
+            <pre className="min-w-0 rounded-none py-2.5 px-3.5 [.no-pre-highlight_&]:bg-background" {...props}>{children}</pre>
+          </div>
+        )}
       </RichContentBlock>
     )
   },
