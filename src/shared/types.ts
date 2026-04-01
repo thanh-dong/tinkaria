@@ -189,6 +189,22 @@ export interface SidebarData {
   projectGroups: SidebarProjectGroup[]
 }
 
+export interface DiscoveredSession {
+  sessionId: string
+  provider: AgentProvider
+  source: "kanna" | "cli"
+  title: string
+  lastExchange: { question: string; answer: string } | null
+  modifiedAt: number
+  kannaChatId: string | null
+}
+
+export interface SessionsSnapshot {
+  projectId: string
+  projectPath: string
+  sessions: DiscoveredSession[]
+}
+
 export interface LocalProjectSummary {
   localPath: string
   title: string
