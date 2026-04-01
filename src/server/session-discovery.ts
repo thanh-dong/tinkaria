@@ -118,6 +118,72 @@ export async function scanClaudeSessions(
   return sessions
 }
 
+async function collectJsonlFiles(dir: string): Promise<string[]> {
+  const result: string[] = []
+  let dirEntries: import("node:fs").Dirent[]
+  try {
+    dirEntries = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+
+  for (const entry of dirEntries) {
+    const fullPath = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      result.push(...(await collectJsonlFiles(fullPath)))
+    } else if (entry.isFile() && extname(entry.name) === ".jsonl") {
+      result.push(fullPath)
+    }
+  }
+  return result
+}
+
+export async function scanCodexSessions(
+  codexSessionsDir: string,
+  projectPath: string
+): Promise<DiscoveredSession[]> {
+  const files = await collectJsonlFiles(codexSessionsDir)
+  const sessions: DiscoveredSession[] = []
+
+  for (const filePath of files) {
+    const headLines = await readHead(filePath, 1)
+    if (headLines.length === 0) continue
+
+    let meta: { id: string; cwd: string; timestamp?: number }
+    try {
+      const parsed = JSON.parse(headLines[0])
+      if (parsed.type !== "session_meta" || !parsed.payload?.id || !parsed.payload?.cwd) continue
+      meta = parsed.payload
+    } catch {
+      continue
+    }
+
+    if (meta.cwd !== projectPath) continue
+
+    const fileStat = await stat(filePath).catch(() => null)
+    if (!fileStat) continue
+
+    const modifiedAt = meta.timestamp ?? fileStat.mtimeMs
+    const tailContent = await readTail(filePath, TAIL_BYTES)
+    const lastExchange = extractLastExchange(tailContent)
+
+    const titleLines = await readHead(filePath, TITLE_SCAN_LINES + 1)
+    const titleCandidate = extractTitleCandidate(titleLines.slice(1))
+
+    sessions.push({
+      sessionId: meta.id,
+      provider: "codex" as AgentProvider,
+      source: "cli",
+      title: titleCandidate ?? formatDateTitle(modifiedAt),
+      lastExchange,
+      modifiedAt,
+      kannaChatId: null,
+    })
+  }
+
+  return sessions
+}
+
 export function formatDateTitle(ms: number): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, mkdir, writeFile, rm, utimes } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { scanClaudeSessions } from "./session-discovery"
+import { scanClaudeSessions, scanCodexSessions } from "./session-discovery"
 
 const tempDirs: string[] = []
 
@@ -63,6 +63,46 @@ describe("scanClaudeSessions", () => {
 
   test("returns empty array for nonexistent directory", async () => {
     const sessions = await scanClaudeSessions("/nonexistent/path")
+    expect(sessions).toEqual([])
+  })
+})
+
+describe("scanCodexSessions", () => {
+  test("discovers sessions filtered by project path", async () => {
+    const sessionsDir = await makeTempDir()
+    const dateDir = join(sessionsDir, "2026", "03", "31")
+    await mkdir(dateDir, { recursive: true })
+
+    const projectPath = "/home/user/dev/kanna"
+
+    // Matching session
+    const matchFile = join(dateDir, "session-match.jsonl")
+    const matchLines = [
+      JSON.stringify({ type: "session_meta", payload: { id: "sess-1", cwd: projectPath, timestamp: Date.now() } }),
+      JSON.stringify({ type: "user", message: { content: "Fix the tests" } }),
+      JSON.stringify({ type: "assistant", message: { content: "Done." } }),
+    ]
+    await writeFile(matchFile, matchLines.join("\n") + "\n")
+
+    // Non-matching session (different cwd)
+    const noMatchFile = join(dateDir, "session-nomatch.jsonl")
+    const noMatchLines = [
+      JSON.stringify({ type: "session_meta", payload: { id: "sess-2", cwd: "/other/project", timestamp: Date.now() } }),
+      JSON.stringify({ type: "user", message: { content: "Hello" } }),
+    ]
+    await writeFile(noMatchFile, noMatchLines.join("\n") + "\n")
+
+    const sessions = await scanCodexSessions(sessionsDir, projectPath)
+
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0].sessionId).toBe("sess-1")
+    expect(sessions[0].provider).toBe("codex")
+    expect(sessions[0].source).toBe("cli")
+    expect(sessions[0].lastExchange!.question).toContain("Fix the tests")
+  })
+
+  test("returns empty array for nonexistent directory", async () => {
+    const sessions = await scanCodexSessions("/nonexistent/path", "/some/path")
     expect(sessions).toEqual([])
   })
 })
