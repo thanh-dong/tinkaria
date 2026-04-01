@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm"
 import type { ProcessedTextMessage } from "./types"
 import { createMarkdownComponents } from "./shared"
 import { RichContentBlock } from "../rich-content/RichContentBlock"
+import { remarkRichContentHint } from "../rich-content/remarkRichContentHint"
 
 const LONG_MESSAGE_THRESHOLD = 800
 
@@ -16,7 +17,7 @@ export const TextMessage = memo(function TextMessage({ message }: Props) {
 
   const content = (
     <div className="text-pretty prose prose-sm dark:prose-invert px-0.5 w-full max-w-full space-y-4">
-      <Markdown remarkPlugins={[remarkGfm]} components={createMarkdownComponents()}>
+      <Markdown remarkPlugins={[remarkGfm, remarkRichContentHint]} components={createMarkdownComponents()}>
         {message.text}
       </Markdown>
     </div>

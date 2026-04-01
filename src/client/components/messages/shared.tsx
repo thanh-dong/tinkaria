@@ -271,13 +271,14 @@ export const markdownComponents = {
     const textContent = extractText(children)
     const language = extractLanguageFromChildren(children)
     const isEmbed = isEmbedLanguage(language)
+    const autoExpand = (props as Record<string, unknown>)["data-auto-expand"] === "true"
 
     return (
       <RichContentBlock
         type={isEmbed ? "embed" : "code"}
         title={language ?? "Code"}
         rawContent={textContent}
-        defaultExpanded
+        defaultExpanded={autoExpand}
       >
         {isEmbed && language ? (
           <EmbedRenderer format={language} source={textContent} />
