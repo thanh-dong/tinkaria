@@ -1,12 +1,14 @@
 import { memo, useMemo } from "react"
 import { diffLines as jsdiffLines } from "diff"
 import type { Change } from "diff"
+import { RichContentBlock } from "../rich-content/RichContentBlock"
 
 interface FileContentViewProps {
   content: string
   isDiff?: boolean
   oldString?: string
   newString?: string
+  filePath?: string
 }
 
 interface ParsedLine {
@@ -68,7 +70,7 @@ export function computeUnifiedDiff(oldStr: string, newStr: string): DiffLine[] {
   return result
 }
 
-export const FileContentView = memo(function FileContentView({ content, isDiff = false, oldString, newString }: FileContentViewProps) {
+export const FileContentView = memo(function FileContentView({ content, isDiff = false, oldString, newString, filePath }: FileContentViewProps) {
   // Diff mode
   const diffLines = useMemo(() => {
     if (isDiff && oldString !== undefined && newString !== undefined) {
@@ -92,64 +94,68 @@ export const FileContentView = memo(function FileContentView({ content, isDiff =
   // Diff rendering
   if (isDiff && diffLines.length > 0) {
     return (
-      <div className="my-1 rounded-lg border border-border overflow-hidden">
-        <div className="overflow-auto max-h-64 md:max-h-[50vh]">
-          <table className="w-full border-collapse text-xs font-mono">
-            <tbody>
-              {diffLines.map((line, i) => {
-                const bg =
-                  line.type === "removed"
-                    ? "bg-red-500/10 dark:bg-red-500/15"
-                    : line.type === "added"
-                      ? "bg-green-500/10 dark:bg-green-500/15"
-                      : ""
+      <RichContentBlock type="diff" title={filePath ?? "Diff"} defaultExpanded>
+        <div className="my-1 overflow-hidden">
+          <div className="overflow-auto max-h-64 md:max-h-[50vh]">
+            <table className="w-full border-collapse text-xs font-mono">
+              <tbody>
+                {diffLines.map((line, i) => {
+                  const bg =
+                    line.type === "removed"
+                      ? "bg-red-500/10 dark:bg-red-500/15"
+                      : line.type === "added"
+                        ? "bg-green-500/10 dark:bg-green-500/15"
+                        : ""
 
-                const textColor =
-                  line.type === "removed"
-                    ? "text-red-700 dark:text-red-400"
-                    : line.type === "added"
-                      ? "text-green-700 dark:text-green-400"
-                      : "text-foreground"
+                  const textColor =
+                    line.type === "removed"
+                      ? "text-red-700 dark:text-red-400"
+                      : line.type === "added"
+                        ? "text-green-700 dark:text-green-400"
+                        : "text-foreground"
 
-                return (
-                  <tr key={i} className={bg}>
-                    <td className={`px-2 py-0 select-none w-0 whitespace-nowrap ${line.type === "removed" ? "text-red-500/50" : line.type === "added" ? "text-green-500/50" : "text-muted-foreground/50"}`}>
-                      {line.type === "removed" ? "-" : line.type === "added" ? "+" : " "}
-                    </td>
-                    <td className={`px-2 py-0 whitespace-pre select-all ${textColor}`}>
-                      {line.content.slice(1)}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <tr key={i} className={bg}>
+                      <td className={`px-2 py-0 select-none w-0 whitespace-nowrap ${line.type === "removed" ? "text-red-500/50" : line.type === "added" ? "text-green-500/50" : "text-muted-foreground/50"}`}>
+                        {line.type === "removed" ? "-" : line.type === "added" ? "+" : " "}
+                      </td>
+                      <td className={`px-2 py-0 whitespace-pre select-all ${textColor}`}>
+                        {line.content.slice(1)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </RichContentBlock>
     )
   }
 
   // Text rendering with optional line numbers
   return (
-    <div className="my-1 rounded-lg border border-border overflow-hidden">
-      <div className="overflow-auto max-h-64 md:max-h-[50vh]">
-        <table className="w-full border-collapse text-xs font-mono">
-          <tbody>
-            {parsedLines.map((line, i) => (
-              <tr key={i}>
-                {hasLineNumbers && (
-                  <td className="px-2 py-0 select-none w-0 whitespace-nowrap text-muted-foreground/50 text-right">
-                    {line.lineNumber !== null ? line.lineNumber : ""}
+    <RichContentBlock type="code" title={filePath ?? "File"} defaultExpanded>
+      <div className="my-1 overflow-hidden">
+        <div className="overflow-auto max-h-64 md:max-h-[50vh]">
+          <table className="w-full border-collapse text-xs font-mono">
+            <tbody>
+              {parsedLines.map((line, i) => (
+                <tr key={i}>
+                  {hasLineNumbers && (
+                    <td className="px-2 py-0 select-none w-0 whitespace-nowrap text-muted-foreground/50 text-right">
+                      {line.lineNumber !== null ? line.lineNumber : ""}
+                    </td>
+                  )}
+                  <td className="px-2 py-0 whitespace-pre select-all text-foreground">
+                    {stripXmlTags(line.content)}
                   </td>
-                )}
-                <td className="px-2 py-0 whitespace-pre select-all text-foreground">
-                  {stripXmlTags(line.content)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </RichContentBlock>
   )
 })

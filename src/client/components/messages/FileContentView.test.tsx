@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test"
-import { computeUnifiedDiff } from "./FileContentView"
+import { renderToStaticMarkup } from "react-dom/server"
+import { computeUnifiedDiff, FileContentView } from "./FileContentView"
 
 describe("computeUnifiedDiff", () => {
   test("identical strings produce all context lines", () => {
@@ -68,5 +69,33 @@ describe("computeUnifiedDiff", () => {
   test("both empty strings produce empty result", () => {
     const result = computeUnifiedDiff("", "")
     expect(result).toEqual([])
+  })
+})
+
+describe("FileContentView with RichContentBlock", () => {
+  test("diff view renders inside RichContentBlock", () => {
+    const html = renderToStaticMarkup(
+      <FileContentView
+        content=""
+        isDiff
+        oldString="old"
+        newString="new"
+      />
+    )
+
+    // Should have the RichContentBlock wrapper
+    expect(html).toContain("group/rich-content")
+    // Should still render the diff
+    expect(html).toContain("old")
+    expect(html).toContain("new")
+  })
+
+  test("text view renders inside RichContentBlock", () => {
+    const html = renderToStaticMarkup(
+      <FileContentView content="     1→const x = 1" />
+    )
+
+    expect(html).toContain("group/rich-content")
+    expect(html).toContain("const x = 1")
   })
 })
