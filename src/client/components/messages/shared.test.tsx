@@ -77,6 +77,18 @@ describe("markdownComponents", () => {
     expect(html).toContain("<li")
   })
 
+  test("renders code blocks with sugar-high syntax highlighting", () => {
+    const html = renderToStaticMarkup(
+      <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {"```typescript\nconst x = 1\n```"}
+      </Markdown>
+    )
+
+    // sugar-high wraps tokens in spans with sh__token classes and CSS var colors
+    expect(html).toContain("sh__token--keyword")
+    expect(html).toContain("var(--sh-keyword)")
+  })
+
   test("renders local file links without browser target handling", () => {
     const html = renderToStaticMarkup(
       <Markdown
