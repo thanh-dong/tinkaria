@@ -61,6 +61,18 @@ function KannaLayout() {
         onInstallUpdate={() => {
           void state.handleInstallUpdate()
         }}
+        sessionsForProject={(projectId) =>
+          state.sessionsSnapshots.get(projectId)?.sessions ?? []
+        }
+        sessionsWindowDaysForProject={(projectId) =>
+          state.sessionsWindowDays.get(projectId) ?? 7
+        }
+        onOpenSessionPicker={state.handleOpenSessionPicker}
+        onResumeSession={(projectId, sessionId, provider) => {
+          void state.handleResumeSession(projectId, sessionId, provider)
+        }}
+        onRefreshSessions={state.handleRefreshSessions}
+        onShowMoreSessions={state.handleShowMoreSessions}
       />
       <Outlet context={state} />
     </div>

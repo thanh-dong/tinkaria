@@ -1,5 +1,7 @@
 import { type ReactNode, useMemo, useRef } from "react"
 import { ChevronRight, FolderOpen, Loader2, SquarePen } from "lucide-react"
+import type { AgentProvider, DiscoveredSession } from "../../../../shared/types"
+import { SessionPicker } from "../SessionPicker"
 import {
   DndContext,
   PointerSensor,
@@ -38,6 +40,13 @@ interface Props {
   onReorderGroups?: (newOrder: string[]) => void
   isConnected?: boolean
   startingLocalPath?: string | null
+  sessionsForProject?: (projectId: string) => DiscoveredSession[]
+  sessionsWindowDaysForProject?: (projectId: string) => number
+  onOpenSessionPicker?: (projectId: string, open: boolean) => void
+  onNavigateToChat?: (chatId: string) => void
+  onResumeSession?: (projectId: string, sessionId: string, provider: AgentProvider) => void
+  onRefreshSessions?: (projectId: string) => void
+  onShowMoreSessions?: (projectId: string) => void
 }
 
 interface SortableProjectGroupProps {
@@ -52,6 +61,13 @@ interface SortableProjectGroupProps {
   onRemoveProject?: (projectId: string) => void
   isConnected?: boolean
   startingLocalPath?: string | null
+  sessions?: DiscoveredSession[]
+  sessionsWindowDays?: number
+  onOpenSessionPicker?: (projectId: string, open: boolean) => void
+  onNavigateToChat?: (chatId: string) => void
+  onResumeSession?: (projectId: string, sessionId: string, provider: AgentProvider) => void
+  onRefreshSessions?: (projectId: string) => void
+  onShowMoreSessions?: (projectId: string) => void
 }
 
 function SortableProjectGroup({
@@ -66,8 +82,22 @@ function SortableProjectGroup({
   onRemoveProject,
   isConnected,
   startingLocalPath,
+  sessions,
+  sessionsWindowDays,
+  onOpenSessionPicker,
+  onNavigateToChat,
+  onResumeSession,
+  onRefreshSessions,
+  onShowMoreSessions,
 }: SortableProjectGroupProps) {
   const { groupKey, localPath, chats: pathChats } = group
+
+  const windowMs = (sessionsWindowDays ?? 7) * 24 * 60 * 60 * 1000
+  const cutoff = Date.now() - windowMs
+  const filteredSessions = useMemo(() => {
+    return (sessions ?? []).filter((s) => s.modifiedAt >= cutoff).slice(0, 25)
+  }, [sessions, cutoff])
+  const hasMoreSessions = (sessions ?? []).some((s) => s.modifiedAt < cutoff)
   const isExpanded = expandedGroups.has(groupKey)
   const displayChats = isExpanded ? pathChats : pathChats.slice(0, chatsPerProject)
   const hasMore = pathChats.length > chatsPerProject
@@ -120,34 +150,54 @@ function SortableProjectGroup({
           </TooltipContent>
         </Tooltip>
       </div>
-      {onNewLocalChat && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-5.5 w-5.5 absolute right-2 !rounded opacity-100 md:opacity-0 md:group-hover/section:opacity-100",
-                (!isConnected || startingLocalPath === localPath) && "opacity-50 cursor-not-allowed"
-              )}
-              disabled={!isConnected || startingLocalPath === localPath}
-              onClick={(event) => {
-                event.stopPropagation()
-                onNewLocalChat(localPath)
-              }}
-            >
-              {startingLocalPath === localPath ? (
-                <Loader2 className="size-4 text-slate-500 dark:text-slate-400 animate-spin" />
-              ) : (
-                <SquarePen className="size-3.5 text-slate-500 dark:text-slate-400" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={4}>
-            {!isConnected ? `Start ${APP_NAME} to connect` : "New chat"}
-          </TooltipContent>
-        </Tooltip>
-      )}
+      <div className="absolute right-2 flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+        {onOpenSessionPicker && (
+          <SessionPicker
+            sessions={filteredSessions}
+            isLoading={false}
+            hasMore={hasMoreSessions}
+            onSelectSession={(session) => {
+              if (session.kannaChatId) {
+                onNavigateToChat?.(session.kannaChatId)
+              } else {
+                onResumeSession?.(groupKey, session.sessionId, session.provider)
+              }
+            }}
+            onRefresh={() => onRefreshSessions?.(groupKey)}
+            onShowMore={() => onShowMoreSessions?.(groupKey)}
+            onOpenChange={(open) => onOpenSessionPicker(groupKey, open)}
+            disabled={!isConnected}
+          />
+        )}
+        {onNewLocalChat && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-5.5 w-5.5 !rounded opacity-100 md:opacity-0 md:group-hover/section:opacity-100",
+                  (!isConnected || startingLocalPath === localPath) && "opacity-50 cursor-not-allowed"
+                )}
+                disabled={!isConnected || startingLocalPath === localPath}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onNewLocalChat(localPath)
+                }}
+              >
+                {startingLocalPath === localPath ? (
+                  <Loader2 className="size-4 text-slate-500 dark:text-slate-400 animate-spin" />
+                ) : (
+                  <SquarePen className="size-3.5 text-slate-500 dark:text-slate-400" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={4}>
+              {!isConnected ? `Start ${APP_NAME} to connect` : "New chat"}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
     </div>
   )
 
@@ -197,6 +247,13 @@ export function LocalProjectsSection({
   onReorderGroups,
   isConnected,
   startingLocalPath,
+  sessionsForProject,
+  sessionsWindowDaysForProject,
+  onOpenSessionPicker,
+  onNavigateToChat,
+  onResumeSession,
+  onRefreshSessions,
+  onShowMoreSessions,
 }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -261,6 +318,13 @@ export function LocalProjectsSection({
             onRemoveProject={onRemoveProject}
             isConnected={isConnected}
             startingLocalPath={startingLocalPath}
+            sessions={sessionsForProject?.(group.groupKey)}
+            sessionsWindowDays={sessionsWindowDaysForProject?.(group.groupKey)}
+            onOpenSessionPicker={onOpenSessionPicker}
+            onNavigateToChat={onNavigateToChat}
+            onResumeSession={onResumeSession}
+            onRefreshSessions={onRefreshSessions}
+            onShowMoreSessions={onShowMoreSessions}
           />
         ))}
       </SortableContext>

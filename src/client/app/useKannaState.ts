@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
-import { PROVIDERS, type AgentProvider, type AskUserQuestionAnswerMap, type KeybindingsSnapshot, type ModelOptions, type ProviderCatalogEntry, type UpdateInstallResult, type UpdateSnapshot } from "../../shared/types"
+import { PROVIDERS, type AgentProvider, type AskUserQuestionAnswerMap, type KeybindingsSnapshot, type ModelOptions, type ProviderCatalogEntry, type SessionsSnapshot, type UpdateInstallResult, type UpdateSnapshot } from "../../shared/types"
 import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
 import { useRightSidebarStore } from "../stores/rightSidebarStore"
 import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
@@ -177,6 +177,12 @@ export interface KannaState {
   handleOpenExternalPath: (action: "open_finder" | "open_editor", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
   handleRenameChat: (chatId: string, title: string) => Promise<void>
+  sessionsSnapshots: Map<string, SessionsSnapshot>
+  sessionsWindowDays: Map<string, number>
+  handleOpenSessionPicker: (projectId: string, open: boolean) => void
+  handleResumeSession: (projectId: string, sessionId: string, provider: AgentProvider) => Promise<void>
+  handleRefreshSessions: (projectId: string) => void
+  handleShowMoreSessions: (projectId: string) => void
   handleCompose: () => void
   handleAskUserQuestion: (
     toolUseId: string,
@@ -215,6 +221,9 @@ export function useKannaState(activeChatId: string | null): KannaState {
   const [commandError, setCommandError] = useState<string | null>(null)
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
+  const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
+  const [sessionsWindowDays, setSessionsWindowDays] = useState<Map<string, number>>(new Map())
+  const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
   const editorLabel = getEditorPresetLabel(useTerminalPreferencesStore((store) => store.editorPreset))
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -774,6 +783,66 @@ export function useKannaState(activeChatId: string | null): KannaState {
     })
   }
 
+  const handleOpenSessionPicker = useCallback(
+    (projectId: string, open: boolean) => {
+      if (open) {
+        if (activeSessionsSubs.current.has(projectId)) return
+        const unsub = socket.subscribe<SessionsSnapshot>(
+          { type: "sessions", projectId },
+          (snapshot) => {
+            setSessionsSnapshots((prev) => new Map(prev).set(projectId, snapshot))
+          }
+        )
+        activeSessionsSubs.current.set(projectId, unsub)
+      } else {
+        const unsub = activeSessionsSubs.current.get(projectId)
+        unsub?.()
+        activeSessionsSubs.current.delete(projectId)
+      }
+    },
+    [socket]
+  )
+
+  const handleResumeSession = useCallback(
+    async (projectId: string, sessionId: string, provider: AgentProvider) => {
+      try {
+        const result = await socket.command<{ chatId: string }>({
+          type: "sessions.resume",
+          projectId,
+          sessionId,
+          provider,
+        })
+        if (result?.chatId) {
+          setPendingChatId(result.chatId)
+          navigate(`/chat/${result.chatId}`)
+        }
+        setCommandError(null)
+      } catch (error) {
+        setCommandError(error instanceof Error ? error.message : String(error))
+      }
+    },
+    [navigate, socket]
+  )
+
+  const handleRefreshSessions = useCallback(
+    (projectId: string) => {
+      void socket.command({ type: "sessions.refresh", projectId }).catch((error) => {
+        setCommandError(error instanceof Error ? error.message : String(error))
+      })
+    },
+    [socket]
+  )
+
+  const handleShowMoreSessions = useCallback(
+    (projectId: string) => {
+      setSessionsWindowDays((prev) => {
+        const current = prev.get(projectId) ?? 7
+        return new Map(prev).set(projectId, current + 7)
+      })
+    },
+    []
+  )
+
   function handleCompose() {
     const intent = resolveComposeIntent({
       selectedProjectId,
@@ -874,6 +943,12 @@ export function useKannaState(activeChatId: string | null): KannaState {
     handleOpenExternal,
     handleOpenExternalPath,
     handleOpenLocalLink,
+    sessionsSnapshots,
+    sessionsWindowDays,
+    handleOpenSessionPicker,
+    handleResumeSession,
+    handleRefreshSessions,
+    handleShowMoreSessions,
     handleCompose,
     handleAskUserQuestion,
     handleExitPlanMode,

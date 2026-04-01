@@ -6,7 +6,7 @@ import { Button } from "../components/ui/button"
 import { cn } from "../lib/utils"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProjectsSection"
-import type { SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
+import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
 import type { SocketStatus } from "./socket-interface"
 import { useProjectGroupOrderStore } from "../stores/projectGroupOrderStore"
 
@@ -28,6 +28,12 @@ interface KannaSidebarProps {
   onRemoveProject: (projectId: string) => void
   updateSnapshot: UpdateSnapshot | null
   onInstallUpdate: () => void
+  sessionsForProject: (projectId: string) => DiscoveredSession[]
+  sessionsWindowDaysForProject: (projectId: string) => number
+  onOpenSessionPicker: (projectId: string, open: boolean) => void
+  onResumeSession: (projectId: string, sessionId: string, provider: AgentProvider) => void
+  onRefreshSessions: (projectId: string) => void
+  onShowMoreSessions: (projectId: string) => void
 }
 
 export function KannaSidebar({
@@ -48,6 +54,12 @@ export function KannaSidebar({
   onRemoveProject,
   updateSnapshot,
   onInstallUpdate,
+  sessionsForProject,
+  sessionsWindowDaysForProject,
+  onOpenSessionPicker,
+  onResumeSession,
+  onRefreshSessions,
+  onShowMoreSessions,
 }: KannaSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -317,6 +329,16 @@ export function KannaSidebar({
               }}
               onRemoveProject={onRemoveProject}
               isConnected={connectionStatus === "connected"}
+              sessionsForProject={sessionsForProject}
+              sessionsWindowDaysForProject={sessionsWindowDaysForProject}
+              onOpenSessionPicker={onOpenSessionPicker}
+              onNavigateToChat={(chatId) => {
+                navigate(`/chat/${chatId}`)
+                onClose()
+              }}
+              onResumeSession={onResumeSession}
+              onRefreshSessions={onRefreshSessions}
+              onShowMoreSessions={onShowMoreSessions}
             />
           </div>
         </div>
