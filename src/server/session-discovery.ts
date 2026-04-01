@@ -192,3 +192,37 @@ export function formatDateTitle(ms: number): string {
     minute: "2-digit",
   }).format(new Date(ms))
 }
+
+export function resolveTitle(
+  rawTitle: string,
+  source: "kanna" | "cli",
+  lastExchange: LastExchange | null,
+  modifiedAt: number
+): string {
+  if (source === "kanna" && rawTitle !== "New Chat" && rawTitle.trim() !== "") {
+    return rawTitle
+  }
+
+  if (lastExchange?.question) {
+    return lastExchange.question.slice(0, 80)
+  }
+
+  return formatDateTitle(modifiedAt)
+}
+
+export function mergeSessions(
+  cliSessions: DiscoveredSession[],
+  kannaSessions: DiscoveredSession[]
+): DiscoveredSession[] {
+  const bySessionId = new Map<string, DiscoveredSession>()
+
+  for (const session of cliSessions) {
+    bySessionId.set(session.sessionId, session)
+  }
+
+  for (const session of kannaSessions) {
+    bySessionId.set(session.sessionId, session)
+  }
+
+  return [...bySessionId.values()].sort((a, b) => b.modifiedAt - a.modifiedAt)
+}

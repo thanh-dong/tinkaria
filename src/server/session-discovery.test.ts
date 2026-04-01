@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, mkdir, writeFile, rm, utimes } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { scanClaudeSessions, scanCodexSessions } from "./session-discovery"
+import { scanClaudeSessions, scanCodexSessions, resolveTitle, formatDateTitle, mergeSessions } from "./session-discovery"
+import type { DiscoveredSession } from "../shared/types"
 
 const tempDirs: string[] = []
 
@@ -104,5 +105,73 @@ describe("scanCodexSessions", () => {
   test("returns empty array for nonexistent directory", async () => {
     const sessions = await scanCodexSessions("/nonexistent/path", "/some/path")
     expect(sessions).toEqual([])
+  })
+})
+
+describe("resolveTitle", () => {
+  test("uses kanna title when source is kanna and title is not default", () => {
+    expect(resolveTitle("Fix the bug", "kanna", null, 1000)).toBe("Fix the bug")
+  })
+
+  test("falls through 'New Chat' title to lastExchange", () => {
+    expect(
+      resolveTitle("New Chat", "kanna", { question: "Why is auth broken?", answer: "Because..." }, 1000)
+    ).toBe("Why is auth broken?")
+  })
+
+  test("truncates lastExchange.question to 80 chars", () => {
+    const longQuestion = "a".repeat(100)
+    expect(
+      resolveTitle("New Chat", "kanna", { question: longQuestion, answer: "" }, 1000)
+    ).toHaveLength(80)
+  })
+
+  test("falls back to formatted date when no title or exchange", () => {
+    const result = resolveTitle("New Chat", "kanna", null, 1711900200000)
+    expect(result).toContain("Mar")
+  })
+})
+
+describe("mergeSessions", () => {
+  test("deduplicates CLI sessions when Kanna has matching sessionToken", () => {
+    const cliSessions: DiscoveredSession[] = [
+      {
+        sessionId: "shared-id",
+        provider: "claude",
+        source: "cli",
+        title: "CLI title",
+        lastExchange: { question: "q", answer: "a" },
+        modifiedAt: 1000,
+        kannaChatId: null,
+      },
+    ]
+    const kannaSessions: DiscoveredSession[] = [
+      {
+        sessionId: "shared-id",
+        provider: "claude",
+        source: "kanna",
+        title: "Kanna title",
+        lastExchange: { question: "q", answer: "a" },
+        modifiedAt: 2000,
+        kannaChatId: "chat-123",
+      },
+    ]
+
+    const merged = mergeSessions(cliSessions, kannaSessions)
+
+    expect(merged).toHaveLength(1)
+    expect(merged[0].source).toBe("kanna")
+    expect(merged[0].kannaChatId).toBe("chat-123")
+  })
+
+  test("sorts by modifiedAt descending", () => {
+    const sessions: DiscoveredSession[] = [
+      { sessionId: "old", provider: "claude", source: "cli", title: "old", lastExchange: null, modifiedAt: 1000, kannaChatId: null },
+      { sessionId: "new", provider: "claude", source: "cli", title: "new", lastExchange: null, modifiedAt: 3000, kannaChatId: null },
+      { sessionId: "mid", provider: "claude", source: "cli", title: "mid", lastExchange: null, modifiedAt: 2000, kannaChatId: null },
+    ]
+
+    const merged = mergeSessions(sessions, [])
+    expect(merged.map((s) => s.sessionId)).toEqual(["new", "mid", "old"])
   })
 })
