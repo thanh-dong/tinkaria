@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { parseLocalFileLink } from "../../lib/pathUtils"
+import { RichContentBlock } from "../rich-content/RichContentBlock"
 
 type OpenLocalLinkTarget = { path: string; line?: number; column?: number }
 type OpenLocalLinkHandler = (target: OpenLocalLinkTarget) => void
@@ -207,7 +208,7 @@ export function VerticalLineContainer({ children, className }: { children: React
 }
 
 // Helper function to extract text content from ReactNode
-function extractText(node: ReactNode): string {
+export function extractText(node: ReactNode): string {
   if (typeof node === "string") {
     return node
   }
@@ -222,6 +223,14 @@ function extractText(node: ReactNode): string {
     return extractText(props.children)
   }
   return ""
+}
+
+export function extractLanguageFromChildren(children: ReactNode): string | null {
+  if (!isValidElement<{ className?: string }>(children)) return null
+  const className = children.props.className
+  if (typeof className !== "string") return null
+  const match = className.match(/language-(\S+)/)
+  return match ? match[1] : null
 }
 
 type MarkdownChildNode = ReturnType<typeof Children.toArray>[number]
@@ -258,31 +267,20 @@ export const markdownComponents = {
   ),
 
   pre: ({ children, ...props }: ComponentPropsWithoutRef<"pre">) => {
-    const [copied, setCopied] = useState(false)
     const textContent = extractText(children)
-
-    const handleCopy = async () => {
-      await navigator.clipboard.writeText(textContent)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
+    const language = extractLanguageFromChildren(children)
 
     return (
-      <div className="relative overflow-x-auto max-w-full min-w-0 no-code-highlight group/pre">
-        <pre className="min-w-0 rounded-xl py-2.5 px-3.5 [.no-pre-highlight_&]:bg-background" {...props}>{children}</pre>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "absolute top-[35px] -translate-y-[50%] -translate-x-[1px] rounded-md right-1.5 h-8 w-8 text-muted-foreground opacity-0 group-hover/pre:opacity-100 transition-opacity",
-            !copied && "hover:text-foreground",
-            copied && "hover:!bg-transparent hover:!border-transparent"
-          )}
-          onClick={handleCopy}
-        >
-          {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-        </Button>
-      </div>
+      <RichContentBlock
+        type="code"
+        title={language ?? "Code"}
+        rawContent={textContent}
+        defaultExpanded
+      >
+        <div className="relative overflow-x-auto max-w-full min-w-0 no-code-highlight group/pre">
+          <pre className="min-w-0 rounded-none py-2.5 px-3.5 [.no-pre-highlight_&]:bg-background" {...props}>{children}</pre>
+        </div>
+      </RichContentBlock>
     )
   },
 
