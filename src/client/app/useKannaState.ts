@@ -67,6 +67,12 @@ export function getUiUpdateRestartReconnectAction(
   return "none"
 }
 
+export const TRANSCRIPT_TAIL_SIZE = 200
+
+export function computeTailOffset(messageCount: number, tailSize = TRANSCRIPT_TAIL_SIZE): number {
+  return Math.max(0, messageCount - tailSize)
+}
+
 const FIXED_TRANSCRIPT_PADDING_BOTTOM = 320
 const UI_UPDATE_RESTART_STORAGE_KEY = "kanna:ui-update-restart"
 
@@ -170,6 +176,7 @@ export interface KannaState {
   handleOpenExternal: (action: "open_finder" | "open_terminal" | "open_editor") => Promise<void>
   handleOpenExternalPath: (action: "open_finder" | "open_editor", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
+  handleRenameChat: (chatId: string, title: string) => Promise<void>
   handleCompose: () => void
   handleAskUserQuestion: (
     toolUseId: string,
@@ -301,7 +308,33 @@ export function useKannaState(activeChatId: string | null): KannaState {
 
     // Buffer message events that arrive before the initial fetch completes
     let initialFetchDone = false
+    let fetchTriggered = false
     const buffer: TranscriptEntry[] = []
+    const chatId = activeChatId
+    const hydrator = hydratorRef.current
+
+    function flushTail(entries: TranscriptEntry[]) {
+      initialFetchDone = true
+      const allEntries = buffer.length > 0 ? [...entries, ...buffer] : entries
+      buffer.length = 0
+      hydrator.reset()
+      for (const entry of allEntries) hydrator.hydrate(entry)
+      setMessages(hydrator.getMessages())
+    }
+
+    async function fetchTail(messageCount: number) {
+      if (fetchTriggered) return
+      fetchTriggered = true
+      try {
+        const offset = computeTailOffset(messageCount)
+        const entries = await socket.command<TranscriptEntry[]>({
+          type: "chat.getMessages", chatId, offset, limit: TRANSCRIPT_TAIL_SIZE,
+        })
+        flushTail(entries)
+      } catch {
+        flushTail([])
+      }
+    }
 
     const unsub = socket.subscribe<ChatSnapshot | null, ChatMessageEvent>(
       { type: "chat", chatId: activeChatId },
@@ -315,11 +348,15 @@ export function useKannaState(activeChatId: string | null): KannaState {
         setChatSnapshot(snapshot)
         setChatReady(true)
         setCommandError(null)
+
+        // Fetch tail on first snapshot — messageCount tells us where the end is
+        if (snapshot && !initialFetchDone) {
+          void fetchTail(snapshot.messageCount)
+        }
       },
       (event) => {
         if (event.chatId !== activeChatId) return
         if (initialFetchDone) {
-          const hydrator = hydratorRef.current
           hydrator.hydrate(event.entry)
           setMessages(hydrator.getMessages())
         } else {
@@ -327,24 +364,6 @@ export function useKannaState(activeChatId: string | null): KannaState {
         }
       }
     )
-
-    // Fetch initial messages, then merge any buffered live events
-    const hydrator = hydratorRef.current
-
-    function bulkHydrate(entries: TranscriptEntry[]) {
-      initialFetchDone = true
-      const allEntries = buffer.length > 0 ? [...entries, ...buffer] : entries
-      buffer.length = 0
-      hydrator.reset()
-      for (const entry of allEntries) {
-        hydrator.hydrate(entry)
-      }
-      setMessages(hydrator.getMessages())
-    }
-
-    socket.command<TranscriptEntry[]>({ type: "chat.getMessages", chatId: activeChatId })
-      .then(bulkHydrate)
-      .catch(() => bulkHydrate([]))
 
     return unsub
   }, [activeChatId, socket])
@@ -662,6 +681,17 @@ export function useKannaState(activeChatId: string | null): KannaState {
     }
   }
 
+  async function handleRenameChat(chatId: string, title: string) {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    try {
+      await socket.command({ type: "chat.rename", chatId, title: trimmed })
+      setCommandError(null)
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   async function handleRemoveProject(projectId: string) {
     const project = sidebarData.projectGroups.find((group) => group.groupKey === projectId)
     if (!project) return
@@ -839,6 +869,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
     handleSend,
     handleCancel,
     handleDeleteChat,
+    handleRenameChat,
     handleRemoveProject,
     handleOpenExternal,
     handleOpenExternalPath,

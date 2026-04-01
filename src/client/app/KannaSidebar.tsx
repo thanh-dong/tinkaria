@@ -24,6 +24,7 @@ interface KannaSidebarProps {
   onExpand: () => void
   onCreateChat: (projectId: string) => void
   onDeleteChat: (chat: SidebarChatRow) => void
+  onRenameChat: (chatId: string, title: string) => void
   onRemoveProject: (projectId: string) => void
   updateSnapshot: UpdateSnapshot | null
   onInstallUpdate: () => void
@@ -43,6 +44,7 @@ export function KannaSidebar({
   onExpand,
   onCreateChat,
   onDeleteChat,
+  onRenameChat,
   onRemoveProject,
   updateSnapshot,
   onInstallUpdate,
@@ -121,8 +123,9 @@ export function KannaSidebar({
         onClose()
       }}
       onDeleteChat={() => onDeleteChat(chat)}
+      onRenameChat={onRenameChat}
     />
-  ), [activeChatId, navigate, nowMs, onClose, onDeleteChat])
+  ), [activeChatId, navigate, nowMs, onClose, onDeleteChat, onRenameChat])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

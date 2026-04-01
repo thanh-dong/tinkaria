@@ -51,6 +51,9 @@ function KannaLayout() {
         onDeleteChat={(chat) => {
           void state.handleDeleteChat(chat)
         }}
+        onRenameChat={(chatId, title) => {
+          void state.handleRenameChat(chatId, title)
+        }}
         onRemoveProject={(projectId) => {
           void state.handleRemoveProject(projectId)
         }}

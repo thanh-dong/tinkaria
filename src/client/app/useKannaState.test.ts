@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import {
+  computeTailOffset,
   getActiveChatSnapshot,
   getNewestRemainingChatId,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
   shouldAutoFollowTranscript,
+  TRANSCRIPT_TAIL_SIZE,
 } from "./useKannaState"
 import type { ChatSnapshot, SidebarData } from "../../shared/types"
 
@@ -200,5 +202,27 @@ describe("getActiveChatSnapshot", () => {
     }
 
     expect(getActiveChatSnapshot(snapshot, "chat-new")).toBeNull()
+  })
+})
+
+describe("computeTailOffset", () => {
+  test("returns 0 for transcripts smaller than tail size", () => {
+    expect(computeTailOffset(0)).toBe(0)
+    expect(computeTailOffset(50)).toBe(0)
+    expect(computeTailOffset(TRANSCRIPT_TAIL_SIZE)).toBe(0)
+  })
+
+  test("returns offset that fetches the last TAIL_SIZE entries", () => {
+    expect(computeTailOffset(1065)).toBe(1065 - TRANSCRIPT_TAIL_SIZE)
+    expect(computeTailOffset(500)).toBe(500 - TRANSCRIPT_TAIL_SIZE)
+  })
+
+  test("accepts custom tail size", () => {
+    expect(computeTailOffset(1000, 100)).toBe(900)
+    expect(computeTailOffset(50, 100)).toBe(0)
+  })
+
+  test("TRANSCRIPT_TAIL_SIZE is 200", () => {
+    expect(TRANSCRIPT_TAIL_SIZE).toBe(200)
   })
 })
