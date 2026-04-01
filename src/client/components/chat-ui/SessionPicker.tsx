@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react"
+import { memo, useCallback, useMemo, useRef, useState } from "react"
 import { Flower, History, RefreshCw, Search, Terminal } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
@@ -55,6 +55,9 @@ export const SessionPickerContent = memo(function SessionPickerContent({
   hasMore,
   isRefreshing,
 }: SessionPickerContentProps) {
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const listRef = useRef<HTMLDivElement>(null)
+
   const filtered = useMemo(() => {
     if (!searchQuery) return sessions
     const lower = searchQuery.toLowerCase()
@@ -65,8 +68,34 @@ export const SessionPickerContent = memo(function SessionPickerContent({
     })
   }, [sessions, searchQuery])
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (filtered.length === 0) return
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setActiveIndex((prev) => {
+          const next = prev < filtered.length - 1 ? prev + 1 : 0
+          listRef.current?.children[0]?.children[next]?.scrollIntoView({ block: "nearest" })
+          return next
+        })
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setActiveIndex((prev) => {
+          const next = prev > 0 ? prev - 1 : filtered.length - 1
+          listRef.current?.children[0]?.children[next]?.scrollIntoView({ block: "nearest" })
+          return next
+        })
+      } else if (e.key === "Enter" && activeIndex >= 0 && activeIndex < filtered.length) {
+        e.preventDefault()
+        onSelectSession(filtered[activeIndex])
+      }
+    },
+    [filtered, activeIndex, onSelectSession]
+  )
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" onKeyDown={handleKeyDown}>
       {/* Header row: search + refresh */}
       <div className="flex items-center gap-1.5">
         <div className="relative flex-1">
@@ -75,7 +104,10 @@ export const SessionPickerContent = memo(function SessionPickerContent({
             type="text"
             placeholder="Search sessions..."
             value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={(e) => {
+              onSearchChange(e.target.value)
+              setActiveIndex(-1)
+            }}
             className="w-full text-xs pl-6 pr-2 py-1.5 bg-muted/50 border border-border rounded-lg outline-none placeholder:text-muted-foreground/50 focus:border-primary/40 transition-colors"
           />
         </div>
@@ -93,18 +125,21 @@ export const SessionPickerContent = memo(function SessionPickerContent({
       </div>
 
       {/* Session list */}
-      <div className="max-h-[320px] overflow-y-auto [scrollbar-width:thin] -mx-1">
+      <div ref={listRef} className="max-h-[300px] overflow-y-auto [scrollbar-width:thin] -mx-1">
         {filtered.length === 0 ? (
           <div className="text-center text-xs text-muted-foreground py-6">
             No sessions found
           </div>
         ) : (
           <div className="flex flex-col gap-0.5">
-            {filtered.map((session) => (
+            {filtered.map((session, index) => (
               <button
                 key={session.sessionId}
                 onClick={() => onSelectSession(session)}
-                className="flex items-start gap-2 px-2 py-1.5 rounded-lg text-left transition-colors hover:bg-muted/50 mx-1"
+                className={cn(
+                  "flex items-start gap-2 px-2 py-1.5 rounded-lg text-left transition-colors hover:bg-muted/50 mx-1",
+                  index === activeIndex && "bg-muted/50"
+                )}
               >
                 <SourceIcon source={session.source} />
                 <div className="flex-1 min-w-0">
