@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react"
-import { Archive, Loader2 } from "lucide-react"
+import { EllipsisVertical, Loader2, Pencil, Trash2 } from "lucide-react"
 import type { SidebarChatRow } from "../../../../shared/types"
 import { AnimatedShinyText } from "../../ui/animated-shiny-text"
 import { Button } from "../../ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../ui/dropdown-menu"
 import { formatSidebarAgeLabel } from "../../../lib/formatters"
 import { cn, normalizeChatId } from "../../../lib/utils"
 import { ChatRowMenu } from "./Menus"
@@ -121,23 +122,37 @@ export function ChatRow({
               {ageLabel}
             </span>
           ) : null}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "absolute inset-0 h-7 w-7 opacity-100 cursor-pointer rounded-sm hover:!bg-transparent !border-0",
-              ageLabel
-                ? "md:opacity-0 md:group-hover:opacity-100"
-                : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
-            )}
-            onClick={(event) => {
-              event.stopPropagation()
-              onDeleteChat(chat.chatId)
-            }}
-            title="Delete chat"
-          >
-            <Archive className="size-3.5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "absolute inset-0 h-7 w-7 opacity-100 cursor-pointer rounded-sm hover:!bg-transparent !border-0",
+                  ageLabel
+                    ? "md:opacity-0 md:group-hover:opacity-100"
+                    : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                )}
+                onClick={(event) => event.stopPropagation()}
+                title="Chat actions"
+              >
+                <EllipsisVertical className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={2}>
+              <DropdownMenuItem onSelect={startEditing}>
+                <Pencil className="h-4 w-4" />
+                <span className="text-xs font-medium">Rename</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => onDeleteChat(chat.chatId)}
+                className="text-destructive dark:text-red-400 hover:bg-destructive/10 focus:bg-destructive/10 dark:hover:bg-red-500/20 dark:focus:bg-red-500/20"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="text-xs font-medium">Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </ChatRowMenu>
