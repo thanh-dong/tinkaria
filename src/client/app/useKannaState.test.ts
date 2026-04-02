@@ -3,6 +3,7 @@ import {
   computeTailOffset,
   getActiveChatSnapshot,
   getNewestRemainingChatId,
+  normalizeLocalFilePreviewErrorMessage,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
   shouldAutoFollowTranscript,
@@ -120,6 +121,18 @@ describe("getUiUpdateRestartReconnectAction", () => {
     expect(getUiUpdateRestartReconnectAction(null, "connected")).toBe("none")
     expect(getUiUpdateRestartReconnectAction("awaiting_disconnect", "connected")).toBe("none")
     expect(getUiUpdateRestartReconnectAction("awaiting_reconnect", "disconnected")).toBe("none")
+  })
+})
+
+describe("normalizeLocalFilePreviewErrorMessage", () => {
+  test("rewrites the stale server preview-command error into a restart hint", () => {
+    expect(
+      normalizeLocalFilePreviewErrorMessage(new Error("Unknown command type: system.readLocalFilePreview"))
+    ).toBe("This Kanna browser client is newer than the running server. Restart Kanna to enable in-app file previews.")
+  })
+
+  test("passes through unrelated errors", () => {
+    expect(normalizeLocalFilePreviewErrorMessage(new Error("Path not found"))).toBe("Path not found")
   })
 })
 
@@ -273,6 +286,16 @@ describe("shouldQueueChatSubmit", () => {
     expect(shouldQueue(false, "   ")).toBe(false)
   })
 
+  test("returns true when queued text already exists even if runtime is idle", async () => {
+    const module = await import("./useKannaState")
+    const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
+
+    expect(typeof shouldQueue).toBe("function")
+    if (typeof shouldQueue !== "function") throw new Error("shouldQueueChatSubmit export missing")
+
+    expect(shouldQueue(false, "Existing queued text")).toBe(true)
+  })
+
   test("returns true when the runtime is busy", async () => {
     const module = await import("./useKannaState")
     const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
@@ -281,6 +304,86 @@ describe("shouldQueueChatSubmit", () => {
     if (typeof shouldQueue !== "function") throw new Error("shouldQueueChatSubmit export missing")
 
     expect(shouldQueue(true, "")).toBe(true)
-    expect(shouldQueue(false, "  queued  ")).toBe(true)
+  })
+})
+
+describe("shouldFlushQueuedText", () => {
+  test("returns true only when the queued text belongs to the active idle chat", async () => {
+    const module = await import("./useKannaState")
+    const shouldFlush = (module as Record<string, unknown>).shouldFlushQueuedText
+
+    expect(typeof shouldFlush).toBe("function")
+    if (typeof shouldFlush !== "function") throw new Error("shouldFlushQueuedText export missing")
+
+    expect(shouldFlush({
+      activeChatId: "chat-1",
+      queuedChatId: "chat-1",
+      queuedText: "Queued follow-up",
+      isProcessing: false,
+      isFlushInFlight: false,
+    })).toBe(true)
+
+    expect(shouldFlush({
+      activeChatId: "chat-2",
+      queuedChatId: "chat-1",
+      queuedText: "Queued follow-up",
+      isProcessing: false,
+      isFlushInFlight: false,
+    })).toBe(false)
+  })
+
+  test("returns false while processing, in flight, or blank", async () => {
+    const module = await import("./useKannaState")
+    const shouldFlush = (module as Record<string, unknown>).shouldFlushQueuedText
+
+    expect(typeof shouldFlush).toBe("function")
+    if (typeof shouldFlush !== "function") throw new Error("shouldFlushQueuedText export missing")
+
+    expect(shouldFlush({
+      activeChatId: "chat-1",
+      queuedChatId: "chat-1",
+      queuedText: "Queued follow-up",
+      isProcessing: true,
+      isFlushInFlight: false,
+    })).toBe(false)
+
+    expect(shouldFlush({
+      activeChatId: "chat-1",
+      queuedChatId: "chat-1",
+      queuedText: "Queued follow-up",
+      isProcessing: false,
+      isFlushInFlight: true,
+    })).toBe(false)
+
+    expect(shouldFlush({
+      activeChatId: "chat-1",
+      queuedChatId: "chat-1",
+      queuedText: "   ",
+      isProcessing: false,
+      isFlushInFlight: false,
+    })).toBe(false)
+  })
+})
+
+describe("consumeFlushedQueuedText", () => {
+  test("clears the queue when the flushed text matches the entire queue", async () => {
+    const module = await import("./useKannaState")
+    const consume = (module as Record<string, unknown>).consumeFlushedQueuedText
+
+    expect(typeof consume).toBe("function")
+    if (typeof consume !== "function") throw new Error("consumeFlushedQueuedText export missing")
+
+    expect(consume("Queued follow-up", "Queued follow-up")).toBe("")
+  })
+
+  test("preserves newer queued text appended during an in-flight flush", async () => {
+    const module = await import("./useKannaState")
+    const consume = (module as Record<string, unknown>).consumeFlushedQueuedText
+
+    expect(typeof consume).toBe("function")
+    if (typeof consume !== "function") throw new Error("consumeFlushedQueuedText export missing")
+
+    expect(consume("First message\n\nSecond message", "First message")).toBe("Second message")
+    expect(consume("Second message", "First message")).toBe("Second message")
   })
 })

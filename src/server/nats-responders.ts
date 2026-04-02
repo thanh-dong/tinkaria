@@ -1,19 +1,22 @@
 import type { NatsConnection, Msg, Subscription } from "@nats-io/transport-node"
+import { stat } from "node:fs/promises"
 import type { ClientCommand } from "../shared/protocol"
 import type { AgentCoordinator } from "./agent"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
 import { openExternal } from "./external-open"
 import type { KeybindingsManager } from "./keybindings"
-import { ensureProjectDirectory } from "./paths"
+import { ensureProjectDirectory, resolveLocalPath } from "./paths"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
 import type { NatsPublisher } from "./nats-publisher"
 import { ALL_COMMANDS } from "../shared/nats-subjects"
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
+import { findSessionFile, importCliTranscript } from "./session-discovery"
 
 const encoder = new TextEncoder()
+const MAX_LOCAL_FILE_PREVIEW_BYTES = 256 * 1024
 
 function encode(data: unknown): Uint8Array {
   return compressPayload(encoder.encode(JSON.stringify(data)))
@@ -44,6 +47,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "settings.readKeybindings",
   "update.check",
   "update.install",
+  "system.readLocalFilePreview",
   "chat.getMessages",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
@@ -156,6 +160,9 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         return undefined
       }
 
+      case "system.readLocalFilePreview":
+        return readLocalFilePreview(command.localPath)
+
       case "chat.create": {
         const chat = await store.createChat(command.projectId)
         return { chatId: chat.id }
@@ -246,6 +253,21 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         const chat = await store.createChat(command.projectId)
         await store.setSessionToken(chat.id, command.sessionId)
         await store.setChatProvider(chat.id, command.provider)
+
+        // Import CLI transcript in background (don't block response)
+        const project = store.getProject(command.projectId)
+        if (project) {
+          findSessionFile(command.sessionId, command.provider, project.localPath)
+            .then((filePath) => {
+              if (filePath) {
+                return importCliTranscript(filePath, store, chat.id, 50)
+              }
+            })
+            .catch((err) =>
+              console.warn(LOG_PREFIX, "transcript import failed:", err instanceof Error ? err.message : String(err))
+            )
+        }
+
         return { chatId: chat.id }
       }
 
@@ -272,5 +294,25 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
     dispose() {
       sub.unsubscribe()
     },
+  }
+}
+
+async function readLocalFilePreview(localPath: string) {
+  const resolvedPath = resolveLocalPath(localPath)
+  const info = await stat(resolvedPath).catch(() => null)
+
+  if (!info) {
+    throw new Error(`Path not found: ${resolvedPath}`)
+  }
+  if (!info.isFile()) {
+    throw new Error(`Path is not a file: ${resolvedPath}`)
+  }
+  if (info.size > MAX_LOCAL_FILE_PREVIEW_BYTES) {
+    throw new Error(`File too large to preview: ${resolvedPath}`)
+  }
+
+  return {
+    localPath: resolvedPath,
+    content: await Bun.file(resolvedPath).text(),
   }
 }

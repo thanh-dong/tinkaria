@@ -1,4 +1,7 @@
 import { afterEach, describe, test, expect } from "bun:test"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect, type NatsConnection } from "@nats-io/transport-node"
 import { registerCommandResponders, type RegisterRespondersArgs } from "./nats-responders"
@@ -112,6 +115,7 @@ let server: NatsServer | null = null
 let serverNc: NatsConnection | null = null
 let clientNc: NatsConnection | null = null
 let disposeFn: (() => void) | null = null
+let tempDir: string | null = null
 
 afterEach(async () => {
   disposeFn?.()
@@ -127,6 +131,10 @@ afterEach(async () => {
   if (server) {
     await server.stop()
     server = null
+  }
+  if (tempDir) {
+    await rm(tempDir, { recursive: true, force: true })
+    tempDir = null
   }
 })
 
@@ -151,6 +159,7 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
       getSnapshot: () => null,
       broadcastSnapshots: () => {},
       publishChatMessage: () => {},
+      refreshSessions: async () => {},
       dispose: () => {},
     },
     onStateChange: () => {},
@@ -198,6 +207,32 @@ describe("nats-responders", () => {
     let changed = false
     const { clientNc } = await setup({ onStateChange: () => { changed = true } })
     await sendCommand(clientNc, { type: "settings.readKeybindings" })
+    expect(changed).toBe(false)
+  })
+
+  test("system.readLocalFilePreview returns local file content", async () => {
+    tempDir = await mkdtemp(path.join(tmpdir(), "kanna-preview-"))
+    const filePath = path.join(tempDir, "README.md")
+    await writeFile(filePath, "# Preview\n")
+
+    const { clientNc } = await setup()
+    const res = await sendCommand(clientNc, { type: "system.readLocalFilePreview", localPath: filePath })
+
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual({
+      localPath: filePath,
+      content: "# Preview\n",
+    })
+  })
+
+  test("system.readLocalFilePreview does not trigger onStateChange", async () => {
+    tempDir = await mkdtemp(path.join(tmpdir(), "kanna-preview-"))
+    const filePath = path.join(tempDir, "README.md")
+    await writeFile(filePath, "# Preview\n")
+
+    let changed = false
+    const { clientNc } = await setup({ onStateChange: () => { changed = true } })
+    await sendCommand(clientNc, { type: "system.readLocalFilePreview", localPath: filePath })
     expect(changed).toBe(false)
   })
 
@@ -519,6 +554,7 @@ describe("nats-responders", () => {
       getSnapshot: () => ({ mock: "snapshot" }),
       broadcastSnapshots: () => {},
       publishChatMessage: () => {},
+      refreshSessions: async () => {},
       dispose: () => {},
     }
     const { clientNc } = await setup({ publisher: mockPublisher })
@@ -541,6 +577,7 @@ describe("nats-responders", () => {
       getSnapshot: () => null,
       broadcastSnapshots: () => {},
       publishChatMessage: () => {},
+      refreshSessions: async () => {},
       dispose: () => {},
     }
     const { clientNc } = await setup({ publisher: mockPublisher })

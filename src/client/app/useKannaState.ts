@@ -7,6 +7,7 @@ import { useRightSidebarStore } from "../stores/rightSidebarStore"
 import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
 import { getEditorPresetLabel, useTerminalPreferencesStore } from "../stores/terminalPreferencesStore"
 import type { ChatMessageEvent, ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
+import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import type { AskUserQuestionItem } from "../components/messages/types"
 import { useAppDialog } from "../components/ui/app-dialog"
 import { createIncrementalHydrator } from "../lib/parseTranscript"
@@ -87,6 +88,42 @@ export function shouldQueueChatSubmit(isProcessing: boolean, queuedText: string)
   return isProcessing || queuedText.trim().length > 0
 }
 
+export function normalizeLocalFilePreviewErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes("Unknown command type: system.readLocalFilePreview")) {
+    return "This Kanna browser client is newer than the running server. Restart Kanna to enable in-app file previews."
+  }
+  return message
+}
+
+export function shouldFlushQueuedText(args: {
+  activeChatId: string | null
+  queuedChatId: string | null
+  queuedText: string
+  isProcessing: boolean
+  isFlushInFlight: boolean
+}): boolean {
+  if (args.isProcessing || args.isFlushInFlight) return false
+  if (args.activeChatId === null || args.queuedChatId === null) return false
+  if (args.activeChatId !== args.queuedChatId) return false
+  return args.queuedText.trim().length > 0
+}
+
+export function consumeFlushedQueuedText(currentQueuedText: string, flushedText: string): string {
+  const current = currentQueuedText.trim()
+  const flushed = flushedText.trim()
+
+  if (!current || !flushed) return current
+  if (current === flushed) return ""
+
+  const prefix = `${flushed}\n\n`
+  if (current.startsWith(prefix)) {
+    return current.slice(prefix.length)
+  }
+
+  return current
+}
+
 const FIXED_TRANSCRIPT_PADDING_BOTTOM = 320
 const UI_UPDATE_RESTART_STORAGE_KEY = "kanna:ui-update-restart"
 
@@ -100,6 +137,12 @@ function setUiUpdateRestartPhase(phase: "awaiting_disconnect" | "awaiting_reconn
 
 function clearUiUpdateRestartPhase() {
   window.sessionStorage.removeItem(UI_UPDATE_RESTART_STORAGE_KEY)
+}
+
+function getQueuedFlushKey(chatId: string | null, queuedText: string): string | null {
+  const text = queuedText.trim()
+  if (chatId === null || !text) return null
+  return `${chatId}:${text}`
 }
 
 export interface ProjectRequest {
@@ -167,15 +210,18 @@ export interface KannaState {
   availableProviders: ProviderCatalogEntry[]
   isProcessing: boolean
   canCancel: boolean
+  queuedText: string
   transcriptPaddingBottom: number
   showScrollButton: boolean
   navbarLocalPath?: string
   editorLabel: string
   hasSelectedProject: boolean
+  localFilePreview: LocalFilePreview | null
   openSidebar: () => void
   closeSidebar: () => void
   collapseSidebar: () => void
   expandSidebar: () => void
+  closeLocalFilePreview: () => void
   updateScrollState: () => void
   scrollToBottom: () => void
   handleCreateChat: (projectId: string) => Promise<void>
@@ -184,7 +230,13 @@ export interface KannaState {
   handleCheckForUpdates: (options?: { force?: boolean }) => Promise<void>
   handleInstallUpdate: () => Promise<void>
   handleSend: (content: string, options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }) => Promise<void>
+  handleSubmitFromComposer: (
+    content: string,
+    options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
+  ) => Promise<void>
   handleCancel: () => Promise<void>
+  clearQueuedText: () => void
+  restoreQueuedText: () => string
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
   handleRemoveProject: (projectId: string) => Promise<void>
   handleOpenExternal: (action: "open_finder" | "open_terminal" | "open_editor") => Promise<void>
@@ -235,15 +287,28 @@ export function useKannaState(activeChatId: string | null): KannaState {
   const [commandError, setCommandError] = useState<string | null>(null)
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
+  const [queuedText, setQueuedText] = useState("")
+  const [queuedChatId, setQueuedChatId] = useState<string | null>(null)
+  const [localFilePreview, setLocalFilePreview] = useState<LocalFilePreview | null>(null)
   const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
   const [sessionsWindowDays, setSessionsWindowDays] = useState<Map<string, number>>(new Map())
   const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
+  const queuedFlushInFlightRef = useRef(false)
+  const blockedQueuedFlushKeyRef = useRef<string | null>(null)
+  const queuedOptionsRef = useRef<{
+    provider?: AgentProvider
+    model?: string
+    modelOptions?: ModelOptions
+    planMode?: boolean
+  } | null>(null)
   const editorLabel = getEditorPresetLabel(useTerminalPreferencesStore((store) => store.editorPreset))
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLDivElement>(null)
   const initialScrollCompletedRef = useRef(false)
   const initialScrollFrameRef = useRef<number | null>(null)
+  const queuedTextRef = useRef("")
+  const activeQueuedText = queuedChatId === activeChatId ? queuedText : ""
 
   useEffect(() => socket.onStatus(setConnectionStatus), [socket])
 
@@ -312,6 +377,10 @@ export function useKannaState(activeChatId: string | null): KannaState {
       setCommandError(null)
     })
   }, [socket])
+
+  useEffect(() => {
+    queuedTextRef.current = queuedText
+  }, [queuedText])
 
   useEffect(() => {
     if (!activeChatId) {
@@ -390,6 +459,21 @@ export function useKannaState(activeChatId: string | null): KannaState {
 
     return unsub
   }, [activeChatId, socket])
+
+  useEffect(() => {
+    if (!queuedTextRef.current || queuedChatId === null) return
+    if (activeChatId === queuedChatId) return
+
+    logKannaState("clearing queued text for route change", {
+      fromChatId: queuedChatId,
+      toChatId: activeChatId,
+    })
+    setQueuedText("")
+    setQueuedChatId(null)
+    queuedOptionsRef.current = null
+    queuedFlushInFlightRef.current = false
+    blockedQueuedFlushKeyRef.current = null
+  }, [activeChatId, queuedChatId])
 
   useEffect(() => {
     if (selectedProjectId) return
@@ -676,6 +760,70 @@ export function useKannaState(activeChatId: string | null): KannaState {
     }
   }
 
+  async function handleSubmitFromComposer(
+    content: string,
+    options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
+  ) {
+    if (shouldQueueChatSubmit(isProcessing, activeQueuedText)) {
+      setQueuedChatId(activeChatId)
+      setQueuedText((current) => appendQueuedText(queuedChatId === activeChatId ? current : "", content))
+      queuedOptionsRef.current = options ?? null
+      return
+    }
+
+    await handleSend(content, options)
+  }
+
+  useEffect(() => {
+    const flushKey = getQueuedFlushKey(queuedChatId, activeQueuedText)
+    if (flushKey !== null && blockedQueuedFlushKeyRef.current === flushKey) return
+    if (!shouldFlushQueuedText({
+      activeChatId,
+      queuedChatId,
+      queuedText: activeQueuedText,
+      isProcessing,
+      isFlushInFlight: queuedFlushInFlightRef.current,
+    })) return
+
+    const text = activeQueuedText.trim()
+    queuedFlushInFlightRef.current = true
+    const options = queuedOptionsRef.current ?? undefined
+
+    void handleSend(text, options)
+      .then(() => {
+        const remainingQueuedText = consumeFlushedQueuedText(queuedTextRef.current, text)
+        blockedQueuedFlushKeyRef.current = null
+        setQueuedText(remainingQueuedText)
+        if (!remainingQueuedText) {
+          setQueuedChatId(null)
+          queuedOptionsRef.current = null
+        }
+      })
+      .catch(() => {
+        // handleSend already persists commandError; keep queued text visible for restore/edit.
+        blockedQueuedFlushKeyRef.current = flushKey
+      })
+      .finally(() => {
+        queuedFlushInFlightRef.current = false
+      })
+  }, [activeChatId, handleSend, isProcessing, queuedChatId, queuedText])
+
+  function clearQueuedText() {
+    setQueuedText("")
+    setQueuedChatId(null)
+    queuedOptionsRef.current = null
+    blockedQueuedFlushKeyRef.current = null
+  }
+
+  function restoreQueuedText(): string {
+    const restored = activeQueuedText
+    setQueuedText("")
+    setQueuedChatId(null)
+    queuedOptionsRef.current = null
+    blockedQueuedFlushKeyRef.current = null
+    return restored
+  }
+
   async function handleCancel() {
     if (!activeChatId) return
     try {
@@ -755,14 +903,19 @@ export function useKannaState(activeChatId: string | null): KannaState {
 
   async function handleOpenLocalLink(target: { path: string; line?: number; column?: number }) {
     try {
-      await openExternal({
-        action: "open_editor",
+      const result = await socket.command<{ localPath: string; content: string }>({
+        type: "system.readLocalFilePreview",
         localPath: target.path,
+      })
+      setLocalFilePreview({
+        path: result.localPath,
+        content: result.content,
         line: target.line,
         column: target.column,
       })
+      setCommandError(null)
     } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
+      setCommandError(normalizeLocalFilePreviewErrorMessage(error))
     }
   }
 
@@ -933,15 +1086,18 @@ export function useKannaState(activeChatId: string | null): KannaState {
     availableProviders,
     isProcessing,
     canCancel,
+    queuedText: activeQueuedText,
     transcriptPaddingBottom,
     showScrollButton,
     navbarLocalPath,
     editorLabel,
     hasSelectedProject,
+    localFilePreview,
     openSidebar: () => setSidebarOpen(true),
     closeSidebar: () => setSidebarOpen(false),
     collapseSidebar: () => setSidebarCollapsed(true),
     expandSidebar: () => setSidebarCollapsed(false),
+    closeLocalFilePreview: () => setLocalFilePreview(null),
     updateScrollState,
     scrollToBottom,
     handleCreateChat,
@@ -950,7 +1106,10 @@ export function useKannaState(activeChatId: string | null): KannaState {
     handleCheckForUpdates,
     handleInstallUpdate,
     handleSend,
+    handleSubmitFromComposer,
     handleCancel,
+    clearQueuedText,
+    restoreQueuedText,
     handleDeleteChat,
     handleRenameChat,
     handleRemoveProject,

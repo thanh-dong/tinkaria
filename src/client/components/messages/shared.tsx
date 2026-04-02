@@ -385,9 +385,35 @@ export const markdownComponents = {
 
 export function createMarkdownComponents(options?: {
   onOpenLocalLink?: OpenLocalLinkHandler
+  renderRichContentBlocks?: boolean
 }) {
+  const renderRichContentBlocks = options?.renderRichContentBlocks ?? true
+
   return {
     ...markdownComponents,
+    pre: ({ children, ...props }: ComponentPropsWithoutRef<"pre">) => {
+      if (renderRichContentBlocks) {
+        return markdownComponents.pre({ children, ...props })
+      }
+
+      const textContent = extractText(children)
+      const language = extractLanguageFromChildren(children)
+      const isEmbed = isEmbedLanguage(language)
+
+      if (isEmbed && language) {
+        return (
+          <div className="my-2 overflow-x-auto max-w-full min-w-0">
+            <EmbedRenderer format={language} source={textContent} />
+          </div>
+        )
+      }
+
+      return (
+        <div className="relative overflow-x-auto max-w-full min-w-0 no-code-highlight group/pre my-2">
+          <pre className="min-w-0 rounded-xl border border-border bg-muted/30 py-2.5 px-3.5 [.no-pre-highlight_&]:bg-background" {...props}>{children}</pre>
+        </div>
+      )
+    },
     a: ({ children, href, onClick, ...props }: ComponentPropsWithoutRef<"a">) => {
       const onOpenLocalLink = options?.onOpenLocalLink ?? useContext(OpenLocalLinkContext)
       const parsedLocalLink = parseLocalFileLink(href)

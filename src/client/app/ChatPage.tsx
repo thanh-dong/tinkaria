@@ -5,6 +5,7 @@ import { ChatInput } from "../components/chat-ui/ChatInput"
 import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
 import { RightSidebar } from "../components/chat-ui/RightSidebar"
 import { TerminalWorkspace } from "../components/chat-ui/TerminalWorkspace"
+import { LocalFilePreviewDialog } from "../components/messages/LocalFilePreviewDialog"
 import { ProcessingMessage } from "../components/messages/ProcessingMessage"
 import { Card, CardContent } from "../components/ui/card"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../components/ui/resizable"
@@ -26,17 +27,122 @@ import { useTerminalToggleAnimation } from "./useTerminalToggleAnimation"
 import type { KannaState } from "./useKannaState"
 import { KannaTranscript } from "./KannaTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
+import type { HydratedTranscriptMessage } from "../../shared/types"
 
 const EMPTY_STATE_TEXT = "What are we building?"
 const EMPTY_STATE_TYPING_INTERVAL_MS = 19
 const CHAT_NAVBAR_OFFSET_PX = 72
 const SCROLL_BUTTON_BOTTOM_PX = 120
+const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32
+const MOBILE_SIDEBAR_SWIPE_MIN_DISTANCE_PX = 72
+const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX = 56
+
+const MOBILE_SIDEBAR_INTERACTIVE_SELECTOR = [
+  "a",
+  "button",
+  "input",
+  "label",
+  "select",
+  "textarea",
+  "[contenteditable='true']",
+  "[data-no-sidebar-swipe]",
+  "[role='button']",
+  "[role='link']",
+  "[role='menuitem']",
+  "[role='option']",
+  "[role='switch']",
+  "[role='textbox']",
+].join(",")
+
+interface MobileSidebarSwipeDecisionArgs {
+  startX: number
+  startY: number
+  currentX: number
+  currentY: number
+  isMobileViewport: boolean
+  isSidebarOpen: boolean
+  target: EventTarget | null
+}
+
+interface MobileSidebarSwipeState {
+  pointerId: number
+  startX: number
+  startY: number
+  target: EventTarget | null
+}
+
+function getSkillsFromDebugRaw(debugRaw?: string): string[] | null {
+  if (!debugRaw) return null
+  try {
+    const parsed = JSON.parse(debugRaw) as { skills?: unknown }
+    if (!Array.isArray(parsed.skills)) return null
+    const result: string[] = []
+    const seen = new Set<string>()
+    for (const skill of parsed.skills) {
+      if (typeof skill !== "string") continue
+      const trimmed = skill.trim()
+      if (!trimmed || seen.has(trimmed)) continue
+      seen.add(trimmed)
+      result.push(trimmed)
+    }
+    return result.length > 0 ? result : null
+  } catch {
+    return null
+  }
+}
+
+export function getAvailableSkillsFromMessages(messages: HydratedTranscriptMessage[]): string[] {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.kind !== "system_init") continue
+    // Prefer skills from debug payload, fall back to slashCommands
+    return getSkillsFromDebugRaw(message.debugRaw) ?? message.slashCommands
+  }
+  return []
+}
+
+export function shouldIgnoreMobileSidebarSwipeStart(target: EventTarget | null): boolean {
+  if (typeof target !== "object" || target === null || !("closest" in target)) {
+    return false
+  }
+
+  const candidate = target as { closest?: (selector: string) => unknown }
+  return typeof candidate.closest === "function"
+    && candidate.closest(MOBILE_SIDEBAR_INTERACTIVE_SELECTOR) !== null
+}
+
+export function shouldOpenMobileSidebarFromSwipe(args: MobileSidebarSwipeDecisionArgs): boolean {
+  if (!args.isMobileViewport || args.isSidebarOpen) {
+    return false
+  }
+
+  if (shouldIgnoreMobileSidebarSwipeStart(args.target)) {
+    return false
+  }
+
+  if (args.startX > MOBILE_SIDEBAR_SWIPE_EDGE_PX) {
+    return false
+  }
+
+  const deltaX = args.currentX - args.startX
+  const deltaY = Math.abs(args.currentY - args.startY)
+  if (deltaX < MOBILE_SIDEBAR_SWIPE_MIN_DISTANCE_PX) {
+    return false
+  }
+
+  if (deltaY > MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX) {
+    return false
+  }
+
+  return deltaX > deltaY
+}
 
 export function ChatPage() {
   const state = useOutletContext<KannaState>()
   const layoutRootRef = useRef<HTMLDivElement>(null)
   const chatCardRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const mobileSidebarSwipeRef = useRef<MobileSidebarSwipeState | null>(null)
   const [typedEmptyStateText, setTypedEmptyStateText] = useState("")
   const [isEmptyStateTypingComplete, setIsEmptyStateTypingComplete] = useState(false)
   const [fixedTerminalHeight, setFixedTerminalHeight] = useState(0)
@@ -57,6 +163,8 @@ export function ChatPage() {
   const minColumnWidth = useTerminalPreferencesStore((store) => store.minColumnWidth)
   const keybindings = state.keybindings
   const resolvedKeybindings = useMemo(() => getResolvedKeybindings(keybindings), [keybindings])
+
+  const availableSkills = useMemo(() => getAvailableSkillsFromMessages(state.messages), [state.messages])
 
   const hasTerminals = terminalLayout.terminals.length > 0
   const showTerminalPane = Boolean(projectId && terminalLayout.isVisible && hasTerminals)
@@ -124,6 +232,49 @@ export function ChatPage() {
     }
 
     setMainSizes(projectId, [chatSize, terminalSize])
+  }
+
+  const handleMobileSidebarPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch") {
+      mobileSidebarSwipeRef.current = null
+      return
+    }
+
+    mobileSidebarSwipeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      target: event.target,
+    }
+  }
+
+  const handleMobileSidebarPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const swipe = mobileSidebarSwipeRef.current
+    if (!swipe || swipe.pointerId !== event.pointerId) {
+      return
+    }
+
+    const isMobileViewport = window.matchMedia("(max-width: 767px)").matches
+    if (!shouldOpenMobileSidebarFromSwipe({
+      startX: swipe.startX,
+      startY: swipe.startY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+      isMobileViewport,
+      isSidebarOpen: state.sidebarOpen,
+      target: swipe.target,
+    })) {
+      return
+    }
+
+    mobileSidebarSwipeRef.current = null
+    state.openSidebar()
+  }
+
+  const handleMobileSidebarPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (mobileSidebarSwipeRef.current?.pointerId === event.pointerId) {
+      mobileSidebarSwipeRef.current = null
+    }
   }
 
   useEffect(() => {
@@ -236,6 +387,14 @@ export function ChatPage() {
   const chatCard = (
     <Card ref={chatCardRef} className="bg-background h-full flex flex-col overflow-hidden border-0 rounded-none relative">
       <CardContent className="flex flex-1 min-h-0 flex-col p-0 overflow-hidden relative">
+        <LocalFilePreviewDialog
+          preview={state.localFilePreview}
+          onClose={state.closeLocalFilePreview}
+          onOpenLocalLink={(target) => {
+            void state.handleOpenLocalLink(target)
+          }}
+        />
+
         <ChatNavbar
           sidebarCollapsed={state.sidebarCollapsed}
           onOpenSidebar={state.openSidebar}
@@ -356,6 +515,7 @@ export function ChatPage() {
             chatId={state.activeChatId}
             activeProvider={state.runtime?.provider ?? null}
             availableProviders={state.availableProviders}
+            availableSkills={availableSkills}
           />
         </div>
       </div>
@@ -363,7 +523,14 @@ export function ChatPage() {
   )
 
   return (
-    <div ref={layoutRootRef} className="flex-1 flex flex-col min-w-0 relative">
+    <div
+      ref={layoutRootRef}
+      className="flex-1 flex flex-col min-w-0 relative"
+      onPointerDown={handleMobileSidebarPointerDown}
+      onPointerMove={handleMobileSidebarPointerMove}
+      onPointerUp={handleMobileSidebarPointerEnd}
+      onPointerCancel={handleMobileSidebarPointerEnd}
+    >
       {shouldRenderRightSidebarLayout && projectId ? (
         <ResizablePanelGroup
           key={`${projectId}-right-sidebar`}

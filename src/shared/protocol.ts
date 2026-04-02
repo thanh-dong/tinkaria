@@ -55,6 +55,10 @@ export type ClientCommand =
       column?: number
       editor?: EditorOpenSettings
     }
+  | {
+      type: "system.readLocalFilePreview"
+      localPath: string
+    }
   | { type: "chat.create"; projectId: string }
   | { type: "chat.rename"; chatId: string; title: string }
   | { type: "chat.delete"; chatId: string }
