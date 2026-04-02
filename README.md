@@ -61,7 +61,7 @@ bun install -g tinkaria
 Run from source:
 
 ```bash
-git clone https://github.com/lagz0ne/kanna.git
+git clone https://github.com/lagz0ne/tinkaria.git
 cd kanna
 bun install
 bun run build
