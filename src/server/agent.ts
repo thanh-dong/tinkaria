@@ -3,7 +3,7 @@ import type {
   AgentProvider,
   NormalizedToolCall,
   PendingToolSnapshot,
-  KannaStatus,
+  TinkariaStatus,
   TranscriptEntry,
 } from "../shared/types"
 import { normalizeToolCall } from "../shared/tools"
@@ -20,6 +20,7 @@ import {
   normalizeServerModel,
 } from "./provider-catalog"
 import { resolveClaudeApiModelId } from "../shared/types"
+import { APP_NAME } from "../shared/branding"
 
 const PROVIDER_NAMES: Record<AgentProvider, string> = {
   claude: "Claude Code",
@@ -28,16 +29,29 @@ const PROVIDER_NAMES: Record<AgentProvider, string> = {
 
 /**
  * Web-context instructions appended to the provider's system prompt.
- * Makes the model aware it's operating within Kanna's browser-based interface
+ * Makes the model aware it's operating within Tinkaria's browser-based interface
  * rather than a terminal, enabling richer output choices.
  */
-export function getWebContextPrompt(provider: AgentProvider): string {
-  return [
-    `You are operating within Kanna, a web-based interface for ${PROVIDER_NAMES[provider]}.`,
+export function getWebContextPrompt(
+  provider: AgentProvider,
+  options?: {
+    presentContentEnabled?: boolean
+  }
+): string {
+  const promptLines = [
+    `You are operating within ${APP_NAME}, a web-based interface for ${PROVIDER_NAMES[provider]}.`,
     "Rich content (markdown tables, syntax-highlighted code blocks, Mermaid diagrams) renders natively in the browser.",
     "The user has a sidebar with chat history and project management — multiple concurrent chats are supported.",
     "Plan mode renders a visual approval UI with approve/reject controls.",
-  ].join("\n")
+  ]
+
+  if (provider === "codex" && options?.presentContentEnabled) {
+    promptLines.push(
+      "When you need to intentionally present a structured artifact in the transcript, call the `present_content` dynamic tool instead of only describing the content in assistant text."
+    )
+  }
+
+  return promptLines.join("\n")
 }
 
 const CLAUDE_TOOLSET = [
@@ -73,7 +87,7 @@ interface ActiveTurn {
   effort?: string
   serviceTier?: "fast"
   planMode: boolean
-  status: KannaStatus
+  status: TinkariaStatus
   pendingTool: PendingToolRequest | null
   postToolFollowUp: { content: string; planMode: boolean } | null
   hasFinalResult: boolean
@@ -377,7 +391,7 @@ export class AgentCoordinator {
   }
 
   getActiveStatuses() {
-    const statuses = new Map<string, KannaStatus>()
+    const statuses = new Map<string, TinkariaStatus>()
     for (const [chatId, turn] of this.activeTurns.entries()) {
       statuses.set(chatId, turn.status)
     }

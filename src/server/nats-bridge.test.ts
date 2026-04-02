@@ -16,8 +16,21 @@ describe("NatsBridge", () => {
   test("create() starts NATS server and connects", async () => {
     bridge = await NatsBridge.create()
     expect(bridge.natsUrl).toMatch(/^nats:\/\/127\.0\.0\.1:\d+$/)
-    expect(bridge.natsWsUrl).toMatch(/^ws:\/\/127\.0\.0\.1:\d+$/)
+    expect(bridge.natsWsUrl).toMatch(/^ws:\/\/127\.0\.0\.1:\d+\/?$/)
     expect(bridge.natsWsPort).toBeGreaterThan(0)
+  })
+
+  test("create() can bind on all interfaces while advertising localhost URLs", async () => {
+    bridge = await NatsBridge.create({
+      bindHost: "0.0.0.0",
+      advertisedHost: "127.0.0.1",
+    })
+
+    expect(bridge.natsUrl).toMatch(/^nats:\/\/127\.0\.0\.1:\d+$/)
+    expect(bridge.natsWsUrl).toMatch(/^ws:\/\/127\.0\.0\.1:\d+\/?$/)
+
+    const testClient = await connect({ servers: bridge.natsUrl })
+    await testClient.drain()
   })
 
   test("publish() delivers message to subscriber", async () => {
@@ -26,6 +39,7 @@ describe("NatsBridge", () => {
     // Connect a test subscriber
     const testClient = await connect({ servers: bridge.natsUrl })
     const sub = testClient.subscribe("test.subject")
+    await testClient.flush()
 
     // Publish via bridge
     bridge.publish("test.subject", { hello: "world" })
@@ -63,8 +77,7 @@ describe("NatsBridge", () => {
     const p1 = collect(sub1, 1)
     const p2 = collect(sub2, 1)
 
-    // Small delay to let subscriptions establish
-    await new Promise((r) => setTimeout(r, 50))
+    await testClient.flush()
 
     bridge.publish("kanna.snap.sidebar", { type: "sidebar" })
     bridge.publish("kanna.snap.chat.abc", { type: "chat", chatId: "abc" })
@@ -111,7 +124,7 @@ describe("NatsBridge", () => {
     }
 
     const p = collect(3)
-    await new Promise((r) => setTimeout(r, 50))
+    await testClient.flush()
 
     bridge.publish("kanna.snap.sidebar", {})
     bridge.publish("kanna.snap.update", {})

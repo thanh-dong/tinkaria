@@ -1,4 +1,5 @@
 import { X } from "lucide-react"
+import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 
 interface RightSidebarProps {
   onClose: () => void
@@ -6,7 +7,10 @@ interface RightSidebarProps {
 
 export function RightSidebar({ onClose }: RightSidebarProps) {
   return (
-    <div className="h-full min-h-0 border-l border-border bg-background md:min-w-[300px]">
+    <div
+      {...getUiIdentityAttributeProps("chat.right-sidebar")}
+      className="h-full min-h-0 border-l border-border bg-background md:min-w-[300px]"
+    >
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
           <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">Diffs</div>

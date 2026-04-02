@@ -15,9 +15,17 @@ export function isGzipped(data: Uint8Array): boolean {
 // TextEncoder.encode() always backs by ArrayBuffer, making the narrowing safe.
 type BunBytes = Uint8Array<ArrayBuffer>
 
+function toBunBytes(data: Uint8Array): BunBytes {
+  if (data.buffer instanceof ArrayBuffer) {
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+  }
+
+  return new Uint8Array(data.slice())
+}
+
 export function compressPayload(raw: Uint8Array): Uint8Array {
   if (raw.length <= COMPRESS_THRESHOLD) return raw
-  return Bun.gzipSync(raw as BunBytes, { level: 1 })
+  return Bun.gzipSync(toBunBytes(raw), { level: 1 })
 }
 
 export async function decompressPayload(data: Uint8Array): Promise<Uint8Array> {
@@ -25,6 +33,6 @@ export async function decompressPayload(data: Uint8Array): Promise<Uint8Array> {
   // DecompressionStream works in both Bun and browser (Bun.gunzipSync is server-only)
   const ds = new DecompressionStream("gzip")
   const writer = ds.writable.getWriter()
-  void writer.write(data).then(() => writer.close())
+  void writer.write(toBunBytes(data)).then(() => writer.close())
   return new Uint8Array(await new Response(ds.readable).arrayBuffer())
 }

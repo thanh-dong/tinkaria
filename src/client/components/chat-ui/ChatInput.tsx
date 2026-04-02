@@ -11,6 +11,7 @@ import {
 } from "../../../shared/types"
 import { Button } from "../ui/button"
 import { Textarea } from "../ui/textarea"
+import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import { useIsStandalone } from "../../hooks/useIsStandalone"
 import { useChatInputStore } from "../../stores/chatInputStore"
@@ -155,7 +156,7 @@ export function resolveComposerPreferences(args: {
   lockedOverrides: ComposerState | null
 }) {
   const providerLocked = args.activeProvider !== null
-  const selectedProvider = providerLocked ? args.activeProvider : args.composerState.provider
+  const selectedProvider = args.activeProvider ?? args.composerState.provider
   const lockedBaseState = args.activeProvider
     ? createLockedComposerState(args.activeProvider, args.composerState, args.providerDefaults)
     : null
@@ -362,6 +363,9 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const composerPreferencesRef = useRef<ComposerPreferencesHandle>(null)
   const isStandalone = useIsStandalone()
   const composerControlsKey = getComposerControlsKey(chatId, activeProvider)
+  const composerAreaId = createUiIdentity("chat.composer", "area")
+  const submitActionId = createUiIdentity("chat.composer.submit", "action")
+  const cancelActionId = createUiIdentity("chat.composer.cancel", "action")
 
   function getComposerSnapshot() {
     return composerPreferencesRef.current?.getSnapshot() ?? resolveComposerPreferences({
@@ -544,7 +548,10 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
         </div>
       ) : null}
       <div className={cn("px-3 pt-0", isStandalone && "px-5")}>
-        <div className="flex items-end gap-2 max-w-[840px] mx-auto border dark:bg-card/40 backdrop-blur-lg border-border rounded-[29px] pr-1.5">
+        <div
+          {...getUiIdentityAttributeProps(composerAreaId)}
+          className="flex items-end gap-2 max-w-[840px] mx-auto border dark:bg-card/40 backdrop-blur-lg border-border rounded-[29px] pr-1.5"
+        >
           <Textarea
             ref={setTextareaRefs}
             placeholder="Build something..."
@@ -562,6 +569,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
             className="flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
           />
           <Button
+            {...getUiIdentityAttributeProps(canCancel ? cancelActionId : submitActionId)}
             type="button"
             onPointerDown={(event) => {
               event.preventDefault()

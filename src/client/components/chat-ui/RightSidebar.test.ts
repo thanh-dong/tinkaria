@@ -7,6 +7,7 @@ describe("RightSidebar", () => {
     const markup = renderToStaticMarkup(RightSidebar({ onClose: () => {} }))
 
     expect(markup).toContain("diffs coming soon")
+    expect(markup).toContain('data-ui-id="chat.right-sidebar"')
   })
 
   test("renders the close affordance", () => {

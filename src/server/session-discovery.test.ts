@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, mkdir, writeFile, rm, utimes } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { scanClaudeSessions, scanCodexSessions, resolveTitle, formatDateTitle, mergeSessions, discoverSessions } from "./session-discovery"
+import { scanClaudeSessions, scanCodexSessions, resolveTitle, mergeSessions, discoverSessions, parseCliTranscript } from "./session-discovery"
 import { EventStore } from "./event-store"
 import type { DiscoveredSession } from "../shared/types"
 
@@ -291,5 +291,88 @@ describe("discoverSessions", () => {
 
     expect(snapshot.projectId).toBe(project.id)
     expect(snapshot.sessions).toEqual([])
+  })
+})
+
+describe("parseCliTranscript", () => {
+  test("extracts user and assistant entries from Claude JSONL", () => {
+    const lines = [
+      JSON.stringify({ type: "summary", summary: "test" }),
+      JSON.stringify({ type: "user", message: { content: "Hello" } }),
+      JSON.stringify({ type: "assistant", message: { content: "Hi there" } }),
+      JSON.stringify({ type: "result", result: "success" }),
+      JSON.stringify({ type: "user", message: { content: "Fix bug" } }),
+      JSON.stringify({ type: "assistant", message: { content: "Done" } }),
+    ]
+    const content = lines.join("\n") + "\n"
+
+    const entries = parseCliTranscript(content, 50)
+
+    expect(entries).toHaveLength(4)
+    expect(entries[0].kind).toBe("user_prompt")
+    expect(entries[1].kind).toBe("assistant_text")
+    expect(entries[2].kind).toBe("user_prompt")
+    expect(entries[3].kind).toBe("assistant_text")
+  })
+
+  test("respects limit parameter", () => {
+    const lines = Array.from({ length: 100 }, (_, i) =>
+      i % 2 === 0
+        ? JSON.stringify({ type: "user", message: { content: `Q${i}` } })
+        : JSON.stringify({ type: "assistant", message: { content: `A${i}` } })
+    )
+    const content = lines.join("\n") + "\n"
+
+    const entries = parseCliTranscript(content, 10)
+
+    expect(entries).toHaveLength(10)
+  })
+
+  test("skips malformed JSON lines gracefully", () => {
+    const lines = [
+      "not valid json",
+      JSON.stringify({ type: "user", message: { content: "Hello" } }),
+      "{broken",
+      JSON.stringify({ type: "assistant", message: { content: "Hi" } }),
+    ]
+    const content = lines.join("\n") + "\n"
+
+    const entries = parseCliTranscript(content, 50)
+
+    expect(entries).toHaveLength(2)
+    expect(entries[0].kind).toBe("user_prompt")
+    expect(entries[1].kind).toBe("assistant_text")
+  })
+
+  test("returns empty array for empty content", () => {
+    expect(parseCliTranscript("", 50)).toEqual([])
+    expect(parseCliTranscript("\n\n", 50)).toEqual([])
+  })
+
+  test("assigns unique _id to each entry", () => {
+    const lines = [
+      JSON.stringify({ type: "user", message: { content: "Q1" } }),
+      JSON.stringify({ type: "user", message: { content: "Q2" } }),
+    ]
+    const content = lines.join("\n") + "\n"
+
+    const entries = parseCliTranscript(content, 50)
+
+    expect(entries[0]._id).not.toBe(entries[1]._id)
+  })
+
+  test("populates content field for user entries and text field for assistant entries", () => {
+    const lines = [
+      JSON.stringify({ type: "user", message: { content: "my question" } }),
+      JSON.stringify({ type: "assistant", message: { content: "my answer" } }),
+    ]
+    const content = lines.join("\n") + "\n"
+
+    const entries = parseCliTranscript(content, 50)
+
+    expect(entries[0].kind).toBe("user_prompt")
+    expect((entries[0] as { content: string }).content).toBe("my question")
+    expect(entries[1].kind).toBe("assistant_text")
+    expect((entries[1] as { text: string }).text).toBe("my answer")
   })
 })

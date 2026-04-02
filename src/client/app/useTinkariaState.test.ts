@@ -9,9 +9,10 @@ import {
   normalizeLocalFilePreviewErrorMessage,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
+  resolveDesktopWebviewOpenCommand,
   shouldAutoFollowTranscript,
   TRANSCRIPT_TAIL_SIZE,
-} from "./useKannaState"
+} from "./useTinkariaState"
 import type { ChatSnapshot, SidebarData } from "../../shared/types"
 
 function createSidebarData(): SidebarData {
@@ -131,7 +132,7 @@ describe("normalizeLocalFilePreviewErrorMessage", () => {
   test("rewrites the stale server preview-command error into a restart hint", () => {
     expect(
       normalizeLocalFilePreviewErrorMessage(new Error("Unknown command type: system.readLocalFilePreview"))
-    ).toBe("This Kanna browser client is newer than the running server. Restart Kanna to enable in-app file previews.")
+    ).toBe("This Tinkaria browser client is newer than the running server. Restart Tinkaria to enable in-app file previews.")
   })
 
   test("passes through unrelated errors", () => {
@@ -178,6 +179,97 @@ describe("resolveComposeIntent", () => {
         fallbackLocalProjectPath: null,
       })
     ).toBeNull()
+  })
+})
+
+describe("resolveDesktopWebviewOpenCommand", () => {
+  test("returns null when no native desktop renderer is available", () => {
+    expect(resolveDesktopWebviewOpenCommand({
+      href: "https://example.com/demo",
+      desktopRenderers: {
+        renderers: [
+          {
+            rendererId: "desktop-1",
+            machineName: "Workstation",
+            capabilities: ["something_else"],
+            connectedAt: 10,
+            lastSeenAt: 10,
+          },
+        ],
+      },
+    })).toBeNull()
+  })
+
+  test("targets the first available renderer for localhost content", () => {
+    expect(resolveDesktopWebviewOpenCommand({
+      href: "http://127.0.0.1:3210/local",
+      desktopRenderers: {
+        renderers: [
+          {
+            rendererId: "desktop-1",
+            machineName: "Workstation",
+            capabilities: ["native_webview"],
+            connectedAt: 10,
+            lastSeenAt: 10,
+          },
+        ],
+      },
+    })).toEqual({
+      type: "webview.open",
+      rendererId: "desktop-1",
+      webviewId: "controlled-content",
+      targetKind: "local-port",
+      target: "http://127.0.0.1:3210/local",
+      dockState: "docked",
+    })
+  })
+
+  test("classifies private network hosts as lan-host targets", () => {
+    expect(resolveDesktopWebviewOpenCommand({
+      href: "http://192.168.1.10:8080",
+      desktopRenderers: {
+        renderers: [
+          {
+            rendererId: "desktop-1",
+            machineName: "Workstation",
+            capabilities: ["native_webview"],
+            connectedAt: 10,
+            lastSeenAt: 10,
+          },
+        ],
+      },
+    })).toEqual({
+      type: "webview.open",
+      rendererId: "desktop-1",
+      webviewId: "controlled-content",
+      targetKind: "lan-host",
+      target: "http://192.168.1.10:8080/",
+      dockState: "docked",
+    })
+  })
+
+  test("classifies public https targets as proxied-remote", () => {
+    expect(resolveDesktopWebviewOpenCommand({
+      href: "https://example.com/demo",
+      desktopRenderers: {
+        renderers: [
+          {
+            rendererId: "desktop-1",
+            machineName: "Workstation",
+            capabilities: ["native_webview"],
+            connectedAt: 10,
+            lastSeenAt: 10,
+          },
+        ],
+      },
+    })).toEqual({
+      type: "webview.open",
+      rendererId: "desktop-1",
+      webviewId: "controlled-content",
+      targetKind: "proxied-remote",
+      target: "https://example.com/demo",
+      dockState: "docked",
+    })
   })
 })
 
@@ -359,7 +451,7 @@ describe("getInitialChatScrollTarget", () => {
 
 describe("appendQueuedText", () => {
   test("uses the incoming text when the queue is empty", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const append = (module as Record<string, unknown>).appendQueuedText
 
     expect(typeof append).toBe("function")
@@ -370,7 +462,7 @@ describe("appendQueuedText", () => {
   })
 
   test("uses the current text when the incoming text is blank", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const append = (module as Record<string, unknown>).appendQueuedText
 
     expect(typeof append).toBe("function")
@@ -380,7 +472,7 @@ describe("appendQueuedText", () => {
   })
 
   test("appends a blank line between queued paragraphs", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const append = (module as Record<string, unknown>).appendQueuedText
 
     expect(typeof append).toBe("function")
@@ -393,7 +485,7 @@ describe("appendQueuedText", () => {
 
 describe("shouldQueueChatSubmit", () => {
   test("returns false when runtime is idle and no queue exists", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
 
     expect(typeof shouldQueue).toBe("function")
@@ -404,7 +496,7 @@ describe("shouldQueueChatSubmit", () => {
   })
 
   test("returns true when queued text already exists even if runtime is idle", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
 
     expect(typeof shouldQueue).toBe("function")
@@ -414,7 +506,7 @@ describe("shouldQueueChatSubmit", () => {
   })
 
   test("returns true when the runtime is busy", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
 
     expect(typeof shouldQueue).toBe("function")
@@ -426,7 +518,7 @@ describe("shouldQueueChatSubmit", () => {
 
 describe("shouldFlushQueuedText", () => {
   test("returns true only when the queued text belongs to the active idle chat", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const shouldFlush = (module as Record<string, unknown>).shouldFlushQueuedText
 
     expect(typeof shouldFlush).toBe("function")
@@ -452,7 +544,7 @@ describe("shouldFlushQueuedText", () => {
   })
 
   test("returns false while processing, in flight, or blank", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const shouldFlush = (module as Record<string, unknown>).shouldFlushQueuedText
 
     expect(typeof shouldFlush).toBe("function")
@@ -498,7 +590,7 @@ describe("shouldFlushQueuedText", () => {
 
 describe("prependQueuedText", () => {
   test("restores a failed flushed message ahead of newer queued text", async () => {
-    const module = await import("./useKannaState")
+    const module = await import("./useTinkariaState")
     const prepend = (module as Record<string, unknown>).prependQueuedText
 
     expect(typeof prepend).toBe("function")

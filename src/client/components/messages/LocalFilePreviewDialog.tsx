@@ -1,5 +1,6 @@
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
 import { remarkRichContentHint } from "../rich-content/remarkRichContentHint"
 import { createMarkdownComponents } from "./shared"
@@ -10,6 +11,8 @@ export interface LocalFilePreview {
   line?: number
   column?: number
 }
+
+const LOCAL_FILE_PREVIEW_DIALOG_UI_ID = "content-preview.dialog"
 
 function isMarkdownFile(path: string): boolean {
   return /\.(md|markdown|mdx)$/i.test(path)
@@ -27,6 +30,7 @@ function inferCodeLanguage(path: string): string | null {
     case "scss":
     case "html":
     case "xml":
+    case "svg":
     case "sh":
     case "bash":
     case "zsh":
@@ -60,6 +64,10 @@ interface LocalFilePreviewDialogProps {
   preview: LocalFilePreview | null
   onClose: () => void
   onOpenLocalLink: (target: { path: string; line?: number; column?: number }) => void
+}
+
+function getLocalFilePreviewDialogUiIdentityProps() {
+  return getUiIdentityAttributeProps(LOCAL_FILE_PREVIEW_DIALOG_UI_ID)
 }
 
 export function LocalFilePreviewContent({
@@ -108,7 +116,7 @@ export function LocalFilePreviewDialog({
         }
       }}
     >
-      <DialogContent size="xl">
+      <DialogContent size="xl" {...getLocalFilePreviewDialogUiIdentityProps()}>
         <DialogHeader>
           <DialogTitle className="truncate text-sm">
             {preview ? getDialogTitle(preview) : "File preview"}
@@ -121,3 +129,5 @@ export function LocalFilePreviewDialog({
     </Dialog>
   )
 }
+
+export { LOCAL_FILE_PREVIEW_DIALOG_UI_ID, getLocalFilePreviewDialogUiIdentityProps }

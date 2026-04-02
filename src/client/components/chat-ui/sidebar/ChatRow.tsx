@@ -5,10 +5,13 @@ import { AnimatedShinyText } from "../../ui/animated-shiny-text"
 import { Button } from "../../ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../ui/dropdown-menu"
 import { formatSidebarAgeLabel } from "../../../lib/formatters"
+import { getUiIdentityAttributeProps } from "../../../lib/uiIdentityOverlay"
 import { cn, normalizeChatId } from "../../../lib/utils"
 import { ChatRowMenu } from "./Menus"
 
 const loadingStatuses = new Set(["starting", "running"])
+const CHAT_ROW_UI_ID = "sidebar.chat-row"
+const CHAT_ROW_MENU_UI_ID = "sidebar.chat-row.menu"
 
 interface Props {
   chat: SidebarChatRow
@@ -58,6 +61,7 @@ export function ChatRow({
     <ChatRowMenu onRename={startEditing} onDelete={() => onDeleteChat(chat.chatId)}>
       <div
         data-chat-id={normalizeChatId(chat.chatId)}
+        {...getUiIdentityAttributeProps(CHAT_ROW_UI_ID)}
         className={cn(
           "group flex items-center gap-2 pl-2.5 pr-0.5 py-0.5 rounded-lg cursor-pointer border-border/0 hover:border-border hover:bg-muted/20 active:scale-[0.985] border transition-all",
           activeChatId === normalizeChatId(chat.chatId) ? "bg-muted hover:bg-muted border-border" : "border-border/0 dark:hover:border-slate-400/10 "
@@ -138,7 +142,7 @@ export function ChatRow({
                 <EllipsisVertical className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={2}>
+            <DropdownMenuContent align="end" sideOffset={2} uiId={CHAT_ROW_MENU_UI_ID}>
               <DropdownMenuItem onSelect={startEditing}>
                 <Pencil className="h-4 w-4" />
                 <span className="text-xs font-medium">Rename</span>

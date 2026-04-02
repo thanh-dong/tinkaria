@@ -12,13 +12,17 @@ import {
   SquarePen,
   Terminal,
 } from "lucide-react"
+import { Streamdown } from "streamdown"
+import remarkGfm from "remark-gfm"
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
-import type { LocalProjectsSnapshot } from "../../shared/types"
+import type { DesktopRenderersSnapshot, LocalProjectsSnapshot } from "../../shared/types"
 import type { SocketStatus } from "../app/socket-interface"
 import { PageHeader } from "../app/PageHeader"
 import { getPathBasename } from "../lib/formatters"
 import { cn } from "../lib/utils"
 import { NewProjectModal } from "./NewProjectModal"
+import { createMarkdownComponents, OpenLocalLinkProvider } from "./messages/shared"
+import { remarkRichContentHint } from "./rich-content/remarkRichContentHint"
 import { Button } from "./ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
 
@@ -26,10 +30,27 @@ interface LocalDevProps {
   connectionStatus: SocketStatus
   ready: boolean
   snapshot: LocalProjectsSnapshot | null
+  desktopRenderers: DesktopRenderersSnapshot
   startingLocalPath: string | null
   commandError: string | null
   onOpenProject: (localPath: string) => Promise<void>
   onCreateProject: (project: { mode: "new" | "existing"; localPath: string; title: string }) => Promise<void>
+  onOpenExternalLink: (href: string) => boolean
+}
+
+export function getDesktopRendererStatusLabel(desktopRenderers: DesktopRenderersSnapshot): string {
+  return desktopRenderers.renderers.some((renderer) => renderer.capabilities.includes("native_webview"))
+    ? "Desktop renderer ready"
+    : "Waiting for a desktop renderer"
+}
+
+export function getDesktopSmokeMarkdown(): string {
+  return [
+    "Use these links to test desktop steering from the main app surface.",
+    "",
+    "- [Local smoke target](http://127.0.0.1:3210/)",
+    "- [Remote smoke target](https://example.com/)",
+  ].join("\n")
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -167,16 +188,19 @@ export function LocalDev({
   connectionStatus,
   ready,
   snapshot,
+  desktopRenderers,
   startingLocalPath,
   commandError,
   onOpenProject,
   onCreateProject,
+  onOpenExternalLink,
 }: LocalDevProps) {
   const [newProjectOpen, setNewProjectOpen] = useState(false)
 
   const projects = useMemo(() => snapshot?.projects ?? [], [snapshot?.projects])
   const isConnecting = connectionStatus === "connecting" || !ready
   const isConnected = connectionStatus === "connected" && ready
+  const desktopRendererStatusLabel = getDesktopRendererStatusLabel(desktopRenderers)
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto">
@@ -266,6 +290,26 @@ export function LocalDev({
           />
 
           <div className="w-full px-6 mb-10">
+            <div className="mb-10">
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider">Desktop Smoke</h2>
+                <span className="text-xs text-muted-foreground">{desktopRendererStatusLabel}</span>
+              </div>
+              <InfoCard>
+                <OpenLocalLinkProvider onOpenExternalLink={onOpenExternalLink}>
+                  <div className="text-pretty prose prose-sm dark:prose-invert max-w-none">
+                    <Streamdown
+                      components={createMarkdownComponents()}
+                      linkSafety={{ enabled: false }}
+                      remarkPlugins={[remarkGfm, remarkRichContentHint]}
+                    >
+                      {getDesktopSmokeMarkdown()}
+                    </Streamdown>
+                  </div>
+                </OpenLocalLinkProvider>
+              </InfoCard>
+            </div>
+
             <div className="flex items-baseline justify-between mb-3">
               <h2 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider">Projects</h2>
               <Button variant="default" size="sm" onClick={() => setNewProjectOpen(true)}>

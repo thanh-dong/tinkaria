@@ -9,6 +9,9 @@ const DialogTrigger = DialogPrimitive.Trigger
 const DialogClose = DialogPrimitive.Close
 const DialogPortal = DialogPrimitive.Portal
 
+const DIALOG_BODY_INSET_CLASS_NAME = "px-4 pb-4 pt-3.5"
+const DIALOG_BODY_CLASS_NAME = `flex-1 min-h-0 overflow-y-auto ${DIALOG_BODY_INSET_CLASS_NAME}`
+
 const DialogOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -99,7 +102,7 @@ function DialogDescription({
 }
 
 function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-3.5", className)} {...props} />
+  return <div className={cn(DIALOG_BODY_CLASS_NAME, className)} {...props} />
 }
 
 function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -154,6 +157,8 @@ export {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DIALOG_BODY_INSET_CLASS_NAME,
+  DIALOG_BODY_CLASS_NAME,
   DialogBody,
   DialogFooter,
   DialogPrimaryButton,

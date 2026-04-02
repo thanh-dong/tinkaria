@@ -1,6 +1,8 @@
-import { readdir, stat, open } from "node:fs/promises"
+import { readdir, readFile, stat, open } from "node:fs/promises"
 import { join, basename, extname } from "node:path"
-import type { AgentProvider, DiscoveredSession, SessionsSnapshot } from "../shared/types"
+import { randomUUID } from "node:crypto"
+import { homedir } from "node:os"
+import type { AgentProvider, AssistantTextEntry, DiscoveredSession, SessionsSnapshot, TranscriptEntry, UserPromptEntry } from "../shared/types"
 import type { EventStore } from "./event-store"
 
 const TAIL_BYTES = 32 * 1024
@@ -47,6 +49,43 @@ function extractTitleCandidate(headLines: string[]): string | null {
     }
   }
   return null
+}
+
+export function parseCliTranscript(
+  fileContent: string,
+  limit: number
+): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = []
+  const lines = fileContent.split("\n").filter(Boolean)
+
+  for (const line of lines) {
+    if (entries.length >= limit) break
+
+    try {
+      const parsed = JSON.parse(line)
+      if (parsed.type === "user" && parsed.message?.content) {
+        const entry: UserPromptEntry = {
+          _id: randomUUID(),
+          kind: "user_prompt",
+          content: String(parsed.message.content),
+          createdAt: parsed.timestamp ?? Date.now(),
+        }
+        entries.push(entry)
+      } else if (parsed.type === "assistant" && parsed.message?.content) {
+        const entry: AssistantTextEntry = {
+          _id: randomUUID(),
+          kind: "assistant_text",
+          text: String(parsed.message.content),
+          createdAt: parsed.timestamp ?? Date.now(),
+        }
+        entries.push(entry)
+      }
+    } catch {
+      // skip malformed lines
+    }
+  }
+
+  return entries
 }
 
 async function readTail(filePath: string, bytes: number): Promise<string> {
@@ -266,4 +305,63 @@ export async function discoverSessions(
   const sessions = mergeSessions(allCliSessions, kannaSessions)
 
   return { projectId, projectPath, sessions }
+}
+
+function encodeClaudeProjectDir(projectPath: string): string {
+  return join(homedir(), ".claude", "projects", `-${projectPath.replace(/\//g, "-")}`)
+}
+
+export async function findSessionFile(
+  sessionId: string,
+  provider: AgentProvider,
+  projectPath: string
+): Promise<string | null> {
+  if (provider === "claude") {
+    const claudeDir = encodeClaudeProjectDir(projectPath)
+    const filePath = join(claudeDir, `${sessionId}.jsonl`)
+    try {
+      await stat(filePath)
+      return filePath
+    } catch {
+      return null
+    }
+  }
+
+  if (provider === "codex") {
+    const sessionsDir = join(homedir(), ".codex", "sessions")
+    const files = await collectJsonlFiles(sessionsDir)
+    for (const filePath of files) {
+      const headLines = await readHead(filePath, 1)
+      try {
+        const parsed = JSON.parse(headLines[0])
+        if (parsed.type === "session_meta" && parsed.payload?.id === sessionId) {
+          return filePath
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  return null
+}
+
+export async function importCliTranscript(
+  sessionFilePath: string,
+  store: EventStore,
+  chatId: string,
+  limit = 50
+): Promise<number> {
+  // Idempotent: skip if chat already has messages
+  const existing = store.getMessages(chatId)
+  if (existing.length > 0) return 0
+
+  const content = await readFile(sessionFilePath, "utf-8")
+  const entries = parseCliTranscript(content, limit)
+
+  for (const entry of entries) {
+    await store.appendMessage(chatId, entry)
+  }
+
+  return entries.length
 }

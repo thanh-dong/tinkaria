@@ -4,7 +4,7 @@ import { snapshotSubject, terminalEventSubject, chatMessageSubject, commandSubje
 import { LOG_PREFIX } from "../../shared/branding"
 import { decompressPayload } from "../../shared/compression"
 import type {
-  KannaTransport,
+  TinkariaTransport,
   SnapshotListener,
   EventListener,
   SocketStatus,
@@ -28,7 +28,7 @@ interface NatsCommandResponse {
   error?: string
 }
 
-export class NatsSocket implements KannaTransport {
+export class NatsSocket implements TinkariaTransport {
   private resolvedWsUrl: string | null = null
   private nc: NatsConnection | null = null
   private started = false

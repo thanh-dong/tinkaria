@@ -83,7 +83,7 @@ function createMockKeybindings() {
       addSplitTerminal: ["cmd+shift+j"],
     },
     warning: null,
-    filePathDisplay: "~/.kanna/keybindings.json",
+    filePathDisplay: "~/.tinkaria/keybindings.json",
   }
   return {
     getSnapshot: () => snapshot,
@@ -107,6 +107,20 @@ function createMockUpdateManager() {
     installUpdate: async () => ({ success: true, version: "1.1.0" }),
     getSnapshot: () => snapshot,
     onChange: () => () => {},
+  }
+}
+
+function createMockDesktopRenderers() {
+  return {
+    register: ({ rendererId, machineName, capabilities }: { rendererId: string; machineName: string; capabilities: string[] }) => ({
+      rendererId,
+      machineName,
+      capabilities,
+      connectedAt: 100,
+      lastSeenAt: 100,
+    }),
+    unregister: () => {},
+    getSnapshot: () => ({ renderers: [] }),
   }
 }
 
@@ -163,6 +177,7 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
       refreshSessions: async () => {},
       dispose: () => {},
     },
+    desktopRenderers: createMockDesktopRenderers() as never,
     onStateChange: () => {},
     ...overrides,
   }
@@ -195,6 +210,25 @@ describe("nats-responders", () => {
     const { clientNc } = await setup({ onStateChange: () => { changed = true } })
     await sendCommand(clientNc, { type: "system.ping" })
     expect(changed).toBe(false)
+  })
+
+  test("desktop.register returns the renderer snapshot", async () => {
+    const { clientNc } = await setup()
+    const res = await sendCommand(clientNc, {
+      type: "desktop.register",
+      rendererId: "desktop-1",
+      machineName: "Workstation",
+      capabilities: ["native_webview"],
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual({
+      rendererId: "desktop-1",
+      machineName: "Workstation",
+      capabilities: ["native_webview"],
+      connectedAt: 100,
+      lastSeenAt: 100,
+    })
   })
 
   test("settings.readKeybindings returns snapshot", async () => {
@@ -330,7 +364,7 @@ describe("nats-responders", () => {
     })
     const res = await sendCommand(clientNc, { type: "chat.delete", chatId: "chat-99" })
     expect(res.ok).toBe(true)
-    expect(cancelled).toEqual(["chat-99"])
+    expect(disposed).toEqual(["chat-99"])
     expect(deleted).toEqual(["chat-99"])
   })
 
@@ -407,7 +441,7 @@ describe("nats-responders", () => {
     })
     const res = await sendCommand(clientNc, { type: "project.remove", projectId: "proj-1" })
     expect(res.ok).toBe(true)
-    expect(cancelled).toContain("chat-1")
+    expect(disposed).toContain("chat-1")
     expect(changed).toBe(true)
   })
 
@@ -544,6 +578,23 @@ describe("nats-responders", () => {
 
     // Only chat.create should have triggered onStateChange
     expect(changeCount).toBe(1)
+  })
+
+  test("desktop-owned webview commands are not handled by the Bun responder", async () => {
+    const { clientNc } = await setup()
+
+    try {
+      await clientNc.request(commandSubject("webview.open"), encode({
+        type: "webview.open",
+        webviewId: "preview",
+        targetKind: "local-port",
+        target: "http://127.0.0.1:3210",
+        dockState: "docked",
+      }), { timeout: 300 })
+      expect.unreachable("webview.open should not be handled by the Bun responder")
+    } catch (error) {
+      expect(error).toBeDefined()
+    }
   })
 
   test("snapshot.subscribe registers subscription and returns snapshot", async () => {

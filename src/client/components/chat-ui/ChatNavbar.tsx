@@ -1,7 +1,9 @@
-import { Flower, Code, FolderOpen, Menu, PanelLeft, PanelRight, SquarePen, Terminal } from "lucide-react"
+import { Code, FolderOpen, Menu, PanelLeft, PanelRight, SquarePen, Terminal } from "lucide-react"
+import { TinkariaSidebarMark } from "../branding/TinkariaSidebarMark"
 import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
 import { HotkeyTooltip, HotkeyTooltipContent, HotkeyTooltipTrigger } from "../ui/tooltip"
+import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 
 interface Props {
@@ -39,14 +41,23 @@ export function ChatNavbar({
   terminalShortcut,
   rightSidebarShortcut,
 }: Props) {
+  const navbarAreaId = createUiIdentity("chat.navbar", "area")
+  const newChatActionId = createUiIdentity("chat.navbar.new-chat", "action")
+  const terminalToggleActionId = createUiIdentity("chat.navbar.terminal-toggle", "action")
+  const rightSidebarToggleActionId = createUiIdentity("chat.navbar.right-sidebar-toggle", "action")
+
   return (
     <CardHeader
+      {...getUiIdentityAttributeProps("chat.navbar")}
       className={cn(
         "absolute top-0 left-0 right-0 z-10 md:pt-3 px-3 border-border/0 md:pb-0 flex items-center justify-center",
         " bg-gradient-to-b from-background/70"
       )}
     >
-      <div className="relative flex items-center gap-2 w-full">
+      <div
+        {...getUiIdentityAttributeProps(navbarAreaId)}
+        className="relative flex items-center gap-2 w-full"
+      >
         <div className={`flex items-center gap-1 flex-shrink-0 border border-border rounded-full ${sidebarCollapsed ? 'px-1.5' : ''} p-1 backdrop-blur-lg`}>
           <Button
             variant="ghost"
@@ -59,7 +70,7 @@ export function ChatNavbar({
           {sidebarCollapsed && (
             <>
               <div className="flex items-center justify-center w-[36px] h-[36px]">
-                <Flower className="h-4 w-4 sm:h-5 sm:w-5 text-logo ml-1 hidden md:block" />
+                <TinkariaSidebarMark className="hidden h-5 w-5 md:inline-flex sm:h-6 sm:w-6" imageClassName="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <Button
                 variant="ghost"
@@ -73,6 +84,7 @@ export function ChatNavbar({
             </>
           )}
           <Button
+            {...getUiIdentityAttributeProps(newChatActionId)}
             variant="ghost"
             size="icon"
             onClick={onNewChat}
@@ -107,6 +119,7 @@ export function ChatNavbar({
                 <HotkeyTooltip>
                   <HotkeyTooltipTrigger asChild>
                     <Button
+                      {...getUiIdentityAttributeProps(terminalToggleActionId)}
                       variant="ghost"
                       size="icon"
                       onClick={onToggleEmbeddedTerminal}
@@ -143,6 +156,7 @@ export function ChatNavbar({
             <HotkeyTooltip>
               <HotkeyTooltipTrigger asChild>
                 <Button
+                  {...getUiIdentityAttributeProps(rightSidebarToggleActionId)}
                   variant="ghost"
                   size="icon"
                   onClick={onToggleRightSidebar}

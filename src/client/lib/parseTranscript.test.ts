@@ -128,6 +128,104 @@ describe("processTranscriptMessages", () => {
     if (messages[0]?.kind !== "tool") throw new Error("unexpected message")
     expect(messages[0].result).toEqual({ answers: { "Provider?": ["Codex"] } })
   })
+
+  test("hydrates present_content tool results as structured data", () => {
+    const messages = processTranscriptMessages([
+      entry({
+        kind: "tool_call",
+        tool: {
+          kind: "tool",
+          toolKind: "present_content",
+          toolName: "present_content",
+          toolId: "tool-pc-1",
+          input: {
+            title: "Snippet",
+            kind: "code",
+            format: "typescript",
+            source: "const x = 1",
+          },
+        },
+      }),
+      entry({
+        kind: "tool_result",
+        toolId: "tool-pc-1",
+        content: {
+          accepted: true,
+          title: "Snippet",
+          kind: "code",
+          format: "typescript",
+          source: "const x = 1",
+          summary: "Context",
+          collapsed: false,
+        },
+      }),
+    ])
+
+    expect(messages[0]?.kind).toBe("tool")
+    if (messages[0]?.kind !== "tool") throw new Error("unexpected message")
+    expect(messages[0].result).toEqual({
+      accepted: true,
+      title: "Snippet",
+      kind: "code",
+      format: "typescript",
+      source: "const x = 1",
+      summary: "Context",
+      collapsed: false,
+    })
+  })
+
+  test("preserves present_content error tool results", () => {
+    const messages = processTranscriptMessages([
+      entry({
+        kind: "tool_call",
+        tool: {
+          kind: "tool",
+          toolKind: "present_content",
+          toolName: "present_content",
+          toolId: "tool-pc-2",
+          input: {
+            title: "Snippet",
+            kind: "code",
+            format: "typescript",
+            source: "const x = 1",
+          },
+        },
+      }),
+      entry({
+        kind: "tool_result",
+        toolId: "tool-pc-2",
+        content: {
+          error: {
+            source: "schema_validation",
+            schema: "present_content",
+            issues: [
+              {
+                path: ["summary"],
+                code: "invalid_type",
+                message: "Invalid input: expected string, received number",
+              },
+            ],
+          },
+        },
+      }),
+    ])
+
+    expect(messages[0]?.kind).toBe("tool")
+    if (messages[0]?.kind !== "tool") throw new Error("unexpected message")
+    expect(messages[0].result).toEqual({
+      error: {
+        source: "schema_validation",
+        schema: "present_content",
+        issues: [
+          {
+            path: ["summary"],
+            code: "invalid_type",
+            message: "Invalid input: expected string, received number",
+          },
+        ],
+      },
+    })
+  })
 })
 
 describe("getLatestToolIds", () => {

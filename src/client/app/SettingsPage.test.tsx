@@ -132,8 +132,8 @@ describe("resolveSettingsSectionId", () => {
 
 describe("getKeybindingsSubtitle", () => {
   test("renders the active keybindings path", () => {
-    expect(getKeybindingsSubtitle("~/.kanna-dev/keybindings.json")).toBe(
-      "Edit global app shortcuts stored in ~/.kanna-dev/keybindings.json."
+    expect(getKeybindingsSubtitle("~/.tinkaria-dev/keybindings.json")).toBe(
+      "Edit global app shortcuts stored in ~/.tinkaria-dev/keybindings.json."
     )
   })
 })

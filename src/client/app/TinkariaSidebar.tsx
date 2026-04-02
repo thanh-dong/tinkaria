@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Flower, Loader2, PanelLeft, X, Menu, Plus, Settings } from "lucide-react"
+import { Loader2, PanelLeft, X, Menu, Plus, Settings } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import { Button } from "../components/ui/button"
+import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
+import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import { cn } from "../lib/utils"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProjectsSection"
@@ -10,7 +12,7 @@ import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, Upd
 import type { SocketStatus } from "./socket-interface"
 import { useProjectGroupOrderStore } from "../stores/projectGroupOrderStore"
 
-interface KannaSidebarProps {
+interface TinkariaSidebarProps {
   data: SidebarData
   activeChatId: string | null
   connectionStatus: SocketStatus
@@ -36,7 +38,7 @@ interface KannaSidebarProps {
   onShowMoreSessions: (projectId: string) => void
 }
 
-export function KannaSidebar({
+export function TinkariaSidebar({
   data,
   activeChatId,
   connectionStatus,
@@ -60,7 +62,7 @@ export function KannaSidebar({
   onResumeSession,
   onRefreshSessions,
   onShowMoreSessions,
-}: KannaSidebarProps) {
+}: TinkariaSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -198,7 +200,7 @@ export function KannaSidebar({
       {collapsed && isUtilityPageActive && (
         <div className="hidden md:flex fixed left-0 top-0 h-full z-40 items-start pt-4 pl-5 border-l border-border/0">
           <div className="flex items-center gap-1">
-            <Flower className="size-6 text-logo" />
+            <TinkariaSidebarMark className="size-6" imageClassName="size-5" />
             <Button
               variant="ghost"
               size="icon"
@@ -212,6 +214,7 @@ export function KannaSidebar({
       )}
 
       <div
+        {...getUiIdentityAttributeProps("chat.sidebar")}
         data-sidebar="open"
         className={cn(
           "fixed inset-0 z-50 bg-background dark:bg-card flex flex-col h-[100dvh] select-none",
@@ -228,10 +231,13 @@ export function KannaSidebar({
               title="Collapse sidebar"
               className="hidden md:flex group/sidebar-collapse relative items-center justify-center h-5 w-5 sm:h-6 sm:w-6"
             >
-              <Flower className="absolute inset-0.5 h-4 w-4 sm:h-5 sm:w-5 text-logo transition-all duration-200 ease-out opacity-100 scale-100 group-hover/sidebar-collapse:opacity-0 group-hover/sidebar-collapse:scale-0" />
+              <TinkariaSidebarMark
+                className="absolute inset-0 transition-all duration-200 ease-out opacity-100 scale-100 group-hover/sidebar-collapse:opacity-0 group-hover/sidebar-collapse:scale-0"
+                imageClassName="h-4 w-4 sm:h-5 sm:w-5"
+              />
               <PanelLeft className="absolute inset-0 h-4 w-4 sm:h-6 sm:w-6 text-slate-500 dark:text-slate-400 transition-all duration-200 ease-out opacity-0 scale-0 group-hover/sidebar-collapse:opacity-100 group-hover/sidebar-collapse:scale-80 hover:opacity-50" />
             </button>
-            <Flower className="h-5 w-5 sm:h-6 sm:w-6 text-logo md:hidden" />
+            <TinkariaSidebarMark className="h-5 w-5 sm:h-6 sm:w-6 md:hidden" imageClassName="h-4 w-4 sm:h-5 sm:w-5" />
             <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">{APP_NAME}</span>
             
           </div>
@@ -250,7 +256,7 @@ export function KannaSidebar({
                 className="rounded-full !h-auto mr-1 py-0.5 px-2 bg-logo/20 hover:bg-logo text-logo border-logo/20 hover:text-foreground hover:border-logo/20  text-[11px] font-bold tracking-wider"
                 onClick={onInstallUpdate}
                 disabled={isUpdating}
-                title={updateSnapshot?.latestVersion ? `Update to ${updateSnapshot.latestVersion}` : "Update Kanna"}
+                title={updateSnapshot?.latestVersion ? `Update to ${updateSnapshot.latestVersion}` : `Update ${APP_NAME}`}
               >
                 {isUpdating ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
                 UPDATE

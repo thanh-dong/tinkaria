@@ -3,6 +3,10 @@ import type {
   KeybindingsSnapshot,
   ModelOptions,
 } from "./types"
+import type {
+  NativeWebviewDockState,
+  NativeWebviewTargetKind,
+} from "./native-webview"
 
 export type EditorPreset = "cursor" | "vscode" | "windsurf" | "custom"
 
@@ -14,6 +18,7 @@ export interface EditorOpenSettings {
 export type SubscriptionTopic =
   | { type: "sidebar" }
   | { type: "local-projects" }
+  | { type: "desktop-renderers" }
   | { type: "update" }
   | { type: "keybindings" }
   | { type: "chat"; chatId: string }
@@ -42,6 +47,8 @@ export type ClientCommand =
   | { type: "project.open"; localPath: string }
   | { type: "project.create"; localPath: string; title: string }
   | { type: "project.remove"; projectId: string }
+  | { type: "desktop.register"; rendererId: string; machineName: string; capabilities: string[] }
+  | { type: "desktop.unregister"; rendererId: string }
   | { type: "system.ping" }
   | { type: "update.check"; force?: boolean }
   | { type: "update.install" }
@@ -84,3 +91,16 @@ export type ClientCommand =
   | { type: "snapshot.unsubscribe"; subscriptionId: string }
   | { type: "sessions.resume"; projectId: string; sessionId: string; provider: AgentProvider }
   | { type: "sessions.refresh"; projectId: string }
+  | {
+      type: "webview.open"
+      rendererId: string
+      webviewId: string
+      targetKind: NativeWebviewTargetKind
+      target: string
+      dockState: NativeWebviewDockState
+    }
+  | {
+      type: "webview.close"
+      rendererId: string
+      webviewId: string
+    }

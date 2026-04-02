@@ -48,22 +48,29 @@ const languagePresets: Record<string, Parameters<typeof highlight>[1]> = {
 
 type OpenLocalLinkTarget = { path: string; line?: number; column?: number }
 type OpenLocalLinkHandler = (target: OpenLocalLinkTarget) => void
+type OpenExternalLinkHandler = (href: string) => boolean
 
 const defaultOpenLocalLink: OpenLocalLinkHandler = () => {}
+const defaultOpenExternalLink: OpenExternalLinkHandler = () => false
 
 const OpenLocalLinkContext = createContext<OpenLocalLinkHandler>(defaultOpenLocalLink)
+const OpenExternalLinkContext = createContext<OpenExternalLinkHandler>(defaultOpenExternalLink)
 
 export function OpenLocalLinkProvider({
   children,
   onOpenLocalLink,
+  onOpenExternalLink,
 }: {
   children: ReactNode
   onOpenLocalLink?: OpenLocalLinkHandler
+  onOpenExternalLink?: OpenExternalLinkHandler
 }) {
   return (
-    <OpenLocalLinkContext.Provider value={onOpenLocalLink ?? defaultOpenLocalLink}>
-      {children}
-    </OpenLocalLinkContext.Provider>
+    <OpenExternalLinkContext.Provider value={onOpenExternalLink ?? defaultOpenExternalLink}>
+      <OpenLocalLinkContext.Provider value={onOpenLocalLink ?? defaultOpenLocalLink}>
+        {children}
+      </OpenLocalLinkContext.Provider>
+    </OpenExternalLinkContext.Provider>
   )
 }
 
@@ -385,6 +392,7 @@ export const markdownComponents = {
 
 export function createMarkdownComponents(options?: {
   onOpenLocalLink?: OpenLocalLinkHandler
+  onOpenExternalLink?: OpenExternalLinkHandler
   renderRichContentBlocks?: boolean
 }) {
   const renderRichContentBlocks = options?.renderRichContentBlocks ?? true
@@ -416,21 +424,29 @@ export function createMarkdownComponents(options?: {
     },
     a: ({ children, href, onClick, ...props }: ComponentPropsWithoutRef<"a">) => {
       const onOpenLocalLink = options?.onOpenLocalLink ?? useContext(OpenLocalLinkContext)
+      const onOpenExternalLink = options?.onOpenExternalLink ?? useContext(OpenExternalLinkContext)
       const parsedLocalLink = parseLocalFileLink(href)
 
       return (
         <a
+          {...props}
           className="transition-all underline decoration-2 text-logo decoration-logo/50 hover:text-logo/70 dark:text-logo dark:decoration-logo/70 dark:hover:text-logo/60 dark:hover:decoration-logo/40 "
           href={href}
           target={parsedLocalLink ? undefined : "_blank"}
           rel={parsedLocalLink ? undefined : "noopener noreferrer"}
           onClick={(event) => {
             onClick?.(event)
-            if (event.defaultPrevented || !parsedLocalLink || onOpenLocalLink === defaultOpenLocalLink) return
+            if (event.defaultPrevented) return
+            if (parsedLocalLink) {
+              if (onOpenLocalLink === defaultOpenLocalLink) return
+              event.preventDefault()
+              onOpenLocalLink(parsedLocalLink)
+              return
+            }
+            if (!href || onOpenExternalLink === defaultOpenExternalLink) return
+            if (!onOpenExternalLink(href)) return
             event.preventDefault()
-            onOpenLocalLink(parsedLocalLink)
           }}
-          {...props}
         >
           {children}
         </a>

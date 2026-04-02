@@ -24,9 +24,16 @@ Thumbs.db
 
 # typescript
 *.tsbuildinfo
+src/**/*.js
 
 # vite
 vite.config.ts.timestamp-*
 
 # worktrees
 .worktrees/
+
+# local tooling state
+.superpowers/
+
+# tauri / rust build output
+src-tauri/target/

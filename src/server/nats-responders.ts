@@ -10,10 +10,11 @@ import { ensureProjectDirectory, resolveLocalPath } from "./paths"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
 import type { NatsPublisher } from "./nats-publisher"
-import { ALL_COMMANDS } from "../shared/nats-subjects"
+import { commandSubject } from "../shared/nats-subjects"
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
 import { findSessionFile, importCliTranscript } from "./session-discovery"
+import type { DesktopRenderersRegistry } from "./desktop-renderers"
 
 const encoder = new TextEncoder()
 const MAX_LOCAL_FILE_PREVIEW_BYTES = 256 * 1024
@@ -35,12 +36,15 @@ export interface RegisterRespondersArgs {
   machineDisplayName?: string
   updateManager: UpdateManager | null
   publisher: NatsPublisher
+  desktopRenderers: DesktopRenderersRegistry
   onStateChange: () => void
 }
 
 /** Command types that do NOT mutate state and should NOT trigger onStateChange */
 const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "system.ping",
+  "desktop.register",
+  "desktop.unregister",
   "terminal.input",
   "terminal.resize",
   "terminal.create",
@@ -54,6 +58,40 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "sessions.refresh",
 ])
 
+/**
+ * Commands handled by the Bun backend. Desktop-owned commands like `webview.open`
+ * and `webview.close` must not be subscribed here so Tauri can be the sole responder.
+ */
+const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
+  "project.open",
+  "project.create",
+  "project.remove",
+  "desktop.register",
+  "desktop.unregister",
+  "system.ping",
+  "update.check",
+  "update.install",
+  "settings.readKeybindings",
+  "settings.writeKeybindings",
+  "system.openExternal",
+  "system.readLocalFilePreview",
+  "chat.create",
+  "chat.rename",
+  "chat.delete",
+  "chat.send",
+  "chat.cancel",
+  "chat.respondTool",
+  "terminal.create",
+  "terminal.input",
+  "terminal.resize",
+  "terminal.close",
+  "chat.getMessages",
+  "snapshot.subscribe",
+  "snapshot.unsubscribe",
+  "sessions.resume",
+  "sessions.refresh",
+]
+
 export function registerCommandResponders(args: RegisterRespondersArgs): { dispose: () => void } {
   const {
     nc,
@@ -64,10 +102,11 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
     refreshDiscovery,
     updateManager,
     publisher,
+    desktopRenderers,
     onStateChange,
   } = args
 
-  const sub: Subscription = nc.subscribe(ALL_COMMANDS)
+  const subs: Subscription[] = SERVER_COMMANDS.map((type) => nc.subscribe(commandSubject(type)))
 
   async function handleMessage(msg: Msg): Promise<void> {
     let command: ClientCommand
@@ -99,6 +138,17 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
   async function executeCommand(command: ClientCommand): Promise<unknown> {
     switch (command.type) {
       case "system.ping":
+        return undefined
+
+      case "desktop.register":
+        return desktopRenderers.register({
+          rendererId: command.rendererId,
+          machineName: command.machineName,
+          capabilities: command.capabilities,
+        })
+
+      case "desktop.unregister":
+        desktopRenderers.unregister(command.rendererId)
         return undefined
 
       case "update.check": {
@@ -272,27 +322,30 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       }
 
       default: {
-        const _exhaustive: never = command
-        throw new Error(`Unknown command type: ${(_exhaustive as ClientCommand).type}`)
+        throw new Error(`Unknown command type: ${command.type}`)
       }
     }
   }
 
   // Process messages in the background
   void (async () => {
-    for await (const msg of sub) {
-      try {
-        await handleMessage(msg)
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        console.warn(LOG_PREFIX, `Unhandled error in command responder: ${message}`)
+    await Promise.all(subs.map(async (sub) => {
+      for await (const msg of sub) {
+        try {
+          await handleMessage(msg)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          console.warn(LOG_PREFIX, `Unhandled error in command responder: ${message}`)
+        }
       }
-    }
+    }))
   })()
 
   return {
     dispose() {
-      sub.unsubscribe()
+      for (const sub of subs) {
+        sub.unsubscribe()
+      }
     },
   }
 }

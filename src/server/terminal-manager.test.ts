@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
@@ -13,16 +13,27 @@ const isSupportedPlatform = process.platform !== "win32" && typeof Bun.Terminal 
 const describeIfSupported = isSupportedPlatform ? describe : describe.skip
 
 let tempProjectPath = ""
+const originalTestShell = process.env.TINKARIA_SHELL
 
 beforeAll(async () => {
   if (!isSupportedPlatform) return
-  tempProjectPath = await mkdtemp(path.join(os.tmpdir(), "kanna-terminal-manager-"))
+  process.env.TINKARIA_SHELL = "/bin/sh"
+  tempProjectPath = await mkdtemp(path.join(os.tmpdir(), "tinkaria-terminal-manager-"))
+})
+
+afterAll(() => {
+  if (originalTestShell === undefined) {
+    delete process.env.TINKARIA_SHELL
+    return
+  }
+
+  process.env.TINKARIA_SHELL = originalTestShell
 })
 
 afterEach(async () => {
   if (!tempProjectPath) return
   await rm(tempProjectPath, { recursive: true, force: true })
-  tempProjectPath = await mkdtemp(path.join(os.tmpdir(), "kanna-terminal-manager-"))
+  tempProjectPath = await mkdtemp(path.join(os.tmpdir(), "tinkaria-terminal-manager-"))
 })
 
 async function waitFor(check: () => boolean, timeoutMs: number, intervalMs = 25) {
@@ -106,31 +117,16 @@ describeIfSupported("TerminalManager", () => {
 
   test("ctrl+d preserves eof behavior", async () => {
     const terminalId = "terminal-ctrl-d"
-    // Use ZDOTDIR with a minimal .zshrc to bypass user prompt config
-    // (starship, powerline). Complex async prompts make ctrl+d unreliable
-    // under parallel test load. The empty .zshrc also prevents the
-    // zsh-newuser-install wizard from triggering.
-    const originalZdotdir = process.env.ZDOTDIR
-    process.env.ZDOTDIR = tempProjectPath
-    await Bun.write(path.join(tempProjectPath, ".zshrc"), "# minimal test shell\n")
+    const { manager } = await createSession(terminalId)
+
     try {
-      const { manager } = await createSession(terminalId)
+      manager.write(terminalId, "\x04")
 
-      try {
-        manager.write(terminalId, "\x04")
+      await waitFor(() => manager.getSnapshot(terminalId)?.status === "exited", COMMAND_TIMEOUT_MS)
 
-        await waitFor(() => manager.getSnapshot(terminalId)?.status === "exited", COMMAND_TIMEOUT_MS)
-
-        expect(manager.getSnapshot(terminalId)?.exitCode).toBe(0)
-      } finally {
-        manager.close(terminalId)
-      }
+      expect(manager.getSnapshot(terminalId)?.exitCode).toBe(0)
     } finally {
-      if (originalZdotdir === undefined) {
-        delete process.env.ZDOTDIR
-      } else {
-        process.env.ZDOTDIR = originalZdotdir
-      }
+      manager.close(terminalId)
     }
   })
 

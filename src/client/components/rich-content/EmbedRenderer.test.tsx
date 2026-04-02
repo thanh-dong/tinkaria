@@ -11,6 +11,10 @@ describe("isEmbedLanguage", () => {
     expect(isEmbedLanguage("d2")).toBe(true)
   })
 
+  test("returns true for svg", () => {
+    expect(isEmbedLanguage("svg")).toBe(true)
+  })
+
   test("returns false for typescript", () => {
     expect(isEmbedLanguage("typescript")).toBe(false)
   })
@@ -36,5 +40,47 @@ describe("EmbedRenderer", () => {
     )
 
     expect(html).toContain("x -&gt; y") // HTML-encoded
+  })
+
+  test("renders svg as an image-first surface with render and source views", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer
+        format="svg"
+        source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'}
+      />
+    )
+
+    expect(html).toContain("Render")
+    expect(html).toContain("Source")
+    expect(html).toContain("data-svg-render")
+    expect(html).toContain("<rect")
+  })
+
+  test("shows svg render error fallback with escaped source visibility", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="svg" source={"<svg><rect></svg>"} />
+    )
+
+    expect(html).toContain("SVG render error")
+    expect(html).not.toContain("data-svg-render")
+    expect(html).toContain("&lt;svg&gt;")
+  })
+
+  test("accepts svg with xml prolog, doctype, comments, and cdata style blocks", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer
+        format="svg"
+        source={`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- exported -->
+<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+  <style><![CDATA[rect { fill: red; }]]></style>
+  <rect width="10" height="10" />
+</svg>`}
+      />
+    )
+
+    expect(html).toContain("data-svg-render")
+    expect(html).not.toContain("SVG render error")
   })
 })

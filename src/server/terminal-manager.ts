@@ -51,6 +51,10 @@ function normalizeTerminalDimension(value: number, fallback: number) {
 }
 
 function resolveShell() {
+  if (process.env.TINKARIA_SHELL) {
+    return process.env.TINKARIA_SHELL
+  }
+
   try {
     return detectDefaultShell()
   } catch {

@@ -1,4 +1,4 @@
-# Kanna
+# Tinkaria
 
 Web UI for Claude Code & Codex CLIs. Full-stack TypeScript: React 19 (client) + Bun HTTP/WS (server).
 

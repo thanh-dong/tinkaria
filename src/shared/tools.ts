@@ -5,6 +5,11 @@ import type {
   ExitPlanModeToolResult,
   HydratedToolCall,
   NormalizedToolCall,
+  PresentContentInput,
+  PresentContentErrorToolResult,
+  PresentContentSchemaValidationError,
+  PresentContentValidationIssue,
+  PresentContentToolResult,
   ReadFileToolResult,
   TodoItem,
 } from "./types"
@@ -12,6 +17,28 @@ import type {
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null
   return value as Record<string, unknown>
+}
+
+function isPresentContentKind(value: unknown): value is PresentContentInput["kind"] {
+  return value === "markdown" || value === "code" || value === "diagram"
+}
+
+function isPresentContentValidationIssue(value: unknown): value is PresentContentValidationIssue {
+  return Boolean(value)
+    && typeof value === "object"
+    && Array.isArray((value as { path?: unknown }).path)
+    && ((value as { path?: unknown[] }).path?.every((segment) => typeof segment === "string") ?? false)
+    && typeof (value as { code?: unknown }).code === "string"
+    && typeof (value as { message?: unknown }).message === "string"
+}
+
+function isPresentContentSchemaValidationError(value: unknown): value is PresentContentSchemaValidationError {
+  return Boolean(value)
+    && typeof value === "object"
+    && (value as { source?: unknown }).source === "schema_validation"
+    && (value as { schema?: unknown }).schema === "present_content"
+    && Array.isArray((value as { issues?: unknown }).issues)
+    && ((value as { issues?: unknown[] }).issues?.every(isPresentContentValidationIssue) ?? false)
 }
 
 export function normalizeToolCall(args: {
@@ -30,6 +57,22 @@ export function normalizeToolCall(args: {
         toolId,
         input: {
           questions: Array.isArray(input.questions) ? (input.questions as AskUserQuestionItem[]) : [],
+        },
+        rawInput: input,
+      }
+    case "present_content":
+      return {
+        kind: "tool",
+        toolKind: "present_content",
+        toolName,
+        toolId,
+        input: {
+          title: typeof input.title === "string" ? input.title : "",
+          kind: isPresentContentKind(input.kind) ? input.kind : "markdown",
+          format: typeof input.format === "string" ? input.format : "text",
+          source: typeof input.source === "string" ? input.source : "",
+          summary: typeof input.summary === "string" ? input.summary : undefined,
+          collapsed: typeof input.collapsed === "boolean" ? input.collapsed : undefined,
         },
         rawInput: input,
       }
@@ -245,6 +288,38 @@ export function hydrateToolResult(tool: NormalizedToolCall, raw: unknown): Hydra
       return {
         content: typeof record?.content === "string" ? record.content : JSON.stringify(parsed, null, 2),
       } satisfies ReadFileToolResult
+    case "present_content": {
+      const record = asRecord(parsed)
+      if (isPresentContentSchemaValidationError(record?.error)) {
+        return {
+          error: record.error,
+        } satisfies PresentContentErrorToolResult
+      }
+      if (typeof record?.error === "string") {
+        return {
+          error: {
+            source: "schema_validation",
+            schema: "present_content",
+            issues: [
+              {
+                path: [],
+                code: "custom",
+                message: record.error,
+              },
+            ],
+          },
+        } satisfies PresentContentErrorToolResult
+      }
+      return {
+        accepted: true,
+        title: typeof record?.title === "string" ? record.title : tool.input.title,
+        kind: isPresentContentKind(record?.kind) ? record.kind : tool.input.kind,
+        format: typeof record?.format === "string" ? record.format : tool.input.format,
+        source: typeof record?.source === "string" ? record.source : tool.input.source,
+        summary: typeof record?.summary === "string" ? record.summary : tool.input.summary,
+        collapsed: typeof record?.collapsed === "boolean" ? record.collapsed : tool.input.collapsed,
+      } satisfies PresentContentToolResult
+    }
     default:
       return parsed
   }

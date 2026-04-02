@@ -19,6 +19,7 @@ const typeIcons: Record<RichContentType, typeof Code> = {
 }
 
 const COLLAPSED_MAX_HEIGHT = "max-h-24"
+const CONTENT_BLOCK_BODY_CLASS_NAME = "px-4 pb-4 pt-3.5"
 
 interface RichContentBlockProps {
   type: RichContentType
@@ -78,7 +79,9 @@ export const RichContentBlock = memo(function RichContentBlock({
           !expanded && `${COLLAPSED_MAX_HEIGHT} overflow-hidden`
         )}
       >
-        {children}
+        <div className={CONTENT_BLOCK_BODY_CLASS_NAME}>
+          {children}
+        </div>
         {!expanded && (
           <div
             className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none"
@@ -99,3 +102,5 @@ export const RichContentBlock = memo(function RichContentBlock({
     </div>
   )
 })
+
+export { CONTENT_BLOCK_BODY_CLASS_NAME }

@@ -7,6 +7,9 @@ import {
   ContextMenuTrigger,
 } from "../../ui/context-menu"
 
+const PROJECT_GROUP_MENU_UI_ID = "sidebar.project-group.menu"
+const CHAT_ROW_MENU_UI_ID = "sidebar.chat-row.menu"
+
 export function ProjectSectionMenu({
   onRemove,
   children,
@@ -19,7 +22,7 @@ export function ProjectSectionMenu({
       <ContextMenuTrigger asChild>
         {children}
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent uiId={PROJECT_GROUP_MENU_UI_ID}>
         <ContextMenuItem
           onSelect={(event) => {
             event.stopPropagation()
@@ -49,7 +52,7 @@ export function ChatRowMenu({
       <ContextMenuTrigger asChild>
         {children}
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent uiId={CHAT_ROW_MENU_UI_ID}>
         <ContextMenuItem
           onSelect={(event) => {
             event.stopPropagation()

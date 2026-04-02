@@ -17,7 +17,7 @@ import {
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Navigate, useNavigate, useOutletContext, useParams } from "react-router-dom"
-import { getKeybindingsFilePathDisplay, SDK_CLIENT_APP } from "../../shared/branding"
+import { APP_NAME, getKeybindingsFilePathDisplay, SDK_CLIENT_APP } from "../../shared/branding"
 import { DEFAULT_KEYBINDINGS, PROVIDERS, type AgentProvider, type KeybindingAction, type UpdateSnapshot } from "../../shared/types"
 import { markdownComponents } from "../components/messages/shared"
 import { ChatPreferenceControls } from "../components/chat-ui/ChatPreferenceControls"
@@ -36,6 +36,7 @@ import {
 } from "../components/ui/select"
 import { useTheme, type ThemePreference } from "../hooks/useTheme"
 import { KEYBINDING_ACTION_LABELS, formatKeybindingInput, getResolvedKeybindings, parseKeybindingInput } from "../lib/keybindings"
+import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import { cn } from "../lib/utils"
 import {
   DEFAULT_TERMINAL_MIN_COLUMN_WIDTH,
@@ -47,7 +48,7 @@ import {
   useTerminalPreferencesStore,
 } from "../stores/terminalPreferencesStore"
 import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
-import type { KannaState } from "./useKannaState"
+import type { TinkariaState } from "./useTinkariaState"
 
 const sidebarItems = [
   {
@@ -410,6 +411,7 @@ function GeneralSettingsDrafts({
   editorLabel,
   minColumnWidth,
   scrollbackLines,
+  setEditorPreset,
   setEditorCommandTemplate,
   setMinColumnWidth,
   setScrollbackLines,
@@ -419,6 +421,7 @@ function GeneralSettingsDrafts({
   editorLabel: string
   minColumnWidth: number
   scrollbackLines: number
+  setEditorPreset: (value: EditorPreset) => void
   setEditorCommandTemplate: (value: string) => void
   setMinColumnWidth: (value: number) => void
   setScrollbackLines: (value: number) => void
@@ -647,7 +650,7 @@ function KeybindingsDrafts({
 export function SettingsPage() {
   const navigate = useNavigate()
   const { sectionId } = useParams<{ sectionId: string }>()
-  const state = useOutletContext<KannaState>()
+  const state = useOutletContext<TinkariaState>()
   const { theme, setTheme } = useTheme()
   const [changelogStatus, setChangelogStatus] = useState<ChangelogStatus>("idle")
   const [releases, setReleases] = useState<GithubRelease[]>([])
@@ -681,7 +684,7 @@ export function SettingsPage() {
     : updateSnapshot?.status === "updating"
       ? "Installing update…"
       : updateSnapshot?.status === "restart_pending"
-        ? "Restarting Kanna…"
+        ? `Restarting ${APP_NAME}…`
         : updateSnapshot?.status === "available"
           ? `Update available${updateSnapshot.latestVersion ? `: ${updateSnapshot.latestVersion}` : ""}`
           : updateSnapshot?.status === "up_to_date"
@@ -752,7 +755,10 @@ export function SettingsPage() {
   const showFooter = !isConnecting
 
   return (
-    <div className="relative flex h-full flex-1 min-w-0 bg-background">
+    <div
+      {...getUiIdentityAttributeProps("settings.page")}
+      className="relative flex h-full flex-1 min-w-0 bg-background"
+    >
       <div className="flex min-w-0 flex-1">
         <aside className={`hidden w-[200px] shrink-0 md:block ${showFooter ? "pb-[89px]" : ""}`}>
           <div className="flex flex-col gap-1 px-4 py-6">
@@ -917,6 +923,7 @@ export function SettingsPage() {
                         editorLabel={state.editorLabel}
                         minColumnWidth={minColumnWidth}
                         scrollbackLines={scrollbackLines}
+                        setEditorPreset={setEditorPreset}
                         setEditorCommandTemplate={setEditorCommandTemplate}
                         setMinColumnWidth={setMinColumnWidth}
                         setScrollbackLines={setScrollbackLines}

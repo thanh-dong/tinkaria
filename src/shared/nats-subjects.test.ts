@@ -1,5 +1,14 @@
 import { describe, test, expect } from "bun:test"
-import { snapshotSubject, terminalEventSubject, commandSubject, ALL_SNAPSHOTS, ALL_TERMINAL_EVENTS, ALL_COMMANDS } from "./nats-subjects"
+import {
+  snapshotSubject,
+  terminalEventSubject,
+  commandSubject,
+  ALL_SNAPSHOTS,
+  ALL_TERMINAL_EVENTS,
+  ALL_COMMANDS,
+  nativeWebviewSnapshotTopic,
+  nativeWebviewEventSubject,
+} from "./nats-subjects"
 
 describe("snapshotSubject", () => {
   test("sidebar", () => {
@@ -12,6 +21,10 @@ describe("snapshotSubject", () => {
 
   test("update", () => {
     expect(snapshotSubject({ type: "update" })).toBe("kanna.snap.update")
+  })
+
+  test("desktop-renderers", () => {
+    expect(snapshotSubject({ type: "desktop-renderers" })).toBe("kanna.snap.desktop-renderers")
   })
 
   test("keybindings", () => {
@@ -54,5 +67,15 @@ describe("wildcards", () => {
 
   test("ALL_COMMANDS", () => {
     expect(ALL_COMMANDS).toBe("kanna.cmd.>")
+  })
+})
+
+describe("native webview subjects", () => {
+  test("builds native webview snapshot subjects", () => {
+    expect(nativeWebviewSnapshotTopic("preview")).toBe("kanna.snap.webview.preview")
+  })
+
+  test("builds native webview event subjects", () => {
+    expect(nativeWebviewEventSubject("preview")).toBe("kanna.evt.webview.preview")
   })
 })

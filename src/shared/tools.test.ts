@@ -51,6 +51,26 @@ describe("normalizeToolCall", () => {
     expect(tool.input.server).toBe("sentry")
     expect(tool.input.tool).toBe("search_issues")
   })
+
+  test("maps present_content input to a typed content payload", () => {
+    const tool = normalizeToolCall({
+      toolName: "present_content",
+      toolId: "tool-4",
+      input: {
+        title: "System Design",
+        kind: "diagram",
+        format: "mermaid",
+        source: "graph TD\nA-->B",
+        summary: "Current flow",
+        collapsed: true,
+      },
+    })
+
+    expect(tool.toolKind).toBe("present_content")
+    if (tool.toolKind !== "present_content") throw new Error("unexpected tool kind")
+    expect(tool.input.title).toBe("System Design")
+    expect(tool.input.format).toBe("mermaid")
+  })
 })
 
 describe("hydrateToolResult", () => {
@@ -95,5 +115,78 @@ describe("hydrateToolResult", () => {
     })
 
     expect(hydrateToolResult(tool, "line 1\nline 2")).toBe("line 1\nline 2")
+  })
+
+  test("hydrates present_content structured results", () => {
+    const tool = normalizeToolCall({
+      toolName: "present_content",
+      toolId: "tool-4",
+      input: {
+        title: "Snippet",
+        kind: "code",
+        format: "typescript",
+        source: "const x = 1",
+      },
+    })
+
+    const result = hydrateToolResult(tool, {
+      title: "Snippet",
+      kind: "code",
+      format: "typescript",
+      source: "const x = 1",
+      summary: "Context",
+      collapsed: false,
+    })
+
+    expect(result).toEqual({
+      accepted: true,
+      title: "Snippet",
+      kind: "code",
+      format: "typescript",
+      source: "const x = 1",
+      summary: "Context",
+      collapsed: false,
+    })
+  })
+
+  test("preserves present_content error payloads", () => {
+    const tool = normalizeToolCall({
+      toolName: "present_content",
+      toolId: "tool-5",
+      input: {
+        title: "Snippet",
+        kind: "code",
+        format: "typescript",
+        source: "const x = 1",
+      },
+    })
+
+    const result = hydrateToolResult(tool, {
+      error: {
+        source: "schema_validation",
+        schema: "present_content",
+        issues: [
+          {
+            path: ["summary"],
+            code: "invalid_type",
+            message: "Invalid input: expected string, received number",
+          },
+        ],
+      },
+    })
+
+    expect(result).toEqual({
+      error: {
+        source: "schema_validation",
+        schema: "present_content",
+        issues: [
+          {
+            path: ["summary"],
+            code: "invalid_type",
+            message: "Invalid input: expected string, received number",
+          },
+        ],
+      },
+    })
   })
 })

@@ -3,13 +3,13 @@ import { SerializeAddon } from "@xterm/addon-serialize"
 import { WebLinksAddon } from "@xterm/addon-web-links"
 import { Terminal, type ITheme } from "@xterm/xterm"
 import type { TerminalSnapshot } from "../../../shared/protocol"
-import type { KannaTransport, SocketStatus } from "../../app/socket-interface"
+import type { TinkariaTransport, SocketStatus } from "../../app/socket-interface"
 import { useTheme } from "../../hooks/useTheme"
 
 interface Props {
   projectId: string
   terminalId: string
-  socket: KannaTransport
+  socket: TinkariaTransport
   scrollback: number
   connectionStatus: SocketStatus
   clearVersion?: number
@@ -438,7 +438,7 @@ export function TerminalPane({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-4">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden px-3 py-1">
-        <div ref={containerRef} className="kanna-terminal min-h-0 min-w-0 flex-1 overflow-hidden w-full" />
+        <div ref={containerRef} className="tinkaria-terminal min-h-0 min-w-0 flex-1 overflow-hidden w-full" />
       </div>
       {error ? <div className="px-3 py-1 text-xs text-destructive">Terminal error: {error}</div> : null}
     </div>

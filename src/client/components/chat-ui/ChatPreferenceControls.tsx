@@ -12,6 +12,7 @@ import {
   type CodexReasoningEffort,
   type ProviderCatalogEntry,
 } from "../../../shared/types"
+import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 
@@ -88,11 +89,15 @@ export function InputPopover({
   trigger,
   triggerClassName,
   disabled = false,
+  triggerUiId,
+  contentUiId,
   children,
 }: {
   trigger: React.ReactNode
   triggerClassName?: string
   disabled?: boolean
+  triggerUiId?: string
+  contentUiId?: string
   children: React.ReactNode | ((close: () => void) => React.ReactNode)
 }) {
   const [open, setOpen] = useState(false)
@@ -100,6 +105,7 @@ export function InputPopover({
   if (disabled) {
     return (
       <button
+        {...(triggerUiId ? getUiIdentityAttributeProps(triggerUiId) : {})}
         disabled
         className={cn(
           "flex items-center gap-1.5 px-2 py-1 text-sm rounded-md text-muted-foreground [&>svg]:shrink-0 opacity-70 cursor-default [&>span]:whitespace-nowrap",
@@ -115,6 +121,7 @@ export function InputPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          {...(triggerUiId ? getUiIdentityAttributeProps(triggerUiId) : {})}
           className={cn(
             "flex items-center gap-1.5 px-2 py-1 text-sm rounded-md transition-colors text-muted-foreground [&>svg]:shrink-0 [&>span]:whitespace-nowrap",
             "hover:bg-muted/50",
@@ -124,7 +131,11 @@ export function InputPopover({
           {trigger}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="center" className="w-64 p-1">
+      <PopoverContent
+        {...(contentUiId ? getUiIdentityAttributeProps(contentUiId) : {})}
+        align="center"
+        className="w-64 p-1"
+      >
         <div className="space-y-1">{typeof children === "function" ? children(() => setOpen(false)) : children}</div>
       </PopoverContent>
     </Popover>
@@ -151,6 +162,7 @@ interface ChatPreferenceControlsProps {
   onPlanModeChange?: (planMode: boolean) => void
   includePlanMode?: boolean
   className?: string
+  skillPicker?: React.ReactNode
 }
 
 export const ChatPreferenceControls = memo(function ChatPreferenceControls({
@@ -167,6 +179,7 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
   onPlanModeChange,
   includePlanMode = true,
   className,
+  skillPicker,
 }: ChatPreferenceControlsProps) {
   const providerConfig = availableProviders.find((provider) => provider.id === selectedProvider) ?? availableProviders[0]
   const ProviderIcon = PROVIDER_ICONS[selectedProvider]
@@ -183,6 +196,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
       {showProviderPicker ? (
         <InputPopover
           disabled={providerLocked || !onProviderChange}
+          triggerUiId={createUiIdentity("chat.composer.provider", "action")}
+          contentUiId={createUiIdentity("chat.composer.provider", "popover")}
           trigger={(
             <>
               <ProviderIcon className="h-3.5 w-3.5" />
@@ -209,6 +224,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
       ) : null}
 
       <InputPopover
+        triggerUiId={createUiIdentity("chat.composer.model", "action")}
+        contentUiId={createUiIdentity("chat.composer.model", "popover")}
         trigger={(
           <>
             <ModelIcon className="h-3.5 w-3.5" />
@@ -234,6 +251,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
       </InputPopover>
 
       <InputPopover
+        triggerUiId={createUiIdentity("chat.composer.reasoning", "action")}
+        contentUiId={createUiIdentity("chat.composer.reasoning", "popover")}
         trigger={(
           <>
             <Brain className="h-3.5 w-3.5" />
@@ -277,6 +296,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
 
       {selectedProvider === "claude" && contextWindowOptions.length > 1 ? (
         <InputPopover
+          triggerUiId={createUiIdentity("chat.composer.context-window", "action")}
+          contentUiId={createUiIdentity("chat.composer.context-window", "popover")}
           trigger={(
             <>
               <ContextWindowIcon className="h-3.5 w-3.5" />
@@ -304,6 +325,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
 
       {selectedProvider === "codex" ? (
         <InputPopover
+          triggerUiId={createUiIdentity("chat.composer.fast-mode", "action")}
+          contentUiId={createUiIdentity("chat.composer.fast-mode", "popover")}
           trigger={(
             <>
               {codexModelOptions?.fastMode
@@ -341,6 +364,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
 
       {showPlanMode ? (
         <InputPopover
+          triggerUiId={createUiIdentity("chat.composer.plan-mode", "action")}
+          contentUiId={createUiIdentity("chat.composer.plan-mode", "popover")}
           trigger={(
             <>
               {planMode ? <ListTodo className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
@@ -375,6 +400,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
           )}
         </InputPopover>
       ) : null}
+
+      {skillPicker}
     </div>
   )
 })

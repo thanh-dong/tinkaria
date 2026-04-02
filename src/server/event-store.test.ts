@@ -7,14 +7,20 @@ import type { TranscriptEntry } from "../shared/types"
 import type { SnapshotFile } from "./events"
 import { EventStore } from "./event-store"
 
-const originalRuntimeProfile = process.env.KANNA_RUNTIME_PROFILE
+const originalRuntimeProfile = process.env.TINKARIA_RUNTIME_PROFILE
+const originalLegacyRuntimeProfile = process.env.KANNA_RUNTIME_PROFILE
 const tempDirs: string[] = []
 
 afterEach(async () => {
   if (originalRuntimeProfile === undefined) {
+    delete process.env.TINKARIA_RUNTIME_PROFILE
+  } else {
+    process.env.TINKARIA_RUNTIME_PROFILE = originalRuntimeProfile
+  }
+  if (originalLegacyRuntimeProfile === undefined) {
     delete process.env.KANNA_RUNTIME_PROFILE
   } else {
-    process.env.KANNA_RUNTIME_PROFILE = originalRuntimeProfile
+    process.env.KANNA_RUNTIME_PROFILE = originalLegacyRuntimeProfile
   }
 
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
@@ -36,11 +42,12 @@ function entry(kind: "user_prompt" | "assistant_text", createdAt: number, extra:
 
 describe("EventStore", () => {
   test("uses the runtime profile for the default data dir", () => {
-    process.env.KANNA_RUNTIME_PROFILE = "dev"
+    process.env.TINKARIA_RUNTIME_PROFILE = "dev"
+    delete process.env.KANNA_RUNTIME_PROFILE
 
     const store = new EventStore()
 
-    expect(store.dataDir).toEndWith("/.kanna-dev/data")
+    expect(store.dataDir).toEndWith("/.tinkaria-dev/data")
   })
 
   test("migrates legacy snapshot and messages log transcripts into per-chat files", async () => {

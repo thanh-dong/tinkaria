@@ -8,6 +8,23 @@ function tokenOption(token?: string): { token: string } | undefined {
   return token ? { token } : undefined
 }
 
+export interface CreateNatsBridgeOptions {
+  token?: string
+  bindHost?: string
+  advertisedHost?: string
+}
+
+function normalizeAdvertisedHost(bindHost: string, advertisedHost?: string): string {
+  if (advertisedHost) return advertisedHost
+  return bindHost === "0.0.0.0" ? "127.0.0.1" : bindHost
+}
+
+function rewriteUrlHost(rawUrl: string, host: string): string {
+  const url = new URL(rawUrl)
+  url.hostname = host
+  return url.toString().replace(/\/$/, "")
+}
+
 export class NatsBridge {
   readonly natsUrl: string
   readonly natsWsUrl: string
@@ -18,20 +35,29 @@ export class NatsBridge {
   readonly nc: NatsConnection
   private disposed = false
 
-  private constructor(server: NatsServer, connection: NatsConnection, token?: string) {
+  private constructor(
+    server: NatsServer,
+    connection: NatsConnection,
+    advertisedNatsUrl: string,
+    advertisedWsUrl: string,
+    token?: string
+  ) {
     this.server = server
     this.nc = connection
-    this.natsUrl = server.url
-    this.natsWsUrl = server.wsUrl!
+    this.natsUrl = advertisedNatsUrl
+    this.natsWsUrl = advertisedWsUrl
     this.natsWsPort = server.wsPort!
     this.authToken = token
   }
 
-  static async create(token?: string): Promise<NatsBridge> {
+  static async create(options: CreateNatsBridgeOptions = {}): Promise<NatsBridge> {
+    const bindHost = options.bindHost ?? "127.0.0.1"
+    const advertisedHost = normalizeAdvertisedHost(bindHost, options.advertisedHost)
     const server = await NatsServer.start({
+      host: bindHost,
       websocket: true,
       jetstream: true,
-      ...tokenOption(token),
+      ...tokenOption(options.token),
     })
 
     if (!server.wsUrl || !server.wsPort) {
@@ -40,13 +66,16 @@ export class NatsBridge {
     }
 
     const connection = await connect({
-      servers: server.url,
-      ...tokenOption(token),
+      servers: rewriteUrlHost(server.url, advertisedHost),
+      ...tokenOption(options.token),
     })
 
-    console.warn(LOG_PREFIX, `NATS bridge started — TCP: ${server.url}, WS: ${server.wsUrl}`)
+    const advertisedNatsUrl = rewriteUrlHost(server.url, advertisedHost)
+    const advertisedWsUrl = rewriteUrlHost(server.wsUrl, advertisedHost)
 
-    const bridge = new NatsBridge(server, connection, token)
+    console.warn(LOG_PREFIX, `NATS bridge started — TCP: ${advertisedNatsUrl}, WS: ${advertisedWsUrl}`)
+
+    const bridge = new NatsBridge(server, connection, advertisedNatsUrl, advertisedWsUrl, options.token)
 
     void server.exited.then((code) => {
       if (!bridge.disposed) {

@@ -329,7 +329,7 @@ export function classifyInstallVersionFailure(output: string): UpdateInstallAtte
     ok: false,
     errorCode: "install_failed",
     userTitle: "Update failed",
-    userMessage: "Kanna could not install the update. Try again later.",
+    userMessage: `${APP_NAME} could not install the update. Try again later.`,
   }
 }
 
@@ -339,7 +339,7 @@ export function installPackageVersion(packageName: string, version: string) {
       ok: false,
       errorCode: "command_missing",
       userTitle: "Bun not found",
-      userMessage: "Kanna could not find Bun to install the update.",
+      userMessage: `${APP_NAME} could not find Bun to install the update.`,
     } satisfies UpdateInstallAttemptResult
   }
 

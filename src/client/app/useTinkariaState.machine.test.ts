@@ -14,7 +14,7 @@ import {
   resolveProjectSelection,
   startQueuedFlush,
   transitionProjectSelection,
-} from "./useKannaState.machine"
+} from "./useTinkariaState.machine"
 
 describe("projectSelection machine", () => {
   test("prefers the active chat project over explicit and fallback selection", () => {

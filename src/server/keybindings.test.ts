@@ -116,17 +116,24 @@ describe("KeybindingsManager", () => {
   })
 
   test("uses the runtime profile for the default keybindings path", () => {
-    const previous = process.env.KANNA_RUNTIME_PROFILE
-    process.env.KANNA_RUNTIME_PROFILE = "dev"
+    const previous = process.env.TINKARIA_RUNTIME_PROFILE
+    const previousLegacy = process.env.KANNA_RUNTIME_PROFILE
+    process.env.TINKARIA_RUNTIME_PROFILE = "dev"
+    delete process.env.KANNA_RUNTIME_PROFILE
 
     const manager = new KeybindingsManager()
 
-    expect(manager.filePath).toEndWith("/.kanna-dev/keybindings.json")
+    expect(manager.filePath).toEndWith("/.tinkaria-dev/keybindings.json")
 
     if (previous === undefined) {
+      delete process.env.TINKARIA_RUNTIME_PROFILE
+    } else {
+      process.env.TINKARIA_RUNTIME_PROFILE = previous
+    }
+    if (previousLegacy === undefined) {
       delete process.env.KANNA_RUNTIME_PROFILE
     } else {
-      process.env.KANNA_RUNTIME_PROFILE = previous
+      process.env.KANNA_RUNTIME_PROFILE = previousLegacy
     }
   })
 })

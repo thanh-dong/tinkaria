@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
-import { PROVIDERS, type AgentProvider, type AskUserQuestionAnswerMap, type KeybindingsSnapshot, type ModelOptions, type ProviderCatalogEntry, type SessionsSnapshot, type UpdateInstallResult, type UpdateSnapshot } from "../../shared/types"
+import { PROVIDERS, type AgentProvider, type AskUserQuestionAnswerMap, type DesktopRenderersSnapshot, type KeybindingsSnapshot, type ModelOptions, type ProviderCatalogEntry, type SessionsSnapshot, type UpdateInstallResult, type UpdateSnapshot } from "../../shared/types"
 import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
 import { useChatReadStateStore } from "../stores/chatReadStateStore"
 import { useRightSidebarStore } from "../stores/rightSidebarStore"
@@ -28,9 +28,10 @@ import {
   type SubmitPipelineState,
   transitionProjectSelection,
   queueSubmit as queueSubmitTransition,
-} from "./useKannaState.machine"
+} from "./useTinkariaState.machine"
 import { NatsSocket } from "./nats-socket"
-import type { KannaTransport, SocketStatus } from "./socket-interface"
+import type { TinkariaTransport, SocketStatus } from "./socket-interface"
+import type { NativeWebviewCommand, NativeWebviewTargetKind } from "../../shared/native-webview"
 
 export function getNewestRemainingChatId(projectGroups: SidebarData["projectGroups"], activeChatId: string): string | null {
   const projectGroup = projectGroups.find((group) => group.chats.some((chat) => chat.chatId === activeChatId))
@@ -82,8 +83,8 @@ export function getInitialChatScrollTarget(args: {
   return args.isRead ? "bottom" : "top"
 }
 
-function useKannaSocket(): KannaTransport {
-  const socketRef = useRef<KannaTransport | null>(null)
+function useTinkariaSocket(): TinkariaTransport {
+  const socketRef = useRef<TinkariaTransport | null>(null)
   if (!socketRef.current) {
     socketRef.current = new NatsSocket()
   }
@@ -96,16 +97,16 @@ function useKannaSocket(): KannaTransport {
     }
   }, [])
 
-  return socketRef.current as KannaTransport
+  return socketRef.current as TinkariaTransport
 }
 
-function logKannaState(message: string, details?: unknown) {
+function logTinkariaState(message: string, details?: unknown) {
   if (details === undefined) {
-    console.info(`[useKannaState] ${message}`)
+    console.info(`[useTinkariaState] ${message}`)
     return
   }
 
-  console.info(`[useKannaState] ${message}`, details)
+  console.info(`[useTinkariaState] ${message}`, details)
 }
 
 export function shouldAutoFollowTranscript(distanceFromBottom: number) {
@@ -154,7 +155,7 @@ export function prependQueuedText(flushedText: string, queuedText: string): stri
 export function normalizeLocalFilePreviewErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   if (message.includes("Unknown command type: system.readLocalFilePreview")) {
-    return "This Kanna browser client is newer than the running server. Restart Kanna to enable in-app file previews."
+    return `This ${APP_NAME} browser client is newer than the running server. Restart ${APP_NAME} to enable in-app file previews.`
   }
   return message
 }
@@ -188,12 +189,6 @@ function clearUiUpdateRestartPhase() {
   window.sessionStorage.removeItem(UI_UPDATE_RESTART_STORAGE_KEY)
 }
 
-function getQueuedFlushKey(chatId: string | null, queuedText: string): string | null {
-  const text = queuedText.trim()
-  if (chatId === null || !text) return null
-  return `${chatId}:${text}`
-}
-
 export interface ProjectRequest {
   mode: "new" | "existing"
   localPath: string
@@ -222,11 +217,64 @@ export function resolveComposeIntent(params: {
   return null
 }
 
+const CONTROLLED_CONTENT_WEBVIEW_ID = "controlled-content"
+
+function isPrivateIpv4(hostname: string): boolean {
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true
+  const match = hostname.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/)
+  if (!match) return false
+  const secondOctet = Number.parseInt(match[1], 10)
+  return secondOctet >= 16 && secondOctet <= 31
+}
+
+function resolveNativeWebviewTargetKind(url: URL): NativeWebviewTargetKind {
+  const hostname = url.hostname.toLowerCase()
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || isPrivateIpv4(hostname)) {
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
+      ? "local-port"
+      : "lan-host"
+  }
+  if (!hostname.includes(".") || hostname.endsWith(".local")) {
+    return "lan-host"
+  }
+  return "proxied-remote"
+}
+
+export function resolveDesktopWebviewOpenCommand(args: {
+  href: string
+  desktopRenderers: DesktopRenderersSnapshot
+}): Extract<NativeWebviewCommand, { type: "webview.open" }> | null {
+  const renderer = args.desktopRenderers.renderers.find((candidate) => candidate.capabilities.includes("native_webview"))
+  if (!renderer) return null
+
+  let url: URL
+  try {
+    url = new URL(args.href)
+  } catch {
+    return null
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return null
+  }
+
+  return {
+    type: "webview.open",
+    rendererId: renderer.rendererId,
+    webviewId: CONTROLLED_CONTENT_WEBVIEW_ID,
+    targetKind: resolveNativeWebviewTargetKind(url),
+    target: url.toString(),
+    dockState: "docked",
+  }
+}
+
 export function getActiveChatSnapshot(chatSnapshot: ChatSnapshot | null, activeChatId: string | null): ChatSnapshot | null {
   if (!chatSnapshot) return null
   if (!activeChatId) return null
   if (chatSnapshot.runtime.chatId !== activeChatId) {
-    logKannaState("stale snapshot masked", {
+    logTinkariaState("stale snapshot masked", {
       routeChatId: activeChatId,
       snapshotChatId: chatSnapshot.runtime.chatId,
       snapshotProvider: chatSnapshot.runtime.provider,
@@ -236,14 +284,15 @@ export function getActiveChatSnapshot(chatSnapshot: ChatSnapshot | null, activeC
   return chatSnapshot
 }
 
-export interface KannaState {
-  socket: KannaTransport
+export interface TinkariaState {
+  socket: TinkariaTransport
   activeChatId: string | null
   sidebarData: SidebarData
   localProjects: LocalProjectsSnapshot | null
   updateSnapshot: UpdateSnapshot | null
   chatSnapshot: ChatSnapshot | null
   keybindings: KeybindingsSnapshot | null
+  desktopRenderers: DesktopRenderersSnapshot
   connectionStatus: SocketStatus
   sidebarReady: boolean
   localProjectsReady: boolean
@@ -291,6 +340,7 @@ export interface KannaState {
   handleOpenExternal: (action: "open_finder" | "open_terminal" | "open_editor") => Promise<void>
   handleOpenExternalPath: (action: "open_finder" | "open_editor", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
+  handleOpenExternalLink: (href: string) => boolean
   handleRenameChat: (chatId: string, title: string) => Promise<void>
   sessionsSnapshots: Map<string, SessionsSnapshot>
   sessionsWindowDays: Map<string, number>
@@ -312,9 +362,9 @@ export interface KannaState {
   ) => Promise<void>
 }
 
-export function useKannaState(activeChatId: string | null): KannaState {
+export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const navigate = useNavigate()
-  const socket = useKannaSocket()
+  const socket = useTinkariaSocket()
   const dialog = useAppDialog()
 
   const [sidebarData, setSidebarData] = useState<SidebarData>({ projectGroups: [] })
@@ -324,6 +374,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
   const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
   const [messages, setMessages] = useState<HydratedTranscriptMessage[]>([])
   const [keybindings, setKeybindings] = useState<KeybindingsSnapshot | null>(null)
+  const [desktopRenderers, setDesktopRenderers] = useState<DesktopRenderersSnapshot>({ renderers: [] })
   const [connectionStatus, setConnectionStatus] = useState<SocketStatus>("connecting")
   const [sidebarReady, setSidebarReady] = useState(false)
   const [localProjectsReady, setLocalProjectsReady] = useState(false)
@@ -392,6 +443,13 @@ export function useKannaState(activeChatId: string | null): KannaState {
   }, [socket])
 
   useEffect(() => {
+    return socket.subscribe<DesktopRenderersSnapshot>({ type: "desktop-renderers" }, (snapshot) => {
+      setDesktopRenderers(snapshot)
+      setCommandError(null)
+    })
+  }, [socket])
+
+  useEffect(() => {
     if (connectionStatus !== "connected") return
     void socket.command<UpdateSnapshot>({ type: "update.check", force: true }).catch((error) => {
       setCommandError(error instanceof Error ? error.message : String(error))
@@ -436,7 +494,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
 
   useEffect(() => {
     if (!activeChatId) {
-      logKannaState("clearing chat snapshot for non-chat route")
+      logTinkariaState("clearing chat snapshot for non-chat route")
       setChatSnapshot(null)
       setProjectSelection((current) => transitionProjectSelection(current, { type: "chat.cleared" }))
       hydratorRef.current.reset()
@@ -445,7 +503,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
       return
     }
 
-    logKannaState("subscribing to chat", { activeChatId })
+    logTinkariaState("subscribing to chat", { activeChatId })
     setChatSnapshot(null)
     hydratorRef.current.reset()
     setMessages([])
@@ -484,7 +542,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
     const unsub = socket.subscribe<ChatSnapshot | null, ChatMessageEvent>(
       { type: "chat", chatId: activeChatId },
       (snapshot) => {
-        logKannaState("chat snapshot received", {
+        logTinkariaState("chat snapshot received", {
           activeChatId,
           snapshotChatId: snapshot?.runtime.chatId ?? null,
           snapshotProvider: snapshot?.runtime.provider ?? null,
@@ -576,7 +634,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
     [activeChatId, sidebarData.projectGroups]
   )
   useEffect(() => {
-    logKannaState("active snapshot resolved", {
+    logTinkariaState("active snapshot resolved", {
       routeChatId: activeChatId,
       rawSnapshotChatId: chatSnapshot?.runtime.chatId ?? null,
       rawSnapshotProvider: chatSnapshot?.runtime.provider ?? null,
@@ -791,7 +849,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
         setCommandError(null)
         await dialog.alert({
           title: result.userTitle ?? "Update failed",
-          description: result.userMessage ?? "Kanna could not install the update. Try again later.",
+          description: result.userMessage ?? `${APP_NAME} could not install the update. Try again later.`,
           closeLabel: "OK",
         })
         return
@@ -1012,6 +1070,19 @@ export function useKannaState(activeChatId: string | null): KannaState {
     }
   }
 
+  function handleOpenExternalLink(href: string): boolean {
+    const command = resolveDesktopWebviewOpenCommand({
+      href,
+      desktopRenderers,
+    })
+    if (!command) return false
+
+    void socket.command(command).catch((error) => {
+      setCommandError(error instanceof Error ? error.message : String(error))
+    })
+    return true
+  }
+
   async function openExternal(command: {
     action: "open_finder" | "open_terminal" | "open_editor"
     localPath: string
@@ -1153,6 +1224,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
     updateSnapshot,
     chatSnapshot,
     keybindings,
+    desktopRenderers,
     connectionStatus,
     sidebarReady,
     localProjectsReady,
@@ -1198,6 +1270,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
     handleOpenExternal,
     handleOpenExternalPath,
     handleOpenLocalLink,
+    handleOpenExternalLink,
     sessionsSnapshots,
     sessionsWindowDays,
     handleOpenSessionPicker,

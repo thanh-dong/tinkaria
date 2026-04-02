@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
-import { RichContentBlock } from "./RichContentBlock"
+import { CONTENT_BLOCK_BODY_CLASS_NAME, RichContentBlock } from "./RichContentBlock"
 
 describe("RichContentBlock", () => {
   test("renders children inside wrapper", () => {
@@ -58,5 +58,11 @@ describe("RichContentBlock", () => {
     )
 
     expect(html).toContain("aria-label")
+  })
+
+  test("applies inset padding to inline rich content body", () => {
+    expect(CONTENT_BLOCK_BODY_CLASS_NAME).toContain("px-4")
+    expect(CONTENT_BLOCK_BODY_CLASS_NAME).toContain("pb-4")
+    expect(CONTENT_BLOCK_BODY_CLASS_NAME).toContain("pt-3.5")
   })
 })

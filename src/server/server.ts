@@ -1,3 +1,4 @@
+import { homedir } from "node:os"
 import path from "node:path"
 import { APP_NAME, getRuntimeProfile } from "../shared/branding"
 import { EventStore } from "./event-store"
@@ -11,9 +12,16 @@ import type { UpdateInstallAttemptResult } from "./cli-runtime"
 import { NatsBridge } from "./nats-bridge"
 import { generateAuthToken } from "./nats-auth"
 import { createNatsPublisher } from "./nats-publisher"
+import { writeDesktopBootstrapFile } from "./desktop-bootstrap"
 import { registerCommandResponders } from "./nats-responders"
 import { ensureTerminalEventsStream, ensureChatMessageStream } from "./nats-streams"
 import type { TranscriptEntry } from "../shared/types"
+import { ensureTinkariaBrandingPaths } from "./branding-migration"
+import { DesktopRenderersRegistry } from "./desktop-renderers"
+import {
+  normalizeDesktopCompanionManifest,
+  type DesktopCompanionManifest,
+} from "../shared/desktop-companion"
 
 export interface StartKannaServerOptions {
   port?: number
@@ -31,7 +39,8 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
   const port = options.port ?? 3210
   const hostname = options.host ?? "127.0.0.1"
   const strictPort = options.strictPort ?? false
-  const store = new EventStore()
+  const brandingPaths = await ensureTinkariaBrandingPaths(homedir(), undefined, options.onMigrationProgress)
+  const store = new EventStore(brandingPaths.dataDir)
   const machineDisplayName = getMachineDisplayName()
   await store.initialize()
   await store.migrateLegacyTranscripts(options.onMigrationProgress)
@@ -46,7 +55,7 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
 
   let server: ReturnType<typeof Bun.serve>
   const terminals = new TerminalManager()
-  const keybindings = new KeybindingsManager()
+  const keybindings = new KeybindingsManager(brandingPaths.keybindingsFilePath)
   await keybindings.initialize()
   const updateManager = options.update
     ? new UpdateManager({
@@ -56,9 +65,13 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
       devMode: getRuntimeProfile() === "dev",
     })
     : null
+  const desktopRenderers = new DesktopRenderersRegistry()
 
   const authToken = generateAuthToken()
-  const natsBridge = await NatsBridge.create(authToken)
+  const natsBridge = await NatsBridge.create({
+    token: authToken,
+    bindHost: hostname,
+  })
   await ensureTerminalEventsStream(natsBridge.nc)
   await ensureChatMessageStream(natsBridge.nc)
 
@@ -84,6 +97,7 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     getDiscoveredProjects: () => discoveredProjects,
     machineDisplayName,
     updateManager,
+    desktopRenderers,
   })
 
   broadcast = () => publisher.broadcastSnapshots()
@@ -98,6 +112,7 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     refreshDiscovery,
     updateManager,
     publisher,
+    desktopRenderers,
     onStateChange: () => publisher.broadcastSnapshots(),
   })
 
@@ -113,6 +128,19 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
         hostname,
         fetch(req) {
           const url = new URL(req.url)
+
+          if (url.pathname === "/desktop-companion.json") {
+            return Response.json(
+              createDesktopCompanionManifest({
+                serverUrl: `http://127.0.0.1:${actualPort}`,
+                natsUrl: natsBridge.natsUrl,
+                natsWsUrl: natsBridge.natsWsUrl,
+                authToken,
+                appName: APP_NAME,
+                version: updateManager?.getSnapshot().currentVersion ?? "unknown",
+              })
+            )
+          }
 
           if (url.pathname === "/health") {
             return Response.json({
@@ -141,6 +169,13 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     }
   }
 
+  await writeDesktopBootstrapFile(homedir(), {
+    serverUrl: `http://${hostname}:${actualPort}`,
+    natsUrl: natsBridge.natsUrl,
+    natsWsUrl: natsBridge.natsWsUrl,
+    authToken,
+  })
+
   const shutdown = async () => {
     for (const chatId of [...agent.activeTurns.keys()]) {
       await agent.cancel(chatId)
@@ -160,6 +195,12 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     updateManager,
     stop: shutdown,
   }
+}
+
+export function createDesktopCompanionManifest(
+  value: Partial<DesktopCompanionManifest> | null | undefined
+): DesktopCompanionManifest {
+  return normalizeDesktopCompanionManifest(value)
 }
 
 async function serveStatic(distDir: string, pathname: string) {

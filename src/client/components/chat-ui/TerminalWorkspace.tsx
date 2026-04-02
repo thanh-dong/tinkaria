@@ -1,9 +1,10 @@
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Eraser, Plus, X } from "lucide-react"
-import type { KannaTransport, SocketStatus } from "../../app/socket-interface"
+import type { TinkariaTransport, SocketStatus } from "../../app/socket-interface"
 import { Button } from "../ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../ui/resizable"
 import { HotkeyTooltip, HotkeyTooltipContent, HotkeyTooltipTrigger } from "../ui/tooltip"
+import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import type { ProjectTerminalLayout } from "../../stores/terminalLayoutStore"
 import { TerminalPane } from "./TerminalPane"
 import { getMinimumTerminalWidth, getMinimumTerminalWorkspaceWidth } from "./TerminalWorkspaceLayout"
@@ -11,7 +12,7 @@ import { getMinimumTerminalWidth, getMinimumTerminalWorkspaceWidth } from "./Ter
 interface Props {
   projectId: string
   layout: ProjectTerminalLayout
-  socket: KannaTransport
+  socket: TinkariaTransport
   connectionStatus: SocketStatus
   scrollback: number
   minColumnWidth: number
@@ -90,7 +91,10 @@ export function TerminalWorkspace({
   }, [layout.terminals])
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div
+      {...getUiIdentityAttributeProps("chat.terminal-workspace")}
+      className="flex h-full min-h-0 flex-col"
+    >
       <div ref={containerRef} className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
         <div className="h-full min-h-0" style={{ width: innerWidth || "100%" }}>
           <ResizablePanelGroup

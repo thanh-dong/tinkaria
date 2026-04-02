@@ -2,9 +2,19 @@ import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { createInterface } from "node:readline"
 import type { Readable, Writable } from "node:stream"
-import type { AskUserQuestionItem, CodexReasoningEffort, ServiceTier, TodoItem, TranscriptEntry } from "../shared/types"
+import type {
+  AskUserQuestionItem,
+  CodexReasoningEffort,
+  PresentContentSchemaValidationError,
+  PresentContentValidationIssue,
+  ServiceTier,
+  TodoItem,
+  TranscriptEntry,
+} from "../shared/types"
 import { getWebContextPrompt } from "./agent"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
+import { normalizeToolCall } from "../shared/tools"
+import { z, type ZodIssue } from "zod"
 import {
   type CollabAgentToolCallItem,
   type ContextCompactedNotification,
@@ -118,6 +128,7 @@ export interface StartCodexTurnArgs {
   model: string
   effort?: CodexReasoningEffort
   serviceTier?: ServiceTier
+  advertiseDynamicTools?: boolean
   content: string
   planMode: boolean
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
@@ -265,6 +276,40 @@ function dynamicToolPayload(value: Record<string, unknown> | unknown[] | string 
   const record = asRecord(value)
   if (record) return record
   return { value }
+}
+
+const presentContentSchema = z.object({
+  title: z.string(),
+  kind: z.enum(["markdown", "code", "diagram"]),
+  format: z.string(),
+  source: z.string(),
+  summary: z.string().optional(),
+  collapsed: z.boolean().optional(),
+}).strict()
+
+function presentContentValidationError(issues: ZodIssue[]): { error: PresentContentSchemaValidationError } {
+  return {
+    error: {
+      source: "schema_validation",
+      schema: "present_content",
+      issues: issues.map((issue) => ({
+        path: issue.path.map(String),
+        code: issue.code,
+        message: issue.message,
+      }) satisfies PresentContentValidationIssue),
+    },
+  }
+}
+
+function presentContentToolCall(toolId: string, input: Record<string, unknown>): TranscriptEntry {
+  return timestamped({
+    kind: "tool_call",
+    tool: normalizeToolCall({
+      toolName: "present_content",
+      toolId,
+      input,
+    }),
+  })
 }
 
 function webSearchQuery(item: Extract<ThreadItem, { type: "webSearch" }>): string {
@@ -673,8 +718,8 @@ export class CodexAppServerManager {
 
     await this.sendRequest(context, "initialize", {
       clientInfo: {
-        name: "kanna_desktop",
-        title: "Kanna",
+        name: "tinkaria_desktop",
+        title: "Tinkaria",
         version: "0.1.0",
       },
       capabilities: {
@@ -753,6 +798,7 @@ export class CodexAppServerManager {
     context.pendingTurn = pendingTurn
 
     try {
+      const shouldAdvertiseDynamicTools = args.advertiseDynamicTools !== false
       const response = await this.sendRequest<TurnStartResponse>(context, "turn/start", {
         threadId: context.sessionToken ?? "",
         input: [
@@ -766,12 +812,37 @@ export class CodexAppServerManager {
         model: args.model,
         effort: args.effort,
         serviceTier: args.serviceTier,
+        ...(shouldAdvertiseDynamicTools
+          ? {
+              dynamicTools: [
+                {
+                  name: "present_content",
+                  description: "Present a structured content artifact in the transcript.",
+                  inputSchema: {
+                    type: "object",
+                    properties: {
+                      title: { type: "string" },
+                      kind: { type: "string", enum: ["markdown", "code", "diagram"] },
+                      format: { type: "string" },
+                      source: { type: "string" },
+                      summary: { type: "string" },
+                      collapsed: { type: "boolean" },
+                    },
+                    required: ["title", "kind", "format", "source"],
+                    additionalProperties: false,
+                  },
+                },
+              ],
+            }
+          : {}),
         collaborationMode: {
           mode: args.planMode ? "plan" : "default",
           settings: {
             model: args.model,
             reasoning_effort: null,
-            developer_instructions: getWebContextPrompt("codex"),
+            developer_instructions: getWebContextPrompt("codex", {
+              presentContentEnabled: shouldAdvertiseDynamicTools,
+            }),
           },
         },
       } satisfies TurnStartParams)
@@ -828,6 +899,7 @@ export class CodexAppServerManager {
         model: args.model ?? "gpt-5.4",
         effort: args.effort,
         serviceTier: args.serviceTier ?? "fast",
+        advertiseDynamicTools: false,
         content: args.prompt,
         planMode: false,
         onToolRequest: async () => ({}),
@@ -1021,6 +1093,58 @@ export class CodexAppServerManager {
           id: request.id,
           result: {
             contentItems: [],
+            success: true,
+          } satisfies DynamicToolCallResponse,
+        })
+        return
+      }
+
+      if (request.params.tool === "present_content") {
+        const payload = dynamicToolPayload(request.params.arguments)
+        const parsed = presentContentSchema.safeParse(payload)
+
+        pendingTurn.queue.push({
+          type: "transcript",
+          entry: presentContentToolCall(request.params.callId, payload),
+        })
+
+        if (!parsed.success) {
+          pendingTurn.queue.push({
+            type: "transcript",
+            entry: timestamped({
+              kind: "tool_result",
+              toolId: request.params.callId,
+              content: presentContentValidationError(parsed.error.issues),
+              isError: true,
+            }),
+          })
+          this.writeMessage(context, {
+            id: request.id,
+            result: {
+              contentItems: [{ type: "inputText", text: "Invalid present_content payload" }],
+              success: false,
+            } satisfies DynamicToolCallResponse,
+          })
+          return
+        }
+
+        const normalized = parsed.data
+
+        pendingTurn.queue.push({
+          type: "transcript",
+          entry: timestamped({
+            kind: "tool_result",
+            toolId: request.params.callId,
+            content: {
+              accepted: true,
+              ...normalized,
+            },
+          }),
+        })
+        this.writeMessage(context, {
+          id: request.id,
+          result: {
+            contentItems: [{ type: "inputText", text: "presented" }],
             success: true,
           } satisfies DynamicToolCallResponse,
         })

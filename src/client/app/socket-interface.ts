@@ -5,7 +5,7 @@ export type EventListener<T> = (value: T) => void
 export type SocketStatus = "connecting" | "connected" | "disconnected"
 export type StatusListener = (status: SocketStatus) => void
 
-export interface KannaTransport {
+export interface TinkariaTransport {
   start(): void
   dispose(): void
   onStatus(listener: StatusListener): () => void

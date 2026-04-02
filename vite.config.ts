@@ -3,6 +3,13 @@ import react from "@vitejs/plugin-react"
 import { getDefaultDevServerPort } from "./src/shared/dev-ports"
 import { DEV_CLIENT_PORT } from "./src/shared/ports"
 
+const DEV_WATCH_IGNORED = [
+  "**/*.md",
+  "**/*.markdown",
+  "**/*.mdx",
+  "**/src-tauri/**",
+]
+
 function getAllowedHosts() {
   const defaults = ["localhost", "127.0.0.1", "0.0.0.0"]
   const configured = process.env.KANNA_DEV_ALLOWED_HOSTS
@@ -44,8 +51,14 @@ export default defineConfig({
       "/auth/token": {
         target: `http://${backendTargetHost}:${backendPort}`,
       },
+      "/desktop-companion.json": {
+        target: `http://${backendTargetHost}:${backendPort}`,
+      },
     },
     allowedHosts: getAllowedHosts(),
+    watch: {
+      ignored: DEV_WATCH_IGNORED,
+    },
   },
   build: {
     outDir: "dist/client",

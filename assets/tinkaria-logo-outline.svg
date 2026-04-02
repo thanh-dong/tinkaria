@@ -1,0 +1,16 @@
+<svg width="760" height="220" viewBox="0 0 760 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="760" height="220" rx="40" fill="#FFF8EE"/>
+  <g transform="translate(112 110)" stroke="#17322C" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 -56V-31"/>
+    <path d="M0 31V56"/>
+    <path d="M-56 0H-31"/>
+    <path d="M31 0H56"/>
+    <path d="M-39.6 -39.6L-22 -22"/>
+    <path d="M22 22L39.6 39.6"/>
+    <path d="M39.6 -39.6L22 -22"/>
+    <path d="M-22 22L-39.6 39.6"/>
+    <circle r="24"/>
+  </g>
+  <circle cx="112" cy="110" r="7" fill="#FF8A5B"/>
+  <text x="178" y="130" fill="#17322C" font-family="Avenir Next, Nunito, Poppins, ui-sans-serif, system-ui, sans-serif" font-size="70" font-weight="650" letter-spacing="0.15">Tinkaria</text>
+</svg>

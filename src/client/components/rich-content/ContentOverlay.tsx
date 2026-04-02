@@ -6,9 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogBody,
+  DIALOG_BODY_INSET_CLASS_NAME,
 } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { cn } from "../../lib/utils"
+import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import type { RichContentType } from "./types"
 
 const typeIcons: Record<RichContentType, typeof Code> = {
@@ -18,6 +20,9 @@ const typeIcons: Record<RichContentType, typeof Code> = {
   diff: GitCompareArrows,
 }
 
+const CONTENT_OVERLAY_INNER_CLASS_NAME = `${DIALOG_BODY_INSET_CLASS_NAME} pt-4`
+const CONTENT_OVERLAY_ROOT_UI_ID = "rich-content.viewer.area"
+
 interface ContentOverlayProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -25,6 +30,10 @@ interface ContentOverlayProps {
   type: RichContentType
   children: ReactNode
   rawContent?: string
+}
+
+function getContentOverlayUiIdentityProps() {
+  return getUiIdentityAttributeProps(CONTENT_OVERLAY_ROOT_UI_ID)
 }
 
 export function ContentOverlay({
@@ -47,7 +56,7 @@ export function ContentOverlay({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl">
+      <DialogContent size="xl" {...getContentOverlayUiIdentityProps()}>
         <DialogHeader>
           <div className="flex items-center gap-2 pr-8">
             <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -74,8 +83,14 @@ export function ContentOverlay({
             ) : null}
           </div>
         </DialogHeader>
-        <DialogBody>{children}</DialogBody>
+        <DialogBody className="p-0">
+          <div className={CONTENT_OVERLAY_INNER_CLASS_NAME}>
+            {children}
+          </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   )
 }
+
+export { CONTENT_OVERLAY_INNER_CLASS_NAME, CONTENT_OVERLAY_ROOT_UI_ID, getContentOverlayUiIdentityProps }

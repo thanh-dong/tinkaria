@@ -1,13 +1,14 @@
-export const APP_NAME = "Kanna"
-export const CLI_COMMAND = "kanna"
-export const DATA_ROOT_NAME = ".kanna"
-export const DEV_DATA_ROOT_NAME = ".kanna-dev"
-export const PACKAGE_NAME = "kanna-code"
-export const RUNTIME_PROFILE_ENV_VAR = "KANNA_RUNTIME_PROFILE"
+export const APP_NAME = "Tinkaria"
+export const CLI_COMMAND = "tinkaria"
+export const DATA_ROOT_NAME = ".tinkaria"
+export const DEV_DATA_ROOT_NAME = ".tinkaria-dev"
+export const PACKAGE_NAME = "tinkaria"
+export const RUNTIME_PROFILE_ENV_VAR = "TINKARIA_RUNTIME_PROFILE"
+export const LEGACY_RUNTIME_PROFILE_ENV_VAR = "KANNA_RUNTIME_PROFILE"
 // Read version from package.json — JSON import works in both Bun and Vite
 import pkg from "../../package.json"
-export const SDK_CLIENT_APP = `kanna/${pkg.version}`
-export const LOG_PREFIX = "[kanna]"
+export const SDK_CLIENT_APP = `tinkaria/${pkg.version}`
+export const LOG_PREFIX = "[tinkaria]"
 export const DEFAULT_NEW_PROJECT_ROOT = `~/${APP_NAME}`
 
 export type RuntimeProfile = "dev" | "prod"
@@ -24,7 +25,8 @@ function getRuntimeEnv(): RuntimeEnv {
 }
 
 export function getRuntimeProfile(env: RuntimeEnv = getRuntimeEnv()): RuntimeProfile {
-  return env?.[RUNTIME_PROFILE_ENV_VAR]?.trim().toLowerCase() === "dev" ? "dev" : "prod"
+  const profile = env?.[RUNTIME_PROFILE_ENV_VAR] ?? env?.[LEGACY_RUNTIME_PROFILE_ENV_VAR]
+  return profile?.trim().toLowerCase() === "dev" ? "dev" : "prod"
 }
 
 export function getDataRootName(env: RuntimeEnv = getRuntimeEnv()) {

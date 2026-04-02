@@ -26,6 +26,11 @@ export type ProcessedResultMessage = Extract<
   { kind: "result" }
 >
 
+export type ProcessedPresentContentMessage = Extract<
+  import("../../../shared/types").HydratedTranscriptMessage,
+  { kind: "tool"; toolKind: "present_content" }
+>
+
 export type ProcessedCompactBoundaryMessage = Extract<
   import("../../../shared/types").HydratedTranscriptMessage,
   { kind: "compact_boundary" }

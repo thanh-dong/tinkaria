@@ -27,10 +27,10 @@ describe("getWebContextPrompt", () => {
     expect(getWebContextPrompt("codex").length).toBeGreaterThan(0)
   })
 
-  test("includes Kanna and web-based interface for both providers", () => {
+  test("includes Tinkaria and web-based interface for both providers", () => {
     for (const provider of ["claude", "codex"] as const) {
       const prompt = getWebContextPrompt(provider)
-      expect(prompt).toContain("Kanna")
+      expect(prompt).toContain("Tinkaria")
       expect(prompt).toContain("web-based interface")
     }
   })
@@ -47,6 +47,19 @@ describe("getWebContextPrompt", () => {
       expect(prompt).toContain("Rich content")
       expect(prompt).toContain("Plan mode")
     }
+  })
+
+  test("mentions present_content for codex only when the tool is advertised", () => {
+    const enabledPrompt = getWebContextPrompt("codex", { presentContentEnabled: true })
+    const disabledPrompt = getWebContextPrompt("codex", { presentContentEnabled: false })
+
+    expect(enabledPrompt).toContain("present_content")
+    expect(disabledPrompt).not.toContain("present_content")
+  })
+
+  test("never mentions present_content for claude", () => {
+    const prompt = getWebContextPrompt("claude", { presentContentEnabled: true })
+    expect(prompt).not.toContain("present_content")
   })
 })
 

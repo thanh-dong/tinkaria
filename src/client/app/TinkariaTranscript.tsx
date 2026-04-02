@@ -9,6 +9,7 @@ import { AccountInfoMessage } from "../components/messages/AccountInfoMessage"
 import { TextMessage } from "../components/messages/TextMessage"
 import { AskUserQuestionMessage } from "../components/messages/AskUserQuestionMessage"
 import { ExitPlanModeMessage } from "../components/messages/ExitPlanModeMessage"
+import { PresentContentMessage } from "../components/messages/PresentContentMessage"
 import { TodoWriteMessage } from "../components/messages/TodoWriteMessage"
 import { ToolCallMessage } from "../components/messages/ToolCallMessage"
 import { ResultMessage } from "../components/messages/ResultMessage"
@@ -67,6 +68,7 @@ interface KannaTranscriptProps {
   localPath?: string
   latestToolIds: Record<string, string | null>
   onOpenLocalLink: (target: { path: string; line?: number; column?: number }) => void
+  onOpenExternalLink: (href: string) => boolean
   onAskUserQuestionSubmit: (
     toolUseId: string,
     questions: AskUserQuestionItem[],
@@ -75,13 +77,14 @@ interface KannaTranscriptProps {
   onExitPlanModeConfirm: (toolUseId: string, confirmed: boolean, clearContext?: boolean, message?: string) => void
 }
 
-export function KannaTranscript({
+export function TinkariaTranscript({
   messages,
   scrollRef,
   isLoading,
   localPath,
   latestToolIds,
   onOpenLocalLink,
+  onOpenExternalLink,
   onAskUserQuestionSubmit,
   onExitPlanModeConfirm,
 }: KannaTranscriptProps) {
@@ -149,6 +152,9 @@ export function KannaTranscript({
           if (message.id !== latestToolIds.TodoWrite) return null
           return <TodoWriteMessage key={message.id} message={message} />
         }
+        if (message.toolKind === "present_content") {
+          return <PresentContentMessage key={message.id} message={message} />
+        }
         return (
           <ToolCallMessage
             key={message.id}
@@ -181,7 +187,7 @@ export function KannaTranscript({
   const virtualItems = virtualizer.getVirtualItems()
 
   return (
-    <OpenLocalLinkProvider onOpenLocalLink={onOpenLocalLink}>
+    <OpenLocalLinkProvider onOpenLocalLink={onOpenLocalLink} onOpenExternalLink={onOpenExternalLink}>
       <div
         style={{
           height: virtualizer.getTotalSize(),

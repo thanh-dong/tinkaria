@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap");
-@import "tailwindcss";
+@import "tailwindcss" source(".");
+@source "../node_modules/streamdown/dist/*.js";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @font-face {
@@ -296,19 +297,19 @@
     margin-bottom: 20px;
   }
 
-  .kanna-terminal,
-  .kanna-terminal .xterm,
-  .kanna-terminal .xterm-scrollable-element,
-  .kanna-terminal .xterm-viewport,
-  .kanna-terminal .xterm-screen,
-  .kanna-terminal .xterm-helpers,
-  .kanna-terminal .xterm-helper-textarea,
-  .kanna-terminal .composition-view {
+  .tinkaria-terminal,
+  .tinkaria-terminal .xterm,
+  .tinkaria-terminal .xterm-scrollable-element,
+  .tinkaria-terminal .xterm-viewport,
+  .tinkaria-terminal .xterm-screen,
+  .tinkaria-terminal .xterm-helpers,
+  .tinkaria-terminal .xterm-helper-textarea,
+  .tinkaria-terminal .composition-view {
     background: transparent !important;
     background-color: transparent !important;
   }
 
-  .kanna-terminal .xterm-screen canvas {
+  .tinkaria-terminal .xterm-screen canvas {
     background: transparent !important;
   }
 
@@ -427,7 +428,7 @@
     }
   }
 
-  @keyframes kanna-empty-state-flower-in {
+  @keyframes tinkaria-empty-state-flower-in {
     from {
       opacity: 0;
       filter: blur(16px);
@@ -441,7 +442,7 @@
     }
   }
 
-  @keyframes kanna-empty-state-text-in {
+  @keyframes tinkaria-empty-state-text-in {
     from {
       filter: blur(4px);
     }
@@ -473,16 +474,16 @@
     }
   }
 
-  .kanna-empty-state-flower {
-    animation: kanna-empty-state-flower-in 0.399s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  .tinkaria-empty-state-flower {
+    animation: tinkaria-empty-state-flower-in 0.399s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
     transform-origin: center;
   }
 
-  .kanna-empty-state-text {
-    animation: kanna-empty-state-text-in 0.38s ease-out both;
+  .tinkaria-empty-state-text {
+    animation: tinkaria-empty-state-text-in 0.38s ease-out both;
   }
 
-  .kanna-typewriter-cursor-slot {
+  .tinkaria-typewriter-cursor-slot {
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
@@ -491,13 +492,13 @@
     flex-shrink: 0;
   }
 
-  .kanna-typewriter-text {
+  .tinkaria-typewriter-text {
     display: inline-block;
     clip-path: inset(0 100% 0 0);
-    animation: kanna-typewriter-reveal var(--kanna-typewriter-duration-ms) steps(var(--kanna-typewriter-steps)) both;
+    animation: tinkaria-typewriter-reveal var(--tinkaria-typewriter-duration-ms) steps(var(--tinkaria-typewriter-steps)) both;
   }
 
-  .kanna-typewriter-cursor {
+  .tinkaria-typewriter-cursor {
     display: inline-block;
     width: 1px;
     height: 1.05em;
@@ -505,7 +506,7 @@
     animation:
       kanna-cursor-blink 0.9s step-end infinite,
       kanna-cursor-fade-out 0.24s ease-out forwards;
-    animation-delay: 0s, var(--kanna-typewriter-duration-ms);
+    animation-delay: 0s, var(--tinkaria-typewriter-duration-ms);
   }
 
 
@@ -525,7 +526,7 @@
   }
 }
 
-@keyframes kanna-typewriter-reveal {
+@keyframes tinkaria-typewriter-reveal {
   from {
     clip-path: inset(0 100% 0 0);
   }

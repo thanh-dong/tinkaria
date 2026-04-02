@@ -152,7 +152,7 @@ export function resolveClaudeApiModelId(modelId: string, contextWindow?: ClaudeC
   return contextWindow === "1m" ? `${modelId}[1m]` : modelId
 }
 
-export type KannaStatus =
+export type TinkariaStatus =
   | "idle"
   | "starting"
   | "running"
@@ -172,7 +172,7 @@ export interface SidebarChatRow {
   _creationTime: number
   chatId: string
   title: string
-  status: KannaStatus
+  status: TinkariaStatus
   localPath: string
   provider: AgentProvider | null
   lastMessageAt?: number
@@ -219,6 +219,18 @@ export interface LocalProjectsSnapshot {
     displayName: string
   }
   projects: LocalProjectSummary[]
+}
+
+export interface DesktopRendererSnapshot {
+  rendererId: string
+  machineName: string
+  capabilities: string[]
+  connectedAt: number
+  lastSeenAt: number
+}
+
+export interface DesktopRenderersSnapshot {
+  renderers: DesktopRendererSnapshot[]
 }
 
 export type UpdateStatus =
@@ -329,6 +341,18 @@ interface ToolCallBase<TKind extends string, TInput> {
 export interface AskUserQuestionToolCall
   extends ToolCallBase<"ask_user_question", { questions: AskUserQuestionItem[] }> { }
 
+export interface PresentContentInput {
+  title: string
+  kind: "markdown" | "code" | "diagram"
+  format: string
+  source: string
+  summary?: string
+  collapsed?: boolean
+}
+
+export interface PresentContentToolCall
+  extends ToolCallBase<"present_content", PresentContentInput> { }
+
 export interface ExitPlanModeToolCall
   extends ToolCallBase<"exit_plan_mode", { plan?: string; summary?: string }> { }
 
@@ -370,6 +394,7 @@ export interface UnknownToolCall
 
 export type NormalizedToolCall =
   | AskUserQuestionToolCall
+  | PresentContentToolCall
   | ExitPlanModeToolCall
   | TodoWriteToolCall
   | SkillToolCall
@@ -486,6 +511,36 @@ export interface AskUserQuestionToolResult {
   discarded?: boolean
 }
 
+export interface PresentContentSuccessToolResult {
+  accepted: true
+  title: string
+  kind: "markdown" | "code" | "diagram"
+  format: string
+  source: string
+  summary?: string
+  collapsed?: boolean
+}
+
+export interface PresentContentValidationIssue {
+  path: string[]
+  code: string
+  message: string
+}
+
+export interface PresentContentSchemaValidationError {
+  source: "schema_validation"
+  schema: "present_content"
+  issues: PresentContentValidationIssue[]
+}
+
+export interface PresentContentErrorToolResult {
+  error: PresentContentSchemaValidationError
+}
+
+export type PresentContentToolResult =
+  | PresentContentSuccessToolResult
+  | PresentContentErrorToolResult
+
 export interface ExitPlanModeToolResult {
   confirmed?: boolean
   clearContext?: boolean
@@ -495,6 +550,9 @@ export interface ExitPlanModeToolResult {
 
 export type HydratedAskUserQuestionToolCall =
   HydratedToolCallBase<"ask_user_question", AskUserQuestionToolCall["input"], AskUserQuestionToolResult>
+
+export type HydratedPresentContentToolCall =
+  HydratedToolCallBase<"present_content", PresentContentToolCall["input"], PresentContentToolResult>
 
 export type HydratedExitPlanModeToolCall =
   HydratedToolCallBase<"exit_plan_mode", ExitPlanModeToolCall["input"], ExitPlanModeToolResult>
@@ -541,6 +599,7 @@ export type HydratedUnknownToolCall =
 
 export type HydratedToolCall =
   | HydratedAskUserQuestionToolCall
+  | HydratedPresentContentToolCall
   | HydratedExitPlanModeToolCall
   | HydratedTodoWriteToolCall
   | HydratedSkillToolCall
@@ -574,7 +633,7 @@ export interface ChatRuntime {
   projectId: string
   localPath: string
   title: string
-  status: KannaStatus
+  status: TinkariaStatus
   provider: AgentProvider | null
   planMode: boolean
   sessionToken: string | null
@@ -591,7 +650,7 @@ export interface ChatMessageEvent {
   entry: TranscriptEntry
 }
 
-export interface KannaSnapshot {
+export interface TinkariaSnapshot {
   sidebar: SidebarData
   chat?: ChatSnapshot | null
 }

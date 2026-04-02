@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { ArrowDown, Flower } from "lucide-react"
+import { ArrowDown } from "lucide-react"
 import { useOutletContext } from "react-router-dom"
+import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
 import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
 import { RightSidebar } from "../components/chat-ui/RightSidebar"
@@ -10,6 +11,7 @@ import { ProcessingMessage } from "../components/messages/ProcessingMessage"
 import { Card, CardContent } from "../components/ui/card"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../components/ui/resizable"
 import { ScrollArea } from "../components/ui/scroll-area"
+import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import { actionMatchesEvent, getResolvedKeybindings } from "../lib/keybindings"
 import { cn } from "../lib/utils"
 import {
@@ -24,8 +26,8 @@ import { shouldCloseTerminalPane } from "./terminalLayoutResize"
 import { TERMINAL_TOGGLE_ANIMATION_DURATION_MS } from "./terminalToggleAnimation"
 import { useRightSidebarToggleAnimation } from "./useRightSidebarToggleAnimation"
 import { useTerminalToggleAnimation } from "./useTerminalToggleAnimation"
-import type { KannaState } from "./useKannaState"
-import { KannaTranscript } from "./KannaTranscript"
+import type { TinkariaState } from "./useTinkariaState"
+import { TinkariaTranscript } from "./TinkariaTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
 import type { HydratedTranscriptMessage } from "../../shared/types"
 
@@ -36,6 +38,12 @@ const SCROLL_BUTTON_BOTTOM_PX = 120
 const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32
 const MOBILE_SIDEBAR_SWIPE_MIN_DISTANCE_PX = 72
 const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX = 56
+const CHAT_PAGE_UI_IDENTITIES = {
+  page: "chat.page",
+  transcript: "transcript.message-list",
+  composer: "chat.composer",
+  navbar: "chat.navbar",
+} as const
 
 const MOBILE_SIDEBAR_INTERACTIVE_SELECTOR = [
   "a",
@@ -141,8 +149,21 @@ export function getEmptyStateTypingDurationMs(text: string): number {
   return text.length * EMPTY_STATE_TYPING_INTERVAL_MS
 }
 
+export function getChatPageUiIdentities() {
+  return CHAT_PAGE_UI_IDENTITIES
+}
+
+export function ChatEmptyStateBrandMark() {
+  return (
+    <TinkariaSidebarMark
+      className="size-8 border-slate-300/60 bg-white/55 p-[3px] text-muted-foreground tinkaria-empty-state-flower dark:border-white/10 dark:bg-white/[0.02]"
+      imageClassName="size-full"
+    />
+  )
+}
+
 export function ChatPage() {
-  const state = useOutletContext<KannaState>()
+  const state = useOutletContext<TinkariaState>()
   const layoutRootRef = useRef<HTMLDivElement>(null)
   const chatCardRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
@@ -165,6 +186,7 @@ export function ChatPage() {
   const minColumnWidth = useTerminalPreferencesStore((store) => store.minColumnWidth)
   const keybindings = state.keybindings
   const resolvedKeybindings = useMemo(() => getResolvedKeybindings(keybindings), [keybindings])
+  const uiIdentities = getChatPageUiIdentities()
 
   const availableSkills = useMemo(() => getAvailableSkillsFromMessages(state.messages), [state.messages])
 
@@ -397,36 +419,39 @@ export function ChatPage() {
           rightSidebarShortcut={resolvedKeybindings.bindings.toggleRightSidebar}
         />
 
-        <ScrollArea
-          ref={state.scrollRef}
-          onScroll={state.updateScrollState}
-          className="flex-1 min-h-0 px-4 scroll-pt-[72px]"
-        >
-          {state.messages.length === 0 ? <div style={{ height: state.transcriptPaddingBottom }} aria-hidden="true" /> : null}
-          {state.messages.length > 0 ? (
-            <>
-              <div className="animate-fade-in space-y-5 pt-[72px] max-w-[800px] mx-auto">
-                <KannaTranscript
-                  messages={state.messages}
-                  scrollRef={state.scrollRef}
-                  isLoading={state.isProcessing}
-                  localPath={state.runtime?.localPath}
-                  latestToolIds={state.latestToolIds}
-                  onOpenLocalLink={state.handleOpenLocalLink}
-                  onAskUserQuestionSubmit={state.handleAskUserQuestion}
-                  onExitPlanModeConfirm={state.handleExitPlanMode}
-                />
-                {state.isProcessing ? <ProcessingMessage status={state.runtime?.status} /> : null}
-                {state.commandError ? (
-                  <div className="text-sm text-destructive border border-destructive/20 bg-destructive/5 rounded-xl px-4 py-3">
-                    {state.commandError}
-                  </div>
-                ) : null}
-              </div>
-              <div style={{ height: 250 }} aria-hidden="true" />
-            </>
-          ) : null}
-        </ScrollArea>
+        <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(uiIdentities.transcript)}>
+          <ScrollArea
+            ref={state.scrollRef}
+            onScroll={state.updateScrollState}
+            className="h-full px-4 scroll-pt-[72px]"
+          >
+            {state.messages.length === 0 ? <div style={{ height: state.transcriptPaddingBottom }} aria-hidden="true" /> : null}
+            {state.messages.length > 0 ? (
+              <>
+                <div className="animate-fade-in space-y-5 pt-[72px] max-w-[800px] mx-auto">
+                  <TinkariaTranscript
+                    messages={state.messages}
+                    scrollRef={state.scrollRef}
+                    isLoading={state.isProcessing}
+                    localPath={state.runtime?.localPath}
+                    latestToolIds={state.latestToolIds}
+                    onOpenLocalLink={state.handleOpenLocalLink}
+                    onOpenExternalLink={state.handleOpenExternalLink}
+                    onAskUserQuestionSubmit={state.handleAskUserQuestion}
+                    onExitPlanModeConfirm={state.handleExitPlanMode}
+                  />
+                  {state.isProcessing ? <ProcessingMessage status={state.runtime?.status} /> : null}
+                  {state.commandError ? (
+                    <div className="text-sm text-destructive border border-destructive/20 bg-destructive/5 rounded-xl px-4 py-3">
+                      {state.commandError}
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{ height: 250 }} aria-hidden="true" />
+              </>
+            ) : null}
+          </ScrollArea>
+        </div>
 
         {state.messages.length === 0 ? (
           <div
@@ -439,31 +464,31 @@ export function ChatPage() {
           >
             <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
               <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 opacity-70">
-                <Flower strokeWidth={1.5} className="size-8 text-muted-foreground kanna-empty-state-flower"></Flower>
+                <ChatEmptyStateBrandMark />
                 <div
-                  className="text-base font-normal text-muted-foreground text-center max-w-xs flex items-center kanna-empty-state-text"
+                  className="text-base font-normal text-muted-foreground text-center max-w-xs flex items-center tinkaria-empty-state-text"
                   aria-label={EMPTY_STATE_TEXT}
                 >
                   <span className="relative inline-grid place-items-start">
                     <span className="invisible col-start-1 row-start-1 whitespace-pre flex items-center">
                       <span>{EMPTY_STATE_TEXT}</span>
-                      <span className="kanna-typewriter-cursor-slot" aria-hidden="true" />
+                      <span className="tinkaria-typewriter-cursor-slot" aria-hidden="true" />
                     </span>
                     <span className="col-start-1 row-start-1 whitespace-pre flex items-center">
                       <span
-                        className="kanna-typewriter-text"
+                        className="tinkaria-typewriter-text"
                         style={{
-                          "--kanna-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
-                          "--kanna-typewriter-steps": EMPTY_STATE_TEXT.length,
+                          "--tinkaria-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
+                          "--tinkaria-typewriter-steps": EMPTY_STATE_TEXT.length,
                         } as CSSProperties}
                       >
                         {EMPTY_STATE_TEXT}
                       </span>
-                      <span className="kanna-typewriter-cursor-slot" aria-hidden="true">
+                      <span className="tinkaria-typewriter-cursor-slot" aria-hidden="true">
                         <span
-                          className="kanna-typewriter-cursor"
+                          className="tinkaria-typewriter-cursor"
                           style={{
-                            "--kanna-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
+                            "--tinkaria-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
                           } as CSSProperties}
                         />
                       </span>
@@ -493,7 +518,10 @@ export function ChatPage() {
         </div>
       </CardContent>
 
-      <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+      <div
+        className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none"
+        {...getUiIdentityAttributeProps(uiIdentities.composer)}
+      >
         <div className="bg-gradient-to-t from-background via-background pointer-events-auto" ref={state.inputRef}>
           <ChatInput
             ref={chatInputRef}
@@ -525,6 +553,7 @@ export function ChatPage() {
       onPointerMove={handleMobileSidebarPointerMove}
       onPointerUp={handleMobileSidebarPointerEnd}
       onPointerCancel={handleMobileSidebarPointerEnd}
+      {...getUiIdentityAttributeProps(uiIdentities.page)}
     >
       {shouldRenderRightSidebarLayout && projectId ? (
         <ResizablePanelGroup

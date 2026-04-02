@@ -1,5 +1,106 @@
 # Kanna Tasks
 
+## Completed: User Prompt Short-Word Wrapping
+
+**Status**: Verified. User prompt bubbles now explicitly prefer normal word wrapping instead of allowing aggressive mid-word breaks for short prompts.
+
+**Root cause**: `src/client/components/messages/UserMessage.tsx` rendered user prompts inside a `prose` bubble without any wrap override. In narrow layouts, typography/default wrap rules could break short prompt words more aggressively than desired.
+
+**Fix**:
+1. Added a focused regression test in `src/client/components/messages/UserMessage.test.tsx` that asserts the user bubble carries an explicit normal-wrap contract.
+2. Updated `src/client/components/messages/UserMessage.tsx` to apply `break-normal` plus `overflow-wrap: break-word` on the bubble and nested paragraphs, keeping the fix local to user prompts.
+
+**Verified**:
+1. RED: `bun test src/client/components/messages/UserMessage.test.tsx`
+2. GREEN: `bun test src/client/components/messages/UserMessage.test.tsx`
+3. `bun test src/client/app/TinkariaTranscript.test.tsx src/client/components/messages/shared.test.tsx`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+5. `agent-browser open http://127.0.0.1:5174` confirmed the local app is reachable; snapshot on the current session only exposed the shell/settings state, so a transcript-specific live repro was not available in this environment.
+
+## Completed: Release Hardening For Full Tinkaria Release Surface
+
+**Status**: Verification green on the current working tree. The branch is still `main` ahead of `origin/main`, but the known pre-release verification blockers reproduced earlier in this session have been cleared for the full `Tinkaria` release surface.
+
+**Release delta from last push**:
+1. Pushed-but-unreleased commit history adds session resume/session picker, inline rich-content viewer, local transcript preview opening, queued-draft/read-state fixes, audited frontend no-effects cleanup, provider cleanup on chat deletion, and multiple approved design/spec docs for overlay, SVG rich content, and Codex `present_content`.
+2. The current dirty worktree expands that further with the `Kanna` -> `Tinkaria` rebrand, npm/bin rename to `tinkaria`, Tauri shell/bootstrap work, desktop renderer/native webview plumbing, transcript `present_content` typing/rendering, Streamdown transcript rendering, and internal symbol/file renames to `Tinkaria*`.
+3. Package metadata is already pointed at the new release identity: `package.json` now uses `"name": "tinkaria"` and bin `"tinkaria"`, but the version is still `0.16.0`.
+
+**Blockers fixed in this pass**:
+1. Removed deprecated `compilerOptions.baseUrl` from `tsconfig.json`, added `src/vite-env.d.ts`, and tightened strict TypeScript callsites/types across the current dirty tree so `bunx @typescript/native-preview --noEmit -p tsconfig.json` now passes.
+2. Stabilized `src/server/nats-bridge.test.ts` by replacing subscription-establishment timing guesses with `await testClient.flush()` before publish assertions.
+3. Made PTY tests deterministic by allowing `src/server/terminal-manager.ts` to honor `TINKARIA_SHELL` and forcing `src/server/terminal-manager.test.ts` onto `/bin/sh`, which cleared the `ctrl+d` timeout and the earlier full-suite shell flake.
+
+**Verification evidence**:
+1. `git status --short --branch` -> `## main...origin/main [ahead 42]` plus extensive modified/untracked files.
+2. `git log --oneline @{u}..HEAD` confirmed 42 unpushed commits through `541a3cb docs: refine overlay context selection rules`.
+3. `git diff --stat @{u}` shows 102 changed paths, `10209` insertions, `2774` deletions.
+4. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+5. `bun test` -> `576 pass`, `0 fail`
+6. `bun run build`
+7. Live browser smoke check via `agent-browser` against `http://127.0.0.1:3210/settings/general` confirmed `document.title === "Tinkaria"` and visible `data-ui-id` surfaces including `chat.sidebar` and `settings.page`.
+8. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check` still passes structurally.
+
+**Notes**:
+1. `zerobased run tinkaria-release ...` brought the app up, but `http://tinkaria-release.localhost` returned `502 Bad Gateway` from Caddy during this smoke pass while direct `http://127.0.0.1:3210` access was healthy. Treat that as local router/environment follow-up, not a product release blocker for this branch.
+2. Package metadata is already renamed to `tinkaria`, but `package.json` version remains `0.16.0`.
+
+**Next**:
+1. Cut the release boundary into commits from the current verified tree.
+2. Bump the package version from `0.16.0`.
+3. Draft release notes for the full `Tinkaria` rename + platform/runtime release.
+4. Publish from a clean worktree once the release commit set is finalized.
+
+## Completed: Vite Dev Watch Ignore Scope
+
+**Status**: Verified. The Vite dev server is now configured to ignore unrelated Markdown files and the entire `src-tauri` tree, so edits in docs/specs/tasks and the desktop shell no longer get picked up by the web client watcher.
+
+**Root cause**: `vite.config.ts` did not constrain `server.watch`, so the default watcher still observed repository Markdown churn and the unrelated Tauri subtree.
+
+**Fix**:
+1. Added a `DEV_WATCH_IGNORED` pattern list in `vite.config.ts` covering `**/*.md`, `**/*.markdown`, `**/*.mdx`, and `**/src-tauri/**`.
+2. Wired that list into `server.watch.ignored` in the Vite config.
+3. Added `src/shared/vite-config.test.ts` to lock the watch-ignore contract.
+
+**Verified**:
+1. `bun test src/shared/vite-config.test.ts`
+2. `bun run build`
+3. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Completed: Chat Empty-State Tinkaria Mark
+
+**Status**: Verified. The empty chat page no longer renders the old Lucide flower icon; it now uses the shared `Tinkaria` SVG mark, matching the sidebar and collapsed navbar branding.
+
+**Root cause**: `src/client/app/ChatPage.tsx` still imported and rendered `Flower` for the empty-state hero, so the rebrand cleanup missed that surface even after the shared sidebar mark was introduced.
+
+**Fix**:
+1. Added `ChatEmptyStateBrandMark()` in `src/client/app/ChatPage.tsx` to make the empty-state logo use the same shared `TinkariaSidebarMark` asset path.
+2. Replaced the old `<Flower />` render in the empty-state block with `ChatEmptyStateBrandMark`.
+3. Added a focused regression test in `src/client/app/ChatPage.test.ts` that asserts the empty-state HTML contains `tinkaria-mark-fine.svg` and not `lucide-flower`.
+
+**Verified**:
+1. RED: `bun test src/client/app/ChatPage.test.ts` failed because `ChatEmptyStateBrandMark` was not exported from `src/client/app/ChatPage.tsx`.
+2. GREEN: `bun test src/client/app/ChatPage.test.ts`
+3. `c3x check` (no errors; existing `ref-zod-defensive-validation` warnings remain)
+4. `agent-browser eval 'document.body.innerHTML'` against the local dev server only exposed the pre-hydration Vite shell in this environment, so visual browser confirmation is still pending.
+
+## Completed: Chat Delete Provider Cleanup
+
+**Status**: Verified. Deleting a chat now disposes provider runtime state instead of only cancelling an active turn, which closes the leaked idle Codex app-server session tied to that chat. Project removal now uses the same disposal path for each chat.
+
+**Root cause**: `chat.delete` only called `agent.cancel(chatId)` and then marked the chat deleted in the event store. `cancel()` only interrupts active turns; it does not tear down an already-idle Codex session, so deleting an idle Codex-backed chat left the app-server child process/session alive.
+
+**Fix**:
+1. Added `AgentCoordinator.disposeChat(chatId)` in `src/server/agent.ts` to cancel any active turn and unconditionally stop the Codex session for that chat.
+2. Updated `src/server/nats-responders.ts` so both `chat.delete` and `project.remove` use `agent.disposeChat(...)` instead of `agent.cancel(...)`.
+3. Added regression coverage in `src/server/agent.test.ts` and `src/server/nats-responders.test.ts` for idle-session disposal and responder wiring.
+
+**Verified**:
+1. RED: `bun test src/server/nats-responders.test.ts src/server/agent.test.ts` failed first because `disposeChat()` did not exist and `chat.delete` still used `cancel()`.
+2. GREEN: `bun test src/server/nats-responders.test.ts src/server/agent.test.ts`
+3. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+4. `bunx @typescript/native-preview --noEmit -p tsconfig.json` still fails on the pre-existing `tsconfig.json` `baseUrl` removal error and was not changed by this fix.
+
 ## In Progress: Codex Present Content
 
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-codex-present-content-design.md`
@@ -20,22 +121,46 @@
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-tauri-native-webview-companion-design.md`
 **Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-02-tauri-native-webview-companion.md`
 
-**Status**: Design approved. Plan written. Implementation started with the first milestone: Tauri shell scaffold + standard-port attach + initial native-webview protocol surface.
+**Status**: Companion registration, desktop renderer snapshots, the first real steering path, the companion lifecycle slice, and the native branding/logging pass are implemented and verified locally in WSL and on a Windows-launched `.exe`. The desktop companion now uses a stable file-first bootstrap contract at `~/.tinkaria-dev/data/desktop-bootstrap.json` with HTTP manifest fallback, runs as a tray-first companion with `Open Settings` and `Exit`, and emits structured native stderr logs for bootstrap, tray, settings, and controlled-webview failures.
 
-**Summary**: Research how to incorporate Tauri so controlled content uses native webviews instead of iframes. Approved direction is a small-scope Tauri shell where the Kanna UI is itself a Tauri-managed webview and controlled content lives in native peer webviews. Runtime coordination stays on NATS; first-cut bootstrap may use standard-port setup/self-discovery.
+**Summary**: Research how to incorporate Tauri so controlled content uses native webviews instead of iframes. The approved direction is now companion-only: the main server stays browser-first, advertises embedded-NATS coordinates through a stable local bootstrap file and companion manifest, and Tauri attaches as a native peer that provides tray lifecycle, settings access, and managed native webviews.
 
 **Current decisions**:
 1. Prefer hybrid architecture eventually, but start with a smaller-scope Tauri companion/shell.
 2. Controlled content should support local and LAN/Tailscale targets first, with optional proxied remote targets later.
 3. UX should support both docked and pop-out controlled webviews.
-4. Kanna UI should be treated as another Tauri-managed webview, not the privileged root surface.
-5. Runtime discovery/control should be NATS-first; avoid relying on HTTP for coordination.
-6. First-cut bootstrap via standard local setup/self-discovery is acceptable.
+4. Runtime discovery/control should be NATS-first; avoid relying on HTTP for coordination.
+5. Companion discovery should use a stable expected local file first, with HTTP manifest only as fallback/convenience.
+6. Tauri should stay companion-only for now: tray lifecycle, settings access, reconnect behavior, and native webviews, not frontend ownership.
+
+**Regression note (2026-04-02)**:
+1. The committed baseline did not include the `desktop-renderers` snapshot topic in the shared/server snapshot pipeline, which explains the `Unknown topic type: desktop-renderers` runtime error on stale code paths.
+2. The current dirty worktree already contains the runtime support in `src/shared/protocol.ts` and `src/server/nats-publisher.ts`.
+3. Added regression coverage so the desktop renderer snapshot path is exercised in `src/server/nats-publisher.test.ts`, `src/shared/nats-subjects.test.ts`, and `src/server/nats-streams.test.ts`.
+
+**Verified**:
+1. `bun test src/server/nats-publisher.test.ts src/shared/nats-subjects.test.ts src/server/nats-streams.test.ts`
+2. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+3. `bun test src/shared/desktop-companion.test.ts`
+4. `bun -e 'import { startKannaServer } from "./src/server/server"; ... fetch("http://127.0.0.1:5220/desktop-companion.json") ...'`
+5. `bun test src/shared/desktop-bootstrap.test.ts src/server/desktop-bootstrap.test.ts src/shared/desktop-companion.test.ts`
+6. `cargo test --manifest-path src-tauri/Cargo.toml`
+7. `cargo check --manifest-path src-tauri/Cargo.toml`
+8. `bun run build`
+9. `agent-browser open http://127.0.0.1:5174/settings/general`
+10. `agent-browser snapshot`
+11. `agent-browser errors --clear`
+12. Windows smoke: rebuilt `src-tauri/target/x86_64-pc-windows-gnu/debug/tinkaria-desktop.exe`, staged it under `C:\Users\duc\AppData\Local\Temp\tinkaria-desktop-smoke\`, refreshed `C:\Users\duc\.tinkaria-dev\data\desktop-bootstrap.json`, and verified `Get-Process -Id 10708` returned `ProcessName : tinkaria-desktop` with the process still alive after launch.
+13. `cargo test --manifest-path src-tauri/Cargo.toml`
+14. `cargo check --manifest-path src-tauri/Cargo.toml`
+15. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu`
+16. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
 
 **Next**:
-1. Implement the Tauri shell scaffold.
-2. Add shared native-webview protocol and tests.
-3. Verify from WSL and document Windows run/build flow.
+1. Add a small companion status/settings view that reflects connected/disconnected state inside the tray-opened settings window.
+2. Route more controlled-content surfaces through desktop preference, not just transcript links.
+3. Add reconnect-state handling so disconnected companion-hosted views disable or close cleanly.
+4. If the tray/window bitmap still shows legacy art on Windows, regenerate `src-tauri/icons/icon.png` and `src-tauri/icons/icon.ico` from the Tinkaria mark instead of relying only on updated product names/titles.
 
 ## In Progress: Rich Content SVG Rendering
 
@@ -56,8 +181,11 @@
 
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-ui-identity-overlay-design.md`
 **Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-02-ui-identity-overlay.md`
+**Expansion Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-ui-identity-overlay-expansion-design.md`
+**Mobile Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-ui-identity-overlay-mobile-design.md`
+**C3 Semantic Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-ui-identity-overlay-c3-semantic-design.md`
 
-**Status**: Plan written. Waiting for execution mode selection.
+**Status**: First release works. Expansion design approved for taxonomy, broader visible coverage, deeper chat/sidebar interactables, and cursor-near placement.
 
 **Summary**: Add a hold-to-reveal client-side overlay that shows curated, copyable `ui-id` labels for meaningful UI surfaces. While `Alt` + `Shift` is held, the hovered tagged surface reveals a short ancestor stack so users can reference either the exact component or the broader containing area in debug/LLM requests.
 
@@ -66,6 +194,57 @@
 2. Hold-only stack with nearest tagged surface first and up to 2 tagged ancestors above it.
 3. Global app-level overlay controller with portal rendering and direct row-click copy.
 4. First-release coverage focused on high-value chat/settings shells and major interaction surfaces.
+
+**Task 4 outcome**:
+1. Exported `getGlobalUiIdentityIds()` from `src/client/app/App.tsx` with the approved first-release ids for sidebar, terminal workspace, right sidebar, and settings page.
+2. Tagged the `KannaSidebar`, `RightSidebar`, `TerminalWorkspace`, and `SettingsPage` shells with their curated `data-ui-id` identities.
+3. Added `App.test.tsx` coverage for the exported id map and extended `RightSidebar.test.ts` to assert the tagged right-sidebar shell.
+
+**Verified**:
+1. RED: `bun test src/client/app/App.test.tsx src/client/components/chat-ui/RightSidebar.test.ts` failed first on the missing `getGlobalUiIdentityIds()` export and missing `data-ui-id="chat.right-sidebar"` tag.
+2. GREEN: `bun test src/client/app/App.test.tsx src/client/components/chat-ui/RightSidebar.test.ts`
+3. `bun test src/client/lib/uiIdentityOverlay.test.ts src/client/components/ui/UiIdentityOverlay.test.tsx src/client/app/App.test.tsx src/client/app/ChatPage.test.ts src/client/components/chat-ui/RightSidebar.test.ts`
+4. `bun run build`
+5. `bunx @typescript/native-preview --noEmit -p tsconfig.json` still fails on the pre-existing `tsconfig.json` `baseUrl` removal error and was not changed by Task 4.
+6. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+7. Live smoke test via `agent-browser` against `http://localhost:5174/settings/general`: overlay resolved `settings.page` on the settings shell and `chat.sidebar` on the sidebar shell while the Alt+Shift modifier state was active, and `agent-browser errors` returned no browser errors.
+
+**Expansion decisions**:
+1. Use a hybrid taxonomy: persistent surfaces use `component + kind`, transient surfaces use explicit suffixes like `.menu`, `.dialog`, and `.popover`.
+2. Expand breadth everywhere with `area`/`item` coverage, but go deeper on chat and sidebar actions/menus first.
+3. Add a visible selected-area halo tied to the highlighted row.
+4. Anchor the overlay near the live pointer and flip/clamp it near viewport edges instead of letting it drift away from the cursor.
+
+**Mobile decisions**:
+1. Trigger mobile inspect mode with a two-finger long press on a tagged surface.
+2. Mobile inspect mode is sticky after entry rather than hold-only.
+3. Dismiss explicitly with tap-outside, close affordance, or system back behavior.
+
+**C3 semantic decisions**:
+1. Keep the visible overlay label UI-readable.
+2. Make the copied payload hybrid: `ui-id | c3:<component-id>`.
+3. Treat copied overlay ids as a bridge into C3 rather than replacing codemap lookup.
+
+## Completed: Streamdown Transcript Spike
+
+**Status**: Verified. Implemented the first transcript-only Streamdown adoption step.
+
+**Summary**: Replaced the assistant transcript text path with Streamdown while keeping Kanna's existing markdown adapter seam. The initial spike is intentionally narrow: only `TextMessage` now uses Streamdown, while local file preview, plan rendering, summaries, user bubbles, and settings changelog remain on `react-markdown`.
+
+**Implemented**:
+1. Added `streamdown` to the workspace and Tailwind `@source` wiring in `src/index.css`.
+2. Switched `src/client/components/messages/TextMessage.tsx` from `react-markdown` to `Streamdown`.
+3. Kept `createMarkdownComponents()` and `remarkRichContentHint` in place so local file links, rich-content fenced blocks, and `richcontent:autoExpand` continue to flow through Kanna's existing adapter.
+4. Disabled Streamdown link-safety modal on the transcript path so Kanna's current link behavior remains unchanged.
+
+**Outcome**:
+1. Assistant transcript rendering now handles incomplete markdown more gracefully during streaming instead of leaking unfinished markers like raw `**`.
+2. This remains an adapter migration, not a full renderer replacement. `react-markdown` is still used elsewhere in the app.
+3. Streamdown currently brings in Mermaid and related markdown tooling transitively, so any broader rollout should account for bundle-size impact and decide whether those surfaces should share one wrapper or stay split.
+
+**Recommended next step**:
+1. Decide whether to continue the migration surface-by-surface or stop at transcript text only.
+2. If continuing, migrate the remaining markdown surfaces behind a shared wrapper and remove `react-markdown` only after the last consumer is gone.
 
 ## Completed: Frontend Un-Effect Machine Lift
 
@@ -318,6 +497,61 @@
 
 **Next step**:
 1. Confirm desired scope: strict parity with upstream `v0.18.0`, or a smaller first cut that ships picker/upload/submit/render first and defers nicer preview polish.
+
+## In Progress: Tinkaria Rebrand
+
+**Status**: Verified in working tree.
+
+**Goal**: Rebrand the current fork from Kanna to Tinkaria, using the thinner `fine` SVG logo direction as the new primary brand asset.
+
+**Scope**:
+1. Update runtime branding constants, package/CLI identifiers, titles, prompts, and user-facing strings from `Kanna`/`kanna` to `Tinkaria`/`tinkaria`.
+2. Replace current icon/logo references with the selected `Tinkaria` SVG assets where the web app and docs point to branded artwork.
+3. Preserve existing local data by keeping compatibility in mind while changing branded paths and labels.
+4. Finish with a no-slop pass, simplify pass, review pass, and full verification evidence.
+
+**Plan**:
+1. RED: updated branding tests to assert `Tinkaria` naming and path expectations, then ran them to confirm failure.
+2. GREEN: implemented the minimal branding constant changes and compatibility handling needed for the tests to pass.
+3. Propagated the new brand through package metadata, app title, prompts, docs, Tauri shell metadata, and icon references.
+4. Ran targeted searches for lingering user-visible `Kanna`/`kanna` branding and kept only intentional legacy/internal references.
+5. Verified with targeted tests, build, live browser smoke check, and `c3x check`.
+
+**Notes**:
+1. Added `src/server/branding-migration.ts` so existing `~/.kanna` and `~/.kanna-dev` roots are renamed forward to `~/.tinkaria` and `~/.tinkaria-dev` on startup instead of silently losing local state.
+2. Switched the current web/app shell branding to the thinner `fine` `Tinkaria` SVG direction via `public/favicon.svg`, `assets/tinkaria-logo-fine.svg`, and `assets/tinkaria-mark-fine.svg`.
+3. Left internal CSS class names and a few historical/test comments untouched where they are not user-visible or where they intentionally document legacy compatibility.
+
+**Verified**:
+1. `bun test src/shared/branding.test.ts src/server/branding-migration.test.ts src/shared/desktop-shell.test.ts src/server/agent.test.ts src/server/cli-runtime.test.ts src/server/keybindings.test.ts src/server/event-store.test.ts src/server/nats-responders.test.ts src/client/app/SettingsPage.test.tsx src/client/app/useKannaState.test.ts`
+2. `bun run build`
+3. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+4. `bun run start -- --no-open --port 4310` plus `agent-browser` smoke check confirmed the live page title resolves to `Tinkaria`.
+
+## Completed: Internal Kanna -> Tinkaria Symbol Refactor
+
+**Status**: Verified in working tree.
+
+**Summary**: Renamed the remaining internal `Kanna*` app-shell symbols and files to `Tinkaria*`, including the main sidebar/transcript/state modules, transport/status types, and client CSS identity classes. Updated C3 codemap coverage so the renamed files map back to their owning components.
+
+**Refactor highlights**:
+1. Renamed `KannaSidebar` -> `TinkariaSidebar`, `KannaTranscript` -> `TinkariaTranscript`, and `useKannaState` -> `useTinkariaState` including their file paths.
+2. Renamed shared/client type identifiers such as `KannaTransport`, `KannaStatus`, and `KannaState` to `Tinkaria*` forms.
+3. Extracted a shared branded sidebar mark component and wired both sidebar and collapsed chat-navbar surfaces to it.
+4. Updated C3 entities and codemap patterns for `c3-0`, `c3-101`, `c3-110`, `c3-113`, and `c3-203` so lookups on renamed files resolve correctly again.
+
+**Intentional leftovers**:
+1. Legacy compatibility references such as `KANNA_RUNTIME_PROFILE`, `~/.kanna*`, and `kanna` session provenance remain on purpose.
+2. Internal NATS subject prefixes `kanna.*` remain unchanged for protocol continuity.
+3. Historical test fixtures, example paths, and upstream repo links that refer to the old fork name remain where they document legacy behavior or upstream lineage.
+
+**Verified**:
+1. `bun test src/client/app/tinkaria-naming.test.tsx src/client/app/useTinkariaState.test.ts src/client/app/useTinkariaState.machine.test.ts src/client/app/App.test.tsx src/client/app/ChatPage.test.ts src/client/components/chat-ui/ChatNavbar.test.tsx`
+2. `bun run build`
+3. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh lookup 'src/client/app/TinkariaSidebar.tsx'`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh lookup 'src/client/app/useTinkariaState.ts'`
+5. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh lookup 'bin/tinkaria'`
+6. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
 
 ## C3 Follow-up: Session Discovery Mapping
 

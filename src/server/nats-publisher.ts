@@ -1,18 +1,22 @@
 import type { NatsConnection } from "@nats-io/transport-node"
 import { jetstream } from "@nats-io/jetstream"
 import { Kvm } from "@nats-io/kv"
+import { homedir } from "node:os"
+import { join } from "node:path"
 import type { SubscriptionTopic } from "../shared/protocol"
 import { snapshotSubject, snapshotKvKey, terminalEventSubject, chatMessageSubject, KV_BUCKET } from "../shared/nats-subjects"
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
-import type { ChatMessageEvent, TranscriptEntry } from "../shared/types"
+import type { ChatMessageEvent, SessionsSnapshot, TranscriptEntry } from "../shared/types"
 import type { AgentCoordinator } from "./agent"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
 import type { KeybindingsManager } from "./keybindings"
+import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSessionsSnapshot, deriveSidebarData } from "./read-models"
+import { discoverSessions } from "./session-discovery"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
-import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSidebarData } from "./read-models"
+import type { DesktopRenderersRegistry } from "./desktop-renderers"
 
 const encoder = new TextEncoder()
 
@@ -40,10 +44,21 @@ export interface CreateNatsPublisherArgs {
   getDiscoveredProjects: () => DiscoveredProject[]
   machineDisplayName: string
   updateManager: UpdateManager | null
+  desktopRenderers: DesktopRenderersRegistry
 }
 
 export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
-  const { nc, store, agent, terminals, keybindings, getDiscoveredProjects, machineDisplayName, updateManager } = args
+  const {
+    nc,
+    store,
+    agent,
+    terminals,
+    keybindings,
+    getDiscoveredProjects,
+    machineDisplayName,
+    updateManager,
+    desktopRenderers,
+  } = args
 
   const js = jetstream(nc)
   const kv = await new Kvm(nc).create(KV_BUCKET)
@@ -51,6 +66,30 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
 
   const activeSubscriptions = new Map<string, SubscriptionTopic>()
   const lastJsonByKey = new Map<string, string>()
+  const sessionsCache = new Map<string, SessionsSnapshot>()
+  const sessionsPollTimers = new Map<string, ReturnType<typeof setInterval>>()
+
+  function encodeClaudeProjectDir(projectPath: string): string {
+    return join(homedir(), ".claude", "projects", `-${projectPath.replace(/\//g, "-")}`)
+  }
+
+  async function refreshSessions(projectId: string, projectPath: string): Promise<void> {
+    const home = homedir()
+    const claudeProjectDir = encodeClaudeProjectDir(projectPath)
+    const codexSessionsDir = join(home, ".codex", "sessions")
+
+    const snapshot = await discoverSessions({
+      projectId,
+      projectPath,
+      store,
+      claudeProjectDir,
+      codexSessionsDir,
+    })
+
+    sessionsCache.set(projectId, snapshot)
+    const topic = { type: "sessions" as const, projectId }
+    publishSnapshot(topic, snapshot)
+  }
 
   function publishSnapshot(topic: SubscriptionTopic, data: unknown): void {
     const kvKey = snapshotKvKey(topic)
@@ -78,6 +117,8 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         return deriveSidebarData(store.state, agent.getActiveStatuses())
       case "local-projects":
         return deriveLocalProjectsSnapshot(store.state, getDiscoveredProjects(), machineDisplayName)
+      case "desktop-renderers":
+        return desktopRenderers.getSnapshot()
       case "keybindings":
         return keybindings.getSnapshot()
       case "update":
@@ -91,6 +132,8 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         )
       case "terminal":
         return terminals.getSnapshot(topic.terminalId)
+      case "sessions":
+        return deriveSessionsSnapshot(sessionsCache.get(topic.projectId) ?? null)
       default: {
         const _exhaustive: never = topic
         throw new Error(`Unknown topic type: ${(_exhaustive as SubscriptionTopic).type}`)
@@ -100,6 +143,24 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
 
   function addSubscription(subscriptionId: string, topic: SubscriptionTopic): void {
     activeSubscriptions.set(subscriptionId, topic)
+
+    if (topic.type === "sessions" && !sessionsPollTimers.has(topic.projectId)) {
+      const projectId = topic.projectId
+      // Look up project path from store
+      const project = store.state.projectsById.get(projectId)
+      if (project) {
+        const projectPath = project.localPath
+        refreshSessions(projectId, projectPath).catch((err) =>
+          console.warn(LOG_PREFIX, "sessions scan failed:", err instanceof Error ? err.message : String(err))
+        )
+        const timer = setInterval(() => {
+          refreshSessions(projectId, projectPath).catch((err) =>
+            console.warn(LOG_PREFIX, "sessions scan failed:", err instanceof Error ? err.message : String(err))
+          )
+        }, 60_000)
+        sessionsPollTimers.set(projectId, timer)
+      }
+    }
   }
 
   function removeSubscription(subscriptionId: string): void {
@@ -112,6 +173,22 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
       const stillTracked = [...activeSubscriptions.values()].some((t) => snapshotKvKey(t) === key)
       if (!stillTracked) {
         lastJsonByKey.delete(key)
+      }
+
+      // Clean up sessions poll timer if no remaining sessions subscriptions for this projectId
+      if (topic.type === "sessions") {
+        const projectId = topic.projectId
+        const hasOtherSessionsSub = [...activeSubscriptions.values()].some(
+          (t) => t.type === "sessions" && t.projectId === projectId
+        )
+        if (!hasOtherSessionsSub) {
+          const timer = sessionsPollTimers.get(projectId)
+          if (timer) {
+            clearInterval(timer)
+            sessionsPollTimers.delete(projectId)
+          }
+          sessionsCache.delete(projectId)
+        }
       }
     }
   }
@@ -163,10 +240,15 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     getSnapshot,
     broadcastSnapshots,
     publishChatMessage,
+    refreshSessions,
     dispose() {
       disposeTerminalEvents()
       disposeKeybindingEvents()
       disposeUpdateEvents()
+      for (const timer of sessionsPollTimers.values()) {
+        clearInterval(timer)
+      }
+      sessionsPollTimers.clear()
     },
   }
 }

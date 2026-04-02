@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
-import { LocalFilePreviewContent } from "./LocalFilePreviewDialog"
+import {
+  LOCAL_FILE_PREVIEW_DIALOG_UI_ID,
+  LocalFilePreviewContent,
+  getLocalFilePreviewDialogUiIdentityProps,
+} from "./LocalFilePreviewDialog"
 
 describe("LocalFilePreviewContent", () => {
   test("renders markdown previews as markdown content", () => {
@@ -35,5 +39,32 @@ describe("LocalFilePreviewContent", () => {
     expect(html).toContain("sh__token--identifier")
     expect(html).toContain(">answer<")
     expect(html).not.toContain("group/rich-content")
+  })
+
+  test("renders svg previews through the embed renderer without extra chrome", () => {
+    const html = renderToStaticMarkup(
+      <LocalFilePreviewContent
+        preview={{
+          path: "/tmp/diagram.svg",
+          content: "<svg viewBox=\"0 0 10 10\"><rect width=\"10\" height=\"10\" /></svg>",
+        }}
+        onOpenLocalLink={() => {}}
+      />
+    )
+
+    expect(html).toContain("Render")
+    expect(html).toContain("Source")
+    expect(html).toContain("data-svg-render")
+    expect(html).not.toContain("sh__token--")
+    expect(html).not.toContain("group/rich-content")
+  })
+})
+
+describe("LocalFilePreviewDialog", () => {
+  test("tags the visible fullscreen preview dialog root", () => {
+    expect(LOCAL_FILE_PREVIEW_DIALOG_UI_ID).toBe("content-preview.dialog")
+    expect(getLocalFilePreviewDialogUiIdentityProps()).toEqual({
+      "data-ui-id": "content-preview.dialog",
+    })
   })
 })
