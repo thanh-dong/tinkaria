@@ -1,5 +1,18 @@
 # Kanna Tasks
 
+## In Progress: Rich Content SVG Rendering
+
+**Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-rich-content-svg-rendering-design.md`
+
+**Status**: Design written, pending user review before implementation planning.
+
+**Summary**: The current transcript rich-content pipeline already upgrades fenced code blocks into `RichContentBlock`, but `svg` is not classified as an embed language. The approved direction is to extend the existing fenced rich-content path so `svg` renders image-first and still exposes raw source within the same viewer.
+
+**Next**:
+1. User reviews the spec.
+2. Write the implementation plan.
+3. Execute RED-GREEN-TDD for SVG embed classification, rendering, and regressions.
+
 ## In Progress: Alt+Shift UI Identity Overlay
 
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-ui-identity-overlay-design.md`
