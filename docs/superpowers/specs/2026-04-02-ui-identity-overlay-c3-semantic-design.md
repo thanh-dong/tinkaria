@@ -69,6 +69,22 @@ Each tagged surface should be able to resolve to:
 
 This can be represented as metadata attached to the same tagged DOM surface rather than inferred later from arbitrary DOM structure.
 
+### Selection Bias
+
+Mappings should prefer the closest useful visible context, not the deepest renderer detail.
+
+Default mapping targets should therefore lean toward:
+- visible content roots
+- review or modal content roots
+- clearly distinct pane-level contexts when they help follow-up prompts
+
+Examples:
+- `rich-content.viewer.area | c3:c3-111`
+- `content-review.panel.area | c3:c3-111`
+- `review.diff.area | c3:c3-111`
+
+Avoid making deep artifact-level payloads the default when a broader surface already carries enough context.
+
 ### Example Mappings
 
 - `chat.navbar.new-chat.action` → `c3-112`
@@ -107,6 +123,11 @@ Do not add more than this by default in the first pass. Avoid dumping file paths
 ## Display Semantics
 
 The overlay row itself should continue to show only the UI-readable label by default.
+
+For rich content and review flows, the visible label should usually be the broad surface users can describe naturally:
+- `rich-content.viewer.area`
+- `content-review.panel.area`
+- `review.diff.area`
 
 Optional secondary treatment is allowed later:
 - muted tiny suffix showing `c3-112`
@@ -158,7 +179,7 @@ Mitigation:
 
 Mitigation:
 - allow temporary fallback to plain `ui-id` where no mapping exists
-- prioritize the high-value surfaces already tagged in the first release
+- prioritize broad visible content surfaces, including enriched review/viewer roots, before going deeper on artifact internals
 
 ## Implementation Notes
 
