@@ -696,6 +696,11 @@ export class AgentCoordinator {
     this.onStateChange()
   }
 
+  async disposeChat(chatId: string) {
+    await this.cancel(chatId)
+    this.codexManager.stopSession(chatId)
+  }
+
   async respondTool(command: Extract<ClientCommand, { type: "chat.respondTool" }>) {
     const active = this.activeTurns.get(command.chatId)
     if (!active || !active.pendingTool) {

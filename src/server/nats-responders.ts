@@ -146,7 +146,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       case "project.remove": {
         const project = store.getProject(command.projectId)
         for (const chat of store.listChatsByProject(command.projectId)) {
-          await agent.cancel(chat.id)
+          await agent.disposeChat(chat.id)
         }
         if (project) {
           terminals.closeByCwd(project.localPath)
@@ -174,7 +174,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       }
 
       case "chat.delete": {
-        await agent.cancel(command.chatId)
+        await agent.disposeChat(command.chatId)
         await store.deleteChat(command.chatId)
         return undefined
       }

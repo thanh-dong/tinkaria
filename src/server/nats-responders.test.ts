@@ -44,6 +44,7 @@ function createMockAgent() {
   return {
     send: async () => ({ chatId: "chat-1" }),
     cancel: async () => {},
+    disposeChat: async () => {},
     respondTool: async () => {},
     getActiveStatuses: () => new Map(),
   }
@@ -312,12 +313,12 @@ describe("nats-responders", () => {
     expect(changed).toBe(true)
   })
 
-  test("chat.delete cancels agent then deletes", async () => {
-    const cancelled: string[] = []
+  test("chat.delete disposes agent runtime state then deletes", async () => {
+    const disposed: string[] = []
     const deleted: string[] = []
     const mockAgent = {
       ...createMockAgent(),
-      cancel: async (id: string) => { cancelled.push(id) },
+      disposeChat: async (id: string) => { disposed.push(id) },
     }
     const mockStore = {
       ...createMockStore(),
@@ -393,12 +394,12 @@ describe("nats-responders", () => {
     expect(res.result).toEqual({ projectId: "proj-1" })
   })
 
-  test("project.remove cancels chats and triggers onStateChange", async () => {
+  test("project.remove disposes chats and triggers onStateChange", async () => {
     let changed = false
-    const cancelled: string[] = []
+    const disposed: string[] = []
     const mockAgent = {
       ...createMockAgent(),
-      cancel: async (id: string) => { cancelled.push(id) },
+      disposeChat: async (id: string) => { disposed.push(id) },
     }
     const { clientNc } = await setup({
       agent: mockAgent as never,

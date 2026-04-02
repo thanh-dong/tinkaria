@@ -372,6 +372,69 @@ describe("AgentCoordinator codex integration", () => {
     expect(turnCalls).toEqual([{ effort: "xhigh", serviceTier: "fast" }])
   })
 
+  test("disposeChat stops an idle codex session after the turn has already finished", async () => {
+    const stoppedChatIds: string[] = []
+    const fakeCodexManager = {
+      async startSession() {},
+      async startTurn(): Promise<HarnessTurn> {
+        async function* stream() {
+          yield { type: "session_token" as const, sessionToken: "thread-1" }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession(chatId: string) {
+        stoppedChatIds.push(chatId)
+      },
+    }
+
+    const store = createFakeStore()
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexManager: fakeCodexManager as never,
+    })
+
+    await coordinator.send({
+      type: "chat.send",
+      chatId: "chat-1",
+      provider: "codex",
+      content: "first",
+    })
+
+    await waitFor(() => store.turnFinishedCount === 1)
+    await coordinator.disposeChat("chat-1")
+
+    expect(stoppedChatIds).toEqual(["chat-1"])
+  })
+
   test("approving synthetic codex ExitPlanMode starts a hidden follow-up turn and can clear context", async () => {
     const sessionCalls: Array<{ chatId: string; sessionToken: string | null }> = []
     const startTurnCalls: Array<{ content: string; planMode: boolean }> = []
