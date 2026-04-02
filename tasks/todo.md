@@ -1,5 +1,19 @@
 # Kanna Tasks
 
+## In Progress: Alt+Shift UI Identity Overlay
+
+**Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-ui-identity-overlay-design.md`
+
+**Status**: Design approved and written. Waiting for user review before implementation planning.
+
+**Summary**: Add a hold-to-reveal client-side overlay that shows curated, copyable `ui-id` labels for meaningful UI surfaces. While `Alt` + `Shift` is held, the hovered tagged surface reveals a short ancestor stack so users can reference either the exact component or the broader containing area in debug/LLM requests.
+
+**Approved shape**:
+1. Curated tags only, not automatic DOM-wide labeling.
+2. Hold-only stack with nearest tagged surface first and up to 2 tagged ancestors above it.
+3. Global app-level overlay controller with portal rendering and direct row-click copy.
+4. First-release coverage focused on high-value chat/settings shells and major interaction surfaces.
+
 ## Completed: Frontend Un-Effect Machine Lift
 
 **Status**: Verified. The remaining audited frontend effect violations were removed by lifting hot-path state into explicit compound machines and replacing identity-reset effects with mount/open-boundary ownership.
