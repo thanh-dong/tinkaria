@@ -3,16 +3,32 @@ import { useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import { PROVIDERS, type AgentProvider, type AskUserQuestionAnswerMap, type KeybindingsSnapshot, type ModelOptions, type ProviderCatalogEntry, type SessionsSnapshot, type UpdateInstallResult, type UpdateSnapshot } from "../../shared/types"
 import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
+import { useChatReadStateStore } from "../stores/chatReadStateStore"
 import { useRightSidebarStore } from "../stores/rightSidebarStore"
 import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
 import { getEditorPresetLabel, useTerminalPreferencesStore } from "../stores/terminalPreferencesStore"
-import type { ChatMessageEvent, ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
+import type { ChatMessageEvent, ChatRuntime, ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import type { AskUserQuestionItem } from "../components/messages/types"
 import { useAppDialog } from "../components/ui/app-dialog"
 import { createIncrementalHydrator } from "../lib/parseTranscript"
 import type { IncrementalHydrator } from "../lib/parseTranscript"
 import { canCancelStatus, getLatestToolIds, isProcessingStatus } from "./derived"
+import {
+  clearQueuedSubmit,
+  completeQueuedFlush,
+  createProjectSelectionState,
+  createSubmitPipelineState,
+  failQueuedFlush,
+  getQueuedText,
+  getSubmitPipelineMode,
+  markPostFlushBusyObserved,
+  resolveProjectSelection,
+  startQueuedFlush,
+  type SubmitPipelineState,
+  transitionProjectSelection,
+  queueSubmit as queueSubmitTransition,
+} from "./useKannaState.machine"
 import { NatsSocket } from "./nats-socket"
 import type { KannaTransport, SocketStatus } from "./socket-interface"
 
@@ -21,6 +37,49 @@ export function getNewestRemainingChatId(projectGroups: SidebarData["projectGrou
   if (!projectGroup) return null
 
   return projectGroup.chats.find((chat) => chat.chatId !== activeChatId)?.chatId ?? null
+}
+
+export function getSidebarChatRow(
+  projectGroups: SidebarData["projectGroups"],
+  activeChatId: string | null
+): SidebarChatRow | null {
+  if (!activeChatId) return null
+
+  for (const group of projectGroups) {
+    const chat = group.chats.find((candidate) => candidate.chatId === activeChatId)
+    if (chat) return chat
+  }
+
+  return null
+}
+
+export function isChatRead(lastSeenMessageAt?: number, lastMessageAt?: number): boolean {
+  if (lastMessageAt === undefined) return true
+  return (lastSeenMessageAt ?? Number.NEGATIVE_INFINITY) >= lastMessageAt
+}
+
+export function getReadTimestampToPersistAfterReply(lastSeenMessageAt?: number, lastMessageAt?: number): number | null {
+  if (lastMessageAt === undefined) return null
+  if ((lastSeenMessageAt ?? Number.NEGATIVE_INFINITY) >= lastMessageAt) return null
+  return lastMessageAt
+}
+
+export function getInitialChatScrollTarget(args: {
+  activeChatId: string | null
+  runtime: ChatRuntime | null
+  sidebarReady: boolean
+  hasSidebarChat: boolean
+  isRead: boolean
+}): "wait" | "top" | "bottom" {
+  if (
+    args.activeChatId
+    && (
+      !args.runtime
+      || !args.sidebarReady
+      || !args.hasSidebarChat
+    )
+  ) return "wait"
+  return args.isRead ? "bottom" : "top"
 }
 
 function useKannaSocket(): KannaTransport {
@@ -88,6 +147,10 @@ export function shouldQueueChatSubmit(isProcessing: boolean, queuedText: string)
   return isProcessing || queuedText.trim().length > 0
 }
 
+export function prependQueuedText(flushedText: string, queuedText: string): string {
+  return appendQueuedText(flushedText, queuedText)
+}
+
 export function normalizeLocalFilePreviewErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   if (message.includes("Unknown command type: system.readLocalFilePreview")) {
@@ -102,26 +165,12 @@ export function shouldFlushQueuedText(args: {
   queuedText: string
   isProcessing: boolean
   isFlushInFlight: boolean
+  isAwaitingPostFlushBusy: boolean
 }): boolean {
-  if (args.isProcessing || args.isFlushInFlight) return false
+  if (args.isProcessing || args.isFlushInFlight || args.isAwaitingPostFlushBusy) return false
   if (args.activeChatId === null || args.queuedChatId === null) return false
   if (args.activeChatId !== args.queuedChatId) return false
   return args.queuedText.trim().length > 0
-}
-
-export function consumeFlushedQueuedText(currentQueuedText: string, flushedText: string): string {
-  const current = currentQueuedText.trim()
-  const flushed = flushedText.trim()
-
-  if (!current || !flushed) return current
-  if (current === flushed) return ""
-
-  const prefix = `${flushed}\n\n`
-  if (current.startsWith(prefix)) {
-    return current.slice(prefix.length)
-  }
-
-  return current
 }
 
 const FIXED_TRANSCRIPT_PADDING_BOTTOM = 320
@@ -233,7 +282,7 @@ export interface KannaState {
   handleSubmitFromComposer: (
     content: string,
     options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
-  ) => Promise<void>
+  ) => Promise<"queued" | "sent">
   handleCancel: () => Promise<void>
   clearQueuedText: () => void
   restoreQueuedText: () => string
@@ -279,7 +328,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
   const [sidebarReady, setSidebarReady] = useState(false)
   const [localProjectsReady, setLocalProjectsReady] = useState(false)
   const [chatReady, setChatReady] = useState(false)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [projectSelection, setProjectSelection] = useState(createProjectSelectionState)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [inputHeight, setInputHeight] = useState(148)
@@ -287,34 +336,41 @@ export function useKannaState(activeChatId: string | null): KannaState {
   const [commandError, setCommandError] = useState<string | null>(null)
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
-  const [queuedText, setQueuedText] = useState("")
-  const [queuedChatId, setQueuedChatId] = useState<string | null>(null)
+  const submitPipelineRef = useRef<SubmitPipelineState>(createSubmitPipelineState())
+  const [submitPipeline, setSubmitPipeline] = useState<SubmitPipelineState>(submitPipelineRef.current)
   const [localFilePreview, setLocalFilePreview] = useState<LocalFilePreview | null>(null)
   const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
   const [sessionsWindowDays, setSessionsWindowDays] = useState<Map<string, number>>(new Map())
   const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
-  const queuedFlushInFlightRef = useRef(false)
-  const blockedQueuedFlushKeyRef = useRef<string | null>(null)
-  const queuedOptionsRef = useRef<{
-    provider?: AgentProvider
-    model?: string
-    modelOptions?: ModelOptions
-    planMode?: boolean
-  } | null>(null)
   const editorLabel = getEditorPresetLabel(useTerminalPreferencesStore((store) => store.editorPreset))
+  const lastSeenMessageAt = useChatReadStateStore((store) => (
+    activeChatId ? store.lastSeenMessageAtByChat[activeChatId] : undefined
+  ))
+  const markChatRead = useChatReadStateStore((store) => store.markChatRead)
+  const clearChatReadState = useChatReadStateStore((store) => store.clearChat)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLDivElement>(null)
   const initialScrollCompletedRef = useRef(false)
   const initialScrollFrameRef = useRef<number | null>(null)
-  const queuedTextRef = useRef("")
-  const activeQueuedText = queuedChatId === activeChatId ? queuedText : ""
+  const activeQueuedText = getQueuedText(submitPipeline, activeChatId)
+
+  function updateSubmitPipeline(updater: (current: SubmitPipelineState) => SubmitPipelineState): SubmitPipelineState {
+    const next = updater(submitPipelineRef.current)
+    submitPipelineRef.current = next
+    setSubmitPipeline(next)
+    return next
+  }
 
   useEffect(() => socket.onStatus(setConnectionStatus), [socket])
 
   useEffect(() => {
     return socket.subscribe<SidebarData>({ type: "sidebar" }, (snapshot) => {
       setSidebarData(snapshot)
+      setProjectSelection((current) => transitionProjectSelection(current, {
+        type: "sidebar.loaded",
+        firstProjectId: snapshot.projectGroups[0]?.groupKey ?? null,
+      }))
       setSidebarReady(true)
       setCommandError(null)
     })
@@ -379,13 +435,10 @@ export function useKannaState(activeChatId: string | null): KannaState {
   }, [socket])
 
   useEffect(() => {
-    queuedTextRef.current = queuedText
-  }, [queuedText])
-
-  useEffect(() => {
     if (!activeChatId) {
       logKannaState("clearing chat snapshot for non-chat route")
       setChatSnapshot(null)
+      setProjectSelection((current) => transitionProjectSelection(current, { type: "chat.cleared" }))
       hydratorRef.current.reset()
       setMessages([])
       setChatReady(true)
@@ -438,6 +491,17 @@ export function useKannaState(activeChatId: string | null): KannaState {
           snapshotStatus: snapshot?.runtime.status ?? null,
         })
         setChatSnapshot(snapshot)
+        if (snapshot) {
+          setProjectSelection((current) => transitionProjectSelection(current, {
+            type: "chat.snapshot_received",
+            projectId: snapshot.runtime.projectId,
+          }))
+          if (isProcessingStatus(snapshot.runtime.status)) {
+            updateSubmitPipeline((current) => markPostFlushBusyObserved(current, snapshot.runtime.chatId))
+          } else {
+            maybeFlushQueuedSubmit(snapshot.runtime.chatId, false)
+          }
+        }
         setChatReady(true)
         setCommandError(null)
 
@@ -461,29 +525,6 @@ export function useKannaState(activeChatId: string | null): KannaState {
   }, [activeChatId, socket])
 
   useEffect(() => {
-    if (!queuedTextRef.current || queuedChatId === null) return
-    if (activeChatId === queuedChatId) return
-
-    logKannaState("clearing queued text for route change", {
-      fromChatId: queuedChatId,
-      toChatId: activeChatId,
-    })
-    setQueuedText("")
-    setQueuedChatId(null)
-    queuedOptionsRef.current = null
-    queuedFlushInFlightRef.current = false
-    blockedQueuedFlushKeyRef.current = null
-  }, [activeChatId, queuedChatId])
-
-  useEffect(() => {
-    if (selectedProjectId) return
-    const firstGroup = sidebarData.projectGroups[0]
-    if (firstGroup) {
-      setSelectedProjectId(firstGroup.groupKey)
-    }
-  }, [selectedProjectId, sidebarData.projectGroups])
-
-  useEffect(() => {
     if (!activeChatId) return
     if (!sidebarReady || !chatReady) return
     const exists = sidebarData.projectGroups.some((group) => group.chats.some((chat) => chat.chatId === activeChatId))
@@ -501,20 +542,10 @@ export function useKannaState(activeChatId: string | null): KannaState {
 
   useEffect(() => {
     if (!chatSnapshot) return
-    setSelectedProjectId(chatSnapshot.runtime.projectId)
     if (pendingChatId === chatSnapshot.runtime.chatId) {
       setPendingChatId(null)
     }
   }, [chatSnapshot, pendingChatId])
-
-  useEffect(() => {
-    initialScrollCompletedRef.current = false
-    if (initialScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(initialScrollFrameRef.current)
-      initialScrollFrameRef.current = null
-    }
-    setIsAtBottom(true)
-  }, [activeChatId])
 
   useEffect(() => {
     return () => {
@@ -540,6 +571,10 @@ export function useKannaState(activeChatId: string | null): KannaState {
     () => getActiveChatSnapshot(chatSnapshot, activeChatId),
     [activeChatId, chatSnapshot]
   )
+  const activeSidebarChat = useMemo(
+    () => getSidebarChatRow(sidebarData.projectGroups, activeChatId),
+    [activeChatId, sidebarData.projectGroups]
+  )
   useEffect(() => {
     logKannaState("active snapshot resolved", {
       routeChatId: activeChatId,
@@ -555,9 +590,31 @@ export function useKannaState(activeChatId: string | null): KannaState {
   const availableProviders = activeChatSnapshot?.availableProviders ?? PROVIDERS
   const isProcessing = isProcessingStatus(runtime?.status)
   const canCancel = canCancelStatus(runtime?.status)
+  const hasResolvedActiveSidebarChat = !activeChatId || activeSidebarChat !== null
+  const activeChatIsRead = isChatRead(lastSeenMessageAt, activeSidebarChat?.lastMessageAt)
+
+  useEffect(() => {
+    initialScrollCompletedRef.current = false
+    if (initialScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(initialScrollFrameRef.current)
+      initialScrollFrameRef.current = null
+    }
+    setIsAtBottom(activeChatIsRead && hasResolvedActiveSidebarChat)
+  }, [activeChatId, activeChatIsRead, hasResolvedActiveSidebarChat])
+
+  const initialChatScrollTarget = getInitialChatScrollTarget({
+    activeChatId,
+    runtime,
+    sidebarReady,
+    hasSidebarChat: hasResolvedActiveSidebarChat,
+    isRead: activeChatIsRead,
+  })
+
   const transcriptPaddingBottom = FIXED_TRANSCRIPT_PADDING_BOTTOM
   const showScrollButton = !isAtBottom && messages.length > 0
   const fallbackLocalProjectPath = localProjects?.projects[0]?.localPath ?? null
+  const selectedProject = resolveProjectSelection(projectSelection)
+  const selectedProjectId = selectedProject.projectId
   const navbarLocalPath =
     runtime?.localPath
     ?? fallbackLocalProjectPath
@@ -574,7 +631,13 @@ export function useKannaState(activeChatId: string | null): KannaState {
 
     const element = scrollRef.current
     if (!element) return
-    if (activeChatId && !runtime) return
+    if (initialChatScrollTarget === "wait") return
+
+    if (initialChatScrollTarget === "top") {
+      element.scrollTo({ top: 0, behavior: "auto" })
+      initialScrollCompletedRef.current = true
+      return
+    }
 
     element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
     if (initialScrollFrameRef.current !== null) {
@@ -587,7 +650,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
       initialScrollFrameRef.current = null
     })
     initialScrollCompletedRef.current = true
-  }, [activeChatId, inputHeight, messages.length, runtime])
+  }, [activeChatId, initialChatScrollTarget, inputHeight, messages.length])
 
   useEffect(() => {
     if (!initialScrollCompletedRef.current || !isAtBottom) return
@@ -600,6 +663,13 @@ export function useKannaState(activeChatId: string | null): KannaState {
 
     return () => window.cancelAnimationFrame(frameId)
   }, [activeChatId, inputHeight, isAtBottom, messages.length, runtime?.status])
+
+  useEffect(() => {
+    if (!activeChatId || !isAtBottom) return
+    const lastMessageAt = activeSidebarChat?.lastMessageAt
+    if (lastMessageAt === undefined) return
+    markChatRead(activeChatId, lastMessageAt)
+  }, [activeChatId, activeSidebarChat?.lastMessageAt, isAtBottom, markChatRead])
 
   function updateScrollState() {
     const element = scrollRef.current
@@ -619,10 +689,35 @@ export function useKannaState(activeChatId: string | null): KannaState {
     enableAutoFollow("smooth")
   }
 
+  function maybeFlushQueuedSubmit(chatId: string, isProcessing: boolean) {
+    const { state: nextState, flushRequest } = startQueuedFlush(submitPipelineRef.current, {
+      chatId,
+      isProcessing,
+    })
+    if (!flushRequest) return
+
+    submitPipelineRef.current = nextState
+    setSubmitPipeline(nextState)
+
+    void handleSend(flushRequest.text, flushRequest.options)
+      .then(() => {
+        updateSubmitPipeline((current) => completeQueuedFlush(current, chatId))
+      })
+      .catch(() => {
+        updateSubmitPipeline((current) => failQueuedFlush(current, {
+          chatId,
+          flushedText: flushRequest.text,
+        }))
+      })
+  }
+
   async function createChatForProject(projectId: string) {
     useChatPreferencesStore.getState().initializeComposerForNewChat()
     const result = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
-    setSelectedProjectId(projectId)
+    setProjectSelection((current) => transitionProjectSelection(current, {
+      type: "project.explicitly_selected",
+      projectId,
+    }))
     setPendingChatId(result.chatId)
     navigate(`/chat/${result.chatId}`)
     setSidebarOpen(false)
@@ -729,7 +824,10 @@ export function useKannaState(activeChatId: string | null): KannaState {
           localPath: fallbackLocalProjectPath,
         })
         projectId = project.projectId
-        setSelectedProjectId(projectId)
+        setProjectSelection((current) => transitionProjectSelection(current, {
+          type: "project.explicitly_selected",
+          projectId,
+        }))
       }
 
       if (!activeChatId && !projectId) {
@@ -753,6 +851,12 @@ export function useKannaState(activeChatId: string | null): KannaState {
         setPendingChatId(result.chatId)
         navigate(`/chat/${result.chatId}`)
       }
+
+      const readTimestampToPersist = getReadTimestampToPersistAfterReply(lastSeenMessageAt, activeSidebarChat?.lastMessageAt)
+      if (activeChatId && readTimestampToPersist !== null) {
+        markChatRead(activeChatId, readTimestampToPersist)
+      }
+
       setCommandError(null)
     } catch (error) {
       setCommandError(error instanceof Error ? error.message : String(error))
@@ -764,63 +868,40 @@ export function useKannaState(activeChatId: string | null): KannaState {
     content: string,
     options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
   ) {
-    if (shouldQueueChatSubmit(isProcessing, activeQueuedText)) {
-      setQueuedChatId(activeChatId)
-      setQueuedText((current) => appendQueuedText(queuedChatId === activeChatId ? current : "", content))
-      queuedOptionsRef.current = options ?? null
-      return
+    if (!activeChatId) {
+      await handleSend(content, options)
+      return "sent"
+    }
+
+    if (
+      shouldQueueChatSubmit(isProcessing, activeQueuedText)
+      || getSubmitPipelineMode(submitPipeline, activeChatId) === "flushing"
+      || getSubmitPipelineMode(submitPipeline, activeChatId) === "awaiting_busy_ack"
+    ) {
+      updateSubmitPipeline((current) => queueSubmitTransition(current, {
+        chatId: activeChatId,
+        content,
+        options: options ?? undefined,
+      }))
+      if (!isProcessing) {
+        maybeFlushQueuedSubmit(activeChatId, false)
+      }
+      return "queued"
     }
 
     await handleSend(content, options)
+    return "sent"
   }
 
-  useEffect(() => {
-    const flushKey = getQueuedFlushKey(queuedChatId, activeQueuedText)
-    if (flushKey !== null && blockedQueuedFlushKeyRef.current === flushKey) return
-    if (!shouldFlushQueuedText({
-      activeChatId,
-      queuedChatId,
-      queuedText: activeQueuedText,
-      isProcessing,
-      isFlushInFlight: queuedFlushInFlightRef.current,
-    })) return
-
-    const text = activeQueuedText.trim()
-    queuedFlushInFlightRef.current = true
-    const options = queuedOptionsRef.current ?? undefined
-
-    void handleSend(text, options)
-      .then(() => {
-        const remainingQueuedText = consumeFlushedQueuedText(queuedTextRef.current, text)
-        blockedQueuedFlushKeyRef.current = null
-        setQueuedText(remainingQueuedText)
-        if (!remainingQueuedText) {
-          setQueuedChatId(null)
-          queuedOptionsRef.current = null
-        }
-      })
-      .catch(() => {
-        // handleSend already persists commandError; keep queued text visible for restore/edit.
-        blockedQueuedFlushKeyRef.current = flushKey
-      })
-      .finally(() => {
-        queuedFlushInFlightRef.current = false
-      })
-  }, [activeChatId, handleSend, isProcessing, queuedChatId, queuedText])
-
   function clearQueuedText() {
-    setQueuedText("")
-    setQueuedChatId(null)
-    queuedOptionsRef.current = null
-    blockedQueuedFlushKeyRef.current = null
+    if (!activeChatId) return
+    updateSubmitPipeline((current) => clearQueuedSubmit(current, activeChatId))
   }
 
   function restoreQueuedText(): string {
     const restored = activeQueuedText
-    setQueuedText("")
-    setQueuedChatId(null)
-    queuedOptionsRef.current = null
-    blockedQueuedFlushKeyRef.current = null
+    if (!activeChatId) return restored
+    updateSubmitPipeline((current) => clearQueuedSubmit(current, activeChatId))
     return restored
   }
 
@@ -843,6 +924,7 @@ export function useKannaState(activeChatId: string | null): KannaState {
     if (!confirmed) return
     try {
       await socket.command({ type: "chat.delete", chatId: chat.chatId })
+      clearChatReadState(chat.chatId)
       if (chat.chatId === activeChatId) {
         const nextChatId = getNewestRemainingChatId(sidebarData.projectGroups, chat.chatId)
         navigate(nextChatId ? `/chat/${nextChatId}` : "/")

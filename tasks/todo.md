@@ -1,5 +1,38 @@
 # Kanna Tasks
 
+## Completed: Frontend Un-Effect Machine Lift
+
+**Status**: Verified. The remaining audited frontend effect violations were removed by lifting hot-path state into explicit compound machines and replacing identity-reset effects with mount/open-boundary ownership.
+
+**Fix**:
+1. Added `projectSelection` and `submitPipeline` machines in `src/client/app/useKannaState.machine.ts`.
+2. Rewired `src/client/app/useKannaState.ts` to use the machine layer, removing the project-repair effects and the queued-send flush loop effect.
+3. Reworked `src/client/components/NewProjectModal.tsx` so modal form state resets on mount/open identity instead of in `useEffect`.
+4. Reworked `src/client/components/ui/app-dialog.tsx` so prompt input initializes at prompt-open time instead of mirroring `initialValue` in an effect.
+5. Replaced the `ChatPage` empty-state typing interval effect with a keyed CSS typewriter primitive in `src/client/app/ChatPage.tsx` and `src/index.css`.
+6. Added focused machine and ChatPage coverage in `src/client/app/useKannaState.machine.test.ts` and `src/client/app/ChatPage.test.ts`.
+
+**Verified**:
+1. `bun test src/client/app/useKannaState.machine.test.ts src/client/app/useKannaState.test.ts src/client/app/ChatPage.test.ts src/client/app/SettingsPage.test.tsx src/client/components/chat-ui/ChatInput.test.ts`
+2. `bun run build`
+3. `c3x check`
+
+## Completed: Read Scroll Retained After Reply
+
+**Status**: Verified. If the user replies to the latest visible message in an existing chat, switching away and back now keeps that chat classified as read and reopens at the newer end of the transcript instead of jumping back to the older unread position.
+
+**Root cause**: Read state only advanced when the transcript viewport was considered at-bottom. Replying to the latest message did not itself persist `lastSeenMessageAt`, so chat remounts could still classify the conversation as unread from stale read-state and choose the old top/unread scroll target.
+
+**Fix**:
+1. Added `getReadTimestampToPersistAfterReply()` in `src/client/app/useKannaState.ts`.
+2. Updated successful sends in existing chats to persist the latest known sidebar `lastMessageAt` as read when replying catches the user up semantically, even if the viewport was not currently flagged as at-bottom.
+3. Added focused regression coverage in `src/client/app/useKannaState.test.ts`.
+
+**Verified**:
+1. `bun test src/client/app/useKannaState.test.ts src/client/components/chat-ui/ChatInput.test.ts`
+2. `bun run build`
+3. `c3x check`
+
 ## Completed: Queued Chat Draft Persists After Tab Switch
 
 **Status**: Verified. Queued follow-up submits no longer leave stale composer drafts behind after the queue auto-flushes and the user switches away and back to the chat.

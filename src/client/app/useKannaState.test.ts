@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test"
 import {
   computeTailOffset,
   getActiveChatSnapshot,
+  getInitialChatScrollTarget,
   getNewestRemainingChatId,
+  getReadTimestampToPersistAfterReply,
+  isChatRead,
   normalizeLocalFilePreviewErrorMessage,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
@@ -240,6 +243,120 @@ describe("computeTailOffset", () => {
   })
 })
 
+describe("isChatRead", () => {
+  test("treats chats with unseen newer messages as unread", () => {
+    expect(isChatRead(10, 11)).toBe(false)
+  })
+
+  test("treats chats with matching last seen timestamps as read", () => {
+    expect(isChatRead(11, 11)).toBe(true)
+    expect(isChatRead(12, 11)).toBe(true)
+  })
+
+  test("treats chats without message timestamps as read", () => {
+    expect(isChatRead(undefined, undefined)).toBe(true)
+    expect(isChatRead(undefined, 11)).toBe(false)
+  })
+})
+
+describe("getReadTimestampToPersistAfterReply", () => {
+  test("promotes the latest visible message to read after a successful reply", () => {
+    const persistedReadAt = getReadTimestampToPersistAfterReply(10, 11)
+
+    expect(persistedReadAt).toBe(11)
+    expect(isChatRead(persistedReadAt ?? undefined, 11)).toBe(true)
+    expect(getInitialChatScrollTarget({
+      activeChatId: "chat-1",
+      runtime: {
+        chatId: "chat-1",
+        projectId: "project-1",
+        localPath: "/tmp/project-1",
+        title: "Chat 1",
+        status: "idle",
+        provider: "codex",
+        planMode: false,
+        sessionToken: null,
+      },
+      sidebarReady: true,
+      hasSidebarChat: true,
+      isRead: isChatRead(persistedReadAt ?? undefined, 11),
+    })).toBe("bottom")
+  })
+
+  test("does nothing when the chat has no latest message timestamp yet", () => {
+    expect(getReadTimestampToPersistAfterReply(10, undefined)).toBeNull()
+  })
+})
+
+describe("getInitialChatScrollTarget", () => {
+  test("waits for the runtime before deciding on an existing chat route", () => {
+    expect(getInitialChatScrollTarget({
+      activeChatId: "chat-1",
+      runtime: null,
+      sidebarReady: true,
+      hasSidebarChat: true,
+      isRead: false,
+    })).toBe("wait")
+  })
+
+  test("waits for the sidebar row before deciding whether the chat is read", () => {
+    expect(getInitialChatScrollTarget({
+      activeChatId: "chat-1",
+      runtime: {
+        chatId: "chat-1",
+        projectId: "project-1",
+        localPath: "/tmp/project-1",
+        title: "Chat 1",
+        status: "idle",
+        provider: "codex",
+        planMode: false,
+        sessionToken: null,
+      },
+      sidebarReady: false,
+      hasSidebarChat: false,
+      isRead: true,
+    })).toBe("wait")
+  })
+
+  test("opens unread chats at the top once the runtime is ready", () => {
+    expect(getInitialChatScrollTarget({
+      activeChatId: "chat-1",
+      runtime: {
+        chatId: "chat-1",
+        projectId: "project-1",
+        localPath: "/tmp/project-1",
+        title: "Unread chat",
+        status: "idle",
+        provider: "codex",
+        planMode: false,
+        sessionToken: null,
+      },
+      sidebarReady: true,
+      hasSidebarChat: true,
+      isRead: false,
+    })).toBe("top")
+  })
+
+  test("opens read chats at the bottom once the runtime is ready", () => {
+    expect(getInitialChatScrollTarget({
+      activeChatId: "chat-1",
+      runtime: {
+        chatId: "chat-1",
+        projectId: "project-1",
+        localPath: "/tmp/project-1",
+        title: "Read chat",
+        status: "idle",
+        provider: "claude",
+        planMode: false,
+        sessionToken: null,
+      },
+      sidebarReady: true,
+      hasSidebarChat: true,
+      isRead: true,
+    })).toBe("bottom")
+  })
+})
+
 describe("appendQueuedText", () => {
   test("uses the incoming text when the queue is empty", async () => {
     const module = await import("./useKannaState")
@@ -321,6 +438,7 @@ describe("shouldFlushQueuedText", () => {
       queuedText: "Queued follow-up",
       isProcessing: false,
       isFlushInFlight: false,
+      isAwaitingPostFlushBusy: false,
     })).toBe(true)
 
     expect(shouldFlush({
@@ -329,6 +447,7 @@ describe("shouldFlushQueuedText", () => {
       queuedText: "Queued follow-up",
       isProcessing: false,
       isFlushInFlight: false,
+      isAwaitingPostFlushBusy: false,
     })).toBe(false)
   })
 
@@ -345,6 +464,7 @@ describe("shouldFlushQueuedText", () => {
       queuedText: "Queued follow-up",
       isProcessing: true,
       isFlushInFlight: false,
+      isAwaitingPostFlushBusy: false,
     })).toBe(false)
 
     expect(shouldFlush({
@@ -353,6 +473,16 @@ describe("shouldFlushQueuedText", () => {
       queuedText: "Queued follow-up",
       isProcessing: false,
       isFlushInFlight: true,
+      isAwaitingPostFlushBusy: false,
+    })).toBe(false)
+
+    expect(shouldFlush({
+      activeChatId: "chat-1",
+      queuedChatId: "chat-1",
+      queuedText: "Queued follow-up",
+      isProcessing: false,
+      isFlushInFlight: false,
+      isAwaitingPostFlushBusy: true,
     })).toBe(false)
 
     expect(shouldFlush({
@@ -361,29 +491,20 @@ describe("shouldFlushQueuedText", () => {
       queuedText: "   ",
       isProcessing: false,
       isFlushInFlight: false,
+      isAwaitingPostFlushBusy: false,
     })).toBe(false)
   })
 })
 
-describe("consumeFlushedQueuedText", () => {
-  test("clears the queue when the flushed text matches the entire queue", async () => {
+describe("prependQueuedText", () => {
+  test("restores a failed flushed message ahead of newer queued text", async () => {
     const module = await import("./useKannaState")
-    const consume = (module as Record<string, unknown>).consumeFlushedQueuedText
+    const prepend = (module as Record<string, unknown>).prependQueuedText
 
-    expect(typeof consume).toBe("function")
-    if (typeof consume !== "function") throw new Error("consumeFlushedQueuedText export missing")
+    expect(typeof prepend).toBe("function")
+    if (typeof prepend !== "function") throw new Error("prependQueuedText export missing")
 
-    expect(consume("Queued follow-up", "Queued follow-up")).toBe("")
-  })
-
-  test("preserves newer queued text appended during an in-flight flush", async () => {
-    const module = await import("./useKannaState")
-    const consume = (module as Record<string, unknown>).consumeFlushedQueuedText
-
-    expect(typeof consume).toBe("function")
-    if (typeof consume !== "function") throw new Error("consumeFlushedQueuedText export missing")
-
-    expect(consume("First message\n\nSecond message", "First message")).toBe("Second message")
-    expect(consume("Second message", "First message")).toBe("Second message")
+    expect(prepend("First message", "")).toBe("First message")
+    expect(prepend("First message", "Second message")).toBe("First message\n\nSecond message")
   })
 })

@@ -1,9 +1,12 @@
-import { forwardRef, memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react"
 import { ArrowUp } from "lucide-react"
 import {
   type AgentProvider,
+  type ClaudeModelOptions,
+  type CodexModelOptions,
   type ModelOptions,
   type ProviderCatalogEntry,
+  PROVIDERS,
   normalizeClaudeContextWindow,
 } from "../../../shared/types"
 import { Button } from "../ui/button"
@@ -141,118 +144,103 @@ export function shouldClearDraftAfterSubmit(submitResult: "queued" | "sent"): bo
   return submitResult === "queued" || submitResult === "sent"
 }
 
-const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput({
-  onSubmit,
-  onCancel,
-  queuedText = "",
-  onClearQueuedText,
-  onRestoreQueuedText,
-  disabled,
-  canCancel,
-  chatId,
-  activeProvider,
-  availableProviders,
-  availableSkills = [],
-}, forwardedRef) {
-  const getDraft = useChatInputStore((s) => s.getDraft)
-  const setDraft = useChatInputStore((s) => s.setDraft)
-  const clearDraft = useChatInputStore((s) => s.clearDraft)
-  const composerState = useChatPreferencesStore((s) => s.composerState)
-  const providerDefaults = useChatPreferencesStore((s) => s.providerDefaults)
-  const setComposerModel = useChatPreferencesStore((s) => s.setComposerModel)
-  const setComposerModelOptions = useChatPreferencesStore((s) => s.setComposerModelOptions)
-  const setComposerPlanMode = useChatPreferencesStore((s) => s.setComposerPlanMode)
-  const resetComposerFromProvider = useChatPreferencesStore((s) => s.resetComposerFromProvider)
-  const skillChatId = chatId ?? "__new__"
-  const selectedSkillsRaw = useSkillCompositionStore((s) => s.selections[skillChatId])
-  const selectedSkills = selectedSkillsRaw ?? EMPTY_SKILLS
-  const toggleSkill = useSkillCompositionStore((s) => s.toggleSkill)
-  const clearSkills = useSkillCompositionStore((s) => s.clearSkills)
-  const recordUsage = useSkillCompositionStore((s) => s.recordUsage)
-  const [value, setValue] = useState(() => (chatId ? getDraft(chatId) : ""))
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const isStandalone = useIsStandalone()
-  const [lockedComposerState, setLockedComposerState] = useState<ComposerState | null>(() => (
-    activeProvider ? createLockedComposerState(activeProvider, composerState, providerDefaults) : null
-  ))
+export function getComposerControlsKey(chatId: string | null | undefined, activeProvider: AgentProvider | null): string {
+  return `${chatId ?? "__new__"}:${activeProvider ?? "unlocked"}`
+}
 
-  const providerLocked = activeProvider !== null
+export function resolveComposerPreferences(args: {
+  activeProvider: AgentProvider | null
+  composerState: ComposerState
+  providerDefaults: ReturnType<typeof useChatPreferencesStore.getState>["providerDefaults"]
+  lockedOverrides: ComposerState | null
+}) {
+  const providerLocked = args.activeProvider !== null
+  const selectedProvider = providerLocked ? args.activeProvider : args.composerState.provider
+  const lockedBaseState = args.activeProvider
+    ? createLockedComposerState(args.activeProvider, args.composerState, args.providerDefaults)
+    : null
   const providerPrefs = providerLocked
-    ? lockedComposerState ?? createLockedComposerState(activeProvider, composerState, providerDefaults)
-    : composerState
-  const selectedProvider = providerLocked ? activeProvider : composerState.provider
-  const providerConfig = availableProviders.find((provider) => provider.id === selectedProvider) ?? availableProviders[0]
+    ? args.lockedOverrides ?? lockedBaseState ?? args.composerState
+    : args.composerState
+  const providerConfig = PROVIDERS.find((provider) => provider.id === selectedProvider) ?? PROVIDERS[0]
+
+  return {
+    providerLocked,
+    selectedProvider,
+    lockedBaseState,
+    providerPrefs,
+    showPlanMode: providerConfig?.supportsPlanMode ?? false,
+  }
+}
+
+interface ComposerPreferencesSnapshot {
+  selectedProvider: AgentProvider
+  providerPrefs: ComposerState
+  showPlanMode: boolean
+}
+
+interface ComposerPreferencesHandle {
+  getSnapshot: () => ComposerPreferencesSnapshot
+  setPlanMode: (planMode: boolean) => void
+}
+
+interface ComposerPreferencesProps {
+  activeProvider: AgentProvider | null
+  composerState: ComposerState
+  providerDefaults: ReturnType<typeof useChatPreferencesStore.getState>["providerDefaults"]
+  availableProviders: ProviderCatalogEntry[]
+  skillPicker?: React.ReactNode
+  setComposerModel: (model: string) => void
+  setComposerModelOptions: (modelOptions: Partial<ClaudeModelOptions> | Partial<CodexModelOptions>) => void
+  setComposerPlanMode: (planMode: boolean) => void
+  resetComposerFromProvider: (provider: AgentProvider) => void
+}
+
+const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, ComposerPreferencesProps>(function ComposerPreferenceControls({
+  activeProvider,
+  composerState,
+  providerDefaults,
+  availableProviders,
+  skillPicker,
+  setComposerModel,
+  setComposerModelOptions,
+  setComposerPlanMode,
+  resetComposerFromProvider,
+}, forwardedRef) {
+  const [lockedOverrides, setLockedOverrides] = useState<ComposerState | null>(null)
+  const resolved = resolveComposerPreferences({
+    activeProvider,
+    composerState,
+    providerDefaults,
+    lockedOverrides,
+  })
+  const providerConfig = availableProviders.find((provider) => provider.id === resolved.selectedProvider) ?? availableProviders[0]
   const showPlanMode = providerConfig?.supportsPlanMode ?? false
 
-  const autoResize = useCallback(() => {
-    const element = textareaRef.current
-    if (!element) return
-    if (element.value.length === 0) {
-      element.style.height = ""
-      return
-    }
-    element.style.height = "auto"
-    element.style.height = `${element.scrollHeight}px`
-  }, [])
-
-  const setTextareaRefs = useCallback((node: HTMLTextAreaElement | null) => {
-    textareaRef.current = node
-
-    if (!forwardedRef) return
-    if (typeof forwardedRef === "function") {
-      forwardedRef(node)
-      return
-    }
-
-    forwardedRef.current = node
-  }, [forwardedRef])
-
-  useLayoutEffect(() => {
-    autoResize()
-  }, [value, autoResize])
-
-  useEffect(() => {
-    window.addEventListener("resize", autoResize)
-    return () => window.removeEventListener("resize", autoResize)
-  }, [autoResize])
-
-  useEffect(() => {
-    textareaRef.current?.focus()
-  }, [chatId])
-
-  useEffect(() => {
-    if (activeProvider === null) {
-      setLockedComposerState(null)
-      return
-    }
-
-    setLockedComposerState(createLockedComposerState(activeProvider, composerState, providerDefaults))
-  }, [activeProvider, chatId])
-
   const handleProviderChange = useCallback((provider: AgentProvider) => {
-    if (providerLocked) return
+    if (resolved.providerLocked) return
     resetComposerFromProvider(provider)
-  }, [providerLocked, resetComposerFromProvider])
+  }, [resolved.providerLocked, resetComposerFromProvider])
 
   const handleModelChange = useCallback((_: AgentProvider, model: string) => {
-    if (providerLocked) {
-      setLockedComposerState((current) => {
-        const next = current ?? createLockedComposerState(selectedProvider, composerState, providerDefaults)
+    if (resolved.providerLocked) {
+      setLockedOverrides((current) => {
+        const next = current ?? resolved.lockedBaseState ?? createLockedComposerState(resolved.selectedProvider, composerState, providerDefaults)
         return withNormalizedContextWindow(next, model)
       })
       return
     }
     setComposerModel(model)
-  }, [providerLocked, selectedProvider, composerState, providerDefaults, setComposerModel])
+  }, [resolved.providerLocked, resolved.lockedBaseState, resolved.selectedProvider, composerState, providerDefaults, setComposerModel])
 
   const handleModelOptionChange = useCallback((change: ModelOptionChange) => {
     const doUpdate = (
       transform: (s: ComposerState) => ComposerState,
       fallback: () => void
     ) => {
-      if (providerLocked) {
-        setLockedComposerState((current) => {
-          const next = current ?? createLockedComposerState(selectedProvider, composerState, providerDefaults)
+      if (resolved.providerLocked) {
+        setLockedOverrides((current) => {
+          const next = current ?? resolved.lockedBaseState ?? createLockedComposerState(resolved.selectedProvider, composerState, providerDefaults)
           return transform(next)
         })
         return
@@ -291,46 +279,161 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
         )
         break
     }
-  }, [providerLocked, selectedProvider, composerState, providerDefaults, setComposerModelOptions])
+  }, [resolved.providerLocked, resolved.lockedBaseState, resolved.selectedProvider, composerState, providerDefaults, setComposerModelOptions])
 
   const handlePlanModeChange = useCallback((planMode: boolean) => {
     const nextState = resolvePlanModeState({
-      providerLocked,
+      providerLocked: resolved.providerLocked,
       planMode,
-      selectedProvider,
+      selectedProvider: resolved.selectedProvider,
       composerState,
       providerDefaults,
-      lockedComposerState,
+      lockedComposerState: lockedOverrides,
     })
 
-    if (nextState.lockedComposerState !== lockedComposerState) {
-      setLockedComposerState(nextState.lockedComposerState)
+    if (resolved.providerLocked) {
+      setLockedOverrides(nextState.lockedComposerState)
+      return
     }
+
     if (nextState.composerPlanMode !== composerState.planMode) {
       setComposerPlanMode(nextState.composerPlanMode)
     }
-  }, [providerLocked, selectedProvider, composerState, providerDefaults, lockedComposerState, setComposerPlanMode])
+  }, [resolved.providerLocked, resolved.selectedProvider, composerState, providerDefaults, lockedOverrides, setComposerPlanMode])
+
+  useImperativeHandle(forwardedRef, () => ({
+    getSnapshot: () => ({
+      selectedProvider: resolved.selectedProvider,
+      providerPrefs: resolved.providerPrefs,
+      showPlanMode,
+    }),
+    setPlanMode: handlePlanModeChange,
+  }), [resolved.selectedProvider, resolved.providerPrefs, showPlanMode, handlePlanModeChange])
+
+  return (
+    <ChatPreferenceControls
+      availableProviders={availableProviders}
+      selectedProvider={resolved.selectedProvider}
+      providerLocked={resolved.providerLocked}
+      model={resolved.providerPrefs.model}
+      modelOptions={resolved.providerPrefs.modelOptions}
+      onProviderChange={handleProviderChange}
+      onModelChange={handleModelChange}
+      onModelOptionChange={handleModelOptionChange}
+      planMode={resolved.providerPrefs.planMode}
+      onPlanModeChange={handlePlanModeChange}
+      includePlanMode={showPlanMode}
+      className="max-w-[840px] mx-auto"
+      skillPicker={skillPicker}
+    />
+  )
+}))
+
+const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput({
+  onSubmit,
+  onCancel,
+  queuedText = "",
+  onClearQueuedText,
+  onRestoreQueuedText,
+  disabled,
+  canCancel,
+  chatId,
+  activeProvider,
+  availableProviders,
+  availableSkills = [],
+}, forwardedRef) {
+  const getDraft = useChatInputStore((s) => s.getDraft)
+  const setDraft = useChatInputStore((s) => s.setDraft)
+  const clearDraft = useChatInputStore((s) => s.clearDraft)
+  const composerState = useChatPreferencesStore((s) => s.composerState)
+  const providerDefaults = useChatPreferencesStore((s) => s.providerDefaults)
+  const setComposerModel = useChatPreferencesStore((s) => s.setComposerModel)
+  const setComposerModelOptions = useChatPreferencesStore((s) => s.setComposerModelOptions)
+  const setComposerPlanMode = useChatPreferencesStore((s) => s.setComposerPlanMode)
+  const resetComposerFromProvider = useChatPreferencesStore((s) => s.resetComposerFromProvider)
+  const skillChatId = chatId ?? "__new__"
+  const selectedSkillsRaw = useSkillCompositionStore((s) => s.selections[skillChatId])
+  const selectedSkills = selectedSkillsRaw ?? EMPTY_SKILLS
+  const toggleSkill = useSkillCompositionStore((s) => s.toggleSkill)
+  const clearSkills = useSkillCompositionStore((s) => s.clearSkills)
+  const recordUsage = useSkillCompositionStore((s) => s.recordUsage)
+  const [value, setValue] = useState(() => (chatId ? getDraft(chatId) : ""))
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const composerPreferencesRef = useRef<ComposerPreferencesHandle>(null)
+  const isStandalone = useIsStandalone()
+  const composerControlsKey = getComposerControlsKey(chatId, activeProvider)
+
+  function getComposerSnapshot() {
+    return composerPreferencesRef.current?.getSnapshot() ?? resolveComposerPreferences({
+      activeProvider,
+      composerState,
+      providerDefaults,
+      lockedOverrides: null,
+    })
+  }
+
+  function setComposerPlanModeFromComposer(planMode: boolean) {
+    composerPreferencesRef.current?.setPlanMode(planMode)
+  }
+
+  const autoResize = useCallback(() => {
+    const element = textareaRef.current
+    if (!element) return
+    if (element.value.length === 0) {
+      element.style.height = ""
+      return
+    }
+    element.style.height = "auto"
+    element.style.height = `${element.scrollHeight}px`
+  }, [])
+
+  const setTextareaRefs = useCallback((node: HTMLTextAreaElement | null) => {
+    textareaRef.current = node
+
+    if (!forwardedRef) return
+    if (typeof forwardedRef === "function") {
+      forwardedRef(node)
+      return
+    }
+
+    forwardedRef.current = node
+  }, [forwardedRef])
+
+  useLayoutEffect(() => {
+    autoResize()
+  }, [value, autoResize])
+
+  useEffect(() => {
+    window.addEventListener("resize", autoResize)
+    return () => window.removeEventListener("resize", autoResize)
+  }, [autoResize])
+
+  useEffect(() => {
+    textareaRef.current?.focus()
+  }, [chatId])
 
   async function handleSubmit() {
     if (!value.trim()) return
     const rawValue = value
     const nextValue = formatContentWithSkills(rawValue, selectedSkills)
+    const composerSnapshot = getComposerSnapshot()
     let modelOptions: ModelOptions
-    if (providerPrefs.provider === "claude") {
-      modelOptions = { claude: { ...providerPrefs.modelOptions } }
+
+    if (composerSnapshot.providerPrefs.provider === "claude") {
+      modelOptions = { claude: { ...composerSnapshot.providerPrefs.modelOptions } }
     } else {
-      modelOptions = { codex: { ...providerPrefs.modelOptions } }
+      modelOptions = { codex: { ...composerSnapshot.providerPrefs.modelOptions } }
     }
     const submitOptions = {
-      provider: selectedProvider,
-      model: providerPrefs.model,
+      provider: composerSnapshot.selectedProvider,
+      model: composerSnapshot.providerPrefs.model,
       modelOptions,
-      planMode: showPlanMode ? providerPrefs.planMode : false,
+      planMode: composerSnapshot.showPlanMode ? composerSnapshot.providerPrefs.planMode : false,
     }
     logChatInput("submit settings", {
       chatId: chatId ?? null,
       activeProvider,
-      composerProvider: providerPrefs.provider,
+      composerProvider: composerSnapshot.providerPrefs.provider,
       skills: selectedSkills.length > 0 ? selectedSkills : undefined,
       submitOptions,
     })
@@ -388,10 +491,13 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       return
     }
 
-    if (event.key === "Tab" && event.shiftKey && showPlanMode) {
-      event.preventDefault()
-      handlePlanModeChange(!providerPrefs.planMode)
-      return
+    if (event.key === "Tab" && event.shiftKey) {
+      const composerSnapshot = getComposerSnapshot()
+      if (composerSnapshot.showPlanMode) {
+        event.preventDefault()
+        setComposerPlanModeFromComposer(!composerSnapshot.providerPrefs.planMode)
+        return
+      }
     }
 
     if (event.key === "Escape" && canCancel) {
@@ -479,27 +585,25 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       </div>
       <div className={cn("overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-3 flex flex-row", isStandalone && "p-5 pt-3")}>
         <div className="min-w-3"/>
-        <ChatPreferenceControls
-            availableProviders={availableProviders}
-            selectedProvider={selectedProvider}
-            providerLocked={providerLocked}
-            model={providerPrefs.model}
-            modelOptions={providerPrefs.modelOptions}
-            onProviderChange={handleProviderChange}
-            onModelChange={handleModelChange}
-            onModelOptionChange={handleModelOptionChange}
-            planMode={providerPrefs.planMode}
-            onPlanModeChange={handlePlanModeChange}
-            includePlanMode={showPlanMode}
-            className="max-w-[840px] mx-auto"
-            skillPicker={availableSkills.length > 0 ? (
-              <SkillPicker
-                availableSkills={availableSkills}
-                selectedSkills={selectedSkills}
-                onToggleSkill={(skill) => toggleSkill(skillChatId, skill)}
-              />
-            ) : undefined}
-          />
+        <ComposerPreferenceControls
+          key={composerControlsKey}
+          ref={composerPreferencesRef}
+          activeProvider={activeProvider}
+          composerState={composerState}
+          providerDefaults={providerDefaults}
+          availableProviders={availableProviders}
+          setComposerModel={setComposerModel}
+          setComposerModelOptions={setComposerModelOptions}
+          setComposerPlanMode={setComposerPlanMode}
+          resetComposerFromProvider={resetComposerFromProvider}
+          skillPicker={availableSkills.length > 0 ? (
+            <SkillPicker
+              availableSkills={availableSkills}
+              selectedSkills={selectedSkills}
+              onToggleSkill={(skill) => toggleSkill(skillChatId, skill)}
+            />
+          ) : undefined}
+        />
         <div className="min-w-3"/>
       </div>
     </div>

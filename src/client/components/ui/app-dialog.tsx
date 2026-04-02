@@ -50,6 +50,7 @@ type DialogState =
   | {
       kind: "prompt"
       options: PromptDialogOptions
+      inputValue: string
       resolve: (value: string | null) => void
     }
   | {
@@ -62,21 +63,16 @@ const AppDialogContext = createContext<AppDialogContextValue | null>(null)
 
 export function AppDialogProvider({ children }: { children: ReactNode }) {
   const [dialogState, setDialogState] = useState<DialogState | null>(null)
-  const [inputValue, setInputValue] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (dialogState?.kind !== "prompt") return
-    setInputValue(dialogState.options.initialValue ?? "")
-    setTimeout(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }, 0)
+    inputRef.current?.focus()
+    inputRef.current?.select()
   }, [dialogState])
 
   const closeDialog = useCallback(() => {
     setDialogState(null)
-    setInputValue("")
   }, [])
 
   const resolveCancel = useCallback(() => {
@@ -96,12 +92,12 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
     if (dialogState.kind === "confirm") {
       dialogState.resolve(true)
     } else if (dialogState.kind === "prompt") {
-      dialogState.resolve(inputValue.trim() || null)
+      dialogState.resolve(dialogState.inputValue.trim() || null)
     } else {
       dialogState.resolve()
     }
     closeDialog()
-  }, [closeDialog, dialogState, inputValue])
+  }, [closeDialog, dialogState])
 
   const confirm = useCallback((options: ConfirmDialogOptions) => {
     return new Promise<boolean>((resolve) => {
@@ -111,7 +107,12 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
 
   const prompt = useCallback((options: PromptDialogOptions) => {
     return new Promise<string | null>((resolve) => {
-      setDialogState({ kind: "prompt", options, resolve })
+      setDialogState({
+        kind: "prompt",
+        options,
+        inputValue: options.initialValue ?? "",
+        resolve,
+      })
     })
   }, [])
 
@@ -151,9 +152,15 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                 {dialogState.kind === "prompt" ? (
                   <Input
                     ref={inputRef}
+                    autoFocus
                     type="text"
-                    value={inputValue}
-                    onChange={(event) => setInputValue(event.target.value)}
+                    value={dialogState.inputValue}
+                    onFocus={(event) => event.currentTarget.select()}
+                    onChange={(event) => setDialogState((current) => (
+                      current?.kind === "prompt"
+                        ? { ...current, inputValue: event.target.value }
+                        : current
+                    ))}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault()
@@ -177,7 +184,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                   variant={dialogState.kind === "confirm" ? (dialogState.options.confirmVariant ?? "default") : "secondary"}
                   size="sm"
                   onClick={resolveConfirm}
-                  disabled={dialogState.kind === "prompt" && !inputValue.trim()}
+                  disabled={dialogState.kind === "prompt" && !dialogState.inputValue.trim()}
                 >
                   {dialogState.kind === "alert"
                     ? (dialogState.options.closeLabel ?? "OK")

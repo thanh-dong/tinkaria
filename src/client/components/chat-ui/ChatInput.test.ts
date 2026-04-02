@@ -1,16 +1,56 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import {
+  getComposerControlsKey,
   getRestoredQueuedTextOnArrowUp,
+  resolveComposerPreferences,
   resolvePlanModeState,
   shouldClearDraftAfterSubmit,
   shouldShowQueuedBlock,
 } from "./ChatInput"
-import { useChatPreferencesStore } from "../../stores/chatPreferencesStore"
+import { type ComposerState, useChatPreferencesStore } from "../../stores/chatPreferencesStore"
 
 const INITIAL_STATE = useChatPreferencesStore.getInitialState()
 
 afterEach(() => {
-  useChatPreferencesStore.setState(INITIAL_STATE)
+  useChatPreferencesStore.setState(INITIAL_STATE, true)
+})
+
+describe("getComposerControlsKey", () => {
+  test("changes when the active provider identity changes", () => {
+    expect(getComposerControlsKey("chat-1", "codex")).toBe("chat-1:codex")
+    expect(getComposerControlsKey("chat-1", "claude")).toBe("chat-1:claude")
+    expect(getComposerControlsKey("chat-1", "codex")).not.toBe(getComposerControlsKey("chat-1", "claude"))
+  })
+})
+
+describe("resolveComposerPreferences", () => {
+  test("derives locked prefs from the active provider instead of carrying prior identity state", () => {
+    const composerState: ComposerState = {
+      provider: "codex",
+      model: "gpt-5.3-codex-spark",
+      modelOptions: { reasoningEffort: "high", fastMode: true },
+      planMode: true,
+    }
+
+    const codexResolved = resolveComposerPreferences({
+      activeProvider: "codex",
+      composerState,
+      providerDefaults: INITIAL_STATE.providerDefaults,
+      lockedOverrides: null,
+    })
+
+    const claudeResolved = resolveComposerPreferences({
+      activeProvider: "claude",
+      composerState,
+      providerDefaults: INITIAL_STATE.providerDefaults,
+      lockedOverrides: null,
+    })
+
+    expect(codexResolved.selectedProvider).toBe("codex")
+    expect(codexResolved.providerPrefs.model).toBe("gpt-5.3-codex-spark")
+    expect(claudeResolved.selectedProvider).toBe("claude")
+    expect(claudeResolved.providerPrefs.model).toBe("opus")
+  })
 })
 
 describe("resolvePlanModeState", () => {

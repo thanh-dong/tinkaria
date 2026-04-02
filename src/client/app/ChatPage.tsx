@@ -137,14 +137,16 @@ export function shouldOpenMobileSidebarFromSwipe(args: MobileSidebarSwipeDecisio
   return deltaX > deltaY
 }
 
+export function getEmptyStateTypingDurationMs(text: string): number {
+  return text.length * EMPTY_STATE_TYPING_INTERVAL_MS
+}
+
 export function ChatPage() {
   const state = useOutletContext<KannaState>()
   const layoutRootRef = useRef<HTMLDivElement>(null)
   const chatCardRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const mobileSidebarSwipeRef = useRef<MobileSidebarSwipeState | null>(null)
-  const [typedEmptyStateText, setTypedEmptyStateText] = useState("")
-  const [isEmptyStateTypingComplete, setIsEmptyStateTypingComplete] = useState(false)
   const [fixedTerminalHeight, setFixedTerminalHeight] = useState(0)
   const projectId = state.runtime?.projectId ?? null
   const projectTerminalLayout = useTerminalLayoutStore((store) => (projectId ? store.projects[projectId] : undefined))
@@ -276,26 +278,6 @@ export function ChatPage() {
       mobileSidebarSwipeRef.current = null
     }
   }
-
-  useEffect(() => {
-    if (state.messages.length !== 0) return
-
-    setTypedEmptyStateText("")
-    setIsEmptyStateTypingComplete(false)
-
-    let characterIndex = 0
-    const interval = window.setInterval(() => {
-      characterIndex += 1
-      setTypedEmptyStateText(EMPTY_STATE_TEXT.slice(0, characterIndex))
-
-      if (characterIndex >= EMPTY_STATE_TEXT.length) {
-        window.clearInterval(interval)
-        setIsEmptyStateTypingComplete(true)
-      }
-    }, EMPTY_STATE_TYPING_INTERVAL_MS)
-
-    return () => window.clearInterval(interval)
-  }, [state.activeChatId, state.messages.length])
 
   useEffect(() => {
     function handleGlobalKeydown(event: KeyboardEvent) {
@@ -468,11 +450,21 @@ export function ChatPage() {
                       <span className="kanna-typewriter-cursor-slot" aria-hidden="true" />
                     </span>
                     <span className="col-start-1 row-start-1 whitespace-pre flex items-center">
-                      <span>{typedEmptyStateText}</span>
+                      <span
+                        className="kanna-typewriter-text"
+                        style={{
+                          "--kanna-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
+                          "--kanna-typewriter-steps": EMPTY_STATE_TEXT.length,
+                        } as CSSProperties}
+                      >
+                        {EMPTY_STATE_TEXT}
+                      </span>
                       <span className="kanna-typewriter-cursor-slot" aria-hidden="true">
                         <span
                           className="kanna-typewriter-cursor"
-                          data-typing-complete={isEmptyStateTypingComplete ? "true" : "false"}
+                          style={{
+                            "--kanna-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
+                          } as CSSProperties}
                         />
                       </span>
                     </span>
@@ -506,10 +498,13 @@ export function ChatPage() {
           <ChatInput
             ref={chatInputRef}
             key={state.activeChatId ?? "new-chat"}
-            onSubmit={state.handleSend}
+            onSubmit={state.handleSubmitFromComposer}
             onCancel={() => {
               void state.handleCancel()
             }}
+            queuedText={state.queuedText}
+            onClearQueuedText={state.clearQueuedText}
+            onRestoreQueuedText={state.restoreQueuedText}
             disabled={!state.hasSelectedProject || state.runtime?.status === "waiting_for_user"}
             canCancel={state.canCancel}
             chatId={state.activeChatId}

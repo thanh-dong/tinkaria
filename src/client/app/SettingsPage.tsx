@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { useNavigate, useOutletContext, useParams } from "react-router-dom"
+import { Navigate, useNavigate, useOutletContext, useParams } from "react-router-dom"
 import { getKeybindingsFilePathDisplay, SDK_CLIENT_APP } from "../../shared/branding"
 import { DEFAULT_KEYBINDINGS, PROVIDERS, type AgentProvider, type KeybindingAction, type UpdateSnapshot } from "../../shared/types"
 import { markdownComponents } from "../components/messages/shared"
@@ -207,6 +207,41 @@ export function formatPublishedDate(value: string | null) {
   }).format(parsed)
 }
 
+export function getGeneralSettingsDraftKey(args: {
+  editorPreset: EditorPreset
+  editorCommandTemplate: string
+  scrollbackLines: number
+  minColumnWidth: number
+}) {
+  return [
+    args.editorPreset,
+    args.editorCommandTemplate,
+    String(args.scrollbackLines),
+    String(args.minColumnWidth),
+  ].join("\u0001")
+}
+
+export function createKeybindingDrafts(bindings: ReturnType<typeof getResolvedKeybindings>["bindings"]): Record<string, string> {
+  return Object.fromEntries(
+    KEYBINDING_ACTIONS.map((action) => [
+      action,
+      formatKeybindingInput(bindings[action]),
+    ])
+  )
+}
+
+function handleNumberInputCommit(event: KeyboardEvent<HTMLInputElement>, commit: () => void) {
+  if (event.key !== "Enter") return
+  commit()
+  event.currentTarget.blur()
+}
+
+function handleTextInputCommit(event: KeyboardEvent<HTMLInputElement>, commit: () => void) {
+  if (event.key !== "Enter") return
+  commit()
+  event.currentTarget.blur()
+}
+
 export function ChangelogSection({
   status,
   releases,
@@ -369,6 +404,246 @@ function SettingsRow({
   )
 }
 
+function GeneralSettingsDrafts({
+  editorPreset,
+  editorCommandTemplate,
+  editorLabel,
+  minColumnWidth,
+  scrollbackLines,
+  setEditorCommandTemplate,
+  setMinColumnWidth,
+  setScrollbackLines,
+}: {
+  editorPreset: EditorPreset
+  editorCommandTemplate: string
+  editorLabel: string
+  minColumnWidth: number
+  scrollbackLines: number
+  setEditorCommandTemplate: (value: string) => void
+  setMinColumnWidth: (value: number) => void
+  setScrollbackLines: (value: number) => void
+}) {
+  const [scrollbackDraft, setScrollbackDraft] = useState(() => String(scrollbackLines))
+  const [minColumnWidthDraft, setMinColumnWidthDraft] = useState(() => String(minColumnWidth))
+  const [editorCommandDraft, setEditorCommandDraft] = useState(() => editorCommandTemplate)
+
+  function commitScrollback() {
+    const nextValue = Number(scrollbackDraft)
+    if (!Number.isFinite(nextValue)) {
+      setScrollbackDraft(String(scrollbackLines))
+      return
+    }
+    setScrollbackLines(nextValue)
+  }
+
+  function commitMinColumnWidth() {
+    const nextValue = Number(minColumnWidthDraft)
+    if (!Number.isFinite(nextValue)) {
+      setMinColumnWidthDraft(String(minColumnWidth))
+      return
+    }
+    setMinColumnWidth(nextValue)
+  }
+
+  function commitEditorCommand() {
+    setEditorCommandTemplate(editorCommandDraft)
+  }
+
+  const customEditorPreview = editorCommandDraft
+    .replaceAll("{path}", "/Users/jake/Projects/kanna/src/client/app/App.tsx")
+    .replaceAll("{line}", "12")
+    .replaceAll("{column}", "1")
+
+  return (
+    <>
+      <SettingsRow
+        title="Default Editor"
+        description="Used by the navbar code button and local file links in chat"
+        alignStart
+      >
+        <Select
+          value={editorPreset}
+          onValueChange={(value) => setEditorPreset(value as EditorPreset)}
+        >
+          <SelectTrigger className="min-w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {editorOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </SettingsRow>
+
+      {editorPreset === "custom" ? (
+        <div className="border-t border-border">
+          <div className="flex justify-between gap-8 py-5 pl-6">
+            <div className="min-w-0 max-w-xl">
+              <div className="text-sm font-medium text-foreground">Command Template</div>
+              <div className="mt-1 text-[13px] text-muted-foreground">
+                Include {"{path}"} and optionally {"{line}"} and {"{column}"} in your command.
+              </div>
+            </div>
+            <div className="flex min-w-0 max-w-[420px] flex-1 flex-col items-stretch gap-2">
+              <Input
+                type="text"
+                value={editorCommandDraft}
+                onChange={(event) => setEditorCommandDraft(event.target.value)}
+                onBlur={commitEditorCommand}
+                onKeyDown={(event) => handleTextInputCommit(event, commitEditorCommand)}
+                className="font-mono"
+              />
+              <div className="text-xs text-muted-foreground">
+                Preview: <span className="font-mono">{customEditorPreview}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <SettingsRow
+        title="Terminal Scrollback"
+        description="Lines retained for embedded terminal history"
+      >
+        <div className="flex w-full min-w-0 flex-col items-stretch gap-2 md:w-auto md:items-end">
+          <Input
+            type="number"
+            min={MIN_TERMINAL_SCROLLBACK}
+            max={MAX_TERMINAL_SCROLLBACK}
+            step={100}
+            value={scrollbackDraft}
+            onChange={(event) => setScrollbackDraft(event.target.value)}
+            onBlur={commitScrollback}
+            onKeyDown={(event) => handleNumberInputCommit(event, commitScrollback)}
+            className="hide-number-steppers w-full text-left font-mono md:w-28 md:text-right"
+          />
+          <div className="text-left text-xs text-muted-foreground md:text-right">
+            {MIN_TERMINAL_SCROLLBACK}-{MAX_TERMINAL_SCROLLBACK} lines
+            {scrollbackLines === DEFAULT_TERMINAL_SCROLLBACK ? " (default)" : ""}
+          </div>
+        </div>
+      </SettingsRow>
+
+      <SettingsRow
+        title="Terminal Min Column Width"
+        description="Minimum width for each terminal pane"
+      >
+        <div className="flex w-full min-w-0 flex-col items-stretch gap-2 md:w-auto md:items-end">
+          <Input
+            type="number"
+            min={MIN_TERMINAL_MIN_COLUMN_WIDTH}
+            max={MAX_TERMINAL_MIN_COLUMN_WIDTH}
+            step={10}
+            value={minColumnWidthDraft}
+            onChange={(event) => setMinColumnWidthDraft(event.target.value)}
+            onBlur={commitMinColumnWidth}
+            onKeyDown={(event) => handleNumberInputCommit(event, commitMinColumnWidth)}
+            className="hide-number-steppers w-full text-left font-mono md:w-28 md:text-right"
+          />
+          <div className="text-left text-xs text-muted-foreground md:text-right">
+            {MIN_TERMINAL_MIN_COLUMN_WIDTH}-{MAX_TERMINAL_MIN_COLUMN_WIDTH} px
+            {minColumnWidth === DEFAULT_TERMINAL_MIN_COLUMN_WIDTH ? " (default)" : ""}
+          </div>
+        </div>
+      </SettingsRow>
+    </>
+  )
+}
+
+function KeybindingsDrafts({
+  resolvedKeybindings,
+  writeKeybindings,
+}: {
+  resolvedKeybindings: ReturnType<typeof getResolvedKeybindings>
+  writeKeybindings: (bindings: Record<KeybindingAction, string[]>) => Promise<void>
+}) {
+  const [keybindingDrafts, setKeybindingDrafts] = useState(() => createKeybindingDrafts(resolvedKeybindings.bindings))
+  const [keybindingsError, setKeybindingsError] = useState<string | null>(null)
+
+  async function commitKeybindings(nextDrafts = keybindingDrafts) {
+    try {
+      setKeybindingsError(null)
+      await writeKeybindings(buildKeybindingPayload(nextDrafts))
+    } catch (error) {
+      setKeybindingsError(error instanceof Error ? error.message : "Unable to save keybindings.")
+    }
+  }
+
+  async function restoreDefaultKeybinding(action: keyof typeof KEYBINDING_ACTION_LABELS) {
+    const nextDrafts = {
+      ...keybindingDrafts,
+      [action]: formatKeybindingInput(DEFAULT_KEYBINDINGS[action]),
+    }
+    setKeybindingDrafts(nextDrafts)
+    await commitKeybindings(nextDrafts)
+  }
+
+  return (
+    <>
+      {keybindingsError ? (
+        <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {keybindingsError}
+        </div>
+      ) : null}
+      {KEYBINDING_ACTIONS.map((action, index) => {
+        const defaultValue = formatKeybindingInput(DEFAULT_KEYBINDINGS[action])
+        const currentValue = keybindingDrafts[action] ?? ""
+        const showRestore = currentValue !== defaultValue
+
+        return (
+          <SettingsRow
+            key={action}
+            title={KEYBINDING_ACTION_LABELS[action]}
+            description={(
+              <>
+                <span>Comma-separated shortcuts.</span>
+                {showRestore ? (
+                  <>
+                    <span> </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void restoreDefaultKeybinding(action)
+                      }}
+                      className="inline rounded text-foreground hover:text-foreground/80"
+                    >
+                      Restore: {defaultValue}
+                    </button>
+                  </>
+                ) : null}
+              </>
+            )}
+            bordered={index !== 0}
+          >
+            <div className="flex min-w-0 max-w-[420px] flex-1 flex-col items-stretch gap-2">
+              <Input
+                type="text"
+                value={currentValue}
+                onChange={(event) => {
+                  const nextValue = event.target.value
+                  setKeybindingDrafts((current) => ({ ...current, [action]: nextValue }))
+                }}
+                onBlur={() => {
+                  void commitKeybindings()
+                }}
+                onKeyDown={(event) => handleTextInputCommit(event, () => {
+                  void commitKeybindings()
+                })}
+                className="font-mono"
+              />
+            </div>
+          </SettingsRow>
+        )
+      })}
+    </>
+  )
+}
+
 export function SettingsPage() {
   const navigate = useNavigate()
   const { sectionId } = useParams<{ sectionId: string }>()
@@ -399,11 +674,6 @@ export function SettingsPage() {
   const setProviderDefaultPlanMode = useChatPreferencesStore((store) => store.setProviderDefaultPlanMode)
   const resolvedKeybindings = useMemo(() => getResolvedKeybindings(keybindings), [keybindings])
   const keybindingsFilePathDisplay = resolvedKeybindings.filePathDisplay || getKeybindingsFilePathDisplay()
-  const [scrollbackDraft, setScrollbackDraft] = useState(String(scrollbackLines))
-  const [minColumnWidthDraft, setMinColumnWidthDraft] = useState(String(minColumnWidth))
-  const [editorCommandDraft, setEditorCommandDraft] = useState(editorCommandTemplate)
-  const [keybindingDrafts, setKeybindingDrafts] = useState<Record<string, string>>({})
-  const [keybindingsError, setKeybindingsError] = useState<string | null>(null)
   const updateSnapshot = state.updateSnapshot
   const generalHeaderAction = getGeneralHeaderAction(updateSnapshot)
   const updateStatusLabel = updateSnapshot?.status === "checking"
@@ -419,33 +689,6 @@ export function SettingsPage() {
             : updateSnapshot?.status === "error"
               ? "Update check failed"
               : "Not checked yet"
-
-  useEffect(() => {
-    setScrollbackDraft(String(scrollbackLines))
-  }, [scrollbackLines])
-
-  useEffect(() => {
-    setMinColumnWidthDraft(String(minColumnWidth))
-  }, [minColumnWidth])
-
-  useEffect(() => {
-    setEditorCommandDraft(editorCommandTemplate)
-  }, [editorCommandTemplate])
-
-  useEffect(() => {
-    setKeybindingDrafts(Object.fromEntries(
-      KEYBINDING_ACTIONS.map((action) => [
-        action,
-        formatKeybindingInput(resolvedKeybindings.bindings[action]),
-      ])
-    ))
-  }, [resolvedKeybindings])
-
-  useEffect(() => {
-    if (!sectionId) return
-    if (resolveSettingsSectionId(sectionId)) return
-    navigate("/settings/general", { replace: true })
-  }, [navigate, sectionId])
 
   useEffect(() => {
     if (selectedPage !== "changelog" || isConnecting) return
@@ -471,70 +714,6 @@ export function SettingsPage() {
     }
   }, [isConnecting, selectedPage])
 
-  function commitScrollback() {
-    const nextValue = Number(scrollbackDraft)
-    if (!Number.isFinite(nextValue)) {
-      setScrollbackDraft(String(scrollbackLines))
-      return
-    }
-    setScrollbackLines(nextValue)
-  }
-
-  function commitMinColumnWidth() {
-    const nextValue = Number(minColumnWidthDraft)
-    if (!Number.isFinite(nextValue)) {
-      setMinColumnWidthDraft(String(minColumnWidth))
-      return
-    }
-    setMinColumnWidth(nextValue)
-  }
-
-  function handleNumberInputKeyDown(event: KeyboardEvent<HTMLInputElement>, commit: () => void) {
-    if (event.key !== "Enter") return
-    commit()
-    event.currentTarget.blur()
-  }
-
-  function handleTextInputKeyDown(event: KeyboardEvent<HTMLInputElement>, commit: () => void) {
-    if (event.key !== "Enter") return
-    commit()
-    event.currentTarget.blur()
-  }
-
-  function commitEditorCommand() {
-    setEditorCommandTemplate(editorCommandDraft)
-  }
-
-  async function commitKeybindings() {
-    try {
-      setKeybindingsError(null)
-      await state.socket.command({
-        type: "settings.writeKeybindings",
-        bindings: buildKeybindingPayload(keybindingDrafts),
-      })
-    } catch (error) {
-      setKeybindingsError(error instanceof Error ? error.message : "Unable to save keybindings.")
-    }
-  }
-
-  async function restoreDefaultKeybinding(action: keyof typeof KEYBINDING_ACTION_LABELS) {
-    const nextDrafts = {
-      ...keybindingDrafts,
-      [action]: formatKeybindingInput(DEFAULT_KEYBINDINGS[action]),
-    }
-    setKeybindingDrafts(nextDrafts)
-
-    try {
-      setKeybindingsError(null)
-      await state.socket.command({
-        type: "settings.writeKeybindings",
-        bindings: buildKeybindingPayload(nextDrafts),
-      })
-    } catch (error) {
-      setKeybindingsError(error instanceof Error ? error.message : "Unable to save keybindings.")
-    }
-  }
-
   function retryChangelog() {
     changelogCache = null
     setChangelogStatus("loading")
@@ -551,10 +730,20 @@ export function SettingsPage() {
       })
   }
 
-  const customEditorPreview = editorCommandDraft
-    .replaceAll("{path}", "/Users/jake/Projects/kanna/src/client/app/App.tsx")
-    .replaceAll("{line}", "12")
-    .replaceAll("{column}", "1")
+  const resolvedSectionId = resolveSettingsSectionId(sectionId)
+  if (sectionId && !resolvedSectionId) {
+    return <Navigate to="/settings/general" replace />
+  }
+
+  const generalDraftKey = getGeneralSettingsDraftKey({
+    editorPreset,
+    editorCommandTemplate,
+    scrollbackLines,
+    minColumnWidth,
+  })
+  const keybindingsDraftKey = KEYBINDING_ACTIONS
+    .map((action) => `${action}:${formatKeybindingInput(resolvedKeybindings.bindings[action])}`)
+    .join("\u0001")
   const selectedSection = sidebarItems.find((item) => item.id === selectedPage) ?? sidebarItems[0]
   const selectedSectionSubtitle =
     selectedPage === "keybindings"
@@ -721,101 +910,17 @@ export function SettingsPage() {
                         />
                       </SettingsRow>
 
-                      <SettingsRow
-                        title="Default Editor"
-                        description="Used by the navbar code button and local file links in chat"
-                        alignStart
-                      >
-                        <Select
-                          value={editorPreset}
-                          onValueChange={(value) => setEditorPreset(value as EditorPreset)}
-                        >
-                          <SelectTrigger className="min-w-[180px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {editorOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </SettingsRow>
-
-                      {editorPreset === "custom" ? (
-                        <div className="border-t border-border">
-                          <div className="flex justify-between gap-8 py-5 pl-6">
-                            <div className="min-w-0 max-w-xl">
-                              <div className="text-sm font-medium text-foreground">Command Template</div>
-                              <div className="mt-1 text-[13px] text-muted-foreground">
-                                Include {"{path}"} and optionally {"{line}"} and {"{column}"} in your command.
-                              </div>
-                            </div>
-                            <div className="flex min-w-0 max-w-[420px] flex-1 flex-col items-stretch gap-2">
-                              <Input
-                                type="text"
-                                value={editorCommandDraft}
-                                onChange={(event) => setEditorCommandDraft(event.target.value)}
-                                onBlur={commitEditorCommand}
-                                onKeyDown={(event) => handleTextInputKeyDown(event, commitEditorCommand)}
-                                className="font-mono"
-                              />
-                              <div className="text-xs text-muted-foreground">
-                                Preview: <span className="font-mono">{customEditorPreview}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      <SettingsRow
-                        title="Terminal Scrollback"
-                        description="Lines retained for embedded terminal history"
-                      >
-                        <div className="flex w-full min-w-0 flex-col items-stretch gap-2 md:w-auto md:items-end">
-                          <Input
-                            type="number"
-                            min={MIN_TERMINAL_SCROLLBACK}
-                            max={MAX_TERMINAL_SCROLLBACK}
-                            step={100}
-                            value={scrollbackDraft}
-                            onChange={(event) => setScrollbackDraft(event.target.value)}
-                            onBlur={commitScrollback}
-                            onKeyDown={(event) => handleNumberInputKeyDown(event, commitScrollback)}
-                            className="hide-number-steppers w-full text-left font-mono md:w-28 md:text-right"
-                          />
-                          <div className="text-left text-xs text-muted-foreground md:text-right">
-                            {MIN_TERMINAL_SCROLLBACK}-{MAX_TERMINAL_SCROLLBACK} lines
-                            {scrollbackLines === DEFAULT_TERMINAL_SCROLLBACK ? " (default)" : ""}
-                          </div>
-                        </div>
-                      </SettingsRow>
-
-                      <SettingsRow
-                        title="Terminal Min Column Width"
-                        description="Minimum width for each terminal pane"
-                      >
-                        <div className="flex w-full min-w-0 flex-col items-stretch gap-2 md:w-auto md:items-end">
-                          <Input
-                            type="number"
-                            min={MIN_TERMINAL_MIN_COLUMN_WIDTH}
-                            max={MAX_TERMINAL_MIN_COLUMN_WIDTH}
-                            step={10}
-                            value={minColumnWidthDraft}
-                            onChange={(event) => setMinColumnWidthDraft(event.target.value)}
-                            onBlur={commitMinColumnWidth}
-                            onKeyDown={(event) => handleNumberInputKeyDown(event, commitMinColumnWidth)}
-                            className="hide-number-steppers w-full text-left font-mono md:w-28 md:text-right"
-                          />
-                          <div className="text-left text-xs text-muted-foreground md:text-right">
-                            {MIN_TERMINAL_MIN_COLUMN_WIDTH}-{MAX_TERMINAL_MIN_COLUMN_WIDTH} px
-                            {minColumnWidth === DEFAULT_TERMINAL_MIN_COLUMN_WIDTH ? " (default)" : ""}
-                          </div>
-                        </div>
-                      </SettingsRow>
+                      <GeneralSettingsDrafts
+                        key={generalDraftKey}
+                        editorPreset={editorPreset}
+                        editorCommandTemplate={editorCommandTemplate}
+                        editorLabel={state.editorLabel}
+                        minColumnWidth={minColumnWidth}
+                        scrollbackLines={scrollbackLines}
+                        setEditorCommandTemplate={setEditorCommandTemplate}
+                        setMinColumnWidth={setMinColumnWidth}
+                        setScrollbackLines={setScrollbackLines}
+                      />
                     </div>
                   </>
                 ) : selectedPage === "providers" ? (
@@ -911,68 +1016,19 @@ export function SettingsPage() {
                   </div>
                 ) : selectedPage === "keybindings" ? (
                   <div className="border-b border-border">
-                    {keybindingsError ? (
-                      <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                        {keybindingsError}
-                      </div>
-                    ) : null}
                     {resolvedKeybindings.warning ? (
                       <div className="mb-4 rounded-2xl border border-border bg-card/30 px-4 py-3 text-sm text-muted-foreground">
                         {resolvedKeybindings.warning}
                       </div>
                     ) : null}
-                    {KEYBINDING_ACTIONS.map((action, index) => {
-                      const defaultValue = formatKeybindingInput(DEFAULT_KEYBINDINGS[action])
-                      const currentValue = keybindingDrafts[action] ?? ""
-                      const showRestore = currentValue !== defaultValue
-
-                      return (
-                        <SettingsRow
-                          key={action}
-                          title={KEYBINDING_ACTION_LABELS[action]}
-
-                          description={(
-                            <>
-                              <span>Comma-separated shortcuts.</span>
-                              {showRestore ? (
-                                <>
-                                  <span> </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      void restoreDefaultKeybinding(action)
-                                    }}
-                                    className="inline rounded text-foreground hover:text-foreground/80"
-                                  >
-                                    Restore: {defaultValue}
-                                  </button>
-                                </>
-                              ) : null}
-                            </>
-                          )}
-                          bordered={index !== 0}
-
-                        >
-                          <div className="flex min-w-0 max-w-[420px] flex-1 flex-col items-stretch gap-2">
-                            <Input
-                              type="text"
-                              value={currentValue}
-                              onChange={(event) => {
-                                const nextValue = event.target.value
-                                setKeybindingDrafts((current) => ({ ...current, [action]: nextValue }))
-                              }}
-                              onBlur={() => {
-                                void commitKeybindings()
-                              }}
-                              onKeyDown={(event) => handleTextInputKeyDown(event, () => {
-                                void commitKeybindings()
-                              })}
-                              className="font-mono"
-                            />
-                          </div>
-                        </SettingsRow>
-                      )
-                    })}
+                    <KeybindingsDrafts
+                      key={keybindingsDraftKey}
+                      resolvedKeybindings={resolvedKeybindings}
+                      writeKeybindings={(bindings) => state.socket.command({
+                        type: "settings.writeKeybindings",
+                        bindings,
+                      })}
+                    />
                   </div>
                 ) : (
                   <ChangelogSection

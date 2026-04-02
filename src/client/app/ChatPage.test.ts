@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import type { HydratedTranscriptMessage } from "../../shared/types"
 import {
   getAvailableSkillsFromMessages,
+  getEmptyStateTypingDurationMs,
   shouldIgnoreMobileSidebarSwipeStart,
   shouldOpenMobileSidebarFromSwipe,
 } from "./ChatPage"
@@ -27,13 +28,13 @@ function systemInitMessage(args: {
 function interactiveTarget(): EventTarget {
   return {
     closest: () => ({ tagName: "BUTTON" }),
-  } as EventTarget
+  } as unknown as EventTarget
 }
 
 function plainTarget(): EventTarget {
   return {
     closest: () => null,
-  } as EventTarget
+  } as unknown as EventTarget
 }
 
 describe("getAvailableSkillsFromMessages", () => {
@@ -156,5 +157,13 @@ describe("shouldOpenMobileSidebarFromSwipe", () => {
       isSidebarOpen: false,
       target,
     })).toBe(false)
+  })
+})
+
+describe("getEmptyStateTypingDurationMs", () => {
+  test("scales linearly with the configured per-character interval", () => {
+    expect(getEmptyStateTypingDurationMs("")).toBe(0)
+    expect(getEmptyStateTypingDurationMs("abc")).toBe(57)
+    expect(getEmptyStateTypingDurationMs("What are we building?")).toBe(399)
   })
 })
