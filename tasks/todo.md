@@ -3,8 +3,9 @@
 ## In Progress: Codex Present Content
 
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-codex-present-content-design.md`
+**Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-02-codex-present-content.md`
 
-**Status**: Spec written. Waiting for user review before implementation plan.
+**Status**: Plan written. Waiting on execution mode selection.
 
 **Summary**: Add a first-class Codex dynamic tool path, `present_content`, so Codex can intentionally surface structured transcript artifacts with `AskUserQuestion`-level integration quality instead of relying only on assistant markdown conventions.
 
@@ -16,21 +17,25 @@
 
 ## In Progress: Tauri Companion / Native Webview Research
 
-**Status**: Brainstorming in progress.
+**Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-tauri-native-webview-companion-design.md`
+**Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-02-tauri-native-webview-companion.md`
 
-**Summary**: Research how to incorporate Tauri so controlled content uses native webviews instead of iframes. Current direction is a small-scope Tauri shell/companion where the Kanna UI is itself a peer webview and all coordination happens over NATS, not over ad hoc HTTP control paths.
+**Status**: Design approved. Plan written. Implementation started with the first milestone: Tauri shell scaffold + standard-port attach + initial native-webview protocol surface.
+
+**Summary**: Research how to incorporate Tauri so controlled content uses native webviews instead of iframes. Approved direction is a small-scope Tauri shell where the Kanna UI is itself a Tauri-managed webview and controlled content lives in native peer webviews. Runtime coordination stays on NATS; first-cut bootstrap may use standard-port setup/self-discovery.
 
 **Current decisions**:
 1. Prefer hybrid architecture eventually, but start with a smaller-scope Tauri companion/shell.
 2. Controlled content should support local and LAN/Tailscale targets first, with optional proxied remote targets later.
 3. UX should support both docked and pop-out controlled webviews.
 4. Kanna UI should be treated as another Tauri-managed webview, not the privileged root surface.
-5. Discovery/control should be NATS-first; avoid relying on HTTP for coordination.
+5. Runtime discovery/control should be NATS-first; avoid relying on HTTP for coordination.
+6. First-cut bootstrap via standard local setup/self-discovery is acceptable.
 
 **Next**:
-1. Finish the brainstorming design for NATS-only discovery/control.
-2. Write the design spec.
-3. After approval, write the implementation plan.
+1. Implement the Tauri shell scaffold.
+2. Add shared native-webview protocol and tests.
+3. Verify from WSL and document Windows run/build flow.
 
 ## In Progress: Rich Content SVG Rendering
 
