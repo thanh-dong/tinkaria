@@ -1,5 +1,37 @@
 # Kanna Tasks
 
+## In Progress: Codex Present Content
+
+**Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-codex-present-content-design.md`
+
+**Status**: Spec written. Waiting for user review before implementation plan.
+
+**Summary**: Add a first-class Codex dynamic tool path, `present_content`, so Codex can intentionally surface structured transcript artifacts with `AskUserQuestion`-level integration quality instead of relying only on assistant markdown conventions.
+
+**Approved shape**:
+1. Advertise `present_content` on Codex turn start as a client-owned dynamic tool.
+2. Normalize it into a typed transcript tool call/result pair and persist the structured payload.
+3. Render it with a dedicated transcript component that reuses `RichContentBlock`, markdown rendering, and embeds.
+4. Keep assistant markdown as the fallback contract.
+
+## In Progress: Tauri Companion / Native Webview Research
+
+**Status**: Brainstorming in progress.
+
+**Summary**: Research how to incorporate Tauri so controlled content uses native webviews instead of iframes. Current direction is a small-scope Tauri shell/companion where the Kanna UI is itself a peer webview and all coordination happens over NATS, not over ad hoc HTTP control paths.
+
+**Current decisions**:
+1. Prefer hybrid architecture eventually, but start with a smaller-scope Tauri companion/shell.
+2. Controlled content should support local and LAN/Tailscale targets first, with optional proxied remote targets later.
+3. UX should support both docked and pop-out controlled webviews.
+4. Kanna UI should be treated as another Tauri-managed webview, not the privileged root surface.
+5. Discovery/control should be NATS-first; avoid relying on HTTP for coordination.
+
+**Next**:
+1. Finish the brainstorming design for NATS-only discovery/control.
+2. Write the design spec.
+3. After approval, write the implementation plan.
+
 ## In Progress: Rich Content SVG Rendering
 
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-rich-content-svg-rendering-design.md`
@@ -18,8 +50,9 @@
 ## In Progress: Alt+Shift UI Identity Overlay
 
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-ui-identity-overlay-design.md`
+**Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-02-ui-identity-overlay.md`
 
-**Status**: Design approved and written. Waiting for user review before implementation planning.
+**Status**: Plan written. Waiting for execution mode selection.
 
 **Summary**: Add a hold-to-reveal client-side overlay that shows curated, copyable `ui-id` labels for meaningful UI surfaces. While `Alt` + `Shift` is held, the hovered tagged surface reveals a short ancestor stack so users can reference either the exact component or the broader containing area in debug/LLM requests.
 
