@@ -12,20 +12,29 @@ import { cn } from "../../lib/utils"
 import { useIsStandalone } from "../../hooks/useIsStandalone"
 import { useChatInputStore } from "../../stores/chatInputStore"
 import { type ComposerState, useChatPreferencesStore } from "../../stores/chatPreferencesStore"
+import { useSkillCompositionStore, formatContentWithSkills } from "../../stores/skillCompositionStore"
 import { CHAT_INPUT_ATTRIBUTE, focusNextChatInput } from "../../app/chatFocusPolicy"
 import { ChatPreferenceControls, type ModelOptionChange } from "./ChatPreferenceControls"
+import { SkillPicker } from "./SkillPicker"
+import { SkillBadges } from "./SkillBadges"
+
+const EMPTY_SKILLS: string[] = []
 
 interface Props {
   onSubmit: (
     value: string,
     options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
-  ) => Promise<void>
+  ) => Promise<"queued" | "sent">
   onCancel?: () => void
+  queuedText?: string
+  onClearQueuedText?: () => void
+  onRestoreQueuedText?: () => string
   disabled: boolean
   canCancel?: boolean
   chatId?: string | null
   activeProvider: AgentProvider | null
   availableProviders: ProviderCatalogEntry[]
+  availableSkills?: string[]
 }
 
 function withNormalizedContextWindow(
@@ -119,14 +128,31 @@ export function resolvePlanModeState(args: {
   }
 }
 
+export function shouldShowQueuedBlock(queuedText: string): boolean {
+  return queuedText.trim().length > 0
+}
+
+export function getRestoredQueuedTextOnArrowUp(value: string, queuedText: string): string | null {
+  if (value.trim().length > 0) return null
+  return queuedText.trim().length > 0 ? queuedText : null
+}
+
+export function shouldClearDraftAfterSubmit(submitResult: "queued" | "sent"): boolean {
+  return submitResult === "queued" || submitResult === "sent"
+}
+
 const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput({
   onSubmit,
   onCancel,
+  queuedText = "",
+  onClearQueuedText,
+  onRestoreQueuedText,
   disabled,
   canCancel,
   chatId,
   activeProvider,
   availableProviders,
+  availableSkills = [],
 }, forwardedRef) {
   const getDraft = useChatInputStore((s) => s.getDraft)
   const setDraft = useChatInputStore((s) => s.setDraft)
@@ -137,6 +163,12 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const setComposerModelOptions = useChatPreferencesStore((s) => s.setComposerModelOptions)
   const setComposerPlanMode = useChatPreferencesStore((s) => s.setComposerPlanMode)
   const resetComposerFromProvider = useChatPreferencesStore((s) => s.resetComposerFromProvider)
+  const skillChatId = chatId ?? "__new__"
+  const selectedSkillsRaw = useSkillCompositionStore((s) => s.selections[skillChatId])
+  const selectedSkills = selectedSkillsRaw ?? EMPTY_SKILLS
+  const toggleSkill = useSkillCompositionStore((s) => s.toggleSkill)
+  const clearSkills = useSkillCompositionStore((s) => s.clearSkills)
+  const recordUsage = useSkillCompositionStore((s) => s.recordUsage)
   const [value, setValue] = useState(() => (chatId ? getDraft(chatId) : ""))
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isStandalone = useIsStandalone()
@@ -281,7 +313,8 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
 
   async function handleSubmit() {
     if (!value.trim()) return
-    const nextValue = value
+    const rawValue = value
+    const nextValue = formatContentWithSkills(rawValue, selectedSkills)
     let modelOptions: ModelOptions
     if (providerPrefs.provider === "claude") {
       modelOptions = { claude: { ...providerPrefs.modelOptions } }
@@ -298,23 +331,57 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       chatId: chatId ?? null,
       activeProvider,
       composerProvider: providerPrefs.provider,
+      skills: selectedSkills.length > 0 ? selectedSkills : undefined,
       submitOptions,
     })
 
     setValue("")
-    if (chatId) clearDraft(chatId)
     if (textareaRef.current) textareaRef.current.style.height = "auto"
 
     try {
-      await onSubmit(nextValue, submitOptions)
+      const submitResult = await onSubmit(nextValue, submitOptions)
+      if (shouldClearDraftAfterSubmit(submitResult)) {
+        if (chatId) clearDraft(chatId)
+        if (selectedSkills.length > 0) recordUsage(selectedSkills)
+        if (submitResult === "sent") {
+          clearSkills(skillChatId)
+        }
+      }
     } catch (error) {
       console.error("[ChatInput] Submit failed:", error)
-      setValue(nextValue)
-      if (chatId) setDraft(chatId, nextValue)
+      setValue(rawValue)
+      if (chatId) setDraft(chatId, rawValue)
     }
   }
 
+  function handleRestoreQueuedText() {
+    const preservedDraft = chatId ? getDraft(chatId) : ""
+    const restored = onRestoreQueuedText?.()
+    const nextValue = preservedDraft || restored
+    if (!nextValue) return
+    setValue(nextValue)
+    if (chatId) setDraft(chatId, nextValue)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      autoResize()
+    })
+  }
+
+  function handleClearQueuedText() {
+    onClearQueuedText?.()
+    if (chatId) clearDraft(chatId)
+  }
+
   function handleKeyDown(event: React.KeyboardEvent) {
+    if (event.key === "ArrowUp") {
+      const restored = getRestoredQueuedTextOnArrowUp(value, queuedText)
+      if (restored) {
+        event.preventDefault()
+        handleRestoreQueuedText()
+        return
+      }
+    }
+
     if (event.key === "Tab" && !event.shiftKey) {
       event.preventDefault()
       focusNextChatInput(textareaRef.current, document)
@@ -347,6 +414,29 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   }
   return (
     <div>
+      {shouldShowQueuedBlock(queuedText) ? (
+        <div className={cn("px-3 pb-2", isStandalone && "px-5")}>
+          <div className="max-w-[840px] mx-auto rounded-[26px] border border-border/70 bg-background/95 px-4 py-3 text-sm whitespace-pre-wrap shadow-sm">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Queue</span>
+              <Button type="button" variant="ghost" size="sm" onClick={handleClearQueuedText}>
+                Clear
+              </Button>
+            </div>
+            <div>{queuedText}</div>
+          </div>
+        </div>
+      ) : null}
+      {selectedSkills.length > 0 ? (
+        <div className={cn("px-3 pb-1.5", isStandalone && "px-5")}>
+          <div className="max-w-[840px] mx-auto pl-4">
+            <SkillBadges
+              skills={selectedSkills}
+              onRemove={(skill) => toggleSkill(skillChatId, skill)}
+            />
+          </div>
+        </div>
+      ) : null}
       <div className={cn("px-3 pt-0", isStandalone && "px-5")}>
         <div className="flex items-end gap-2 max-w-[840px] mx-auto border dark:bg-card/40 backdrop-blur-lg border-border rounded-[29px] pr-1.5">
           <Textarea
@@ -402,12 +492,16 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
             onPlanModeChange={handlePlanModeChange}
             includePlanMode={showPlanMode}
             className="max-w-[840px] mx-auto"
+            skillPicker={availableSkills.length > 0 ? (
+              <SkillPicker
+                availableSkills={availableSkills}
+                selectedSkills={selectedSkills}
+                onToggleSkill={(skill) => toggleSkill(skillChatId, skill)}
+              />
+            ) : undefined}
           />
         <div className="min-w-3"/>
-
       </div>
-
-     
     </div>
   )
 })

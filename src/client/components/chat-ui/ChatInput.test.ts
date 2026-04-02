@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { resolvePlanModeState } from "./ChatInput"
+import {
+  getRestoredQueuedTextOnArrowUp,
+  resolvePlanModeState,
+  shouldClearDraftAfterSubmit,
+  shouldShowQueuedBlock,
+} from "./ChatInput"
 import { useChatPreferencesStore } from "../../stores/chatPreferencesStore"
 
 const INITIAL_STATE = useChatPreferencesStore.getInitialState()
@@ -83,5 +88,29 @@ describe("resolvePlanModeState", () => {
       modelOptions: { reasoningEffort: "high", contextWindow: "200k" },
       planMode: false,
     })
+  })
+})
+
+describe("shouldShowQueuedBlock", () => {
+  test("returns true when queued text exists", () => {
+    expect(shouldShowQueuedBlock("Check layout")).toBe(true)
+  })
+
+  test("returns false when queued text is empty", () => {
+    expect(shouldShowQueuedBlock("   ")).toBe(false)
+  })
+})
+
+describe("getRestoredQueuedTextOnArrowUp", () => {
+  test("restores the queue only when the textarea is empty", () => {
+    expect(getRestoredQueuedTextOnArrowUp("", "Queued follow-up")).toBe("Queued follow-up")
+    expect(getRestoredQueuedTextOnArrowUp("draft", "Queued follow-up")).toBeNull()
+  })
+})
+
+describe("shouldClearDraftAfterSubmit", () => {
+  test("clears persisted drafts for queued and sent submits", () => {
+    expect(shouldClearDraftAfterSubmit("queued")).toBe(true)
+    expect(shouldClearDraftAfterSubmit("sent")).toBe(true)
   })
 })
