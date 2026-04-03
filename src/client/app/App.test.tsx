@@ -199,9 +199,9 @@ describe("bindUiIdentityOverlayWindowEvents", () => {
       },
     })
 
+    fakeWindow.dispatch("pointermove", { target: surfaceTarget, clientX: 120, clientY: 160 } as unknown as PointerEvent)
     fakeWindow.dispatch("keydown", { altKey: true, shiftKey: true } as unknown as KeyboardEvent)
     fakeWindow.dispatch("pointermove", { target: overlayTarget, clientX: 90, clientY: 100 } as unknown as PointerEvent)
-    fakeWindow.dispatch("pointermove", { target: surfaceTarget, clientX: 120, clientY: 160 } as unknown as PointerEvent)
     fakeWindow.dispatch("pointermove", { target: gapTarget, clientX: 140, clientY: 175 } as unknown as PointerEvent)
     fakeWindow.dispatch("blur", new Event("blur"))
 
@@ -212,10 +212,9 @@ describe("bindUiIdentityOverlayWindowEvents", () => {
     expect(pointerTargets).toEqual([surfaceTarget])
     expect(pointerPositions).toEqual([
       { clientX: 120, clientY: 160 },
-      { clientX: 140, clientY: 175 },
     ])
     expect(highlightResetCount).toBe(1)
-    expect(delayedClearCount).toBe(1)
+    expect(delayedClearCount).toBe(0)
     expect(cancelledClearCount).toBe(2)
 
     cleanup()
@@ -224,6 +223,88 @@ describe("bindUiIdentityOverlayWindowEvents", () => {
     expect(fakeWindow.listenerCount("keyup")).toBe(0)
     expect(fakeWindow.listenerCount("pointermove")).toBe(0)
     expect(fakeWindow.listenerCount("blur")).toBe(0)
+  })
+
+  test("latches the current target for one Alt+Shift hold and only refreshes after release", () => {
+    const fakeWindow = createFakeWindow()
+    const modifierSnapshots: Array<{ altKey: boolean; shiftKey: boolean }> = []
+    const pointerTargets: unknown[] = []
+    const pointerPositions: Array<{ clientX: number; clientY: number }> = []
+    let highlightResetCount = 0
+    let delayedClearCount = 0
+    let cancelledClearCount = 0
+
+    const firstSurfaceTarget = {
+      closest() {
+        return null
+      },
+      getAttribute(name: string) {
+        return name === "data-ui-id" ? "chat.page" : null
+      },
+      parentElement: null,
+    }
+    const secondSurfaceTarget = {
+      closest() {
+        return null
+      },
+      getAttribute(name: string) {
+        return name === "data-ui-id" ? "settings.page" : null
+      },
+      parentElement: null,
+    }
+
+    const cleanup = bindUiIdentityOverlayWindowEvents(fakeWindow, {
+      setModifiers: (modifiers) => {
+        modifierSnapshots.push(modifiers)
+      },
+      setPointerTarget: (target) => {
+        if (target) {
+          pointerTargets.push(target)
+        }
+      },
+      setPointerPosition: (position) => {
+        pointerPositions.push(position)
+      },
+      resetHighlight: () => {
+        highlightResetCount += 1
+      },
+      cancelPendingPointerClear: () => {
+        cancelledClearCount += 1
+      },
+      clearPointerTargetWithDelay: () => {
+        delayedClearCount += 1
+      },
+    })
+
+    fakeWindow.dispatch(
+      "pointermove",
+      { target: firstSurfaceTarget, clientX: 120, clientY: 160 } as unknown as PointerEvent
+    )
+    fakeWindow.dispatch("keydown", { altKey: true, shiftKey: true } as unknown as KeyboardEvent)
+    fakeWindow.dispatch(
+      "pointermove",
+      { target: secondSurfaceTarget, clientX: 260, clientY: 320 } as unknown as PointerEvent
+    )
+    fakeWindow.dispatch("keyup", { altKey: false, shiftKey: false } as unknown as KeyboardEvent)
+    fakeWindow.dispatch(
+      "pointermove",
+      { target: secondSurfaceTarget, clientX: 260, clientY: 320 } as unknown as PointerEvent
+    )
+
+    expect(modifierSnapshots).toEqual([
+      { altKey: true, shiftKey: true },
+      { altKey: false, shiftKey: false },
+    ])
+    expect(pointerTargets).toEqual([firstSurfaceTarget, secondSurfaceTarget])
+    expect(pointerPositions).toEqual([
+      { clientX: 120, clientY: 160 },
+      { clientX: 260, clientY: 320 },
+    ])
+    expect(highlightResetCount).toBe(2)
+    expect(delayedClearCount).toBe(0)
+    expect(cancelledClearCount).toBe(2)
+
+    cleanup()
   })
 })
 

@@ -7,6 +7,7 @@ import { useChatReadStateStore } from "../stores/chatReadStateStore"
 import { useRightSidebarStore } from "../stores/rightSidebarStore"
 import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
 import { getEditorPresetLabel, useTerminalPreferencesStore } from "../stores/terminalPreferencesStore"
+import { useChatInputStore } from "../stores/chatInputStore"
 import type { ChatMessageEvent, ChatRuntime, ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import type { AskUserQuestionItem } from "../components/messages/types"
@@ -111,6 +112,10 @@ function logTinkariaState(message: string, details?: unknown) {
 
 export function shouldAutoFollowTranscript(distanceFromBottom: number) {
   return distanceFromBottom < 24
+}
+
+export function shouldStickToBottomOnComposerSubmit(distanceFromBottom: number) {
+  return distanceFromBottom < 97
 }
 
 export function getUiUpdateRestartReconnectAction(
@@ -387,7 +392,14 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [commandError, setCommandError] = useState<string | null>(null)
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
-  const submitPipelineRef = useRef<SubmitPipelineState>(createSubmitPipelineState())
+  const submitPipelineRef = useRef<SubmitPipelineState>(createSubmitPipelineState({
+    queuedTextByChat: Object.fromEntries(
+      Object.entries(useChatInputStore.getState().queuedDrafts).map(([chatId, draft]) => [chatId, draft.text])
+    ),
+    optionsByChat: Object.fromEntries(
+      Object.entries(useChatInputStore.getState().queuedDrafts).map(([chatId, draft]) => [chatId, draft.options])
+    ),
+  }))
   const [submitPipeline, setSubmitPipeline] = useState<SubmitPipelineState>(submitPipelineRef.current)
   const [localFilePreview, setLocalFilePreview] = useState<LocalFilePreview | null>(null)
   const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
@@ -410,6 +422,19 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     const next = updater(submitPipelineRef.current)
     submitPipelineRef.current = next
     setSubmitPipeline(next)
+    useChatInputStore.getState().syncQueuedDrafts(
+      Object.fromEntries(
+        Object.entries(next.queuedTextByChat).flatMap(([chatId, text]) => {
+          const trimmed = text.trim()
+          if (!trimmed) return []
+          return [[chatId, {
+            text: trimmed,
+            updatedAt: Date.now(),
+            options: next.optionsByChat[chatId],
+          }]]
+        })
+      )
+    )
     return next
   }
 
@@ -422,6 +447,9 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         type: "sidebar.loaded",
         firstProjectId: snapshot.projectGroups[0]?.groupKey ?? null,
       }))
+      useChatInputStore.getState().reconcileQueuedDrafts(
+        snapshot.projectGroups.flatMap((group) => group.chats.map((chat) => chat.chatId))
+      )
       setSidebarReady(true)
       setCommandError(null)
     })
@@ -747,6 +775,14 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     enableAutoFollow("smooth")
   }
 
+  function keepComposerSubmitAnchored() {
+    const element = scrollRef.current
+    if (!element) return
+    const distance = element.scrollHeight - element.scrollTop - element.clientHeight
+    if (!shouldStickToBottomOnComposerSubmit(distance)) return
+    enableAutoFollow("auto")
+  }
+
   function maybeFlushQueuedSubmit(chatId: string, isProcessing: boolean) {
     const { state: nextState, flushRequest } = startQueuedFlush(submitPipelineRef.current, {
       chatId,
@@ -926,6 +962,8 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     content: string,
     options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
   ) {
+    keepComposerSubmitAnchored()
+
     if (!activeChatId) {
       await handleSend(content, options)
       return "sent"
@@ -982,6 +1020,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     if (!confirmed) return
     try {
       await socket.command({ type: "chat.delete", chatId: chat.chatId })
+      useChatInputStore.getState().clearQueuedDraft(chat.chatId)
       clearChatReadState(chat.chatId)
       if (chat.chatId === activeChatId) {
         const nextChatId = getNewestRemainingChatId(sidebarData.projectGroups, chat.chatId)
@@ -1017,6 +1056,9 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
     try {
       await socket.command({ type: "project.remove", projectId })
+      for (const chat of project.chats) {
+        useChatInputStore.getState().clearQueuedDraft(chat.chatId)
+      }
       useTerminalLayoutStore.getState().clearProject(projectId)
       useRightSidebarStore.getState().clearProject(projectId)
       if (runtime?.projectId === projectId) {

@@ -1,3 +1,7 @@
 # Session Lessons
 
 - 2026-04-02: For Tauri companion/shell research around Kanna, do not assume HTTP discovery is acceptable. The intended control plane is NATS-only once auth and broker coordinates are available.
+- 2026-04-03: For the Tauri companion, distinguish the browser-facing attach surface from the native transport. The main server now fronts browser WebSocket access on one server URL, so public companion/settings UX should be server-first and avoid separate WS-port discovery, but the native Rust companion may still legitimately require a raw `nats://` bootstrap until its transport changes.
+- 2026-04-03: For busy composer controls, keep the queue affordance explicit as `Queue`, keep queued content above the composer only, and preserve `ArrowUp` as the restore path instead of adding transcript-level queued placeholders.
+- 2026-04-03: Persist queued drafts as local per-chat pending state with self-cleaning rules and original submit options; do not promote them into transcript/server state just to survive refresh.
+- 2026-04-03: For Windows Tauri companion work from WSL, never rely on a bootstrap file or random embedded NATS WS port that lives only inside the WSL filesystem/network namespace. The only valid cross-boundary attach path is the public server origin, and when debugging attach failures, prove the public `/nats-ws` endpoint actually returns `101 Switching Protocols` from Windows-facing clients before changing native code again.

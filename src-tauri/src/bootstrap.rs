@@ -5,7 +5,7 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::json;
 use tauri::{
-    AppHandle, Builder, Manager, Url, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Builder, Manager, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
 
 use crate::logging::{last_error_message, log_event, open_log_file, LogEvent};
@@ -15,15 +15,15 @@ use crate::manifest::{
 };
 use crate::settings::open_settings_window;
 use crate::tray::{
-    setup_tray, update_tray_snapshot, CompanionTraySnapshot, EXIT_MENU_ID, OPEN_LOG_FILE_MENU_ID,
-    OPEN_SETTINGS_MENU_ID,
+    current_tray_snapshot, setup_tray, update_tray_snapshot, CompanionTraySnapshot, EXIT_MENU_ID,
+    OPEN_LOG_FILE_MENU_ID, OPEN_MAIN_SHELL_MENU_ID, OPEN_SETTINGS_MENU_ID,
 };
 use crate::webview::{close_controlled_webview, open_controlled_webview};
 
 const WEBVIEW_COMMAND_SUBJECT: &str = "kanna.cmd.webview.>";
 const DESKTOP_REGISTER_SUBJECT: &str = "kanna.cmd.desktop.register";
 const PRIMARY_SHELL_WINDOW_LABEL: &str = "main-shell";
-const PRIMARY_SHELL_WINDOW_TITLE: &str = "Tinkaria Companion";
+const PRIMARY_SHELL_WINDOW_TITLE: &str = "Tinkaria";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum PrimaryShellWindowTransition {
@@ -63,6 +63,16 @@ pub fn run() {
                         "open_settings",
                         error,
                         [("menuId", json!(OPEN_SETTINGS_MENU_ID))],
+                    ));
+                }
+            }
+            OPEN_MAIN_SHELL_MENU_ID => {
+                if let Err(error) = reopen_primary_shell_window(app) {
+                    log_event(LogEvent::error(
+                        "tray",
+                        "open_main_shell",
+                        error,
+                        [("menuId", json!(OPEN_MAIN_SHELL_MENU_ID))],
                     ));
                 }
             }
@@ -388,11 +398,39 @@ fn open_primary_shell_window(app: &AppHandle, server_url: &str) -> Result<(), St
             .build()
             .map_err(|error| error.to_string())?;
 
+            window.on_window_event(|event| {
+                if should_hide_primary_shell_on_close(event) {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                    }
+                }
+            });
             window.show().map_err(|error| error.to_string())?;
             window.set_focus().map_err(|error| error.to_string())?;
             Ok(())
         }
     }
+}
+
+fn should_hide_primary_shell_on_close(event: &WindowEvent) -> bool {
+    should_hide_primary_shell_on_close_requested(matches!(event, WindowEvent::CloseRequested { .. }))
+}
+
+fn should_hide_primary_shell_on_close_requested(is_close_requested: bool) -> bool {
+    is_close_requested
+}
+
+fn primary_shell_server_url(app: &AppHandle) -> String {
+    current_tray_snapshot(app)
+        .ok()
+        .and_then(|snapshot| snapshot.server_url)
+        .filter(|url| !url.trim().is_empty())
+        .unwrap_or_else(|| "http://127.0.0.1:5174".to_string())
+}
+
+fn reopen_primary_shell_window(app: &AppHandle) -> Result<(), String> {
+    let server_url = primary_shell_server_url(app);
+    open_primary_shell_window(app, &server_url)
 }
 
 fn primary_shell_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
@@ -515,7 +553,8 @@ mod tests {
     use super::{
         normalize_primary_shell_url, primary_shell_window_label,
         primary_shell_window_transition, PrimaryShellWindowTransition,
-        PRIMARY_SHELL_WINDOW_LABEL, PRIMARY_SHELL_WINDOW_TITLE,
+        should_hide_primary_shell_on_close_requested, PRIMARY_SHELL_WINDOW_LABEL,
+        PRIMARY_SHELL_WINDOW_TITLE,
     };
 
     #[test]
@@ -526,7 +565,7 @@ mod tests {
 
     #[test]
     fn primary_shell_window_title_uses_tinkaria_branding() {
-        assert_eq!(PRIMARY_SHELL_WINDOW_TITLE, "Tinkaria Companion");
+        assert_eq!(PRIMARY_SHELL_WINDOW_TITLE, "Tinkaria");
     }
 
     #[test]
@@ -551,5 +590,11 @@ mod tests {
             }
             PrimaryShellWindowTransition::Open(_) => panic!("expected an existing window refresh"),
         }
+    }
+
+    #[test]
+    fn primary_shell_close_requests_are_hidden_instead_of_exiting() {
+        assert!(should_hide_primary_shell_on_close_requested(true));
+        assert!(!should_hide_primary_shell_on_close_requested(false));
     }
 }

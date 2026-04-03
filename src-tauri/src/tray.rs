@@ -12,6 +12,7 @@ pub const SERVER_MENU_ID: &str = "server";
 pub const NATS_MENU_ID: &str = "nats";
 pub const RENDERER_MENU_ID: &str = "renderer";
 pub const ERROR_MENU_ID: &str = "last-error";
+pub const OPEN_MAIN_SHELL_MENU_ID: &str = "open-main-shell";
 pub const OPEN_SETTINGS_MENU_ID: &str = "open-settings";
 pub const OPEN_LOG_FILE_MENU_ID: &str = "open-log-file";
 pub const EXIT_MENU_ID: &str = "exit";
@@ -76,6 +77,17 @@ pub fn update_tray_snapshot(
     refresh_tray(app).map_err(|error| error.to_string())
 }
 
+pub fn current_tray_snapshot(app: &AppHandle) -> Result<CompanionTraySnapshot, String> {
+    let state = app
+        .try_state::<Mutex<CompanionTraySnapshot>>()
+        .ok_or_else(|| "tray state not initialized".to_string())?;
+
+    state
+        .lock()
+        .map(|snapshot| snapshot.clone())
+        .map_err(|error| error.to_string())
+}
+
 pub fn refresh_tray(app: &AppHandle) -> tauri::Result<()> {
     let state = app
         .try_state::<Mutex<CompanionTraySnapshot>>()
@@ -120,6 +132,7 @@ fn build_tray_menu(
         .item(&renderer)
         .item(&error)
         .separator()
+        .text(OPEN_MAIN_SHELL_MENU_ID, "Open Tinkaria")
         .text(OPEN_SETTINGS_MENU_ID, "Open Settings")
         .text(OPEN_LOG_FILE_MENU_ID, "Open Log File")
         .separator()
@@ -164,7 +177,8 @@ mod tests {
     use super::{
         format_error_label, format_nats_label, format_renderer_label, format_server_label,
         format_status_label, CompanionTraySnapshot, COMPANION_TOOLTIP, ERROR_MENU_ID,
-        OPEN_LOG_FILE_MENU_ID, RENDERER_MENU_ID, SERVER_MENU_ID, STATUS_MENU_ID,
+        OPEN_LOG_FILE_MENU_ID, OPEN_MAIN_SHELL_MENU_ID, RENDERER_MENU_ID, SERVER_MENU_ID,
+        STATUS_MENU_ID,
     };
 
     #[test]
@@ -202,6 +216,7 @@ mod tests {
         assert_eq!(SERVER_MENU_ID, "server");
         assert_eq!(RENDERER_MENU_ID, "renderer");
         assert_eq!(ERROR_MENU_ID, "last-error");
+        assert_eq!(OPEN_MAIN_SHELL_MENU_ID, "open-main-shell");
         assert_eq!(OPEN_LOG_FILE_MENU_ID, "open-log-file");
     }
 

@@ -1,9 +1,10 @@
-import { Cpu, MonitorSmartphone, PlugZap, RadioTower } from "lucide-react"
-import { useOutletContext, useParams } from "react-router-dom"
+import type { ReactNode } from "react"
+import { Cpu, MonitorSmartphone, PlugZap, RadioTower, ShieldCheck } from "lucide-react"
+import { useParams } from "react-router-dom"
 import type { DesktopRendererSnapshot, DesktopRenderersSnapshot } from "../../shared/types"
+import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
-import { PageHeader } from "./PageHeader"
-import type { TinkariaState } from "./useTinkariaState"
+import { useTinkariaAppState } from "./TinkariaStateContext"
 
 export function findDesktopRendererSnapshot(
   snapshot: DesktopRenderersSnapshot,
@@ -60,6 +61,31 @@ function DesktopCompanionInfoCard({
   )
 }
 
+export function DesktopCompanionShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="h-full overflow-y-auto bg-[linear-gradient(180deg,rgba(255,250,242,0.98)_0%,rgba(255,246,234,0.94)_100%)] text-foreground dark:bg-[linear-gradient(180deg,rgba(14,20,18,1)_0%,rgba(11,16,14,1)_100%)]">
+      <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col px-6 pb-12 pt-8 sm:px-8">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <TinkariaSidebarMark className="rounded-2xl border-orange-200/80 bg-white/90 p-1.5" imageClassName="size-8" />
+            <div className="space-y-1">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Tinkaria Companion
+              </div>
+              <h1 className="text-2xl font-semibold tracking-tight">Native desktop controls for one renderer</h1>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 py-2 text-sm text-muted-foreground shadow-sm backdrop-blur">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            Companion-only surface
+          </div>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export function DesktopCompanionPageBody({
   renderer,
   rendererId,
@@ -70,53 +96,53 @@ export function DesktopCompanionPageBody({
   const statusLabel = getDesktopCompanionStatusLabel(renderer)
 
   return (
-    <div className="flex-1 min-w-0 overflow-y-auto bg-background">
-      <PageHeader
-        title="Desktop Companion"
-        subtitle="Renderer-specific companion settings powered by the shared desktop registry."
-        icon={MonitorSmartphone}
-      />
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-10">
-        <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-sm">
+    <DesktopCompanionShell>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
+        <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-sm lg:col-span-2">
           <CardHeader className="gap-3 p-6">
-            <CardDescription>Renderer</CardDescription>
-            <CardTitle className="text-2xl">{rendererId}</CardTitle>
+            <CardDescription>Renderer control surface</CardDescription>
+            <CardTitle className="text-3xl">{rendererId}</CardTitle>
             <p className="text-sm text-muted-foreground">
               {renderer
-                ? `Connected from ${renderer.machineName}. Registry-backed desktop settings live here so the companion can share the same UI system as the rest of Tinkaria.`
+                ? `Connected from ${renderer.machineName}. Attached to the running Tinkaria server and its embedded NATS authority.`
                 : "This renderer is not currently registered. The page stays addressable so the tray can land on a stable per-renderer route."}
             </p>
           </CardHeader>
+          <CardContent className="grid gap-4 border-t border-border/60 p-6 md:grid-cols-2 xl:grid-cols-4">
+            <DesktopCompanionInfoCard
+              title="Status"
+              value={statusLabel}
+              description={renderer ? "Driven from the live desktop renderer snapshot." : "Waiting for the renderer to register over NATS."}
+              icon={PlugZap}
+            />
+            <DesktopCompanionInfoCard
+              title="Main server"
+              value={renderer?.serverUrl ?? "Unavailable"}
+              description="The browser-first Tinkaria server this companion is attached to."
+              icon={RadioTower}
+            />
+            <DesktopCompanionInfoCard
+              title="Embedded NATS"
+              value={renderer?.natsUrl ?? "Unavailable"}
+              description="Native attach target for the companion. Browser clients stay on the main server WebSocket path."
+              icon={Cpu}
+            />
+            <DesktopCompanionInfoCard
+              title="Capabilities"
+              value={renderer?.capabilities.join(", ") ?? "Unavailable"}
+              description="Desktop-native capabilities currently reported by this renderer."
+              icon={MonitorSmartphone}
+            />
+          </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4">
           <DesktopCompanionInfoCard
-            title="Status"
-            value={statusLabel}
-            description={renderer ? "Driven from the live desktop renderer snapshot." : "Waiting for the renderer to register over NATS."}
-            icon={PlugZap}
-          />
-          <DesktopCompanionInfoCard
-            title="Main server"
-            value={renderer?.serverUrl ?? "Unavailable"}
-            description="The browser-first Tinkaria server this companion is attached to."
-            icon={RadioTower}
-          />
-          <DesktopCompanionInfoCard
-            title="NATS"
-            value={renderer?.natsUrl ?? "Unavailable"}
-            description="Embedded NATS endpoint currently advertised for this renderer."
-            icon={Cpu}
-          />
-          <DesktopCompanionInfoCard
-            title="Capabilities"
-            value={renderer?.capabilities.join(", ") ?? "Unavailable"}
-            description="Desktop-native capabilities currently reported by this renderer."
+            title="Renderer identity"
+            value={renderer?.machineName ?? "Unavailable"}
+            description={renderer ? `Connected at ${formatDesktopCompanionTimestamp(renderer.connectedAt)}` : "Waiting for first successful attach."}
             icon={MonitorSmartphone}
           />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
           <Card className="rounded-2xl border border-border/70 bg-card/80 shadow-sm">
             <CardHeader className="p-5">
               <CardDescription>Connection details</CardDescription>
@@ -153,12 +179,12 @@ export function DesktopCompanionPageBody({
           </Card>
         </div>
       </div>
-    </div>
+    </DesktopCompanionShell>
   )
 }
 
 export function DesktopCompanionPage() {
-  const state = useOutletContext<TinkariaState>()
+  const state = useTinkariaAppState()
   const params = useParams()
   const rendererId = params.rendererId ?? ""
   const renderer = findDesktopRendererSnapshot(state.desktopRenderers, rendererId)

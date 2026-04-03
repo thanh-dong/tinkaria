@@ -1,5 +1,73 @@
 # Kanna Tasks
 
+## Completed: Queued Draft Persistence And Composer Submit Anchoring
+
+**Status**: Verified. Queued drafts now survive refresh as local per-chat pending state, self-clean on age/size/orphan conditions, retain their original submit options, and render with a distinct pending treatment above the composer. Composer submit now also keeps the transcript anchored when the user is already near the bottom, including the queue path used by `Ctrl/Cmd+Enter`.
+
+**Root cause**:
+1. `useTinkariaState` kept queued text only in ephemeral in-memory submit-pipeline state, so refresh discarded it entirely.
+2. Queue rendering reused a near-default card treatment, so pending local drafts did not read clearly as separate from transcript messages.
+3. Composer queue submission could mutate the bottom layout without reasserting bottom-follow for users already near the tail, which produced the apparent jump back toward the previous reply.
+
+**Fix**:
+1. Extended `src/client/stores/chatInputStore.ts` with persisted queued drafts keyed by `chatId`, including `updatedAt` and the original submit options.
+2. Added self-cleaning normalization for queued drafts: blank removal, 7-day TTL expiry, 20k-character trimming, and orphan reconciliation against current sidebar chats.
+3. Hydrated `useTinkariaState` submit-pipeline state from the persisted queued drafts and synced queue mutations back into the store.
+4. Cleared queued drafts on manual clear, restore-to-composer, successful flush, chat delete, and project removal.
+5. Updated `src/client/components/chat-ui/ChatInput.tsx` so the queued block uses a visibly pending local style instead of normal message-adjacent styling.
+6. Added a dedicated near-bottom composer-submit threshold so queue/send submissions keep bottom-follow when the user is already close to the tail.
+
+**Verified**:
+1. RED: `bun test src/client/stores/chatInputStore.test.ts src/client/app/useTinkariaState.test.ts src/client/components/chat-ui/ChatInput.test.ts`
+2. GREEN: `bun test src/client/stores/chatInputStore.test.ts src/client/app/useTinkariaState.test.ts src/client/components/chat-ui/ChatInput.test.ts src/client/app/useTinkariaState.machine.test.ts`
+3. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Completed: Alt-Shift Overlay Hold Latch
+
+**Status**: Verified in tests and build checks. The Alt+Shift UI identity overlay now latches to the pre-hovered target for a single hold cycle instead of chasing later pointer movement, so the modal remains reachable while the keys stay down. To inspect a different spot, release and repress Alt+Shift.
+
+**Root cause**: `src/client/app/App.tsx` kept updating the overlay pointer target and anchor on every non-overlay `pointermove`, even after the Alt+Shift combo was active. That caused the modal to keep retargeting as the cursor moved toward it, making it difficult to reach.
+
+**Fix**:
+1. Added a regression test in `src/client/app/App.test.tsx` that proves one Alt+Shift hold latches the current target and only refreshes after release.
+2. Updated `bindUiIdentityOverlayWindowEvents()` in `src/client/app/App.tsx` to track modifier state locally and ignore non-overlay pointer moves while Alt+Shift is active.
+3. Tightened the existing overlay-owned pointer-target test to reflect the intended flow: pre-hover a target, hold Alt+Shift, then move into the modal without retargeting.
+
+**Verified**:
+1. RED: `bun test src/client/app/App.test.tsx`
+2. GREEN: `bun test src/client/app/App.test.tsx`
+3. `bun test src/client/app/App.test.tsx src/client/components/ui/UiIdentityOverlay.test.tsx`
+4. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+5. `bun run build`
+6. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+**Notes**:
+1. `agent-browser` could load the local page shell in this environment, but the React app never mounted under browser automation (`#root` stayed empty on both `http://127.0.0.1:5174` and `http://127.0.0.1:5175`), so a live interactive smoke for the overlay remained blocked by the local runtime rather than by this change.
+
+## Completed: Busy Composer Stop + Queue Controls
+
+**Status**: Verified. When a chat is actively processing, the composer now keeps `Stop` visible and adds a sibling `Queue` button. Queued content still renders only in the existing block above the composer, and repeated queue actions continue to concatenate into that single block.
+
+**Root cause**: `src/client/components/chat-ui/ChatInput.tsx` collapsed the busy-state composer action into a single stop control, so queueing remained a hidden capability even though the state pipeline already supported queued concatenation and restoration.
+
+**Fix**:
+1. Added explicit busy-state queue helpers and regression tests in `src/client/components/chat-ui/ChatInput.test.ts`.
+2. Updated `src/client/components/chat-ui/ChatInput.tsx` to render `Stop` and `Queue` side-by-side while `canCancel` is true.
+3. Wired `Queue` through the existing submit path, preserving the current queue block above the composer and the existing `ArrowUp` restore flow.
+
+**Verified**:
+1. RED: `bun test src/client/components/chat-ui/ChatInput.test.ts`
+2. GREEN: `bun test src/client/components/chat-ui/ChatInput.test.ts src/client/app/useTinkariaState.machine.test.ts src/client/app/useTinkariaState.test.ts`
+3. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+5. Browser smoke: `agent-browser open http://127.0.0.1:5174`
+6. Browser smoke: `agent-browser screenshot` -> `/home/lagz0ne/.agent-browser/tmp/screenshots/screenshot-1775204169648.png`
+7. Browser smoke: `agent-browser errors` -> no browser errors
+
+**Notes**:
+1. The current local browser session at `http://127.0.0.1:5174` did not expose an active processing chat to drive a live busy-state repro, so the browser check for this pass remained a page-load/error smoke rather than a full interactive queue demo.
+
 ## Completed: Dependency Upgrade Worktree Baseline
 
 **Status**: Verified in isolated worktree `/home/lagz0ne/dev/kanna/.worktrees/upgrade-deps-latest` on branch `chore/upgrade-deps-latest`. The branch now carries a broad latest-version dependency bump without touching the main workspace beyond this handoff note and the C3 ADR.
@@ -152,18 +220,22 @@
 
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-tauri-native-webview-companion-design.md`
 **Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-02-tauri-native-webview-companion.md`
+**Next Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-03-tauri-two-window-desktop.md`
 
-**Status**: Companion registration, desktop renderer snapshots, the first real steering path, the companion lifecycle slice, and the native branding/logging pass are implemented and verified locally in WSL and on a Windows-launched `.exe`. The desktop companion now uses a stable file-first bootstrap contract at `~/.tinkaria-dev/data/desktop-bootstrap.json` with HTTP manifest fallback, runs as a tray-first companion with `Open Settings` and `Exit`, and emits structured native stderr logs for bootstrap, tray, settings, and controlled-webview failures.
+**Status**: Companion registration, desktop renderer snapshots, the first real steering path, tray/logging lifecycle, and the dedicated desktop settings route are implemented. The bootstrap path is now server-first: the Windows companion no longer depends on a local bootstrap file, normalizes the discovered companion server back to the public `5174` origin, and prefers `/auth/token` + `/nats-ws` there. Task 2 from the two-window desktop plan is now in place in the native runtime: Tauri opens a borderless `main-shell` window pointed at the browser-hosted server route, registers native maximize/fullscreen commands, hides the primary shell on close instead of exiting, and exposes a tray `Open Tinkaria` restore path. The Tauri capability file now grants remote IPC/window access to the `main-shell` route on `http://127.0.0.1:5174/*` / `http://localhost:5174/*`. The browser-hosted shell chrome is now reduced to the existing sidebar header only: the desktop maximize/fullscreen controls reveal only while hovering the Tinkaria logo/header cluster, alongside the collapse affordance, and that same cluster acts as the drag region. Current blocker: the public `/nats-ws` surface on the running dev server still returns `HTTP 200` instead of upgrading, so the Windows companion cannot complete native NATS attach yet. A defensive legacy fallback exists, but the old direct `natsWsUrl` from the WSL-hosted manifest is not reachable from Windows (`os error 10061`), which confirms the public proxy path must work for cross-WSL desktop attach.
 
-**Summary**: Research how to incorporate Tauri so controlled content uses native webviews instead of iframes. The approved direction is now companion-only: the main server stays browser-first, advertises embedded-NATS coordinates through a stable local bootstrap file and companion manifest, and Tauri attaches as a native peer that provides tray lifecycle, settings access, and managed native webviews.
+**Summary**: Research how to incorporate Tauri so controlled content uses native webviews instead of iframes. The approved direction is now companion-only: the main server stays browser-first, exposes a single main-server surface for browser/desktop settings, advertises the native NATS attach target through the companion manifest/bootstrap, and Tauri attaches as a native peer that provides tray lifecycle, settings access, and managed native webviews.
 
 **Current decisions**:
 1. Prefer hybrid architecture eventually, but start with a smaller-scope Tauri companion/shell.
 2. Controlled content should support local and LAN/Tailscale targets first, with optional proxied remote targets later.
 3. UX should support both docked and pop-out controlled webviews.
 4. Runtime discovery/control should be NATS-first; avoid relying on HTTP for coordination.
-5. Companion discovery should use a stable expected local file first, with HTTP manifest only as fallback/convenience.
+5. Companion discovery should attach to the public server origin first; local bootstrap files are no longer a valid cross-WSL contract.
 6. Tauri should stay companion-only for now: tray lifecycle, settings access, reconnect behavior, and native webviews, not frontend ownership.
+7. Browser-facing companion UX should be server-first: `/desktop/:rendererId` is the dedicated desktop route, outside the normal sidebar/settings shell.
+8. Public companion discovery no longer needs a separate NATS WebSocket URL because the main server fronts the browser `/nats-ws` path.
+9. The companion must be defensive against stale manifest payloads during migration: prefer the discovered manifest origin for `serverUrl`, but optionally parse legacy `natsWsUrl`/`authToken` fields as compatibility fallback.
 
 **Regression note (2026-04-02)**:
 1. The committed baseline did not include the `desktop-renderers` snapshot topic in the shared/server snapshot pipeline, which explains the `Unknown topic type: desktop-renderers` runtime error on stale code paths.
@@ -191,12 +263,64 @@
 18. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
 19. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
 20. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage` -> `100%`
+21. `bun test src/client/app/App.test.tsx src/client/app/DesktopCompanionPage.test.tsx src/shared/desktop-companion.test.ts src/client/app/useTinkariaState.test.ts`
+22. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+23. `cargo test --manifest-path src-tauri/Cargo.toml settings::tests::settings_window_document_is_local_and_branded --target-dir /tmp/tinkaria-tauri-target`
+24. `cargo test --manifest-path src-tauri/Cargo.toml manifest::tests::parses_desktop_companion_manifest_json --target-dir /tmp/tinkaria-tauri-target`
+25. `bun run build`
+26. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
+27. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
+28. `agent-browser open http://127.0.0.1:5175/desktop/desktop:LAGZ0NE`
+29. `agent-browser errors --clear`
+30. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+31. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage` -> `100%`
+32. `bun test src/shared/desktop-companion.test.ts`
+33. `cargo test --manifest-path src-tauri/Cargo.toml manifest::tests::derives_server_url_from_manifest_url --target-dir /tmp/tinkaria-tauri-target`
+34. `cargo test --manifest-path src-tauri/Cargo.toml manifest::tests::resolves_legacy_transport_fields_when_present --target-dir /tmp/tinkaria-tauri-target`
+35. `cargo test --manifest-path src-tauri/Cargo.toml settings::tests::companion_settings_route_targets_a_specific_renderer --target-dir /tmp/tinkaria-tauri-target`
+36. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+37. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
+38. `bun run build`
+39. `agent-browser open http://127.0.0.1:5174/desktop/desktop:LAGZ0NE`
+40. `agent-browser errors`
+41. `curl -i -N -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: SGVsbG8sIHdvcmxkIQ==' http://127.0.0.1:5174/nats-ws` -> returned `HTTP/1.1 200 OK` with the Vite shell instead of `101`
+42. `bun -e 'const ws = new WebSocket("ws://127.0.0.1:43659"); ...'` -> `open`
+43. `curl -sSf http://127.0.0.1:5174/auth/token`
+44. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
+45. Windows launch smoke via `cmd.exe /C start "" "C:\Users\duc\AppData\Local\Temp\tinkaria-desktop-release\tinkaria-desktop-20260403b.exe"` plus live log inspection under `C:\Users\duc\.tinkaria\logs\companion.log`
+46. RED: `cargo test --manifest-path src-tauri/Cargo.toml primary_shell_window_title_uses_tinkaria_branding --target-dir /tmp/tinkaria-tauri-target` -> failed (`left: "Tinkaria Companion"`, `right: "Tinkaria"`)
+47. GREEN: `cargo test --manifest-path src-tauri/Cargo.toml primary_shell_ --target-dir /tmp/tinkaria-tauri-target`
+48. RED: `cargo test --manifest-path src-tauri/Cargo.toml primary_shell_close_requests_are_hidden_instead_of_exiting --target-dir /tmp/tinkaria-tauri-target` -> failed because `should_hide_primary_shell_on_close_requested` did not exist
+49. GREEN: `cargo test --manifest-path src-tauri/Cargo.toml primary_shell_close_requests_are_hidden_instead_of_exiting --target-dir /tmp/tinkaria-tauri-target`
+50. RED: `cargo test --manifest-path src-tauri/Cargo.toml tray_menu_ids_cover_diagnostics_surfaces --target-dir /tmp/tinkaria-tauri-target` -> failed because `OPEN_MAIN_SHELL_MENU_ID` did not exist
+51. GREEN: `cargo test --manifest-path src-tauri/Cargo.toml tray_menu_ids_cover_diagnostics_surfaces --target-dir /tmp/tinkaria-tauri-target`
+52. `cargo test --manifest-path src-tauri/Cargo.toml settings::tests::settings_window_close_requests_are_hidden_instead_of_exiting --target-dir /tmp/tinkaria-tauri-target`
+53. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
+54. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
+55. `agent-browser open http://127.0.0.1:5174/desktop/desktop:LAGZ0NE`
+56. `agent-browser errors`
+57. Windows launch smoke via `Start-Process -FilePath 'C:\Users\duc\AppData\Local\Temp\tinkaria-desktop-release\tinkaria-desktop-1775208584.exe'`
+58. Windows process check: `Get-Process tinkaria-desktop*` -> PID `8744` for `tinkaria-desktop-1775208584`
+59. `bun test src/client/app/App.test.tsx`
+60. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+61. `bun run build`
+62. `agent-browser open http://127.0.0.1:5174`
+63. `agent-browser errors`
+64. `agent-browser snapshot`
+65. RED: `bun test src/client/app/TinkariaSidebar.test.tsx` after moving desktop controls into the sidebar header hover cluster
+66. GREEN: `bun test src/client/app/TinkariaSidebar.test.tsx src/client/app/App.test.tsx`
+67. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+68. `bun run build`
+69. `agent-browser open http://127.0.0.1:5174`
+70. `agent-browser errors`
 
 **Next**:
-1. User-verify that the fresh Windows companion opens `http://127.0.0.1:5175/desktop/desktop:LAGZ0NE` from the tray and that the page reflects the live renderer registry instead of staying offline.
-2. Route more controlled-content surfaces through desktop preference, not just transcript links.
-3. Add reconnect-state handling so disconnected companion-hosted views disable or close cleanly.
-4. If needed, make the tray diagnostics live-update on more granular connection transitions (for example subscriber disconnects after initial attach), not just bootstrap/register failures.
+1. Fix the public dev `/nats-ws` upgrade path so a Windows native client gets `101 Switching Protocols` on `ws://127.0.0.1:5174/nats-ws` instead of the Vite shell HTML.
+2. Once the public upgrade works, rerun the Windows companion smoke and confirm the log reaches `register_renderer` after the public-origin attach, with no legacy fallback needed.
+3. Fix the public dev `/nats-ws` upgrade path so the Windows companion uses only the public `5174` server path, with no legacy fallback.
+4. Keep the legacy manifest transport parsing only as migration compatibility; remove it after the running server/public proxy path is proven.
+5. Route more controlled-content surfaces through desktop preference, not just transcript links.
+6. Add reconnect-state handling so disconnected companion-hosted views disable or close cleanly.
 
 ## In Progress: Rich Content SVG Rendering
 

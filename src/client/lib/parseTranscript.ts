@@ -164,10 +164,14 @@ export interface IncrementalHydrator {
 export function createIncrementalHydrator(): IncrementalHydrator {
   let pendingToolCalls = new Map<string, { hydrated: HydratedToolCall; normalized: NormalizedToolCall }>()
   let messages: HydratedTranscriptMessage[] = []
+  let seenEntryIds = new Set<string>()
   let dirty = false
 
   return {
     hydrate(entry: TranscriptEntry): HydratedTranscriptMessage | null {
+      if (seenEntryIds.has(entry._id)) return null
+      seenEntryIds.add(entry._id)
+
       const msg = hydrateEntry(entry, pendingToolCalls)
       if (msg) {
         messages.push(msg)
@@ -191,6 +195,7 @@ export function createIncrementalHydrator(): IncrementalHydrator {
     reset(): void {
       pendingToolCalls = new Map()
       messages = []
+      seenEntryIds = new Set()
       dirty = false
     },
   }

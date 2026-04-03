@@ -96,13 +96,13 @@ export interface FlushRequest {
 
 export type SubmitPipelineMode = "idle" | "queued" | "flushing" | "awaiting_busy_ack" | "blocked"
 
-export function createSubmitPipelineState(): SubmitPipelineState {
+export function createSubmitPipelineState(initialState?: Partial<SubmitPipelineState>): SubmitPipelineState {
   return {
-    queuedTextByChat: {},
-    blockedFlushKeyByChat: {},
-    awaitingBusyByChat: {},
-    inFlightTextByChat: {},
-    optionsByChat: {},
+    queuedTextByChat: initialState?.queuedTextByChat ?? {},
+    blockedFlushKeyByChat: initialState?.blockedFlushKeyByChat ?? {},
+    awaitingBusyByChat: initialState?.awaitingBusyByChat ?? {},
+    inFlightTextByChat: initialState?.inFlightTextByChat ?? {},
+    optionsByChat: initialState?.optionsByChat ?? {},
   }
 }
 

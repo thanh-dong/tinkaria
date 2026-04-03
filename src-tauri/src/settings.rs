@@ -1,16 +1,18 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, thread, time::Duration};
 
 use base64::Engine;
-use serde_json::Value;
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    webview::PageLoadEvent, AppHandle, Manager, Url, WebviewUrl, WebviewWindowBuilder,
+    WindowEvent,
+};
 
-use crate::logging::{companion_log_path_for_current_runtime, last_error_message};
+use crate::logging::{companion_log_path_for_current_runtime, last_error_message, log_event, LogEvent};
 
 pub const SETTINGS_WINDOW_LABEL: &str = "settings";
 pub const SETTINGS_WINDOW_TITLE: &str = "Tinkaria Companion Settings";
 const SETTINGS_WINDOW_WIDTH: f64 = 980.0;
 const SETTINGS_WINDOW_HEIGHT: f64 = 760.0;
-const DEFAULT_DESKTOP_SETTINGS_SERVER_URL: &str = "http://127.0.0.1:5175";
+const DEFAULT_DESKTOP_SETTINGS_SERVER_URL: &str = "http://127.0.0.1:5174";
 
 pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {
@@ -19,24 +21,123 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    let url = settings_window_url(app).or_else(|_| settings_data_url(app))?;
+    let fallback_url = settings_data_url(app)?;
+    let url = settings_window_url(app).unwrap_or_else(|_| fallback_url.clone());
+    let fallback_url_for_probe = fallback_url.clone();
+    let probe_script = build_settings_fallback_probe_script();
 
     let window = WebviewWindowBuilder::new(app, SETTINGS_WINDOW_LABEL, WebviewUrl::External(url))
+        .on_page_load(move |window, payload| {
+            if payload.event() != PageLoadEvent::Finished {
+                return;
+            }
+
+            let loaded_url = payload.url().to_string();
+            log_event(LogEvent::info(
+                "settings",
+                "page_load_finished",
+                [("url", serde_json::json!(loaded_url.clone()))],
+            ));
+
+            if payload.url().scheme() == "data" {
+                return;
+            }
+
+            if let Err(error) = window.eval(&probe_script) {
+                log_event(LogEvent::error(
+                    "settings",
+                    "inject_fallback_probe",
+                    error.to_string(),
+                    [("url", serde_json::json!(loaded_url))],
+                ));
+                return;
+            }
+
+            let window_for_probe = window.clone();
+            let fallback_url = fallback_url_for_probe.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(1800));
+                let Ok(current_url) = window_for_probe.url() else {
+                    log_event(LogEvent::error(
+                        "settings",
+                        "probe_read_url",
+                        "failed to read settings window URL after probe",
+                        Vec::new(),
+                    ));
+                    return;
+                };
+
+                let current_url_text = current_url.to_string();
+                if current_url_text.contains("#__settings_ready") {
+                    log_event(LogEvent::info(
+                        "settings",
+                        "probe_ready",
+                        [("url", serde_json::json!(current_url_text))],
+                    ));
+                    return;
+                }
+
+                if !current_url_text.contains("#__settings_empty") {
+                    log_event(LogEvent::info(
+                        "settings",
+                        "probe_inconclusive",
+                        [("url", serde_json::json!(current_url_text))],
+                    ));
+                    return;
+                }
+
+                if let Err(error) = window_for_probe.navigate(fallback_url.clone()) {
+                    log_event(LogEvent::error(
+                        "settings",
+                        "probe_fallback_navigate",
+                        error.to_string(),
+                        [
+                            ("url", serde_json::json!(current_url_text)),
+                            ("fallbackUrl", serde_json::json!(fallback_url.to_string())),
+                        ],
+                    ));
+                    return;
+                }
+
+                log_event(LogEvent::info(
+                    "settings",
+                    "probe_fallback_navigate",
+                    [
+                        ("url", serde_json::json!(current_url_text)),
+                        ("fallbackUrl", serde_json::json!(fallback_url.to_string())),
+                    ],
+                ));
+            });
+        })
         .title(SETTINGS_WINDOW_TITLE)
         .inner_size(SETTINGS_WINDOW_WIDTH, SETTINGS_WINDOW_HEIGHT)
         .resizable(true)
         .build()
         .map_err(|error| error.to_string())?;
 
+    window.on_window_event(|event| {
+        if should_hide_on_close(event) {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+            }
+        }
+    });
+
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(())
 }
 
-fn settings_window_url(app: &AppHandle) -> Result<Url, String> {
+fn should_hide_on_close(event: &WindowEvent) -> bool {
+    should_hide_on_close_requested(matches!(event, WindowEvent::CloseRequested { .. }))
+}
+
+fn should_hide_on_close_requested(is_close_requested: bool) -> bool {
+    is_close_requested
+}
+
+fn settings_window_url(_app: &AppHandle) -> Result<Url, String> {
     let renderer_id = companion_renderer_id();
-    let server_url = read_bootstrap_snapshot(app)
-        .and_then(|value| value.get("serverUrl").and_then(Value::as_str).map(str::to_string))
-        .unwrap_or_else(|| DEFAULT_DESKTOP_SETTINGS_SERVER_URL.to_string());
+    let server_url = resolve_settings_server_url();
 
     get_companion_settings_url(&server_url, &renderer_id)
 }
@@ -58,36 +159,34 @@ fn settings_data_url(app: &AppHandle) -> Result<Url, String> {
         .map_err(|error| format!("invalid settings data url: {error}"))
 }
 
-fn render_settings_document(app: &AppHandle) -> Result<String, String> {
-    let snapshot = read_bootstrap_snapshot(app);
-    let bootstrap_path = desktop_bootstrap_path(app)?;
-    Ok(render_settings_document_from_snapshot(snapshot.as_ref(), &bootstrap_path))
+fn build_settings_fallback_probe_script() -> String {
+    format!(
+        r#"
+setTimeout(() => {{
+  const text = (document.body?.innerText ?? "").trim();
+  const root = document.getElementById("root");
+  const hasMeaningfulContent = text.length > 24 || ((root?.childElementCount ?? 0) > 0);
+  if (hasMeaningfulContent) {{
+    window.location.hash = "__settings_ready";
+    return;
+  }}
+  window.location.hash = "__settings_empty";
+}}, 1200);
+"#
+    )
 }
 
-fn render_settings_document_from_snapshot(snapshot: Option<&Value>, bootstrap_path: &PathBuf) -> String {
-    let server_url = snapshot
-        .and_then(|value| value.get("serverUrl"))
-        .and_then(Value::as_str)
-        .unwrap_or("Unavailable");
-    let nats_url = snapshot
-        .and_then(|value| value.get("natsUrl"))
-        .and_then(Value::as_str)
-        .unwrap_or("Unavailable");
-    let nats_ws_url = snapshot
-        .and_then(|value| value.get("natsWsUrl"))
-        .and_then(Value::as_str)
-        .unwrap_or("Unavailable");
-    let auth_present = snapshot
-        .and_then(|value| value.get("authToken"))
-        .and_then(Value::as_str)
-        .map(|value| !value.trim().is_empty())
-        .unwrap_or(false);
+fn render_settings_document(_app: &AppHandle) -> Result<String, String> {
+    Ok(render_settings_document_from_server_url(&resolve_settings_server_url()))
+}
+
+fn render_settings_document_from_server_url(server_url: &str) -> String {
     let log_path = companion_log_path_for_current_runtime()
         .map(|path| path.display().to_string())
         .unwrap_or_else(|_| "Unavailable".to_string());
     let last_error = last_error_message().unwrap_or_else(|| "None".to_string());
     let renderer_id = companion_renderer_id();
-    let attach_state = if snapshot.is_some() { "Bootstrap loaded" } else { "Bootstrap missing" };
+    let attach_state = "Server-target attach";
 
     format!(
         r#"<!doctype html>
@@ -205,9 +304,9 @@ fn render_settings_document_from_snapshot(snapshot: Option<&Value>, bootstrap_pa
         <span class="eyebrow">Tinkaria Companion</span>
         <h1>Native companion settings</h1>
         <p>
-          This window is local to the Tauri companion. It stays usable even when the browser app
-          cannot attach over NATS WebSocket from Windows. Use it to inspect the current bootstrap
-          contract and companion identity without depending on the main frontend transport.
+          This window is local to the Tauri companion. It stays usable even when the server-hosted
+          desktop route is unavailable. Use it to inspect the current bootstrap contract and
+          companion identity without depending on the main frontend surface.
         </p>
       </section>
 
@@ -215,27 +314,15 @@ fn render_settings_document_from_snapshot(snapshot: Option<&Value>, bootstrap_pa
         <article class="card">
           <h2>Attach status</h2>
           <div class="status"><span class="dot"></span><span>{attach_state}</span></div>
-          <p class="muted" style="margin-top: 10px;">Auth token present: {auth_present}</p>
+          <p class="muted" style="margin-top: 10px;">Auth and NATS transport are resolved from the server at runtime.</p>
         </article>
         <article class="card">
           <h2>Renderer identity</h2>
           <div class="value"><code>{renderer_id}</code></div>
         </article>
         <article class="card">
-          <h2>Main server</h2>
+          <h2>Server target</h2>
           <div class="value"><code>{server_url}</code></div>
-        </article>
-        <article class="card">
-          <h2>NATS TCP</h2>
-          <div class="value"><code>{nats_url}</code></div>
-        </article>
-        <article class="card">
-          <h2>NATS WebSocket</h2>
-          <div class="value"><code>{nats_ws_url}</code></div>
-        </article>
-        <article class="card">
-          <h2>Bootstrap file</h2>
-          <div class="value"><code>{bootstrap_path}</code></div>
         </article>
         <article class="card">
           <h2>Companion log</h2>
@@ -250,9 +337,9 @@ fn render_settings_document_from_snapshot(snapshot: Option<&Value>, bootstrap_pa
       <section class="note">
         <strong>Why this page is local:</strong>
         <span class="muted">
-          the companion settings window no longer loads <code>/settings/general</code> from the browser app,
-          because that route depends on browser-side NATS WebSocket connectivity that is not currently reachable
-          from the Windows companion environment.
+          the companion prefers the server-hosted <code>/desktop/&lt;rendererId&gt;</code> route, but this
+          fallback remains available when the running Tinkaria server cannot serve that page. It no longer
+          depends on a local bootstrap file.
         </span>
       </section>
     </main>
@@ -260,16 +347,12 @@ fn render_settings_document_from_snapshot(snapshot: Option<&Value>, bootstrap_pa
 </html>"#,
         title = SETTINGS_WINDOW_TITLE,
         attach_state = escape_html(attach_state),
-        auth_present = if auth_present { "yes" } else { "no" },
         renderer_id = escape_html(&renderer_id),
         server_url = escape_html(server_url),
-        nats_url = escape_html(nats_url),
-        nats_ws_url = escape_html(nats_ws_url),
-        bootstrap_path = escape_html(&bootstrap_path.display().to_string()),
         log_path = escape_html(&log_path),
         last_error = escape_html(&last_error),
-        status_color = if snapshot.is_some() { "#2f9e6f" } else { "#c96a43" },
-        status_glow = if snapshot.is_some() {
+        status_color = if server_url != "Unavailable" { "#2f9e6f" } else { "#c96a43" },
+        status_glow = if server_url != "Unavailable" {
             "rgba(47, 158, 111, 0.16)"
         } else {
             "rgba(201, 106, 67, 0.16)"
@@ -277,35 +360,11 @@ fn render_settings_document_from_snapshot(snapshot: Option<&Value>, bootstrap_pa
     )
 }
 
-fn read_bootstrap_snapshot(app: &AppHandle) -> Option<Value> {
-    let path = desktop_bootstrap_path(app).ok()?;
-    let text = fs::read_to_string(path).ok()?;
-    serde_json::from_str::<Value>(&text).ok()
-}
-
-fn desktop_bootstrap_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let home_dir = app
-        .path()
-        .home_dir()
-        .map_err(|error| format!("failed to resolve home dir: {error}"))?;
-
-    Ok(home_dir
-        .join(runtime_data_root_name())
-        .join("data")
-        .join("desktop-bootstrap.json"))
-}
-
-fn runtime_data_root_name() -> &'static str {
-    let profile = env::var("TINKARIA_RUNTIME_PROFILE")
+fn resolve_settings_server_url() -> String {
+    env::var("TINKARIA_DESKTOP_SERVER_URL")
         .ok()
-        .or_else(|| env::var("KANNA_RUNTIME_PROFILE").ok())
-        .unwrap_or_default();
-
-    if profile.trim().eq_ignore_ascii_case("dev") {
-        ".tinkaria-dev"
-    } else {
-        ".tinkaria"
-    }
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_DESKTOP_SETTINGS_SERVER_URL.to_string())
 }
 
 fn companion_renderer_id() -> String {
@@ -329,18 +388,18 @@ fn escape_html(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        escape_html, get_companion_settings_url, render_settings_document_from_snapshot,
-        SETTINGS_WINDOW_HEIGHT, SETTINGS_WINDOW_TITLE, SETTINGS_WINDOW_WIDTH,
+        build_settings_fallback_probe_script, escape_html,
+        get_companion_settings_url, render_settings_document_from_server_url,
+        should_hide_on_close_requested, SETTINGS_WINDOW_HEIGHT, SETTINGS_WINDOW_TITLE,
+        SETTINGS_WINDOW_WIDTH,
     };
-    use serde_json::json;
-    use std::path::PathBuf;
 
     #[test]
     fn companion_settings_route_targets_a_specific_renderer() {
-        let url = get_companion_settings_url("http://127.0.0.1:5175", "desktop:LAGZ0NE")
+        let url = get_companion_settings_url("http://127.0.0.1:5174", "desktop:LAGZ0NE")
             .expect("desktop settings url should parse");
 
-        assert_eq!(url.as_str(), "http://127.0.0.1:5175/desktop/desktop:LAGZ0NE");
+        assert_eq!(url.as_str(), "http://127.0.0.1:5174/desktop/desktop:LAGZ0NE");
     }
 
     #[test]
@@ -352,19 +411,11 @@ mod tests {
 
     #[test]
     fn settings_window_document_is_local_and_branded() {
-        let html = render_settings_document_from_snapshot(
-            Some(&json!({
-                "serverUrl": "http://127.0.0.1:5174",
-                "natsUrl": "nats://127.0.0.1:4222",
-                "natsWsUrl": "ws://127.0.0.1:4223",
-                "authToken": "secret",
-            })),
-            &PathBuf::from("/tmp/.tinkaria-dev/data/desktop-bootstrap.json"),
-        );
+        let html = render_settings_document_from_server_url("http://127.0.0.1:5174");
 
         assert!(html.contains("Tinkaria Companion"));
         assert!(html.contains("Native companion settings"));
-        assert!(html.contains("no longer loads <code>/settings/general</code>"));
+        assert!(html.contains("server-hosted <code>/desktop/&lt;rendererId&gt;</code> route"));
         assert!(html.contains("http://127.0.0.1:5174"));
         assert!(html.contains("Companion log"));
         assert!(html.contains("Last error"));
@@ -384,5 +435,21 @@ mod tests {
     #[test]
     fn escapes_html_values() {
         assert_eq!(escape_html("<tag>&\""), "&lt;tag&gt;&amp;&quot;");
+    }
+
+    #[test]
+    fn settings_window_probe_falls_back_to_local_page_when_server_page_stays_blank() {
+        let script = build_settings_fallback_probe_script();
+
+        assert!(script.contains("setTimeout(() => {"));
+        assert!(script.contains("document.body?.innerText"));
+        assert!(script.contains("window.location.hash = \"__settings_ready\""));
+        assert!(script.contains("window.location.hash = \"__settings_empty\""));
+    }
+
+    #[test]
+    fn settings_window_close_requests_are_hidden_instead_of_exiting() {
+        assert!(should_hide_on_close_requested(true));
+        assert!(!should_hide_on_close_requested(false));
     }
 }

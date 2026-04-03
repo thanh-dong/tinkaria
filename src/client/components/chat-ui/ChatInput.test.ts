@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import {
+  getQueueActionDisabledState,
   getComposerControlsKey,
   getRestoredQueuedTextOnArrowUp,
+  shouldQueueOnSubmitKeystroke,
   resolveComposerPreferences,
   resolvePlanModeState,
   shouldClearDraftAfterSubmit,
+  shouldShowQueueAction,
   shouldShowQueuedBlock,
+  ChatInput,
 } from "./ChatInput"
 import { type ComposerState, useChatPreferencesStore } from "../../stores/chatPreferencesStore"
+import { PROVIDERS } from "../../../shared/types"
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
 
 const INITIAL_STATE = useChatPreferencesStore.getInitialState()
 
@@ -138,6 +145,83 @@ describe("shouldShowQueuedBlock", () => {
 
   test("returns false when queued text is empty", () => {
     expect(shouldShowQueuedBlock("   ")).toBe(false)
+  })
+})
+
+describe("queue action", () => {
+  test("shows an explicit queue action while cancel is available", () => {
+    expect(shouldShowQueueAction(true)).toBe(true)
+    expect(shouldShowQueueAction(false)).toBe(false)
+  })
+
+  test("disables queue when the composer is disabled or empty", () => {
+    expect(getQueueActionDisabledState({ disabled: true, value: "Queued follow-up" })).toBe(true)
+    expect(getQueueActionDisabledState({ disabled: false, value: "   " })).toBe(true)
+    expect(getQueueActionDisabledState({ disabled: false, value: "Queued follow-up" })).toBe(false)
+  })
+
+  test("renders stop and queue icon controls side-by-side while processing", () => {
+    const html = renderToStaticMarkup(
+      createElement(ChatInput, {
+        onSubmit: async () => "queued",
+        onCancel: () => {},
+        disabled: false,
+        canCancel: true,
+        chatId: "chat-1",
+        activeProvider: null,
+        availableProviders: PROVIDERS,
+      })
+    )
+
+    expect(html).toContain("aria-label=\"Stop\"")
+    expect(html).toContain("aria-label=\"Queue\"")
+  })
+
+  test("renders queued drafts with a distinct pending-state treatment", () => {
+    const html = renderToStaticMarkup(
+      createElement(ChatInput, {
+        onSubmit: async () => "queued",
+        disabled: false,
+        canCancel: false,
+        chatId: "chat-1",
+        queuedText: "Queued follow-up",
+        activeProvider: null,
+        availableProviders: PROVIDERS,
+      })
+    )
+
+    expect(html).toContain("Queued")
+    expect(html).toContain("border-dashed")
+    expect(html).toContain("bg-amber")
+  })
+
+  test("treats submit keystrokes as queue requests while busy", () => {
+    expect(shouldQueueOnSubmitKeystroke({
+      key: "Enter",
+      shiftKey: false,
+      metaKey: false,
+      ctrlKey: false,
+      canCancel: true,
+      isTouchDevice: false,
+    })).toBe(true)
+
+    expect(shouldQueueOnSubmitKeystroke({
+      key: "Enter",
+      shiftKey: false,
+      metaKey: true,
+      ctrlKey: false,
+      canCancel: true,
+      isTouchDevice: false,
+    })).toBe(true)
+
+    expect(shouldQueueOnSubmitKeystroke({
+      key: "Enter",
+      shiftKey: true,
+      metaKey: false,
+      ctrlKey: false,
+      canCancel: true,
+      isTouchDevice: false,
+    })).toBe(false)
   })
 })
 

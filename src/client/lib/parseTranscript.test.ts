@@ -534,6 +534,58 @@ describe("createIncrementalHydrator", () => {
     expect(refStable).toBe(refAfter)
   })
 
+  test("skips duplicate entries when fetch and buffer overlap after reset", () => {
+    const hydrator = createIncrementalHydrator()
+
+    const entryA = entry({ kind: "user_prompt", content: "Hello" })
+    const entryB = entry({ kind: "assistant_text", text: "Hi there" })
+    const entryC = entry({ kind: "assistant_text", text: "How can I help?" })
+    const entryD = entry({ kind: "user_prompt", content: "Fix a bug" })
+
+    // Simulate flushTail: reset then hydrate fetched + overlapping buffer
+    hydrator.reset()
+    // Fetched entries
+    hydrator.hydrate(entryA)
+    hydrator.hydrate(entryB)
+    hydrator.hydrate(entryC)
+    // Buffer entries (B and C overlap with fetched, D is new)
+    hydrator.hydrate(entryB)
+    hydrator.hydrate(entryC)
+    hydrator.hydrate(entryD)
+
+    const messages = hydrator.getMessages()
+    expect(messages).toHaveLength(4)
+    expect(messages.map((m) => m.id)).toEqual([entryA._id, entryB._id, entryC._id, entryD._id])
+  })
+
+  test("skips duplicate real-time event after initial hydration", () => {
+    const hydrator = createIncrementalHydrator()
+
+    const entryA = entry({ kind: "user_prompt", content: "Hello" })
+    const entryB = entry({ kind: "assistant_text", text: "Hi" })
+
+    hydrator.hydrate(entryA)
+    hydrator.hydrate(entryB)
+    // Delayed re-delivery of entryA
+    const duplicate = hydrator.hydrate(entryA)
+
+    expect(duplicate).toBeNull()
+    expect(hydrator.getMessages()).toHaveLength(2)
+  })
+
+  test("reset clears dedup state so previously seen entries can be re-hydrated", () => {
+    const hydrator = createIncrementalHydrator()
+
+    const entryA = entry({ kind: "user_prompt", content: "Hello" })
+    hydrator.hydrate(entryA)
+    expect(hydrator.getMessages()).toHaveLength(1)
+
+    hydrator.reset()
+    hydrator.hydrate(entryA)
+    expect(hydrator.getMessages()).toHaveLength(1)
+    expect(hydrator.getMessages()[0]?.id).toBe(entryA._id)
+  })
+
   test("reset clears all state", () => {
     const hydrator = createIncrementalHydrator()
     hydrator.hydrate(entry({ kind: "user_prompt", content: "Hello" }))

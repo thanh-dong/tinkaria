@@ -11,6 +11,7 @@ import {
   resolveComposeIntent,
   resolveDesktopWebviewOpenCommand,
   shouldAutoFollowTranscript,
+  shouldStickToBottomOnComposerSubmit,
   TRANSCRIPT_TAIL_SIZE,
 } from "./useTinkariaState"
 import type { ChatSnapshot, SidebarData } from "../../shared/types"
@@ -112,6 +113,14 @@ describe("shouldAutoFollowTranscript", () => {
   })
 })
 
+describe("shouldStickToBottomOnComposerSubmit", () => {
+  test("keeps bottom follow for composer submits that happen near the tail", () => {
+    expect(shouldStickToBottomOnComposerSubmit(0)).toBe(true)
+    expect(shouldStickToBottomOnComposerSubmit(96)).toBe(true)
+    expect(shouldStickToBottomOnComposerSubmit(97)).toBe(false)
+  })
+})
+
 describe("getUiUpdateRestartReconnectAction", () => {
   test("waits for reconnect after the socket disconnects", () => {
     expect(getUiUpdateRestartReconnectAction("awaiting_disconnect", "disconnected")).toBe("awaiting_reconnect")
@@ -192,6 +201,9 @@ describe("resolveDesktopWebviewOpenCommand", () => {
             rendererId: "desktop-1",
             machineName: "Workstation",
             capabilities: ["something_else"],
+            serverUrl: null,
+            natsUrl: null,
+            lastError: null,
             connectedAt: 10,
             lastSeenAt: 10,
           },
@@ -209,6 +221,9 @@ describe("resolveDesktopWebviewOpenCommand", () => {
             rendererId: "desktop-1",
             machineName: "Workstation",
             capabilities: ["native_webview"],
+            serverUrl: null,
+            natsUrl: null,
+            lastError: null,
             connectedAt: 10,
             lastSeenAt: 10,
           },
@@ -233,6 +248,9 @@ describe("resolveDesktopWebviewOpenCommand", () => {
             rendererId: "desktop-1",
             machineName: "Workstation",
             capabilities: ["native_webview"],
+            serverUrl: null,
+            natsUrl: null,
+            lastError: null,
             connectedAt: 10,
             lastSeenAt: 10,
           },
@@ -257,6 +275,9 @@ describe("resolveDesktopWebviewOpenCommand", () => {
             rendererId: "desktop-1",
             machineName: "Workstation",
             capabilities: ["native_webview"],
+            serverUrl: null,
+            natsUrl: null,
+            lastError: null,
             connectedAt: 10,
             lastSeenAt: 10,
           },

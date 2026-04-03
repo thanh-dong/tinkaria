@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom"
+import { useContext, useEffect, useMemo, useRef, useState } from "react"
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom"
 import {
   buildUiIdentityStack,
   isUiIdentityOverlayActive,
@@ -19,6 +19,7 @@ import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalProjectsPage"
 import { SettingsPage } from "./SettingsPage"
 import { DesktopCompanionPage } from "./DesktopCompanionPage"
+import { TinkariaStateContext } from "./TinkariaStateContext"
 import { useTinkariaState } from "./useTinkariaState"
 
 const VERSION_SEEN_STORAGE_KEY = "kanna:last-seen-version"
@@ -114,13 +115,17 @@ export function bindUiIdentityOverlayWindowEvents(
   windowLike: UiIdentityOverlayWindowLike,
   handlers: UiIdentityOverlayWindowHandlers,
 ) {
+  let modifiers = createUiIdentityOverlayInactiveModifiers()
+
   function handleKeyChange(event: Event) {
     if (!isUiIdentityOverlayKeyboardEvent(event)) return
-    handlers.setModifiers(getUiIdentityOverlayModifiers(event))
+    modifiers = getUiIdentityOverlayModifiers(event)
+    handlers.setModifiers(modifiers)
   }
 
   function handleWindowBlur() {
-    handlers.setModifiers(createUiIdentityOverlayInactiveModifiers())
+    modifiers = createUiIdentityOverlayInactiveModifiers()
+    handlers.setModifiers(modifiers)
   }
 
   function handlePointerMove(event: Event) {
@@ -129,6 +134,10 @@ export function bindUiIdentityOverlayWindowEvents(
     const target = event.target ?? null
     if (shouldIgnoreUiIdentityOverlayPointerTarget(target)) {
       handlers.cancelPendingPointerClear()
+      return
+    }
+
+    if (isUiIdentityOverlayActive(modifiers)) {
       return
     }
 
@@ -306,8 +315,10 @@ function UiIdentityOverlayController() {
 function TinkariaLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const params = useParams()
-  const state = useTinkariaState(params.chatId ?? null)
+  const state = useContext(TinkariaStateContext)
+  if (!state) {
+    throw new Error("Tinkaria layout requires app state context")
+  }
   const showMobileOpenButton = location.pathname === "/"
   const currentVersion = SDK_CLIENT_APP.split("/")[1] ?? "unknown"
 
@@ -320,50 +331,74 @@ function TinkariaLayout() {
   }, [currentVersion, location.pathname, navigate])
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden">
-      <TinkariaSidebar
-        data={state.sidebarData}
-        activeChatId={state.activeChatId}
-        connectionStatus={state.connectionStatus}
-        ready={state.sidebarReady}
-        open={state.sidebarOpen}
-        collapsed={state.sidebarCollapsed}
-        showMobileOpenButton={showMobileOpenButton}
-        onOpen={state.openSidebar}
-        onClose={state.closeSidebar}
-        onCollapse={state.collapseSidebar}
-        onExpand={state.expandSidebar}
-        onCreateChat={(projectId) => {
-          void state.handleCreateChat(projectId)
-        }}
-        onDeleteChat={(chat) => {
-          void state.handleDeleteChat(chat)
-        }}
-        onRenameChat={(chatId, title) => {
-          void state.handleRenameChat(chatId, title)
-        }}
-        onRemoveProject={(projectId) => {
-          void state.handleRemoveProject(projectId)
-        }}
-        updateSnapshot={state.updateSnapshot}
-        onInstallUpdate={() => {
-          void state.handleInstallUpdate()
-        }}
-        sessionsForProject={(projectId) =>
-          state.sessionsSnapshots.get(projectId)?.sessions ?? []
-        }
-        sessionsWindowDaysForProject={(projectId) =>
-          state.sessionsWindowDays.get(projectId) ?? 7
-        }
-        onOpenSessionPicker={state.handleOpenSessionPicker}
-        onResumeSession={(projectId, sessionId, provider) => {
-          void state.handleResumeSession(projectId, sessionId, provider)
-        }}
-        onRefreshSessions={state.handleRefreshSessions}
-        onShowMoreSessions={state.handleShowMoreSessions}
-      />
-      <Outlet context={state} />
+    <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <TinkariaSidebar
+          data={state.sidebarData}
+          activeChatId={state.activeChatId}
+          connectionStatus={state.connectionStatus}
+          ready={state.sidebarReady}
+          open={state.sidebarOpen}
+          collapsed={state.sidebarCollapsed}
+          showMobileOpenButton={showMobileOpenButton}
+          onOpen={state.openSidebar}
+          onClose={state.closeSidebar}
+          onCollapse={state.collapseSidebar}
+          onExpand={state.expandSidebar}
+          onCreateChat={(projectId) => {
+            void state.handleCreateChat(projectId)
+          }}
+          onDeleteChat={(chat) => {
+            void state.handleDeleteChat(chat)
+          }}
+          onRenameChat={(chatId, title) => {
+            void state.handleRenameChat(chatId, title)
+          }}
+          onRemoveProject={(projectId) => {
+            void state.handleRemoveProject(projectId)
+          }}
+          updateSnapshot={state.updateSnapshot}
+          onInstallUpdate={() => {
+            void state.handleInstallUpdate()
+          }}
+          sessionsForProject={(projectId) =>
+            state.sessionsSnapshots.get(projectId)?.sessions ?? []
+          }
+          sessionsWindowDaysForProject={(projectId) =>
+            state.sessionsWindowDays.get(projectId) ?? 7
+          }
+          onOpenSessionPicker={state.handleOpenSessionPicker}
+          onResumeSession={(projectId, sessionId, provider) => {
+            void state.handleResumeSession(projectId, sessionId, provider)
+          }}
+          onRefreshSessions={state.handleRefreshSessions}
+          onShowMoreSessions={state.handleShowMoreSessions}
+        />
+        <Outlet context={state} />
+      </div>
     </div>
+  )
+}
+
+function AppInner() {
+  const location = useLocation()
+  const activeChatId = location.pathname.startsWith("/chat/")
+    ? location.pathname.slice("/chat/".length)
+    : null
+  const state = useTinkariaState(activeChatId || null)
+
+  return (
+    <TinkariaStateContext.Provider value={state}>
+      <Routes>
+        <Route path="/desktop/:rendererId" element={<DesktopCompanionPage />} />
+        <Route element={<TinkariaLayout />}>
+          <Route path="/" element={<LocalProjectsPage />} />
+          <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
+          <Route path="/settings/:sectionId" element={<SettingsPage />} />
+          <Route path="/chat/:chatId" element={<ChatPage />} />
+        </Route>
+      </Routes>
+    </TinkariaStateContext.Provider>
   )
 }
 
@@ -372,15 +407,7 @@ export function App() {
     <TooltipProvider>
       <UiIdentityOverlayController />
       <AppDialogProvider>
-        <Routes>
-          <Route element={<TinkariaLayout />}>
-            <Route path="/" element={<LocalProjectsPage />} />
-            <Route path="/desktop/:rendererId" element={<DesktopCompanionPage />} />
-            <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
-            <Route path="/settings/:sectionId" element={<SettingsPage />} />
-            <Route path="/chat/:chatId" element={<ChatPage />} />
-          </Route>
-        </Routes>
+        <AppInner />
       </AppDialogProvider>
     </TooltipProvider>
   )
