@@ -4,7 +4,9 @@ use async_nats::{Client, ConnectOptions, Message};
 use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::json;
-use tauri::{AppHandle, Builder};
+use tauri::{
+    AppHandle, Builder, Manager, Url, WebviewUrl, WebviewWindowBuilder,
+};
 
 use crate::logging::{last_error_message, log_event, open_log_file, LogEvent};
 use crate::manifest::{
@@ -20,6 +22,8 @@ use crate::webview::{close_controlled_webview, open_controlled_webview};
 
 const WEBVIEW_COMMAND_SUBJECT: &str = "kanna.cmd.webview.>";
 const DESKTOP_REGISTER_SUBJECT: &str = "kanna.cmd.desktop.register";
+const PRIMARY_SHELL_WINDOW_LABEL: &str = "main-shell";
+const PRIMARY_SHELL_WINDOW_TITLE: &str = "Tinkaria Companion";
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -41,6 +45,10 @@ enum DesktopCommand {
 
 pub fn run() {
     Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            toggle_primary_shell_maximize,
+            set_primary_shell_fullscreen
+        ])
         .on_menu_event(|app, event| match event.id().as_ref() {
             OPEN_SETTINGS_MENU_ID => {
                 if let Err(error) = open_settings_window(app) {
@@ -112,6 +120,17 @@ async fn run_desktop_bootstrap(app: AppHandle) -> Result<(), String> {
         snapshot.last_error = None;
     });
     let manifest = load_desktop_companion_manifest(&app).await?;
+    if let Err(error) = open_primary_shell_window(&app, &manifest.server_url) {
+        log_event(LogEvent::error(
+            "shell",
+            "open_primary_window",
+            error,
+            [
+                ("rendererId", json!(desktop_renderer_id())),
+                ("serverUrl", json!(manifest.server_url.clone())),
+            ],
+        ));
+    }
     let nats_ws_url = derive_nats_ws_url(&manifest.server_url)?;
     let auth_token = fetch_server_auth_token(&manifest.server_url).await?;
     let _ = update_tray_snapshot(&app, |snapshot| {
@@ -309,6 +328,71 @@ fn desktop_machine_name() -> String {
         .unwrap_or_else(|| "Desktop Renderer".to_string())
 }
 
+pub fn primary_shell_window_label() -> &'static str {
+    PRIMARY_SHELL_WINDOW_LABEL
+}
+
+pub fn normalize_primary_shell_url(server_url: &str) -> Result<Url, String> {
+    let mut url = Url::parse(server_url)
+        .map_err(|error| format!("invalid primary shell server url {server_url}: {error}"))?;
+    url.set_query(None);
+    url.set_fragment(None);
+    Ok(url)
+}
+
+fn open_primary_shell_window(app: &AppHandle, server_url: &str) -> Result<(), String> {
+    let url = normalize_primary_shell_url(server_url)?;
+
+    if let Some(window) = app.get_webview_window(primary_shell_window_label()) {
+        window.show().map_err(|error| error.to_string())?;
+        window.set_focus().map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+
+    let window = WebviewWindowBuilder::new(
+        app,
+        primary_shell_window_label(),
+        WebviewUrl::External(url),
+    )
+    .title(PRIMARY_SHELL_WINDOW_TITLE)
+    .decorations(false)
+    .resizable(true)
+    .maximizable(true)
+    .fullscreen(false)
+    .visible(true)
+    .focused(true)
+    .build()
+    .map_err(|error| error.to_string())?;
+
+    window.show().map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn primary_shell_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
+    app.get_webview_window(primary_shell_window_label())
+        .ok_or_else(|| "primary shell window is unavailable".to_string())
+}
+
+#[tauri::command]
+pub fn toggle_primary_shell_maximize(app: AppHandle) -> Result<(), String> {
+    let window = primary_shell_window(&app)?;
+    if window.is_maximized().map_err(|error| error.to_string())? {
+        window.unmaximize().map_err(|error| error.to_string())?;
+    } else {
+        window.maximize().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_primary_shell_fullscreen(app: AppHandle, fullscreen: bool) -> Result<(), String> {
+    let window = primary_shell_window(&app)?;
+    window
+        .set_fullscreen(fullscreen)
+        .map_err(|error| error.to_string())
+}
+
 async fn handle_message(app: &AppHandle, client: &Client, message: Message) -> Result<(), String> {
     let subject = message.subject.to_string();
     let reply = message
@@ -398,4 +482,31 @@ async fn handle_message(app: &AppHandle, client: &Client, message: Message) -> R
         })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        normalize_primary_shell_url, primary_shell_window_label, PRIMARY_SHELL_WINDOW_LABEL,
+        PRIMARY_SHELL_WINDOW_TITLE,
+    };
+
+    #[test]
+    fn primary_shell_window_label_is_stable() {
+        assert_eq!(primary_shell_window_label(), PRIMARY_SHELL_WINDOW_LABEL);
+        assert_eq!(PRIMARY_SHELL_WINDOW_LABEL, "main-shell");
+    }
+
+    #[test]
+    fn primary_shell_window_title_uses_tinkaria_branding() {
+        assert_eq!(PRIMARY_SHELL_WINDOW_TITLE, "Tinkaria Companion");
+    }
+
+    #[test]
+    fn primary_shell_url_normalizes_to_the_server_route() {
+        let url = normalize_primary_shell_url("http://127.0.0.1:5174/app?query=1#shell")
+            .expect("server url should parse");
+
+        assert_eq!(url.as_str(), "http://127.0.0.1:5174/app");
+    }
 }
