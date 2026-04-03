@@ -241,6 +241,7 @@ describe("getChatPageUiIdentities", () => {
       createElement(ChatNavbar, {
         sidebarCollapsed: false,
         onOpenSidebar: () => {},
+        onCollapseSidebar: () => {},
         onExpandSidebar: () => {},
         onNewChat: () => {},
       })
@@ -266,6 +267,7 @@ describe("getChatPageUiIdentities", () => {
         createElement(ChatNavbar, {
           sidebarCollapsed: false,
           onOpenSidebar: () => {},
+          onCollapseSidebar: () => {},
           onExpandSidebar: () => {},
           onNewChat: () => {},
           localPath: "/tmp/project",

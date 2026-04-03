@@ -402,6 +402,7 @@ export function ChatPage() {
         <ChatNavbar
           sidebarCollapsed={state.sidebarCollapsed}
           onOpenSidebar={state.openSidebar}
+          onCollapseSidebar={state.collapseSidebar}
           onExpandSidebar={state.expandSidebar}
           onNewChat={state.handleCompose}
           localPath={state.navbarLocalPath}

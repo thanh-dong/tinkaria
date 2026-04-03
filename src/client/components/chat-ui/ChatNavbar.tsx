@@ -1,4 +1,5 @@
-import { Code, FolderOpen, Menu, PanelLeft, PanelRight, SquarePen, Terminal } from "lucide-react"
+import { type MouseEvent as ReactMouseEvent } from "react"
+import { Code, FolderOpen, Grip, Maximize2, Menu, PanelLeft, PanelRight, Plus, SquarePen, Terminal } from "lucide-react"
 import { TinkariaSidebarMark } from "../branding/TinkariaSidebarMark"
 import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
@@ -9,6 +10,7 @@ import { cn } from "../../lib/utils"
 interface Props {
   sidebarCollapsed: boolean
   onOpenSidebar: () => void
+  onCollapseSidebar: () => void
   onExpandSidebar: () => void
   onNewChat: () => void
   localPath?: string
@@ -24,9 +26,37 @@ interface Props {
   rightSidebarShortcut?: string[]
 }
 
+type DesktopShellRuntimeWindow = {
+  __TAURI_INTERNALS__: object
+}
+
+interface DesktopShellWindowApi {
+  isMaximized(): Promise<boolean>
+  toggleMaximize(): Promise<void>
+  startDragging(): Promise<void>
+}
+
+function hasDesktopShellRuntime(value: unknown): value is DesktopShellRuntimeWindow {
+  return typeof value === "object"
+    && value !== null
+    && "__TAURI_INTERNALS__" in value
+    && typeof (value as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ === "object"
+    && (value as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== null
+}
+
+async function getDesktopShellWindowApi(windowLike: unknown): Promise<DesktopShellWindowApi | null> {
+  if (!hasDesktopShellRuntime(windowLike)) {
+    return null
+  }
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window")
+  return getCurrentWindow()
+}
+
 export function ChatNavbar({
   sidebarCollapsed,
   onOpenSidebar,
+  onCollapseSidebar,
   onExpandSidebar,
   onNewChat,
   localPath,
@@ -45,6 +75,32 @@ export function ChatNavbar({
   const newChatActionId = createUiIdentity("chat.navbar.new-chat", "action")
   const terminalToggleActionId = createUiIdentity("chat.navbar.terminal-toggle", "action")
   const rightSidebarToggleActionId = createUiIdentity("chat.navbar.right-sidebar-toggle", "action")
+  const showDesktopShellControls = hasDesktopShellRuntime(typeof window === "undefined" ? null : window)
+
+  async function handleDesktopMovePointerDown(event: ReactMouseEvent<HTMLButtonElement>) {
+    if (event.button !== 0) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const desktopWindow = await getDesktopShellWindowApi(window)
+    if (!desktopWindow) {
+      return
+    }
+
+    await desktopWindow.startDragging()
+  }
+
+  async function handleDesktopMaximizeToggle() {
+    const desktopWindow = await getDesktopShellWindowApi(window)
+    if (!desktopWindow) {
+      return
+    }
+
+    await desktopWindow.toggleMaximize()
+  }
 
   return (
     <CardHeader
@@ -72,26 +128,70 @@ export function ChatNavbar({
               <div className="flex items-center justify-center w-[36px] h-[36px]">
                 <TinkariaSidebarMark className="hidden h-5 w-5 md:inline-flex sm:h-6 sm:w-6" imageClassName="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
+              {!showDesktopShellControls ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hidden md:flex"
+                  onClick={onExpandSidebar}
+                  title="Expand sidebar"
+                >
+                  <PanelLeft className="size-4.5" />
+                </Button>
+              ) : null}
+            </>
+          )}
+          {showDesktopShellControls ? (
+            <>
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden md:flex"
-                onClick={onExpandSidebar}
-                title="Expand sidebar"
+                onClick={sidebarCollapsed ? onExpandSidebar : onCollapseSidebar}
+                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               >
                 <PanelLeft className="size-4.5" />
               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Move window"
+                onMouseDown={(event) => {
+                  void handleDesktopMovePointerDown(event)
+                }}
+              >
+                <Grip className="size-4.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Toggle maximize"
+                onClick={() => {
+                  void handleDesktopMaximizeToggle()
+                }}
+                >
+                  <Maximize2 className="size-4.5" />
+                </Button>
+              <Button
+                {...getUiIdentityAttributeProps(newChatActionId)}
+                variant="ghost"
+                size="icon"
+                onClick={onNewChat}
+                title="New project"
+              >
+                <Plus className="size-4.5" />
+              </Button>
             </>
+          ) : (
+            <Button
+              {...getUiIdentityAttributeProps(newChatActionId)}
+              variant="ghost"
+              size="icon"
+              onClick={onNewChat}
+              title="Compose"
+            >
+              <SquarePen className="size-4.5" />
+            </Button>
           )}
-          <Button
-            {...getUiIdentityAttributeProps(newChatActionId)}
-            variant="ghost"
-            size="icon"
-            onClick={onNewChat}
-            title="Compose"
-          >
-            <SquarePen className="size-4.5" />
-          </Button>
         </div>
 
         <div className="flex-1 min-w-0" />
