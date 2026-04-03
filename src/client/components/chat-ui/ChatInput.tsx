@@ -383,6 +383,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composerPreferencesRef = useRef<ComposerPreferencesHandle>(null)
   const isStandalone = useIsStandalone()
+  const isTouchDevice = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0)
   const composerControlsKey = getComposerControlsKey(chatId, activeProvider)
   const composerAreaId = createUiIdentity("chat.composer", "area")
   const submitActionId = createUiIdentity("chat.composer.submit", "action")
@@ -435,8 +436,8 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   }, [autoResize])
 
   useEffect(() => {
-    textareaRef.current?.focus()
-  }, [chatId])
+    if (!isTouchDevice) textareaRef.current?.focus()
+  }, [chatId, isTouchDevice])
 
   async function handleSubmit() {
     if (!value.trim()) return
@@ -601,7 +602,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
             ref={setTextareaRefs}
             placeholder="Build something..."
             value={value}
-            autoFocus
+            autoFocus={!isTouchDevice}
             {...{ [CHAT_INPUT_ATTRIBUTE]: "" }}
             rows={1}
             onChange={(event) => {
