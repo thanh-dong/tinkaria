@@ -615,6 +615,12 @@ export class AgentCoordinator {
         }
 
         if (!event.entry) continue
+
+        // After cancel, suppress final-state entries — cancel() already emitted "interrupted"
+        if (active.cancelRequested && (event.entry.kind === "result" || event.entry.kind === "interrupted")) {
+          continue
+        }
+
         await this.appendAndPublish(active.chatId, event.entry)
 
         if (event.entry.kind === "system_init") {

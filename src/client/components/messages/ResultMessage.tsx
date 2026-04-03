@@ -1,4 +1,5 @@
 import { memo } from "react"
+import { CircleSlash } from "lucide-react"
 import type { ProcessedResultMessage } from "./types"
 import { MetaRow, MetaLabel } from "./shared"
 
@@ -28,10 +29,21 @@ export const ResultMessage = memo(function ResultMessage({ message }: Props) {
     return `${seconds}s`
   }
 
+  if (message.cancelled) {
+    return (
+      <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground my-3">
+        <div className="inline-flex gap-1.5 items-center justify-center whitespace-nowrap text-sm font-medium bg-background text-foreground/60 border border-border h-9 pl-1 pr-4 rounded-full">
+          <CircleSlash className="h-4 w-4 ml-1.5" />
+          <em>Interrupted</em>
+        </div>
+      </div>
+    )
+  }
+
   if (!message.success) {
     return (
       <div className="px-4 py-3 mx-2 my-1 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-        {message.result || "An unknown error occurred."}
+        {message.result || "The session ended unexpectedly."}
       </div>
     )
   }

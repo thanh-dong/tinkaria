@@ -756,6 +756,84 @@ describe("AgentCoordinator codex integration", () => {
     expect(discardedResult.content).toEqual({ discarded: true })
     expect(startTurnCalls).toEqual(["plan this"])
   })
+
+  test("result entries from the stream are suppressed after cancel", async () => {
+    let releaseInterrupt!: () => void
+    const interrupted = new Promise<void>((resolve) => {
+      releaseInterrupt = resolve
+    })
+
+    const fakeCodexManager = {
+      async startSession() {},
+      async startTurn(): Promise<HarnessTurn> {
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          await interrupted
+          // After cancel, the CLI sends back an error result — should be suppressed
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "error",
+              isError: true,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {
+            releaseInterrupt()
+          },
+          close: () => {},
+        }
+      },
+    }
+
+    const store = createFakeStore()
+    // Allow turn failures in this test (default fake store throws)
+    store.recordTurnFailed = (async () => {}) as never
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexManager: fakeCodexManager as never,
+    })
+
+    await coordinator.send({
+      type: "chat.send",
+      chatId: "chat-1",
+      provider: "codex",
+      content: "do something",
+    })
+
+    await waitFor(() => store.messages.some((e) => e.kind === "system_init"))
+    await coordinator.cancel("chat-1")
+
+    // Give the stream time to process the post-cancel result entry
+    await new Promise((r) => setTimeout(r, 100))
+
+    // cancel() appends exactly one "interrupted" entry
+    const interruptedEntries = store.messages.filter((e) => e.kind === "interrupted")
+    expect(interruptedEntries).toHaveLength(1)
+
+    // The error result from the stream should NOT appear in the transcript
+    const resultEntries = store.messages.filter((e) => e.kind === "result")
+    expect(resultEntries).toHaveLength(0)
+  })
 })
 
 function createFakeStore() {
