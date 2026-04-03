@@ -1,10 +1,18 @@
 export interface DesktopCompanionManifest {
   serverUrl: string
-  natsUrl: string
-  natsWsUrl: string
-  authToken: string
   appName: string
   version: string
+}
+
+export function resolveDesktopCompanionServerUrl(hostname: string, port: number) {
+  const configured = process.env.TINKARIA_PUBLIC_SERVER_URL?.trim()
+    || process.env.KANNA_PUBLIC_SERVER_URL?.trim()
+
+  if (configured) {
+    return configured
+  }
+
+  return `http://${hostname}:${port}`
 }
 
 export function normalizeDesktopCompanionManifest(
@@ -12,9 +20,6 @@ export function normalizeDesktopCompanionManifest(
 ): DesktopCompanionManifest {
   return {
     serverUrl: value?.serverUrl ?? "http://127.0.0.1:5174",
-    natsUrl: value?.natsUrl ?? "",
-    natsWsUrl: value?.natsWsUrl ?? "",
-    authToken: value?.authToken ?? "",
     appName: value?.appName ?? "Tinkaria",
     version: value?.version ?? "unknown",
   }

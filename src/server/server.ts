@@ -1,8 +1,13 @@
 import path from "node:path"
-import { APP_NAME, getRuntimeProfile } from "../shared/branding"
+import { APP_NAME, SDK_CLIENT_APP, getRuntimeProfile } from "../shared/branding"
+import {
+  resolveDesktopCompanionServerUrl,
+  type DesktopCompanionManifest,
+} from "../shared/desktop-companion"
 import { EventStore } from "./event-store"
 import { AgentCoordinator } from "./agent"
 import { discoverProjects, type DiscoveredProject } from "./discovery"
+import { DesktopRenderersRegistry } from "./desktop-renderers"
 import { KeybindingsManager } from "./keybindings"
 import { getMachineDisplayName } from "./machine-name"
 import { TerminalManager } from "./terminal-manager"
@@ -14,6 +19,20 @@ import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
 import { ensureTerminalEventsStream, ensureChatMessageStream } from "./nats-streams"
 import type { TranscriptEntry } from "../shared/types"
+
+function getAppVersion() {
+  return SDK_CLIENT_APP.split("/")[1] ?? "unknown"
+}
+
+export function createDesktopCompanionManifest(
+  value: DesktopCompanionManifest,
+): DesktopCompanionManifest {
+  return {
+    serverUrl: value.serverUrl,
+    appName: value.appName,
+    version: value.version,
+  }
+}
 
 export interface StartKannaServerOptions {
   port?: number
@@ -58,7 +77,8 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     : null
 
   const authToken = generateAuthToken()
-  const natsBridge = await NatsBridge.create(authToken)
+  const natsBridge = await NatsBridge.create({ token: authToken })
+  const desktopRenderers = new DesktopRenderersRegistry()
   await ensureTerminalEventsStream(natsBridge.nc)
   await ensureChatMessageStream(natsBridge.nc)
 
@@ -84,6 +104,7 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     getDiscoveredProjects: () => discoveredProjects,
     machineDisplayName,
     updateManager,
+    desktopRenderers,
   })
 
   broadcast = () => publisher.broadcastSnapshots()
@@ -98,6 +119,7 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     refreshDiscovery,
     updateManager,
     publisher,
+    desktopRenderers,
     onStateChange: () => publisher.broadcastSnapshots(),
   })
 
@@ -122,7 +144,15 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
             return new Response("WebSocket upgrade failed", { status: 426 })
           }
 
-                    if (url.pathname === "/health") {
+          if (url.pathname === "/desktop-companion.json") {
+            return Response.json(createDesktopCompanionManifest({
+              serverUrl: resolveDesktopCompanionServerUrl(hostname, actualPort),
+              appName: APP_NAME,
+              version: getAppVersion(),
+            }))
+          }
+
+          if (url.pathname === "/health") {
             return Response.json({
               ok: true,
               port: actualPort,

@@ -11,6 +11,7 @@ const bunBin = process.execPath
 const localHostname = getHostname()
 const devArgs = parseDevArgs(forwardedArgs, localHostname)
 const { clientPort, serverPort, serverArgs, share } = devArgs
+const publicServerUrl = `http://127.0.0.1:${clientPort}`
 
 const clientEnv = {
   ...process.env,
@@ -19,7 +20,10 @@ const clientEnv = {
     : JSON.stringify(devArgs.allowedHosts),
   KANNA_DEV_BACKEND_TARGET_HOST: devArgs.backendTargetHost,
   KANNA_DEV_BACKEND_PORT: String(serverPort),
+  TINKARIA_PUBLIC_SERVER_URL: publicServerUrl,
 }
+
+process.env.TINKARIA_PUBLIC_SERVER_URL = publicServerUrl
 
 function spawnLabeledProcess(label: string, args: string[]) {
   const child = spawn(bunBin, args, {
