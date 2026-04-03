@@ -112,10 +112,27 @@ function createMockUpdateManager() {
 
 function createMockDesktopRenderers() {
   return {
-    register: ({ rendererId, machineName, capabilities }: { rendererId: string; machineName: string; capabilities: string[] }) => ({
+    register: ({
       rendererId,
       machineName,
       capabilities,
+      serverUrl,
+      natsUrl,
+      lastError,
+    }: {
+      rendererId: string
+      machineName: string
+      capabilities: string[]
+      serverUrl?: string | null
+      natsUrl?: string | null
+      lastError?: string | null
+    }) => ({
+      rendererId,
+      machineName,
+      capabilities,
+      serverUrl: serverUrl ?? null,
+      natsUrl: natsUrl ?? null,
+      lastError: lastError ?? null,
       connectedAt: 100,
       lastSeenAt: 100,
     }),
@@ -219,6 +236,9 @@ describe("nats-responders", () => {
       rendererId: "desktop-1",
       machineName: "Workstation",
       capabilities: ["native_webview"],
+      serverUrl: "http://127.0.0.1:5175",
+      natsUrl: "nats://127.0.0.1:4222",
+      lastError: null,
     })
 
     expect(res.ok).toBe(true)
@@ -226,6 +246,9 @@ describe("nats-responders", () => {
       rendererId: "desktop-1",
       machineName: "Workstation",
       capabilities: ["native_webview"],
+      serverUrl: "http://127.0.0.1:5175",
+      natsUrl: "nats://127.0.0.1:4222",
+      lastError: null,
       connectedAt: 100,
       lastSeenAt: 100,
     })

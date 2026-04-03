@@ -18,6 +18,7 @@ import { TinkariaSidebar } from "./TinkariaSidebar"
 import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalProjectsPage"
 import { SettingsPage } from "./SettingsPage"
+import { DesktopCompanionPage } from "./DesktopCompanionPage"
 import { useTinkariaState } from "./useTinkariaState"
 
 const VERSION_SEEN_STORAGE_KEY = "kanna:last-seen-version"
@@ -374,6 +375,7 @@ export function App() {
         <Routes>
           <Route element={<TinkariaLayout />}>
             <Route path="/" element={<LocalProjectsPage />} />
+            <Route path="/desktop/:rendererId" element={<DesktopCompanionPage />} />
             <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
             <Route path="/settings/:sectionId" element={<SettingsPage />} />
             <Route path="/chat/:chatId" element={<ChatPage />} />

@@ -145,6 +145,9 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
           rendererId: command.rendererId,
           machineName: command.machineName,
           capabilities: command.capabilities,
+          serverUrl: command.serverUrl ?? null,
+          natsUrl: command.natsUrl ?? null,
+          lastError: command.lastError ?? null,
         })
 
       case "desktop.unregister":

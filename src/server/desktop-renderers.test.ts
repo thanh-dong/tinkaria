@@ -9,6 +9,9 @@ describe("DesktopRenderersRegistry", () => {
       rendererId: "desktop-1",
       machineName: "Workstation",
       capabilities: ["native_webview"],
+      serverUrl: "http://127.0.0.1:5175",
+      natsUrl: "nats://127.0.0.1:4222",
+      lastError: null,
     }, 100)
 
     expect(registry.getSnapshot()).toEqual({
@@ -17,6 +20,9 @@ describe("DesktopRenderersRegistry", () => {
           rendererId: "desktop-1",
           machineName: "Workstation",
           capabilities: ["native_webview"],
+          serverUrl: "http://127.0.0.1:5175",
+          natsUrl: "nats://127.0.0.1:4222",
+          lastError: null,
           connectedAt: 100,
           lastSeenAt: 100,
         },
@@ -30,12 +36,18 @@ describe("DesktopRenderersRegistry", () => {
       rendererId: "desktop-1",
       machineName: "Workstation",
       capabilities: ["native_webview"],
+      serverUrl: "http://127.0.0.1:5175",
+      natsUrl: "nats://127.0.0.1:4222",
+      lastError: null,
     }, 100)
 
     registry.register({
       rendererId: "desktop-1",
       machineName: "Workstation",
       capabilities: ["native_webview", "popout"],
+      serverUrl: "http://127.0.0.1:5175",
+      natsUrl: "nats://127.0.0.1:4333",
+      lastError: "connect failed once",
     }, 200)
 
     expect(registry.getSnapshot()).toEqual({
@@ -44,6 +56,9 @@ describe("DesktopRenderersRegistry", () => {
           rendererId: "desktop-1",
           machineName: "Workstation",
           capabilities: ["native_webview", "popout"],
+          serverUrl: "http://127.0.0.1:5175",
+          natsUrl: "nats://127.0.0.1:4333",
+          lastError: "connect failed once",
           connectedAt: 100,
           lastSeenAt: 200,
         },

@@ -53,6 +53,10 @@ export default defineConfig({
       "/desktop-companion.json": {
         target: `http://${backendTargetHost}:${backendPort}`,
       },
+      "/nats-ws": {
+        target: `ws://${backendTargetHost}:${backendPort}`,
+        ws: true,
+      },
     },
     allowedHosts: getAllowedHosts(),
     watch: {

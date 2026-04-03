@@ -225,6 +225,9 @@ export interface DesktopRendererSnapshot {
   rendererId: string
   machineName: string
   capabilities: string[]
+  serverUrl: string | null
+  natsUrl: string | null
+  lastError: string | null
   connectedAt: number
   lastSeenAt: number
 }

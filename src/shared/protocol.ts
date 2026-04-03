@@ -47,7 +47,15 @@ export type ClientCommand =
   | { type: "project.open"; localPath: string }
   | { type: "project.create"; localPath: string; title: string }
   | { type: "project.remove"; projectId: string }
-  | { type: "desktop.register"; rendererId: string; machineName: string; capabilities: string[] }
+  | {
+      type: "desktop.register"
+      rendererId: string
+      machineName: string
+      capabilities: string[]
+      serverUrl?: string | null
+      natsUrl?: string | null
+      lastError?: string | null
+    }
   | { type: "desktop.unregister"; rendererId: string }
   | { type: "system.ping" }
   | { type: "update.check"; force?: boolean }

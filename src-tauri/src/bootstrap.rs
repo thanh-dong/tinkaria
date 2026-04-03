@@ -6,10 +6,13 @@ use serde::Deserialize;
 use serde_json::json;
 use tauri::{AppHandle, Builder, Manager};
 
-use crate::logging::{log_event, LogEvent};
+use crate::logging::{last_error_message, log_event, open_log_file, LogEvent};
 use crate::manifest::{fetch_desktop_companion_manifest, DesktopCompanionManifest};
 use crate::settings::open_settings_window;
-use crate::tray::{setup_tray, EXIT_MENU_ID, OPEN_SETTINGS_MENU_ID};
+use crate::tray::{
+    setup_tray, update_tray_snapshot, CompanionTraySnapshot, EXIT_MENU_ID, OPEN_LOG_FILE_MENU_ID,
+    OPEN_SETTINGS_MENU_ID,
+};
 use crate::webview::{close_controlled_webview, open_controlled_webview};
 
 const WEBVIEW_COMMAND_SUBJECT: &str = "kanna.cmd.webview.>";
@@ -46,6 +49,16 @@ pub fn run() {
                     ));
                 }
             }
+            OPEN_LOG_FILE_MENU_ID => {
+                if let Err(error) = open_log_file() {
+                    log_event(LogEvent::error(
+                        "tray",
+                        "open_log_file",
+                        error,
+                        [("menuId", json!(OPEN_LOG_FILE_MENU_ID))],
+                    ));
+                }
+            }
             EXIT_MENU_ID => {
                 log_event(LogEvent::info("tray", "exit", [("menuId", json!(EXIT_MENU_ID))]));
                 app.exit(0);
@@ -53,13 +66,29 @@ pub fn run() {
             _ => {}
         })
         .setup(|app| {
-            setup_tray(&app.handle()).map_err(|error| {
+            setup_tray(
+                &app.handle(),
+                {
+                    let mut snapshot = CompanionTraySnapshot::new(desktop_renderer_id());
+                    snapshot.connection_state = "connecting".to_string();
+                    snapshot.server_url = Some("http://127.0.0.1:5174".to_string());
+                    snapshot.last_error = last_error_message();
+                    snapshot
+                },
+            )
+            .map_err(|error| {
                 log_event(LogEvent::error("tray", "setup", error.to_string(), Vec::new()));
                 error
             })?;
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(error) = run_desktop_bootstrap(handle).await {
+                let bootstrap_handle = handle.clone();
+                if let Err(error) = run_desktop_bootstrap(bootstrap_handle).await {
+                    let tray_error = error.clone();
+                    let _ = update_tray_snapshot(&handle, |snapshot| {
+                        snapshot.connection_state = "disconnected".to_string();
+                        snapshot.last_error = Some(tray_error.clone());
+                    });
                     log_event(LogEvent::error(
                         "bootstrap",
                         "run",
@@ -75,7 +104,17 @@ pub fn run() {
 }
 
 async fn run_desktop_bootstrap(app: AppHandle) -> Result<(), String> {
+    let _ = update_tray_snapshot(&app, |snapshot| {
+        snapshot.connection_state = "connecting".to_string();
+        snapshot.last_error = None;
+    });
     let manifest = load_desktop_companion_manifest(&app).await?;
+    let _ = update_tray_snapshot(&app, |snapshot| {
+        snapshot.server_url = Some(manifest.server_url.clone());
+        snapshot.nats_url = Some(manifest.nats_url.clone());
+        snapshot.connection_state = "connecting".to_string();
+        snapshot.last_error = None;
+    });
     log_event(LogEvent::info(
         "bootstrap",
         "load_manifest",
@@ -85,11 +124,16 @@ async fn run_desktop_bootstrap(app: AppHandle) -> Result<(), String> {
             ("rendererId", json!(desktop_renderer_id())),
         ],
     ));
-    let client = ConnectOptions::with_token(manifest.auth_token)
+    let client = ConnectOptions::with_token(manifest.auth_token.clone())
         .connect(manifest.nats_url.clone())
         .await
         .map_err(|error| {
             let message = error.to_string();
+            let tray_error = message.clone();
+            let _ = update_tray_snapshot(&app, |snapshot| {
+                snapshot.connection_state = "disconnected".to_string();
+                snapshot.last_error = Some(tray_error.clone());
+            });
             log_event(LogEvent::error(
                 "bootstrap",
                 "connect_nats",
@@ -102,7 +146,11 @@ async fn run_desktop_bootstrap(app: AppHandle) -> Result<(), String> {
             message
         })?;
 
-    register_desktop_renderer(&client).await?;
+    register_desktop_renderer(&app, &client, &manifest).await?;
+    let _ = update_tray_snapshot(&app, |snapshot| {
+        snapshot.connection_state = "connected".to_string();
+        snapshot.last_error = None;
+    });
 
     let mut subscriber = client
         .subscribe(WEBVIEW_COMMAND_SUBJECT)
@@ -139,6 +187,10 @@ async fn load_desktop_companion_manifest(
             Ok(manifest)
         }
         Err(file_error) => {
+            let file_error_message = file_error.clone();
+            let _ = update_tray_snapshot(app, |snapshot| {
+                snapshot.last_error = Some(file_error_message.clone());
+            });
             log_event(LogEvent::error(
                 "bootstrap",
                 "load_manifest_file",
@@ -147,6 +199,11 @@ async fn load_desktop_companion_manifest(
             ));
             fetch_desktop_companion_manifest().await.map_err(|http_error| {
                 let combined = format!("{file_error}; {http_error}");
+                let tray_error = combined.clone();
+                let _ = update_tray_snapshot(app, |snapshot| {
+                    snapshot.connection_state = "disconnected".to_string();
+                    snapshot.last_error = Some(tray_error.clone());
+                });
                 log_event(LogEvent::error(
                     "bootstrap",
                     "load_manifest_http_fallback",
@@ -172,13 +229,20 @@ fn read_desktop_companion_manifest_file(
         .map_err(|error| format!("failed to parse {}: {error}", manifest_path.display()))
 }
 
-async fn register_desktop_renderer(client: &Client) -> Result<(), String> {
+async fn register_desktop_renderer(
+    app: &AppHandle,
+    client: &Client,
+    manifest: &DesktopCompanionManifest,
+) -> Result<(), String> {
     let renderer_id = desktop_renderer_id();
     let payload = serde_json::to_vec(&serde_json::json!({
         "type": "desktop.register",
         "rendererId": renderer_id,
         "machineName": desktop_machine_name(),
         "capabilities": ["native_webview"],
+        "serverUrl": manifest.server_url,
+        "natsUrl": manifest.nats_url,
+        "lastError": last_error_message(),
     }))
     .map_err(|error| error.to_string())?;
 
@@ -187,6 +251,11 @@ async fn register_desktop_renderer(client: &Client) -> Result<(), String> {
         .await
         .map_err(|error| {
             let message = error.to_string();
+            let tray_error = message.clone();
+            let _ = update_tray_snapshot(app, |snapshot| {
+                snapshot.connection_state = "disconnected".to_string();
+                snapshot.last_error = Some(tray_error.clone());
+            });
             log_event(LogEvent::error(
                 "bootstrap",
                 "register_renderer",
@@ -318,6 +387,10 @@ async fn handle_message(app: &AppHandle, client: &Client, message: Message) -> R
         .await
         .map_err(|error| {
             let message = error.to_string();
+            let tray_error = message.clone();
+            let _ = update_tray_snapshot(app, |snapshot| {
+                snapshot.last_error = Some(tray_error.clone());
+            });
             log_event(LogEvent::error(
                 "bootstrap",
                 "publish_reply",

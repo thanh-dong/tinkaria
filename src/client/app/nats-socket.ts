@@ -49,19 +49,11 @@ export class NatsSocket implements TinkariaTransport {
 
   private async discoverAndConnect(): Promise<void> {
     try {
-      const [healthRes, authRes] = await Promise.all([
-        fetch("/health"),
-        fetch("/auth/token"),
-      ])
-      const health = await healthRes.json() as { natsWsPort?: number }
-      if (!health.natsWsPort) {
-        console.warn(LOG_PREFIX, "NATS WS port not available, falling back to WS transport")
-        return
-      }
+      const authRes = await fetch("/auth/token")
       const auth = await authRes.json() as { token?: string }
       this.resolvedToken = auth.token
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-      this.resolvedWsUrl = `${protocol}//${window.location.hostname}:${health.natsWsPort}`
+      this.resolvedWsUrl = `${protocol}//${window.location.host}/nats-ws`
       void this.connect()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

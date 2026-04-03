@@ -1,5 +1,37 @@
 # Kanna Tasks
 
+## Completed: Dependency Upgrade Worktree Baseline
+
+**Status**: Verified in isolated worktree `/home/lagz0ne/dev/kanna/.worktrees/upgrade-deps-latest` on branch `chore/upgrade-deps-latest`. The branch now carries a broad latest-version dependency bump without touching the main workspace beyond this handoff note and the C3 ADR.
+
+**Scope**:
+1. Upgraded `package.json` dependency ranges to the latest available versions, including `vite` `^8.0.3`, `@vitejs/plugin-react` `6.0.1`, `typescript` `6.0.2`, `lucide-react` `^1.7.0`, React `19.2.4`, and the latest listed Bun package-manager version `1.3.11`.
+2. Regenerated `bun.lock` in the worktree with `bun install`.
+3. Kept verification on an alternate local port to avoid clashing with the existing app sessions.
+
+**Verified**:
+1. Worktree setup: `git worktree add .worktrees/upgrade-deps-latest -b chore/upgrade-deps-latest`
+2. Baseline before upgrade: `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+3. Baseline before upgrade: `bun run build`
+4. Upgrade scan: `bun outdated`
+5. Upgrade manifest: `bunx npm-check-updates -u`
+6. Install updated graph: `bun install`
+7. Post-upgrade typecheck: `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+8. Post-upgrade build: `bun run build`
+9. Browser smoke on alternate port: `bunx vite preview --host 127.0.0.1 --port 4310`
+10. `agent-browser open http://127.0.0.1:4310`
+11. `agent-browser errors` -> no browser errors
+12. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+**Notes**:
+1. The preview smoke used `4310`, not the repo’s normal dev ports.
+2. `agent-browser screenshot` saved a render artifact at `/home/lagz0ne/.agent-browser/tmp/screenshots/screenshot-1775191872904.png`.
+3. Current worktree diff is limited to `package.json` and `bun.lock` (`git diff --stat` -> `2 files changed, 302 insertions(+), 232 deletions(-)`).
+
+**Next**:
+1. Decide whether to keep the dependency-only branch as a standalone PR or fold it into the broader release work.
+2. If we want higher confidence than build smoke, run the full `bun test` suite in the worktree and fix any runtime/test-only regressions before merge.
+
 ## Completed: User Prompt Short-Word Wrapping
 
 **Status**: Verified. User prompt bubbles now explicitly prefer normal word wrapping instead of allowing aggressive mid-word breaks for short prompts.
@@ -155,12 +187,16 @@
 14. `cargo check --manifest-path src-tauri/Cargo.toml`
 15. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu`
 16. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+17. `cargo test --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
+18. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
+19. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
+20. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage` -> `100%`
 
 **Next**:
-1. Add a small companion status/settings view that reflects connected/disconnected state inside the tray-opened settings window.
+1. User-verify that the fresh Windows companion opens `http://127.0.0.1:5175/desktop/desktop:LAGZ0NE` from the tray and that the page reflects the live renderer registry instead of staying offline.
 2. Route more controlled-content surfaces through desktop preference, not just transcript links.
 3. Add reconnect-state handling so disconnected companion-hosted views disable or close cleanly.
-4. If the tray/window bitmap still shows legacy art on Windows, regenerate `src-tauri/icons/icon.png` and `src-tauri/icons/icon.ico` from the Tinkaria mark instead of relying only on updated product names/titles.
+4. If needed, make the tray diagnostics live-update on more granular connection transitions (for example subscriber disconnects after initial attach), not just bootstrap/register failures.
 
 ## In Progress: Rich Content SVG Rendering
 

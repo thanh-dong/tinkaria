@@ -4,6 +4,9 @@ export interface RegisterDesktopRendererInput {
   rendererId: string
   machineName: string
   capabilities: string[]
+  serverUrl?: string | null
+  natsUrl?: string | null
+  lastError?: string | null
 }
 
 export class DesktopRenderersRegistry {
@@ -15,6 +18,9 @@ export class DesktopRenderersRegistry {
       rendererId: input.rendererId,
       machineName: input.machineName,
       capabilities: [...input.capabilities],
+      serverUrl: input.serverUrl ?? existing?.serverUrl ?? null,
+      natsUrl: input.natsUrl ?? existing?.natsUrl ?? null,
+      lastError: input.lastError ?? existing?.lastError ?? null,
       connectedAt: existing?.connectedAt ?? now,
       lastSeenAt: now,
     }
