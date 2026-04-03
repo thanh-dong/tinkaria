@@ -25,6 +25,12 @@ const DESKTOP_REGISTER_SUBJECT: &str = "kanna.cmd.desktop.register";
 const PRIMARY_SHELL_WINDOW_LABEL: &str = "main-shell";
 const PRIMARY_SHELL_WINDOW_TITLE: &str = "Tinkaria Companion";
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PrimaryShellWindowTransition {
+    Open(Url),
+    Navigate(Url),
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum DesktopCommand {
@@ -340,33 +346,53 @@ pub fn normalize_primary_shell_url(server_url: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-fn open_primary_shell_window(app: &AppHandle, server_url: &str) -> Result<(), String> {
+fn primary_shell_window_transition(
+    server_url: &str,
+    window_exists: bool,
+) -> Result<PrimaryShellWindowTransition, String> {
     let url = normalize_primary_shell_url(server_url)?;
+    Ok(if window_exists {
+        PrimaryShellWindowTransition::Navigate(url)
+    } else {
+        PrimaryShellWindowTransition::Open(url)
+    })
+}
 
-    if let Some(window) = app.get_webview_window(primary_shell_window_label()) {
-        window.show().map_err(|error| error.to_string())?;
-        window.set_focus().map_err(|error| error.to_string())?;
-        return Ok(());
+fn open_primary_shell_window(app: &AppHandle, server_url: &str) -> Result<(), String> {
+    match primary_shell_window_transition(
+        server_url,
+        app.get_webview_window(primary_shell_window_label()).is_some(),
+    )? {
+        PrimaryShellWindowTransition::Navigate(url) => {
+            let window = app
+                .get_webview_window(primary_shell_window_label())
+                .ok_or_else(|| "primary shell window is unavailable".to_string())?;
+            window.navigate(url).map_err(|error| error.to_string())?;
+            window.show().map_err(|error| error.to_string())?;
+            window.set_focus().map_err(|error| error.to_string())?;
+            Ok(())
+        }
+        PrimaryShellWindowTransition::Open(url) => {
+            let window = WebviewWindowBuilder::new(
+                app,
+                primary_shell_window_label(),
+                WebviewUrl::External(url),
+            )
+            .title(PRIMARY_SHELL_WINDOW_TITLE)
+            .decorations(false)
+            .resizable(true)
+            .maximizable(true)
+            .fullscreen(false)
+            .visible(true)
+            .focused(true)
+            .build()
+            .map_err(|error| error.to_string())?;
+
+            window.show().map_err(|error| error.to_string())?;
+            window.set_focus().map_err(|error| error.to_string())?;
+            Ok(())
+        }
     }
-
-    let window = WebviewWindowBuilder::new(
-        app,
-        primary_shell_window_label(),
-        WebviewUrl::External(url),
-    )
-    .title(PRIMARY_SHELL_WINDOW_TITLE)
-    .decorations(false)
-    .resizable(true)
-    .maximizable(true)
-    .fullscreen(false)
-    .visible(true)
-    .focused(true)
-    .build()
-    .map_err(|error| error.to_string())?;
-
-    window.show().map_err(|error| error.to_string())?;
-    window.set_focus().map_err(|error| error.to_string())?;
-    Ok(())
 }
 
 fn primary_shell_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
@@ -487,8 +513,9 @@ async fn handle_message(app: &AppHandle, client: &Client, message: Message) -> R
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_primary_shell_url, primary_shell_window_label, PRIMARY_SHELL_WINDOW_LABEL,
-        PRIMARY_SHELL_WINDOW_TITLE,
+        normalize_primary_shell_url, primary_shell_window_label,
+        primary_shell_window_transition, PrimaryShellWindowTransition,
+        PRIMARY_SHELL_WINDOW_LABEL, PRIMARY_SHELL_WINDOW_TITLE,
     };
 
     #[test]
@@ -508,5 +535,21 @@ mod tests {
             .expect("server url should parse");
 
         assert_eq!(url.as_str(), "http://127.0.0.1:5174/app");
+    }
+
+    #[test]
+    fn primary_shell_existing_window_refreshes_to_current_server_url() {
+        let transition = primary_shell_window_transition(
+            "http://127.0.0.1:5174/app?query=1#shell",
+            true,
+        )
+        .expect("server url should parse");
+
+        match transition {
+            PrimaryShellWindowTransition::Navigate(url) => {
+                assert_eq!(url.as_str(), "http://127.0.0.1:5174/app");
+            }
+            PrimaryShellWindowTransition::Open(_) => panic!("expected an existing window refresh"),
+        }
     }
 }
