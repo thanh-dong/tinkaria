@@ -1289,7 +1289,12 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     editorLabel,
     hasSelectedProject,
     localFilePreview,
-    openSidebar: () => setSidebarOpen(true),
+    openSidebar: () => {
+      setSidebarOpen(true)
+      if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
+        (document.activeElement as HTMLElement)?.blur?.()
+      }
+    },
     closeSidebar: () => setSidebarOpen(false),
     collapseSidebar: () => setSidebarCollapsed(true),
     expandSidebar: () => setSidebarCollapsed(false),
