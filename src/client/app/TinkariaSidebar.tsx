@@ -359,8 +359,10 @@ export function TinkariaSidebar({
         data-sidebar="open"
         className={cn(
           "fixed inset-0 z-50 bg-background dark:bg-card flex flex-col h-[100dvh] select-none",
-          "md:relative md:inset-auto md:w-[275px] md:mr-0 md:h-[calc(100dvh-16px)] md:my-2 md:ml-2 md:border md:border-border md:rounded-2xl",
-          open ? "flex" : "hidden md:flex",
+          "transition-transform duration-300 ease-out",
+          "md:relative md:inset-auto md:w-[275px] md:mr-0 md:h-[calc(100dvh-16px)] md:my-2 md:ml-2 md:border md:border-border md:rounded-2xl md:transition-none",
+          open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+          !open && "pointer-events-none md:pointer-events-auto",
           collapsed && "md:hidden"
         )}
         onPointerDown={handleSwipePointerDown}
@@ -431,7 +433,7 @@ export function TinkariaSidebar({
         <div
           ref={scrollContainerRef}
           className="flex-1 min-h-0 overflow-y-auto scrollbar-hide"
-          style={{ WebkitOverflowScrolling: "touch" }}
+          style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
         >
           <div className="p-[7px]">
             {!hasVisibleChats && isConnecting ? (
@@ -524,7 +526,13 @@ export function TinkariaSidebar({
         </div>
       </div>
 
-      {open ? <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={onClose} /> : null}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 md:hidden transition-opacity duration-300",
+          open ? "bg-black/40 opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={onClose}
+      />
     </>
   )
 }
