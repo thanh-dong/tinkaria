@@ -10,19 +10,18 @@ const DEV_WATCH_IGNORED = [
   "**/src-tauri/**",
 ]
 
-function getAllowedHosts() {
-  const defaults = ["localhost", "127.0.0.1", "0.0.0.0"]
+export function getAllowedHosts() {
   const configured = process.env.KANNA_DEV_ALLOWED_HOSTS
-  if (!configured) return defaults
+  if (!configured) return undefined
   if (configured === "true") return true
 
   try {
     const parsed = JSON.parse(configured)
-    if (!Array.isArray(parsed)) return defaults
+    if (!Array.isArray(parsed)) return undefined
     const hosts = parsed.filter((value): value is string => typeof value === "string" && value.length > 0)
-    return hosts.length > 0 ? hosts : defaults
+    return hosts.length > 0 ? hosts : undefined
   } catch {
-    return defaults
+    return undefined
   }
 }
 

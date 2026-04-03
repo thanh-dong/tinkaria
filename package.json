@@ -34,7 +34,7 @@
   },
   "scripts": {
     "build": "vite build",
-    "check": "tsc --noEmit && vite build",
+    "check": "bunx @typescript/native-preview --noEmit -p tsconfig.json && vite build",
     "dev": "bun run ./scripts/dev.ts",
     "dev:client": "vite --host 0.0.0.0 --port 5174",
     "dev:server": "bun run ./scripts/dev-server.ts --no-open --port 5175",
