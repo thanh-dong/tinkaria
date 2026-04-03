@@ -35,13 +35,19 @@ describe("shouldOpenMobileSidebarFromSwipe", () => {
     startY: 200,
     currentX: 120,
     currentY: 200,
+    viewportWidth: 375,
     isMobileViewport: true,
     isSidebarOpen: false,
     target: null,
   }
 
-  test("returns true for valid right swipe from left edge", () => {
+  test("returns true for valid right swipe from left third", () => {
     expect(shouldOpenMobileSidebarFromSwipe(base)).toBe(true)
+  })
+
+  test("returns true when swipe starts near the edge of left third", () => {
+    // startX=120 is within left third (375/3=125), swipe far enough right
+    expect(shouldOpenMobileSidebarFromSwipe({ ...base, startX: 120, currentX: 250 })).toBe(true)
   })
 
   test("returns false when not mobile viewport", () => {
@@ -52,8 +58,9 @@ describe("shouldOpenMobileSidebarFromSwipe", () => {
     expect(shouldOpenMobileSidebarFromSwipe({ ...base, isSidebarOpen: true })).toBe(false)
   })
 
-  test("returns false when swipe starts too far from left edge", () => {
-    expect(shouldOpenMobileSidebarFromSwipe({ ...base, startX: 100 })).toBe(false)
+  test("returns false when swipe starts past the left third", () => {
+    // 375 / 3 = 125, so 130 is past the threshold
+    expect(shouldOpenMobileSidebarFromSwipe({ ...base, startX: 130, currentX: 250 })).toBe(false)
   })
 
   test("returns false when horizontal distance is too short", () => {
@@ -80,6 +87,7 @@ describe("shouldCloseMobileSidebarFromSwipe", () => {
     startY: 200,
     currentX: 80,
     currentY: 200,
+    viewportWidth: 375,
     isMobileViewport: true,
     isSidebarOpen: true,
     target: null,

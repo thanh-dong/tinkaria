@@ -105,24 +105,26 @@ describe("shouldIgnoreMobileSidebarSwipeStart", () => {
 })
 
 describe("shouldOpenMobileSidebarFromSwipe", () => {
-  test("opens the mobile sidebar for a right swipe from the left edge", () => {
+  test("opens the mobile sidebar for a right swipe from the left third", () => {
     expect(shouldOpenMobileSidebarFromSwipe({
       startX: 12,
       startY: 120,
       currentX: 112,
       currentY: 138,
+      viewportWidth: 375,
       isMobileViewport: true,
       isSidebarOpen: false,
       target: plainTarget(),
     })).toBe(true)
   })
 
-  test("rejects swipes that start away from the left edge", () => {
+  test("rejects swipes that start past the left third of the viewport", () => {
     expect(shouldOpenMobileSidebarFromSwipe({
-      startX: 80,
+      startX: 200,
       startY: 120,
-      currentX: 180,
+      currentX: 300,
       currentY: 132,
+      viewportWidth: 375,
       isMobileViewport: true,
       isSidebarOpen: false,
       target: plainTarget(),
@@ -135,6 +137,7 @@ describe("shouldOpenMobileSidebarFromSwipe", () => {
       startY: 120,
       currentX: 72,
       currentY: 240,
+      viewportWidth: 375,
       isMobileViewport: true,
       isSidebarOpen: false,
       target: plainTarget(),
@@ -147,6 +150,7 @@ describe("shouldOpenMobileSidebarFromSwipe", () => {
       startY: 120,
       currentX: 120,
       currentY: 130,
+      viewportWidth: 375,
       isMobileViewport: true,
       isSidebarOpen: false,
       target: interactiveTarget(),
@@ -161,6 +165,7 @@ describe("shouldOpenMobileSidebarFromSwipe", () => {
       startY: 120,
       currentX: 120,
       currentY: 130,
+      viewportWidth: 375,
       isMobileViewport: true,
       isSidebarOpen: true,
       target,
@@ -171,6 +176,7 @@ describe("shouldOpenMobileSidebarFromSwipe", () => {
       startY: 120,
       currentX: 120,
       currentY: 130,
+      viewportWidth: 375,
       isMobileViewport: false,
       isSidebarOpen: false,
       target,

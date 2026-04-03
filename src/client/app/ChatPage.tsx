@@ -35,7 +35,7 @@ const EMPTY_STATE_TEXT = "What are we building?"
 const EMPTY_STATE_TYPING_INTERVAL_MS = 19
 const CHAT_NAVBAR_OFFSET_PX = 72
 const SCROLL_BUTTON_BOTTOM_PX = 120
-const MOBILE_SIDEBAR_SWIPE_EDGE_PX = 32
+const MOBILE_SIDEBAR_SWIPE_EDGE_FRACTION = 1 / 3
 const MOBILE_SIDEBAR_SWIPE_MIN_DISTANCE_PX = 72
 const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX = 56
 const CHAT_PAGE_UI_IDENTITIES = {
@@ -67,6 +67,7 @@ interface MobileSidebarSwipeDecisionArgs {
   startY: number
   currentX: number
   currentY: number
+  viewportWidth: number
   isMobileViewport: boolean
   isSidebarOpen: boolean
   target: EventTarget | null
@@ -128,7 +129,7 @@ export function shouldOpenMobileSidebarFromSwipe(args: MobileSidebarSwipeDecisio
     return false
   }
 
-  if (args.startX > MOBILE_SIDEBAR_SWIPE_EDGE_PX) {
+  if (args.startX > args.viewportWidth * MOBILE_SIDEBAR_SWIPE_EDGE_FRACTION) {
     return false
   }
 
@@ -306,6 +307,7 @@ export function ChatPage() {
       startY: swipe.startY,
       currentX: event.clientX,
       currentY: event.clientY,
+      viewportWidth: window.innerWidth,
       isMobileViewport,
       isSidebarOpen: state.sidebarOpen,
       target: swipe.target,

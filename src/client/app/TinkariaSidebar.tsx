@@ -133,6 +133,7 @@ export function TinkariaSidebar({
       startY: swipe.startY,
       currentX: event.clientX,
       currentY: event.clientY,
+      viewportWidth: window.innerWidth,
       isMobileViewport,
       isSidebarOpen: open,
       target: swipe.target,
