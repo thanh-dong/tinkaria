@@ -1,0 +1,534 @@
+import { describe, expect, test, afterEach } from "bun:test"
+import { SessionOrchestrator } from "./orchestration"
+import type { TranscriptEntry } from "../shared/types"
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
+
+function timestamped<T extends Omit<TranscriptEntry, "_id" | "createdAt">>(entry: T): TranscriptEntry {
+  return {
+    _id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    ...entry,
+  } as TranscriptEntry
+}
+
+// ---------------------------------------------------------------------------
+// Fake store — supports multiple chats
+// ---------------------------------------------------------------------------
+
+interface FakeChat {
+  id: string
+  projectId: string
+  title: string
+  provider: "claude" | "codex" | null
+  planMode: boolean
+  sessionToken: string | null
+}
+
+function createFakeStore() {
+  const chats = new Map<string, FakeChat>()
+  const project = { id: "project-1", localPath: "/tmp/project" }
+  let chatCounter = 0
+
+  return {
+    chats,
+    project,
+    async createChat(projectId: string) {
+      const id = `chat-${++chatCounter}`
+      const chat: FakeChat = {
+        id,
+        projectId,
+        title: "New Chat",
+        provider: null,
+        planMode: false,
+        sessionToken: null,
+      }
+      chats.set(id, chat)
+      return chat
+    },
+    requireChat(chatId: string) {
+      const chat = chats.get(chatId)
+      if (!chat) throw new Error(`Chat not found: ${chatId}`)
+      return chat
+    },
+    getProject() {
+      return project
+    },
+    listChatsByProject() {
+      return [...chats.values()]
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fake coordinator — tracks calls, can simulate turn completion
+// ---------------------------------------------------------------------------
+
+function createFakeCoordinator() {
+  const startedTurns: Array<{ chatId: string; content: string; provider: string }> = []
+  const activeTurns = new Map<string, unknown>()
+  const cancelledChats: string[] = []
+  const disposedChats: string[] = []
+
+  return {
+    startedTurns,
+    activeTurns,
+    cancelledChats,
+    disposedChats,
+    async startTurnForChat(args: { chatId: string; content: string; provider: string }) {
+      startedTurns.push(args)
+      activeTurns.set(args.chatId, { chatId: args.chatId })
+    },
+    async cancel(chatId: string) {
+      cancelledChats.push(chatId)
+      activeTurns.delete(chatId)
+    },
+    async disposeChat(chatId: string) {
+      disposedChats.push(chatId)
+      activeTurns.delete(chatId)
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Factory for orchestrator under test
+// ---------------------------------------------------------------------------
+
+function createOrchestrator(overrides?: { maxDepth?: number; maxConcurrency?: number }) {
+  const store = createFakeStore()
+  const coordinator = createFakeCoordinator()
+  const appendedMessages: Array<{ chatId: string; entry: TranscriptEntry }> = []
+
+  let onMessageAppendedCallback: ((chatId: string, entry: TranscriptEntry) => void) | undefined
+
+  const orchestrator = new SessionOrchestrator({
+    store: store as never,
+    coordinator: coordinator as never,
+    onMessageAppended(chatId: string, entry: TranscriptEntry) {
+      appendedMessages.push({ chatId, entry })
+      onMessageAppendedCallback?.(chatId, entry)
+    },
+    maxDepth: overrides?.maxDepth,
+    maxConcurrency: overrides?.maxConcurrency,
+  })
+
+  return {
+    orchestrator,
+    store,
+    coordinator,
+    appendedMessages,
+    /** Allow tests to hook into message delivery for simulating delayed results */
+    setOnMessageAppended(cb: (chatId: string, entry: TranscriptEntry) => void) {
+      onMessageAppendedCallback = cb
+    },
+    /** Simulate the target agent emitting a result entry */
+    emitResult(chatId: string, result: string, isError = false) {
+      const entry = timestamped({
+        kind: "result" as const,
+        subtype: isError ? ("error" as const) : ("success" as const),
+        isError,
+        durationMs: 100,
+        result,
+      })
+      orchestrator.onMessageAppended(chatId, entry)
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Seed a caller chat in the fake store so orchestrator calls have a valid origin
+// ---------------------------------------------------------------------------
+
+async function seedCallerChat(store: ReturnType<typeof createFakeStore>, provider: "claude" | "codex" = "claude") {
+  const chat = await store.createChat("project-1")
+  chat.provider = provider
+  return chat
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("SessionOrchestrator", () => {
+  let ctx: ReturnType<typeof createOrchestrator>
+
+  afterEach(() => {
+    ctx = undefined!
+  })
+
+  // =========================================================================
+  // spawnAgent
+  // =========================================================================
+
+  describe("spawnAgent", () => {
+    test("creates a new chat and records origin chain", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      const { chatId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Do the thing",
+      })
+
+      expect(chatId).toBeDefined()
+      expect(typeof chatId).toBe("string")
+      // The spawned chat should exist in the store
+      const spawned = ctx.store.requireChat(chatId)
+      expect(spawned).toBeDefined()
+      expect(spawned.projectId).toBe("project-1")
+    })
+
+    test("passes instruction to startTurnForChat", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Write unit tests",
+      })
+
+      expect(ctx.coordinator.startedTurns).toHaveLength(1)
+      expect(ctx.coordinator.startedTurns[0]!.content).toBe("Write unit tests")
+    })
+
+    test("uses caller's provider by default", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store, "codex")
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Refactor module",
+      })
+
+      expect(ctx.coordinator.startedTurns[0]!.provider).toBe("codex")
+    })
+
+    test("allows explicit provider override", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store, "claude")
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Refactor module",
+        provider: "codex",
+      })
+
+      expect(ctx.coordinator.startedTurns[0]!.provider).toBe("codex")
+    })
+
+    test("rejects when max concurrency (3) reached", async () => {
+      ctx = createOrchestrator({ maxConcurrency: 3 })
+      const caller = await seedCallerChat(ctx.store)
+
+      // Spawn 3 agents (the default max)
+      await ctx.orchestrator.spawnAgent(caller.id, { instruction: "task-1" })
+      await ctx.orchestrator.spawnAgent(caller.id, { instruction: "task-2" })
+      await ctx.orchestrator.spawnAgent(caller.id, { instruction: "task-3" })
+
+      // The 4th should reject
+      await expect(
+        ctx.orchestrator.spawnAgent(caller.id, { instruction: "task-4" }),
+      ).rejects.toThrow(/concurrency/i)
+    })
+
+    test("rejects when max depth (3) exceeded", async () => {
+      ctx = createOrchestrator({ maxDepth: 3 })
+      const caller = await seedCallerChat(ctx.store)
+
+      // Build a chain: caller -> child1 -> child2 -> child3 (depth 3)
+      const child1 = await ctx.orchestrator.spawnAgent(caller.id, { instruction: "depth-1" })
+      const child2 = await ctx.orchestrator.spawnAgent(child1.chatId, { instruction: "depth-2" })
+      const child3 = await ctx.orchestrator.spawnAgent(child2.chatId, { instruction: "depth-3" })
+
+      // Depth 4 should reject
+      await expect(
+        ctx.orchestrator.spawnAgent(child3.chatId, { instruction: "depth-4" }),
+      ).rejects.toThrow(/depth/i)
+    })
+  })
+
+  // =========================================================================
+  // sendInput
+  // =========================================================================
+
+  describe("sendInput", () => {
+    test("calls startTurnForChat on target with content", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "initial",
+      })
+
+      // Clear started turns from spawn
+      ctx.coordinator.startedTurns.length = 0
+      // Remove from active so sendInput doesn't see it as running
+      ctx.coordinator.activeTurns.delete(targetId)
+
+      await ctx.orchestrator.sendInput(caller.id, {
+        targetChatId: targetId,
+        content: "follow-up message",
+      })
+
+      expect(ctx.coordinator.startedTurns).toHaveLength(1)
+      expect(ctx.coordinator.startedTurns[0]!.chatId).toBe(targetId)
+      expect(ctx.coordinator.startedTurns[0]!.content).toBe("follow-up message")
+    })
+
+    test("rejects if target chat does not exist", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      await expect(
+        ctx.orchestrator.sendInput(caller.id, {
+          targetChatId: "nonexistent-chat",
+          content: "hello",
+        }),
+      ).rejects.toThrow(/not found/i)
+    })
+
+    test("rejects if target is already running", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "initial",
+      })
+
+      // Target is still in activeTurns from spawnAgent
+      await expect(
+        ctx.orchestrator.sendInput(caller.id, {
+          targetChatId: targetId,
+          content: "more input",
+        }),
+      ).rejects.toThrow(/already running|busy/i)
+    })
+  })
+
+  // =========================================================================
+  // waitForResult
+  // =========================================================================
+
+  describe("waitForResult", () => {
+    test("resolves when target emits result entry via onMessageAppended", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "compute something",
+      })
+
+      // Emit a result after a small delay
+      setTimeout(() => ctx.emitResult(targetId, "computed value"), 50)
+
+      const outcome = await ctx.orchestrator.waitForResult(caller.id, {
+        targetChatId: targetId,
+        timeoutMs: 2000,
+      })
+
+      expect(outcome.result).toBe("computed value")
+      expect(outcome.isError).toBe(false)
+    })
+
+    test("returns result text and isError flag", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "do something risky",
+      })
+
+      // Emit an error result
+      setTimeout(() => ctx.emitResult(targetId, "something went wrong", true), 50)
+
+      const outcome = await ctx.orchestrator.waitForResult(caller.id, {
+        targetChatId: targetId,
+        timeoutMs: 2000,
+      })
+
+      expect(outcome.result).toBe("something went wrong")
+      expect(outcome.isError).toBe(true)
+    })
+
+    test("times out after configured duration", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "slow task",
+      })
+
+      // No result emitted — should time out
+      await expect(
+        ctx.orchestrator.waitForResult(caller.id, {
+          targetChatId: targetId,
+          timeoutMs: 50,
+        }),
+      ).rejects.toThrow(/timeout|timed out/i)
+    })
+
+    test("cancels target turn on timeout", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "slow task",
+      })
+
+      try {
+        await ctx.orchestrator.waitForResult(caller.id, {
+          targetChatId: targetId,
+          timeoutMs: 50,
+        })
+      } catch {
+        // Expected to throw on timeout
+      }
+
+      expect(ctx.coordinator.cancelledChats).toContain(targetId)
+    })
+  })
+
+  // =========================================================================
+  // closeAgent
+  // =========================================================================
+
+  describe("closeAgent", () => {
+    test("disposes the target chat via coordinator", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "short-lived agent",
+      })
+
+      await ctx.orchestrator.closeAgent(caller.id, { targetChatId: targetId })
+
+      expect(ctx.coordinator.disposedChats).toContain(targetId)
+    })
+
+    test("cleans up origin chain tracking", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "temporary agent",
+      })
+
+      await ctx.orchestrator.closeAgent(caller.id, { targetChatId: targetId })
+
+      // After cleanup, spawning again should not count toward the old concurrency
+      // Spawn up to maxConcurrency to confirm the slot was freed
+      const { chatId: newId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "replacement agent",
+      })
+      expect(newId).toBeDefined()
+    })
+  })
+
+  // =========================================================================
+  // circular detection
+  // =========================================================================
+
+  describe("circular detection", () => {
+    test("rejects A->B->A cycle", async () => {
+      ctx = createOrchestrator()
+      const chatA = await seedCallerChat(ctx.store)
+
+      const { chatId: chatBId } = await ctx.orchestrator.spawnAgent(chatA.id, {
+        instruction: "B's task",
+      })
+
+      // B trying to spawn A (the original caller) should be detected as a cycle
+      await expect(
+        ctx.orchestrator.spawnAgent(chatBId, {
+          instruction: "cycle back to A",
+        }),
+      ).rejects.toThrow(/cycle|circular/i)
+    })
+
+    test("allows A->B, A->C (fan-out, no cycle)", async () => {
+      ctx = createOrchestrator()
+      const chatA = await seedCallerChat(ctx.store)
+
+      const childB = await ctx.orchestrator.spawnAgent(chatA.id, {
+        instruction: "B's task",
+      })
+      expect(childB.chatId).toBeDefined()
+
+      const childC = await ctx.orchestrator.spawnAgent(chatA.id, {
+        instruction: "C's task",
+      })
+      expect(childC.chatId).toBeDefined()
+
+      // Both should succeed — fan-out is fine
+      expect(childB.chatId).not.toBe(childC.chatId)
+    })
+  })
+
+  // =========================================================================
+  // cancelWithCascade
+  // =========================================================================
+
+  describe("cancelWithCascade", () => {
+    test("cancelling parent cancels all children", async () => {
+      ctx = createOrchestrator()
+      const parent = await seedCallerChat(ctx.store)
+
+      const childA = await ctx.orchestrator.spawnAgent(parent.id, {
+        instruction: "child A",
+      })
+      const childB = await ctx.orchestrator.spawnAgent(parent.id, {
+        instruction: "child B",
+      })
+
+      await ctx.orchestrator.cancelWithCascade(parent.id)
+
+      expect(ctx.coordinator.cancelledChats).toContain(childA.chatId)
+      expect(ctx.coordinator.cancelledChats).toContain(childB.chatId)
+      expect(ctx.coordinator.cancelledChats).toContain(parent.id)
+    })
+
+    test("handles nested chains: A->B->C, cancel A cancels B and C", async () => {
+      ctx = createOrchestrator({ maxDepth: 5 })
+      const chatA = await seedCallerChat(ctx.store)
+
+      const { chatId: chatBId } = await ctx.orchestrator.spawnAgent(chatA.id, {
+        instruction: "B's task",
+      })
+      const { chatId: chatCId } = await ctx.orchestrator.spawnAgent(chatBId, {
+        instruction: "C's task",
+      })
+
+      await ctx.orchestrator.cancelWithCascade(chatA.id)
+
+      expect(ctx.coordinator.cancelledChats).toContain(chatA.id)
+      expect(ctx.coordinator.cancelledChats).toContain(chatBId)
+      expect(ctx.coordinator.cancelledChats).toContain(chatCId)
+    })
+  })
+
+  // =========================================================================
+  // destroy
+  // =========================================================================
+
+  describe("destroy", () => {
+    test("rejects pending waiters and clears timers", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "long-running task",
+      })
+
+      const waitPromise = ctx.orchestrator.waitForResult(caller.id, {
+        targetChatId: targetId,
+        timeoutMs: 60_000,
+      })
+
+      ctx.orchestrator.destroy()
+
+      await expect(waitPromise).rejects.toThrow(/disposed/i)
+    })
+
+    test("allows new spawns after destroy + re-init", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      await ctx.orchestrator.spawnAgent(caller.id, { instruction: "pre-destroy" })
+      ctx.orchestrator.destroy()
+
+      // After destroy, origin tracking is cleared — new spawns should work
+      const { chatId } = await ctx.orchestrator.spawnAgent(caller.id, { instruction: "post-destroy" })
+      expect(chatId).toBeDefined()
+    })
+  })
+})

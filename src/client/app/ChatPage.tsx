@@ -72,7 +72,7 @@ interface MobileSidebarSwipeDecisionArgs {
   target: EventTarget | null
 }
 
-interface MobileSidebarSwipeState {
+export interface MobileSidebarSwipeState {
   pointerId: number
   startX: number
   startY: number
@@ -133,6 +133,28 @@ export function shouldOpenMobileSidebarFromSwipe(args: MobileSidebarSwipeDecisio
   }
 
   const deltaX = args.currentX - args.startX
+  const deltaY = Math.abs(args.currentY - args.startY)
+  if (deltaX < MOBILE_SIDEBAR_SWIPE_MIN_DISTANCE_PX) {
+    return false
+  }
+
+  if (deltaY > MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX) {
+    return false
+  }
+
+  return deltaX > deltaY
+}
+
+export function shouldCloseMobileSidebarFromSwipe(args: MobileSidebarSwipeDecisionArgs): boolean {
+  if (!args.isMobileViewport || !args.isSidebarOpen) {
+    return false
+  }
+
+  if (shouldIgnoreMobileSidebarSwipeStart(args.target)) {
+    return false
+  }
+
+  const deltaX = args.startX - args.currentX
   const deltaY = Math.abs(args.currentY - args.startY)
   if (deltaX < MOBILE_SIDEBAR_SWIPE_MIN_DISTANCE_PX) {
     return false

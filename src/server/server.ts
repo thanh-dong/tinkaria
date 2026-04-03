@@ -19,6 +19,7 @@ import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
 import { ensureTerminalEventsStream, ensureChatMessageStream } from "./nats-streams"
 import type { TranscriptEntry } from "../shared/types"
+import { SessionOrchestrator } from "./orchestration"
 
 function getAppVersion() {
   return SDK_CLIENT_APP.split("/")[1] ?? "unknown"
@@ -91,8 +92,19 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
   const agent = new AgentCoordinator({
     store,
     onStateChange: () => broadcast(),
-    onMessageAppended: (chatId, entry) => publishMessage(chatId, entry),
+    onMessageAppended: (chatId, entry) => {
+      publishMessage(chatId, entry)
+      if (entry.kind === "result") {
+        orchestrator.onMessageAppended(chatId, entry)
+      }
+    },
   })
+
+  const orchestrator = new SessionOrchestrator({
+    store,
+    coordinator: agent,
+  })
+  agent.orchestrator = orchestrator
 
   const publisher = await createNatsPublisher({
     nc: natsBridge.nc,
@@ -208,6 +220,7 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     for (const chatId of [...agent.activeTurns.keys()]) {
       await agent.cancel(chatId)
     }
+    orchestrator.destroy()
     responders.dispose()
     publisher.dispose()
     keybindings.dispose()

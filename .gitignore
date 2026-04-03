@@ -29,6 +29,9 @@ src/**/*.js
 # vite
 vite.config.ts.timestamp-*
 
+# generated PWA icons (regenerate from SVG: bun run scripts/generate-pwa-icons.ts)
+public/icon-*.png
+
 # worktrees
 .worktrees/
 

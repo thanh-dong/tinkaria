@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react"
 import { Grip, Loader2, Maximize2, Menu, PanelLeft, Plus, Settings, X } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
@@ -11,6 +11,7 @@ import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProject
 import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
 import type { SocketStatus } from "./socket-interface"
 import { useProjectGroupOrderStore } from "../stores/projectGroupOrderStore"
+import { shouldCloseMobileSidebarFromSwipe, type MobileSidebarSwipeState } from "./ChatPage"
 
 interface TinkariaSidebarProps {
   data: SidebarData
@@ -107,6 +108,45 @@ export function TinkariaSidebar({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [nowMs, setNowMs] = useState(() => Date.now())
   const chatsPerProject = 10
+  const mobileSidebarSwipeRef = useRef<MobileSidebarSwipeState | null>(null)
+
+  const handleSwipePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch") {
+      mobileSidebarSwipeRef.current = null
+      return
+    }
+    mobileSidebarSwipeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      target: event.target,
+    }
+  }, [])
+
+  const handleSwipePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const swipe = mobileSidebarSwipeRef.current
+    if (!swipe || swipe.pointerId !== event.pointerId) return
+
+    const isMobileViewport = window.matchMedia("(max-width: 767px)").matches
+    if (!shouldCloseMobileSidebarFromSwipe({
+      startX: swipe.startX,
+      startY: swipe.startY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+      isMobileViewport,
+      isSidebarOpen: open,
+      target: swipe.target,
+    })) return
+
+    mobileSidebarSwipeRef.current = null
+    onClose()
+  }, [open, onClose])
+
+  const handleSwipePointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (mobileSidebarSwipeRef.current?.pointerId === event.pointerId) {
+      mobileSidebarSwipeRef.current = null
+    }
+  }, [])
 
   const savedOrder = useProjectGroupOrderStore((s) => s.order)
   const setGroupOrder = useProjectGroupOrderStore((s) => s.setOrder)
@@ -322,6 +362,10 @@ export function TinkariaSidebar({
           open ? "flex" : "hidden md:flex",
           collapsed && "md:hidden"
         )}
+        onPointerDown={handleSwipePointerDown}
+        onPointerMove={handleSwipePointerMove}
+        onPointerUp={handleSwipePointerEnd}
+        onPointerCancel={handleSwipePointerEnd}
       >
         <div className=" pl-3 pr-[7px] h-[64px] max-h-[64px] md:h-[55px] md:max-h-[55px] border-b flex items-center justify-between">
           <div

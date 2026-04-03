@@ -1,4 +1,4 @@
-import { query, type CanUseTool, type PermissionResult, type Query } from "@anthropic-ai/claude-agent-sdk"
+import { query, type CanUseTool, type McpServerConfig, type PermissionResult, type Query } from "@anthropic-ai/claude-agent-sdk"
 import type {
   AgentProvider,
   NormalizedToolCall,
@@ -21,6 +21,8 @@ import {
 } from "./provider-catalog"
 import { resolveClaudeApiModelId } from "../shared/types"
 import { APP_NAME } from "../shared/branding"
+import type { SessionOrchestrator } from "./orchestration"
+import { createOrchestrationMcpServer } from "./orchestration"
 
 const PROVIDER_NAMES: Record<AgentProvider, string> = {
   claude: "Claude Code",
@@ -101,6 +103,7 @@ interface AgentCoordinatorArgs {
   onMessageAppended?: (chatId: string, entry: TranscriptEntry) => void
   codexManager?: CodexAppServerManager
   generateTitle?: (messageContent: string, cwd: string) => Promise<string | null>
+  orchestrator?: SessionOrchestrator
 }
 
 function timestamped<T extends Omit<TranscriptEntry, "_id" | "createdAt">>(
@@ -274,6 +277,8 @@ async function startClaudeTurn(args: {
   planMode: boolean
   sessionToken: string | null
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
+  orchestrator?: SessionOrchestrator
+  chatId?: string
 }): Promise<HarnessTurn> {
   const canUseTool: CanUseTool = async (toolName, input, options) => {
     if (toolName !== "AskUserQuestion" && toolName !== "ExitPlanMode") {
@@ -330,6 +335,11 @@ async function startClaudeTurn(args: {
     } satisfies PermissionResult
   }
 
+  const mcpServers: Record<string, McpServerConfig> | undefined =
+    args.orchestrator && args.chatId
+      ? { "kanna-orchestration": createOrchestrationMcpServer(args.orchestrator, args.chatId) }
+      : undefined
+
   const q = query({
     prompt: args.content,
     options: {
@@ -340,6 +350,7 @@ async function startClaudeTurn(args: {
       permissionMode: args.planMode ? "plan" : "acceptEdits",
       canUseTool,
       tools: [...CLAUDE_TOOLSET],
+      mcpServers,
       systemPrompt: {
         type: "preset",
         preset: "claude_code",
@@ -375,6 +386,7 @@ export class AgentCoordinator {
   private readonly onMessageAppended: ((chatId: string, entry: TranscriptEntry) => void) | undefined
   private readonly codexManager: CodexAppServerManager
   private readonly generateTitle: (messageContent: string, cwd: string) => Promise<string | null>
+  orchestrator: SessionOrchestrator | undefined
   readonly activeTurns = new Map<string, ActiveTurn>()
 
   constructor(args: AgentCoordinatorArgs) {
@@ -383,6 +395,7 @@ export class AgentCoordinator {
     this.onMessageAppended = args.onMessageAppended
     this.codexManager = args.codexManager ?? new CodexAppServerManager()
     this.generateTitle = args.generateTitle ?? generateTitleForChat
+    this.orchestrator = args.orchestrator
   }
 
   private async appendAndPublish(chatId: string, entry: TranscriptEntry): Promise<void> {
@@ -431,7 +444,7 @@ export class AgentCoordinator {
     }
   }
 
-  private async startTurnForChat(args: {
+  async startTurnForChat(args: {
     chatId: string
     provider: AgentProvider
     content: string
@@ -496,6 +509,8 @@ export class AgentCoordinator {
         planMode: args.planMode,
         sessionToken: chat.sessionToken,
         onToolRequest,
+        orchestrator: this.orchestrator,
+        chatId: args.chatId,
       })
     } else {
       await this.codexManager.startSession({
