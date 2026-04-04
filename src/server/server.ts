@@ -20,6 +20,12 @@ import { registerCommandResponders } from "./nats-responders"
 import { ensureTerminalEventsStream, ensureChatMessageStream } from "./nats-streams"
 import type { TranscriptEntry } from "../shared/types"
 import { SessionOrchestrator } from "./orchestration"
+import { SessionIndex } from "./session-index"
+import { TaskLedger } from "./task-ledger"
+import { TranscriptSearchIndex } from "./transcript-search"
+import { ResourceRegistry } from "./resource-registry"
+import { ProjectAgent } from "./project-agent"
+import { createProjectAgentRouter } from "./project-agent-routes"
 
 function getAppVersion() {
   return SDK_CLIENT_APP.split("/")[1] ?? "unknown"
@@ -94,6 +100,8 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     onStateChange: () => broadcast(),
     onMessageAppended: (chatId, entry) => {
       publishMessage(chatId, entry)
+      sessionIndex.onMessageAppended(chatId, entry, store.state)
+      transcriptSearch.addEntry(chatId, entry)
       if (entry.kind === "result") {
         orchestrator.onMessageAppended(chatId, entry)
       }
@@ -105,6 +113,19 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
     coordinator: agent,
   })
   agent.orchestrator = orchestrator
+
+  // Project agent: cross-session awareness and coordination
+  const sessionIndex = new SessionIndex()
+  const taskLedger = new TaskLedger()
+  const transcriptSearch = new TranscriptSearchIndex()
+  const resourceRegistry = new ResourceRegistry()
+  const projectAgent = new ProjectAgent({
+    sessions: sessionIndex,
+    tasks: taskLedger,
+    search: transcriptSearch,
+    resources: resourceRegistry,
+  })
+  const projectAgentRouter = createProjectAgentRouter(projectAgent)
 
   const publisher = await createNatsPublisher({
     nc: natsBridge.nc,
@@ -174,6 +195,10 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
 
           if (url.pathname === "/auth/token") {
             return Response.json({ token: authToken })
+          }
+
+          if (url.pathname.startsWith("/api/project/")) {
+            return projectAgentRouter(req)
           }
 
           return serveStatic(distDir, url.pathname)

@@ -1,0 +1,15 @@
+#!/usr/bin/env bun
+// bin/tinkaria-project
+import { parseProjectCliArgs, executeCommand } from "../src/server/project-cli"
+
+const port = process.argv.includes("--port")
+  ? process.argv[process.argv.indexOf("--port") + 1]
+  : "3210"
+const baseUrl = `http://127.0.0.1:${port}`
+
+const args = process.argv.slice(2).filter((a) => a !== "--port" && a !== port)
+const parsed = parseProjectCliArgs(args)
+const { output, exitCode } = await executeCommand(parsed, baseUrl)
+
+console.log(output)
+process.exit(exitCode)

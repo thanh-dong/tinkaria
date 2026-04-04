@@ -20,7 +20,8 @@
     "url": "git+https://github.com/lagz0ne/tinkaria.git"
   },
   "bin": {
-    "tinkaria": "./bin/tinkaria"
+    "tinkaria": "./bin/tinkaria",
+    "tinkaria-project": "./bin/tinkaria-project"
   },
   "packageManager": "bun@1.3.11",
   "files": [
