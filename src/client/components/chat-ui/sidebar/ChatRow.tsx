@@ -7,11 +7,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { formatSidebarAgeLabel } from "../../../lib/formatters"
 import { getUiIdentityAttributeProps } from "../../../lib/uiIdentityOverlay"
 import { cn, normalizeChatId } from "../../../lib/utils"
+import { PROVIDER_ICONS } from "../ChatPreferenceControls"
 import { ChatRowMenu } from "./Menus"
 
 const loadingStatuses = new Set(["starting", "running"])
 const CHAT_ROW_UI_ID = "sidebar.chat-row"
 const CHAT_ROW_MENU_UI_ID = "sidebar.chat-row.menu"
+const PROVIDER_LABELS = {
+  claude: "Claude",
+  codex: "Codex",
+} as const
 
 interface Props {
   chat: SidebarChatRow
@@ -34,6 +39,8 @@ export function ChatRow({
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(chat.title)
   const inputRef = useRef<HTMLInputElement>(null)
+  const ProviderIcon = chat.provider ? PROVIDER_ICONS[chat.provider] : null
+  const providerLabel = chat.provider ? PROVIDER_LABELS[chat.provider] : null
 
   useEffect(() => {
     if (isEditing) {
@@ -119,43 +126,58 @@ export function ChatRow({
             )}
           </span>
         )}
-        <div className="relative h-7 w-7 mr-[2px] shrink-0">
-          {ageLabel ? (
-            <span className="hidden md:flex absolute inset-0 items-center justify-end pr-1 text-[11px] text-muted-foreground opacity-50 transition-opacity group-hover:opacity-0">
-              {ageLabel}
+        <div className="mr-[2px] flex shrink-0 items-center gap-0.5">
+          {ProviderIcon && providerLabel ? (
+            <span
+              className={cn(
+                "flex h-7 w-4 items-center justify-center text-muted-foreground/55 transition-colors",
+                activeChatId === normalizeChatId(chat.chatId) && "text-muted-foreground/80",
+                "group-hover:text-muted-foreground/80"
+              )}
+              title={providerLabel}
+              aria-label={providerLabel}
+            >
+              <ProviderIcon className="h-2.5 w-2.5" />
             </span>
           ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "absolute inset-0 h-7 w-7 opacity-100 cursor-pointer rounded-sm hover:!bg-transparent !border-0",
-                  ageLabel
-                    ? "md:opacity-0 md:group-hover:opacity-100"
-                    : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                )}
-                onClick={(event) => event.stopPropagation()}
-                title="Chat actions"
-              >
-                <EllipsisVertical className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={2} uiId={CHAT_ROW_MENU_UI_ID}>
-              <DropdownMenuItem onSelect={startEditing}>
-                <Pencil className="h-4 w-4" />
-                <span className="text-xs font-medium">Rename</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => onDeleteChat(chat.chatId)}
-                className="text-destructive dark:text-red-400 hover:bg-destructive/10 focus:bg-destructive/10 dark:hover:bg-red-500/20 dark:focus:bg-red-500/20"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="text-xs font-medium">Delete</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="relative h-7 w-7">
+            {ageLabel ? (
+              <span className="hidden md:flex absolute inset-0 items-center justify-end pr-1 text-[11px] text-muted-foreground opacity-50 transition-opacity group-hover:opacity-0">
+                {ageLabel}
+              </span>
+            ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "absolute inset-0 h-7 w-7 opacity-100 cursor-pointer rounded-sm hover:!bg-transparent !border-0",
+                    ageLabel
+                      ? "md:opacity-0 md:group-hover:opacity-100"
+                      : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                  )}
+                  onClick={(event) => event.stopPropagation()}
+                  title="Chat actions"
+                >
+                  <EllipsisVertical className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={2} uiId={CHAT_ROW_MENU_UI_ID}>
+                <DropdownMenuItem onSelect={startEditing}>
+                  <Pencil className="h-4 w-4" />
+                  <span className="text-xs font-medium">Rename</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => onDeleteChat(chat.chatId)}
+                  className="text-destructive dark:text-red-400 hover:bg-destructive/10 focus:bg-destructive/10 dark:hover:bg-red-500/20 dark:focus:bg-red-500/20"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="text-xs font-medium">Delete</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </ChatRowMenu>

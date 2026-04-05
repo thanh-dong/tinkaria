@@ -1,5 +1,44 @@
 # Kanna Tasks
 
+## Completed: Sidebar Provider Glyph
+
+**Status**: Verified. Sidebar chat rows now show a tiny provider glyph beside the kebab menu so Claude vs Codex is visible at a glance without adding row text or changing the existing status indicators.
+
+**Root cause**:
+1. `src/client/components/chat-ui/sidebar/ChatRow.tsx` only exposed runtime status and row actions, so provider identity was hidden unless the user opened the chat and inspected the composer controls.
+2. Sidebar row data already included `provider`, but the UI was not using it.
+
+**Fix**:
+1. Reused the existing provider icon set and added a compact, low-emphasis glyph immediately left of the row actions button in `src/client/components/chat-ui/sidebar/ChatRow.tsx`.
+2. Added an accessible provider label on the glyph so SSR/static markup and assistive tech can distinguish `Claude` vs `Codex`.
+3. Extended `src/client/app/TinkariaSidebar.test.tsx` with a sidebar render assertion covering the provider glyph and updated the test harness to include `TooltipProvider` now that project rows render tooltips in the test fixture.
+
+**Verified**:
+1. RED: `bun test src/client/app/TinkariaSidebar.test.tsx` failed before the UI change because the expected `Codex` glyph marker was absent.
+2. GREEN: `bun test src/client/app/TinkariaSidebar.test.tsx`
+3. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Completed: PWA Stale Session Resume Refresh
+
+**Status**: Verified. Standalone/PWA chat sessions now treat long background gaps and broken reconnect states as stale, then proactively refresh the active chat on foreground so transcript tails are fetched again instead of staying frozen mid-session.
+
+**Root cause**:
+1. `src/client/app/useTinkariaState.ts` only revalidated transcript cache on explicit socket disconnects or sidebar timestamp deltas, so a suspended mobile PWA could resume with a cached mid-turn transcript that still looked current.
+2. `src/client/app/nats-socket.ts` exposed `ensureHealthyConnection()`, but it only forced a reconnect when the underlying NATS handle was missing, not when the transport had already fallen into a non-connected status.
+
+**Fix**:
+1. Added a standalone/PWA stale-resume policy in `src/client/app/useTinkariaState.ts` keyed off `visibilitychange`, `focus`, `online`, and `pageshow`, with a 15-second background threshold plus reconnect-state fallback.
+2. Added a deduped active-chat refresh nonce so foreground recovery re-runs the chat subscription and refetches the transcript tail without adding cached API data or service-worker fetch caching.
+3. Tightened `src/client/app/nats-socket.ts` so `ensureHealthyConnection()` reconnects whenever the socket status is not `connected`.
+4. Added regression coverage in `src/client/app/useTinkariaState.test.ts` for the stale-resume decision boundary.
+
+**Verified**:
+1. `bun test src/client/app/useTinkariaState.test.ts`
+2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+3. `bun run build`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
 ## Completed: Homepage Welcome-Back Sessions
 
 **Status**: Verified. The `/` homepage now behaves like a return-to-work surface: it welcomes the user back, shows recent sessions first, and lets them resume directly instead of leading with a block of project statistics.

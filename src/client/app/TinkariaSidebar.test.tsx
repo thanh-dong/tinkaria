@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { MemoryRouter } from "react-router-dom"
+import { TooltipProvider } from "../components/ui/tooltip"
 import {
   getDesktopSidebarShellTitle,
   hasDesktopShellRuntime,
@@ -16,32 +17,34 @@ function createSidebarData(): SidebarData {
 
 function renderSidebar(overrides: Partial<Parameters<typeof TinkariaSidebar>[0]> = {}) {
   return renderToStaticMarkup(
-    createElement(MemoryRouter, null, createElement(TinkariaSidebar, {
-      data: createSidebarData(),
-      activeChatId: null,
-      connectionStatus: "connected",
-      ready: true,
-      open: true,
-      collapsed: false,
-      showMobileOpenButton: false,
-      onOpen: () => {},
-      onClose: () => {},
-      onCollapse: () => {},
-      onExpand: () => {},
-      onCreateChat: () => {},
-      onDeleteChat: () => {},
-      onRenameChat: () => {},
-      onRemoveProject: () => {},
-      updateSnapshot: null as UpdateSnapshot | null,
-      onInstallUpdate: () => {},
-      sessionsForProject: () => [],
-      sessionsWindowDaysForProject: () => 7,
-      onOpenSessionPicker: () => {},
-      onResumeSession: () => {},
-      onRefreshSessions: () => {},
-      onShowMoreSessions: () => {},
-      ...overrides,
-    }))
+    createElement(TooltipProvider, null,
+      createElement(MemoryRouter, null, createElement(TinkariaSidebar, {
+        data: createSidebarData(),
+        activeChatId: null,
+        connectionStatus: "connected",
+        ready: true,
+        open: true,
+        collapsed: false,
+        showMobileOpenButton: false,
+        onOpen: () => {},
+        onClose: () => {},
+        onCollapse: () => {},
+        onExpand: () => {},
+        onCreateChat: () => {},
+        onDeleteChat: () => {},
+        onRenameChat: () => {},
+        onRemoveProject: () => {},
+        updateSnapshot: null as UpdateSnapshot | null,
+        onInstallUpdate: () => {},
+        sessionsForProject: () => [],
+        sessionsWindowDaysForProject: () => 7,
+        onOpenSessionPicker: () => {},
+        onResumeSession: () => {},
+        onRefreshSessions: () => {},
+        onShowMoreSessions: () => {},
+        ...overrides,
+      }))
+    )
   )
 }
 
@@ -107,5 +110,32 @@ describe("desktop sidebar shell helpers", () => {
       expect(html).toContain("data-tauri-drag-region")
       expect(html).toContain("tinkaria-mark-fine.svg")
     })
+  })
+
+  test("renders the chat provider glyph next to the sidebar row menu", () => {
+    const html = renderSidebar({
+      data: {
+        projectGroups: [
+          {
+            groupKey: "project-1",
+            localPath: "/tmp/demo",
+            chats: [{
+              _id: "chat-1",
+              _creationTime: 1,
+              chatId: "chat-1",
+              title: "Demo chat",
+              status: "idle",
+              localPath: "/tmp/demo",
+              provider: "codex",
+              lastMessageAt: 1,
+              hasAutomation: false,
+            }],
+          },
+        ],
+      },
+    })
+
+    expect(html).toContain('title="Codex"')
+    expect(html).toContain('title="Chat actions"')
   })
 })
