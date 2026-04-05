@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useState, type ReactNode } from "react"
+import { useCallback, useReducer, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft, Code, FileText, GitCompareArrows, Image, Copy, Check } from "lucide-react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogClose, DIALOG_BODY_INSET_CLASS_NAME,
@@ -21,7 +21,7 @@ const CONTENT_OVERLAY_ROOT_UI_ID = "rich-content.viewer.area"
 const DESKTOP_DIALOG_SIZE = "xl" as const
 
 const MOBILE_DIALOG_CLASSES =
-  "inset-0 max-w-none max-h-none h-[100dvh] rounded-none border-0 translate-x-0 translate-y-0 left-0 top-0 shadow-none data-[state=open]:slide-in-from-bottom data-[state=open]:duration-300 data-[state=closed]:slide-out-to-bottom data-[state=closed]:duration-200 data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100"
+  "h-[100dvh] data-[state=open]:slide-in-from-bottom data-[state=open]:duration-300 data-[state=closed]:slide-out-to-bottom data-[state=closed]:duration-200 data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100"
 
 interface ContentOverlayProps {
   open: boolean
@@ -40,13 +40,18 @@ export function ContentOverlay({ open, onOpenChange, title, type, children, rawC
   const [copied, setCopied] = useState(false)
   const isMobile = useIsMobile()
   const [viewerState, dispatch] = useReducer(viewerReducer, type, createInitialState)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const Icon = typeIcons[type]
 
   const handleCopy = useCallback(async () => {
     if (!rawContent) return
-    await navigator.clipboard.writeText(rawContent)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(rawContent)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.warn("[tinkaria] clipboard write failed:", err instanceof Error ? err.message : String(err))
+    }
   }, [rawContent])
 
   return (
@@ -56,7 +61,7 @@ export function ContentOverlay({ open, onOpenChange, title, type, children, rawC
         className={cn(isMobile && MOBILE_DIALOG_CLASSES)}
         {...getContentOverlayUiIdentityProps()}
       >
-        <ContentViewerContext.Provider value={{ state: viewerState, dispatch }}>
+        <ContentViewerContext.Provider key={type} value={{ state: viewerState, dispatch }}>
           <DialogHeader className={cn(isMobile && "pt-[env(safe-area-inset-top)]")}>
             <div className="flex items-center gap-2 pr-8">
               {isMobile ? (
@@ -97,14 +102,14 @@ export function ContentOverlay({ open, onOpenChange, title, type, children, rawC
             <TocPanel
               headings={viewerState.headings}
               onSelect={(id) => {
-                const el = document.getElementById(id)
+                const el = bodyRef.current?.querySelector(`#${CSS.escape(id)}`)
                 if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
               }}
             />
           ) : null}
 
           <DialogBody className={cn("p-0", isMobile && "pb-[env(safe-area-inset-bottom)]")}>
-            <div className={CONTENT_OVERLAY_INNER_CLASS_NAME}>{children}</div>
+            <div ref={bodyRef} className={CONTENT_OVERLAY_INNER_CLASS_NAME}>{children}</div>
           </DialogBody>
         </ContentViewerContext.Provider>
       </DialogContent>

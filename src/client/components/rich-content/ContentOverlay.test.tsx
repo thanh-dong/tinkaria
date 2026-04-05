@@ -25,11 +25,10 @@ describe("ContentOverlay", () => {
     })
   })
 
-  test("mobile dialog classes include fullscreen inset and slide-up animation", () => {
-    expect(MOBILE_DIALOG_CLASSES).toContain("inset-0")
-    expect(MOBILE_DIALOG_CLASSES).toContain("max-w-none")
-    expect(MOBILE_DIALOG_CLASSES).toContain("rounded-none")
+  test("mobile dialog classes add slide-up animation and dvh height", () => {
+    expect(MOBILE_DIALOG_CLASSES).toContain("h-[100dvh]")
     expect(MOBILE_DIALOG_CLASSES).toContain("slide-in-from-bottom")
+    expect(MOBILE_DIALOG_CLASSES).toContain("slide-out-to-bottom")
   })
 
   test("desktop dialog size is xl", () => {

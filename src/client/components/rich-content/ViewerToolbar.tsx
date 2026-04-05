@@ -20,8 +20,8 @@ export const ViewerToolbar = memo(function ViewerToolbar({ state, dispatch }: Vi
       return (
         <ToolbarRow>
           <SegmentGroup>
-            <SegmentButton label="Unified" active={state.viewMode === "unified"} onClick={() => dispatch({ type: "TOGGLE_VIEW_MODE" })} />
-            <SegmentButton label="Split" active={state.viewMode === "split"} onClick={() => dispatch({ type: "TOGGLE_VIEW_MODE" })} />
+            <SegmentButton label="Unified" active={state.viewMode === "unified"} onClick={() => dispatch({ type: "SET_VIEW_MODE", payload: "unified" })} />
+            <SegmentButton label="Split" active={state.viewMode === "split"} onClick={() => dispatch({ type: "SET_VIEW_MODE", payload: "split" })} />
           </SegmentGroup>
         </ToolbarRow>
       )

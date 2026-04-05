@@ -16,7 +16,7 @@ export type ViewerState = CodeViewerState | DiffViewerState | EmbedViewerState |
 
 export type ViewerAction =
   | { type: "TOGGLE_LINE_NUMBERS" }
-  | { type: "TOGGLE_VIEW_MODE" }
+  | { type: "SET_VIEW_MODE"; payload: "unified" | "split" }
   | { type: "SET_RENDER_MODE"; payload: "render" | "source" }
   | { type: "ZOOM_IN" }
   | { type: "ZOOM_OUT" }
@@ -26,6 +26,7 @@ export type ViewerAction =
 
 const ZOOM_STEP = 0.25
 const ZOOM_MIN = 0.25
+const ZOOM_MAX = 5
 
 export function viewerReducer(state: ViewerState, action: ViewerAction): ViewerState {
   switch (state.type) {
@@ -35,14 +36,14 @@ export function viewerReducer(state: ViewerState, action: ViewerAction): ViewerS
       }
       return state
     case "diff":
-      if (action.type === "TOGGLE_VIEW_MODE") {
-        return { ...state, viewMode: state.viewMode === "unified" ? "split" : "unified" }
+      if (action.type === "SET_VIEW_MODE") {
+        return { ...state, viewMode: action.payload }
       }
       return state
     case "embed":
       switch (action.type) {
         case "SET_RENDER_MODE": return { ...state, renderMode: action.payload }
-        case "ZOOM_IN": return { ...state, zoom: state.zoom + ZOOM_STEP }
+        case "ZOOM_IN": return { ...state, zoom: Math.min(ZOOM_MAX, state.zoom + ZOOM_STEP) }
         case "ZOOM_OUT": return { ...state, zoom: Math.max(ZOOM_MIN, state.zoom - ZOOM_STEP) }
         case "ZOOM_RESET": return { ...state, zoom: 1 }
         default: return state

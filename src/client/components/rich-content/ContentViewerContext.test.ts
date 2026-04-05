@@ -20,12 +20,14 @@ describe("ContentViewerContext reducer", () => {
       const state = createInitialState("diff")
       expect(state).toEqual({ type: "diff", viewMode: "unified" })
     })
-    test("TOGGLE_VIEW_MODE flips between unified and split", () => {
+    test("SET_VIEW_MODE sets view mode idempotently", () => {
       const state = createInitialState("diff")
-      const next = viewerReducer(state, { type: "TOGGLE_VIEW_MODE" })
-      expect(next).toEqual({ type: "diff", viewMode: "split" })
-      const reverted = viewerReducer(next, { type: "TOGGLE_VIEW_MODE" })
-      expect(reverted).toEqual({ type: "diff", viewMode: "unified" })
+      const split = viewerReducer(state, { type: "SET_VIEW_MODE", payload: "split" })
+      expect(split).toEqual({ type: "diff", viewMode: "split" })
+      const unified = viewerReducer(split, { type: "SET_VIEW_MODE", payload: "unified" })
+      expect(unified).toEqual({ type: "diff", viewMode: "unified" })
+      const noop = viewerReducer(state, { type: "SET_VIEW_MODE", payload: "unified" })
+      expect(noop).toEqual({ type: "diff", viewMode: "unified" })
     })
   })
   describe("embed viewer", () => {
@@ -52,6 +54,11 @@ describe("ContentViewerContext reducer", () => {
         { type: "ZOOM_OUT" },
       )
       expect(floor).toEqual({ type: "embed", renderMode: "render", zoom: 0.25 })
+    })
+    test("ZOOM_IN clamps at max 5", () => {
+      const state = { type: "embed" as const, renderMode: "render" as const, zoom: 5 }
+      const next = viewerReducer(state, { type: "ZOOM_IN" })
+      expect(next).toEqual({ type: "embed", renderMode: "render", zoom: 5 })
     })
     test("ZOOM_RESET sets zoom back to 1", () => {
       const state = { type: "embed" as const, renderMode: "render" as const, zoom: 2.5 }
