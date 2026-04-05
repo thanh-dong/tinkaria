@@ -599,4 +599,70 @@ describe("createIncrementalHydrator", () => {
     expect(hydrator.getMessages()).toHaveLength(1)
     expect(hydrator.getMessages()[0]?.kind).toBe("assistant_text")
   })
+
+  test("deduplicates without reset — cache restore scenario", () => {
+    const hydrator = createIncrementalHydrator()
+
+    const entryA = entry({ kind: "user_prompt", content: "Hello" })
+    const entryB = entry({ kind: "assistant_text", text: "Hi there" })
+    const entryC = entry({ kind: "assistant_text", text: "How can I help?" })
+    const entryD = entry({ kind: "user_prompt", content: "Fix a bug" })
+
+    // Initial hydration (simulates first visit)
+    hydrator.hydrate(entryA)
+    hydrator.hydrate(entryB)
+    hydrator.hydrate(entryC)
+    expect(hydrator.getMessages()).toHaveLength(3)
+
+    // Simulate cache restore: do NOT reset.
+    // Feed overlapping entries (A,B,C) + new entry (D).
+    // Hydrator should skip A,B,C and only add D.
+    hydrator.hydrate(entryA)
+    hydrator.hydrate(entryB)
+    hydrator.hydrate(entryC)
+    hydrator.hydrate(entryD)
+
+    const messages = hydrator.getMessages()
+    expect(messages).toHaveLength(4)
+    expect(messages.map((m) => m.id)).toEqual([entryA._id, entryB._id, entryC._id, entryD._id])
+  })
+
+  test("deduplicates without reset — tool_call + tool_result across cache boundary", () => {
+    const hydrator = createIncrementalHydrator()
+
+    const toolCallEntry = entry({
+      kind: "tool_call",
+      tool: {
+        kind: "tool",
+        toolKind: "bash",
+        toolName: "Bash",
+        toolId: "tool-cache-1",
+        input: { command: "ls" },
+      },
+    })
+    const toolResultEntry = entry({
+      kind: "tool_result",
+      toolId: "tool-cache-1",
+      content: "file.ts\n",
+    })
+    const newEntry = entry({ kind: "assistant_text", text: "Done" })
+
+    // First visit: hydrate tool_call + tool_result
+    hydrator.hydrate(toolCallEntry)
+    hydrator.hydrate(toolResultEntry)
+    const cached = hydrator.getMessages()
+    expect(cached).toHaveLength(1)
+    if (cached[0]?.kind !== "tool") throw new Error("expected tool")
+    expect(cached[0].result).toBe("file.ts\n")
+
+    // Cache restore: re-feed same entries + new one — no reset
+    hydrator.hydrate(toolCallEntry)
+    hydrator.hydrate(toolResultEntry)
+    hydrator.hydrate(newEntry)
+
+    const restored = hydrator.getMessages()
+    expect(restored).toHaveLength(2)
+    expect(restored[0]?.kind).toBe("tool")
+    expect(restored[1]?.kind).toBe("assistant_text")
+  })
 })

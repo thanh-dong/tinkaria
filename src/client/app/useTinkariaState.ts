@@ -139,6 +139,57 @@ export function computeTailOffset(messageCount: number, tailSize = TRANSCRIPT_TA
   return Math.max(0, messageCount - tailSize)
 }
 
+// --- Per-chat message cache ---
+// Preserves hydrator + messages across chat switches so stale content
+// renders instantly while fresh data is fetched (stale-while-revalidate).
+
+export interface CachedChatState {
+  hydrator: IncrementalHydrator
+  messages: HydratedTranscriptMessage[]
+  messageCount: number
+  cachedAt: number
+  lastMessageAt: number | undefined
+  stale: boolean
+}
+
+const chatCache = new Map<string, CachedChatState>()
+export const MAX_CACHED_CHATS = 10
+
+export function getCachedChat(chatId: string): CachedChatState | null {
+  return chatCache.get(chatId) ?? null
+}
+
+export function setCachedChat(chatId: string, state: CachedChatState): void {
+  // Delete first so re-insert moves to end (preserves insertion order for LRU)
+  chatCache.delete(chatId)
+  chatCache.set(chatId, state)
+
+  if (chatCache.size > MAX_CACHED_CHATS) {
+    const oldest = chatCache.keys().next().value
+    if (oldest !== undefined) chatCache.delete(oldest)
+  }
+}
+
+export function deleteCachedChat(chatId: string): void {
+  chatCache.delete(chatId)
+}
+
+export function clearChatCache(): void {
+  chatCache.clear()
+}
+
+export function markCachedChatsStale(sidebarChats: Array<{ chatId: string; lastMessageAt?: number }>): void {
+  const chatMap = new Map(sidebarChats.map((c) => [c.chatId, c]))
+  for (const [chatId, cached] of chatCache) {
+    if (cached.stale) continue
+    const sidebarChat = chatMap.get(chatId)
+    if (!sidebarChat || sidebarChat.lastMessageAt === undefined || cached.lastMessageAt === undefined) continue
+    if (sidebarChat.lastMessageAt > cached.lastMessageAt) {
+      setCachedChat(chatId, { ...cached, stale: true })
+    }
+  }
+}
+
 export function appendQueuedText(currentQueuedText: string, nextContent: string): string {
   const current = currentQueuedText.trim()
   const next = nextContent.trim()
@@ -319,6 +370,7 @@ export interface TinkariaState {
   navbarLocalPath?: string
   editorLabel: string
   hasSelectedProject: boolean
+  chatHasKnownMessages: boolean
   localFilePreview: LocalFilePreview | null
   openSidebar: () => void
   closeSidebar: () => void
@@ -378,6 +430,8 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [chatSnapshot, setChatSnapshot] = useState<ChatSnapshot | null>(null)
   const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
   const [messages, setMessages] = useState<HydratedTranscriptMessage[]>([])
+  const messagesRef = useRef<HydratedTranscriptMessage[]>(messages)
+  const messageCountRef = useRef(0)
   const [keybindings, setKeybindings] = useState<KeybindingsSnapshot | null>(null)
   const [desktopRenderers, setDesktopRenderers] = useState<DesktopRenderersSnapshot>({ renderers: [] })
   const [connectionStatus, setConnectionStatus] = useState<SocketStatus>("connecting")
@@ -438,7 +492,12 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     return next
   }
 
-  useEffect(() => socket.onStatus(setConnectionStatus), [socket])
+  useEffect(() => socket.onStatus((status) => {
+    setConnectionStatus(status)
+    if (status === "disconnected") {
+      clearChatCache()
+    }
+  }), [socket])
 
   useEffect(() => {
     return socket.subscribe<SidebarData>({ type: "sidebar" }, (snapshot) => {
@@ -450,6 +509,9 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       useChatInputStore.getState().reconcileQueuedDrafts(
         snapshot.projectGroups.flatMap((group) => group.chats.map((chat) => chat.chatId))
       )
+      // Mark cached chats as stale when sidebar shows newer lastMessageAt
+      const allChats = snapshot.projectGroups.flatMap((group) => group.chats)
+      markCachedChatsStale(allChats)
       setSidebarReady(true)
       setCommandError(null)
     })
@@ -525,30 +587,47 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       logTinkariaState("clearing chat snapshot for non-chat route")
       setChatSnapshot(null)
       setProjectSelection((current) => transitionProjectSelection(current, { type: "chat.cleared" }))
-      hydratorRef.current.reset()
+      // Don't mutate cached hydrator — create a fresh one
+      hydratorRef.current = createIncrementalHydrator()
       setMessages([])
       setChatReady(true)
       return
     }
 
-    logTinkariaState("subscribing to chat", { activeChatId })
-    setChatSnapshot(null)
-    hydratorRef.current.reset()
-    setMessages([])
-    setChatReady(false)
+    // Restore from cache or create fresh state
+    const cached = getCachedChat(activeChatId)
+    const restoredFromCache = cached !== null
+    const hydrator = cached?.hydrator ?? createIncrementalHydrator()
+    hydratorRef.current = hydrator
+
+    if (restoredFromCache) {
+      logTinkariaState("restoring chat from cache", { activeChatId, cachedMessages: cached.messages.length, stale: cached.stale })
+      setMessages(cached.messages)
+      setChatSnapshot(null) // will be replaced when snapshot arrives
+      setChatReady(true)    // show stale content immediately
+    } else {
+      logTinkariaState("subscribing to chat (no cache)", { activeChatId })
+      setChatSnapshot(null)
+      setMessages([])
+      setChatReady(false)
+    }
 
     // Buffer message events that arrive before the initial fetch completes
+    let cancelled = false
     let initialFetchDone = false
     let fetchTriggered = false
     const buffer: TranscriptEntry[] = []
     const chatId = activeChatId
-    const hydrator = hydratorRef.current
 
     function flushTail(entries: TranscriptEntry[]) {
+      if (cancelled) return
       initialFetchDone = true
       const allEntries = buffer.length > 0 ? [...entries, ...buffer] : entries
       buffer.length = 0
-      hydrator.reset()
+      // Only reset on fresh load — cache-restored hydrators skip duplicates via seenEntryIds
+      if (!restoredFromCache) {
+        hydrator.reset()
+      }
       for (const entry of allEntries) hydrator.hydrate(entry)
       setMessages(hydrator.getMessages())
     }
@@ -570,6 +649,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     const unsub = socket.subscribe<ChatSnapshot | null, ChatMessageEvent>(
       { type: "chat", chatId: activeChatId },
       (snapshot) => {
+        if (cancelled) return
         logTinkariaState("chat snapshot received", {
           activeChatId,
           snapshotChatId: snapshot?.runtime.chatId ?? null,
@@ -578,6 +658,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         })
         setChatSnapshot(snapshot)
         if (snapshot) {
+          messageCountRef.current = snapshot.messageCount
           setProjectSelection((current) => transitionProjectSelection(current, {
             type: "chat.snapshot_received",
             projectId: snapshot.runtime.projectId,
@@ -597,6 +678,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         }
       },
       (event) => {
+        if (cancelled) return
         if (event.chatId !== activeChatId) return
         if (initialFetchDone) {
           hydrator.hydrate(event.entry)
@@ -607,7 +689,24 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       }
     )
 
-    return unsub
+    return () => {
+      cancelled = true
+      unsub()
+      // Save departing chat to cache — use sidebar's lastMessageAt as the source of truth
+      const departingSidebarChat = sidebarData.projectGroups
+        .flatMap((g) => g.chats)
+        .find((c) => c.chatId === chatId)
+      if (chatId && messagesRef.current.length > 0) {
+        setCachedChat(chatId, {
+          hydrator,
+          messages: messagesRef.current,
+          messageCount: messageCountRef.current,
+          cachedAt: Date.now(),
+          lastMessageAt: departingSidebarChat?.lastMessageAt,
+          stale: false,
+        })
+      }
+    }
   }, [activeChatId, socket])
 
   useEffect(() => {
@@ -640,6 +739,8 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       }
     }
   }, [])
+
+  useLayoutEffect(() => { messagesRef.current = messages }, [messages])
 
   useLayoutEffect(() => {
     const element = inputRef.current
@@ -711,6 +812,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     ?? sidebarData.projectGroups[0]?.groupKey
     ?? fallbackLocalProjectPath
   )
+  const chatHasKnownMessages = activeSidebarChat?.lastMessageAt !== undefined
 
   useLayoutEffect(() => {
     if (initialScrollCompletedRef.current) return
@@ -1022,6 +1124,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       await socket.command({ type: "chat.delete", chatId: chat.chatId })
       useChatInputStore.getState().clearQueuedDraft(chat.chatId)
       clearChatReadState(chat.chatId)
+      deleteCachedChat(chat.chatId)
       if (chat.chatId === activeChatId) {
         const nextChatId = getNewestRemainingChatId(sidebarData.projectGroups, chat.chatId)
         navigate(nextChatId ? `/chat/${nextChatId}` : "/")
@@ -1058,6 +1161,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       await socket.command({ type: "project.remove", projectId })
       for (const chat of project.chats) {
         useChatInputStore.getState().clearQueuedDraft(chat.chatId)
+        deleteCachedChat(chat.chatId)
       }
       useTerminalLayoutStore.getState().clearProject(projectId)
       useRightSidebarStore.getState().clearProject(projectId)
@@ -1288,6 +1392,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     navbarLocalPath,
     editorLabel,
     hasSelectedProject,
+    chatHasKnownMessages,
     localFilePreview,
     openSidebar: () => {
       setSidebarOpen(true)

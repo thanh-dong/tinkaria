@@ -478,7 +478,7 @@ export function ChatPage() {
           </ScrollArea>
         </div>
 
-        {state.messages.length === 0 ? (
+        {state.messages.length === 0 && !state.chatHasKnownMessages ? (
           <div
             key={state.activeChatId ?? "new-chat"}
             className="pointer-events-none absolute inset-x-4 animate-fade-in"

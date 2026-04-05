@@ -1,7 +1,13 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import {
   computeTailOffset,
   getActiveChatSnapshot,
+  getCachedChat,
+  setCachedChat,
+  deleteCachedChat,
+  clearChatCache,
+  markCachedChatsStale,
+  MAX_CACHED_CHATS,
   getInitialChatScrollTarget,
   getNewestRemainingChatId,
   getReadTimestampToPersistAfterReply,
@@ -14,7 +20,8 @@ import {
   shouldStickToBottomOnComposerSubmit,
   TRANSCRIPT_TAIL_SIZE,
 } from "./useTinkariaState"
-import type { ChatSnapshot, SidebarData } from "../../shared/types"
+import type { ChatSnapshot, HydratedTranscriptMessage, SidebarData } from "../../shared/types"
+import { createIncrementalHydrator } from "../lib/parseTranscript"
 
 function createSidebarData(): SidebarData {
   return {
@@ -619,5 +626,141 @@ describe("prependQueuedText", () => {
 
     expect(prepend("First message", "")).toBe("First message")
     expect(prepend("First message", "Second message")).toBe("First message\n\nSecond message")
+  })
+})
+
+function createMockCachedState(messageCount = 5): {
+  hydrator: ReturnType<typeof createIncrementalHydrator>
+  messages: HydratedTranscriptMessage[]
+  messageCount: number
+  cachedAt: number
+  lastMessageAt: number | undefined
+  stale: boolean
+} {
+  return {
+    hydrator: createIncrementalHydrator(),
+    messages: [] as HydratedTranscriptMessage[],
+    messageCount,
+    cachedAt: Date.now(),
+    lastMessageAt: Date.now(),
+    stale: false,
+  }
+}
+
+describe("chatCache", () => {
+  afterEach(() => {
+    clearChatCache()
+  })
+
+  test("getCachedChat returns null for unknown chat IDs", () => {
+    expect(getCachedChat("unknown-id")).toBeNull()
+  })
+
+  test("setCachedChat stores and getCachedChat retrieves", () => {
+    const state = createMockCachedState()
+    setCachedChat("chat-1", state)
+
+    const retrieved = getCachedChat("chat-1")
+    expect(retrieved).not.toBeNull()
+    expect(retrieved?.messageCount).toBe(5)
+  })
+
+  test("setCachedChat overwrites existing entry", () => {
+    setCachedChat("chat-1", createMockCachedState(5))
+    setCachedChat("chat-1", createMockCachedState(10))
+
+    const retrieved = getCachedChat("chat-1")
+    expect(retrieved?.messageCount).toBe(10)
+  })
+
+  test("LRU eviction when exceeding MAX_CACHED_CHATS", () => {
+    for (let i = 0; i < MAX_CACHED_CHATS; i++) {
+      setCachedChat(`chat-${i}`, createMockCachedState(i))
+    }
+
+    // All should be present
+    for (let i = 0; i < MAX_CACHED_CHATS; i++) {
+      expect(getCachedChat(`chat-${i}`)).not.toBeNull()
+    }
+
+    // Adding one more should evict the first
+    setCachedChat("chat-overflow", createMockCachedState(99))
+    expect(getCachedChat("chat-0")).toBeNull()
+    expect(getCachedChat("chat-overflow")).not.toBeNull()
+    expect(getCachedChat("chat-overflow")?.messageCount).toBe(99)
+  })
+
+  test("deleteCachedChat removes specific entry", () => {
+    setCachedChat("chat-1", createMockCachedState())
+    setCachedChat("chat-2", createMockCachedState())
+
+    deleteCachedChat("chat-1")
+    expect(getCachedChat("chat-1")).toBeNull()
+    expect(getCachedChat("chat-2")).not.toBeNull()
+  })
+
+  test("deleteCachedChat is no-op for missing chat", () => {
+    deleteCachedChat("nonexistent")
+    // No error thrown
+  })
+
+  test("clearChatCache empties entire cache", () => {
+    setCachedChat("chat-1", createMockCachedState())
+    setCachedChat("chat-2", createMockCachedState())
+
+    clearChatCache()
+    expect(getCachedChat("chat-1")).toBeNull()
+    expect(getCachedChat("chat-2")).toBeNull()
+  })
+
+  test("markCachedChatsStale marks entry stale when sidebar has newer lastMessageAt", () => {
+    const now = Date.now()
+    const state = createMockCachedState()
+    state.lastMessageAt = now - 5000
+    setCachedChat("chat-1", state)
+
+    markCachedChatsStale([
+      { chatId: "chat-1", lastMessageAt: now },
+    ])
+
+    expect(getCachedChat("chat-1")?.stale).toBe(true)
+  })
+
+  test("markCachedChatsStale does not mark entry stale when sidebar lastMessageAt is older", () => {
+    const now = Date.now()
+    const state = createMockCachedState()
+    state.lastMessageAt = now
+    setCachedChat("chat-1", state)
+
+    markCachedChatsStale([
+      { chatId: "chat-1", lastMessageAt: now - 5000 },
+    ])
+
+    expect(getCachedChat("chat-1")?.stale).toBe(false)
+  })
+
+  test("markCachedChatsStale skips chats not in sidebar", () => {
+    setCachedChat("chat-1", createMockCachedState())
+
+    markCachedChatsStale([
+      { chatId: "chat-other", lastMessageAt: Date.now() + 10000 },
+    ])
+
+    expect(getCachedChat("chat-1")?.stale).toBe(false)
+  })
+
+  test("markCachedChatsStale skips already-stale entries", () => {
+    const state = createMockCachedState()
+    state.lastMessageAt = 100
+    state.stale = true
+    setCachedChat("chat-1", state)
+
+    // Even with a newer sidebar timestamp, already-stale entries are skipped
+    markCachedChatsStale([
+      { chatId: "chat-1", lastMessageAt: 200 },
+    ])
+
+    // Still stale (no unnecessary re-save)
+    expect(getCachedChat("chat-1")?.stale).toBe(true)
   })
 })
