@@ -76,10 +76,6 @@ export function createProjectAgentRouter(agent: ProjectAgent): (req: Request) =>
       return task ? jsonResponse(task) : errorResponse("Task not found", 404)
     }
 
-    if (req.method === "GET" && path === "/resources") {
-      return jsonResponse(agent.queryResources())
-    }
-
     if (req.method === "POST" && path === "/delegate") {
       const body = await readBody(req)
       const request = body.request as string | undefined

@@ -41,11 +41,6 @@ describe("parseProjectCliArgs", () => {
     expect(result).toEqual({ command: "complete", args: { taskId: "t-1" } })
   })
 
-  test("parses 'resources' command", () => {
-    const result = parseProjectCliArgs(["resources"])
-    expect(result).toEqual({ command: "resources", args: {} })
-  })
-
   test("parses 'delegate <request>'", () => {
     const result = parseProjectCliArgs(["delegate", "ensure", "postgres", "running"])
     expect(result).toEqual({ command: "delegate", args: { request: "ensure postgres running" } })

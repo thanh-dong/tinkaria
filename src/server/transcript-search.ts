@@ -3,6 +3,9 @@ import type { TranscriptEntry, NormalizedToolCall } from "../shared/types"
 import type { SearchResult, SearchDocumentKind } from "../shared/project-agent-types"
 import { BM25Index } from "./bm25"
 
+const TOOL_RESULT_MAX_CHARS = 500
+const SEARCH_FRAGMENT_MAX_CHARS = 300
+
 interface IndexedEntry {
   chatId: string
   timestamp: string
@@ -18,8 +21,10 @@ function extractTextFromEntry(entry: TranscriptEntry): { text: string; kind: Sea
       return { text: entry.text, kind: "assistant_text" }
     case "tool_call":
       return { text: toolCallToText(entry.tool), kind: "tool_call" }
-    case "tool_result":
-      return { text: typeof entry.content === "string" ? entry.content : JSON.stringify(entry.content), kind: "tool_result" }
+    case "tool_result": {
+      const raw = typeof entry.content === "string" ? entry.content : JSON.stringify(entry.content)
+      return { text: raw.slice(0, TOOL_RESULT_MAX_CHARS), kind: "tool_result" }
+    }
     default:
       return null
   }
@@ -69,7 +74,7 @@ export class TranscriptSearchIndex {
           chatId: entry.chatId,
           timestamp: entry.timestamp,
           kind: entry.kind,
-          fragment: entry.text.slice(0, 300),
+          fragment: entry.text.slice(0, SEARCH_FRAGMENT_MAX_CHARS),
           score: r.score,
         }
       })

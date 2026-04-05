@@ -45,8 +45,6 @@ export function parseProjectCliArgs(argv: string[]): CliCommand {
       return { command: "claim", args: { ...args, description: rest.join(" ") } }
     case "complete":
       return { command: "complete", args: { ...args, taskId: rest[0] } }
-    case "resources":
-      return { command: "resources", args }
     case "delegate":
       return { command: "delegate", args: { ...args, request: rest.join(" ") } }
     default:
@@ -73,15 +71,6 @@ export function formatOutput(command: string, data: unknown, json: boolean): str
     return ["ID     STATUS        OWNER     DESCRIPTION", ...rows].join("\n")
   }
 
-  if (command === "resources" && Array.isArray(data)) {
-    if (data.length === 0) return "No resources registered."
-    const rows = data.map((r: Record<string, unknown>) => {
-      const leases = Array.isArray(r.leases) ? r.leases.length : 0
-      return `${r.name}  ${String(r.status).padEnd(8)}  ${r.managedBy}  ${leases} lease(s)`
-    })
-    return ["NAME       STATUS    MANAGER      LEASES", ...rows].join("\n")
-  }
-
   return JSON.stringify(data, null, 2)
 }
 
@@ -96,7 +85,6 @@ Commands:
   tasks <task-id>             Get task details
   claim <description>         Claim a new task for the current session
   complete <task-id>          Mark a task as complete
-  resources                   List managed resources and their status
   delegate <request>          Submit a delegation request to the project agent
 
 Flags:
@@ -169,11 +157,6 @@ export async function executeCommand(
           body: JSON.stringify({ taskId: args.taskId, outputs: [] }),
         })
         if (res.status === 404) return { output: formatOutput("error", { error: "Task not found" }, json), exitCode: 1 }
-        data = await res.json()
-        break
-      }
-      case "resources": {
-        const res = await fetch(`${baseUrl}/api/project/resources`)
         data = await res.json()
         break
       }

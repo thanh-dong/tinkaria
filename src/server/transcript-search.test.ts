@@ -151,6 +151,36 @@ describe("TranscriptSearchIndex", () => {
     expect(results[0].fragment.length).toBeLessThanOrEqual(300)
   })
 
+  test("tool_result content is truncated to 500 chars before indexing", () => {
+    const index = new TranscriptSearchIndex()
+    // "filler " is 7 chars; 72 repeats = 504 chars, pushing ZZZMARKER past the 500 boundary
+    const padding = "filler ".repeat(72)
+    const content = padding + "ZZZMARKER"
+    expect(content.indexOf("ZZZMARKER")).toBeGreaterThan(500)
+
+    index.addEntry("chat-1", timestamped({
+      kind: "tool_result",
+      toolId: "tool-1",
+      content,
+    }))
+
+    // ZZZMARKER sits beyond 500 chars and must not be indexed
+    const results = index.search("ZZZMARKER")
+    expect(results).toEqual([])
+  })
+
+  test("tool_result content within 500 chars is still searchable", () => {
+    const index = new TranscriptSearchIndex()
+    index.addEntry("chat-1", timestamped({
+      kind: "tool_result",
+      toolId: "tool-1",
+      content: "File written successfully to /src/server/auth.ts",
+    }))
+
+    const results = index.search("auth.ts written")
+    expect(results.length).toBe(1)
+  })
+
   test("timestamp is ISO string derived from createdAt", () => {
     const index = new TranscriptSearchIndex()
     const now = Date.now()

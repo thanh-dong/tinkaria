@@ -4,17 +4,15 @@ import { createProjectAgentRouter } from "./project-agent-routes"
 import { SessionIndex } from "./session-index"
 import { TaskLedger } from "./task-ledger"
 import { TranscriptSearchIndex } from "./transcript-search"
-import { ResourceRegistry } from "./resource-registry"
 import { ProjectAgent } from "./project-agent"
 
 function createRouter() {
   const sessions = new SessionIndex()
   const tasks = new TaskLedger()
   const search = new TranscriptSearchIndex()
-  const resources = new ResourceRegistry()
-  const agent = new ProjectAgent({ sessions, tasks, search, resources })
+  const agent = new ProjectAgent({ sessions, tasks, search })
   const router = createProjectAgentRouter(agent)
-  return { router, agent, sessions, tasks, search, resources }
+  return { router, agent, sessions, tasks, search }
 }
 
 describe("project-agent-routes", () => {
@@ -79,17 +77,6 @@ describe("project-agent-routes", () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.status).toBe("complete")
-  })
-
-  test("GET /api/project/resources returns resources", async () => {
-    const { router, resources } = createRouter()
-    resources.registerResource({ name: "pg", kind: "database", managedBy: "zerobased", connectionString: "pg://..." })
-
-    const req = new Request("http://localhost/api/project/resources")
-    const res = await router(req)
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.length).toBe(1)
   })
 
   test("POST /api/project/delegate returns delegation result", async () => {

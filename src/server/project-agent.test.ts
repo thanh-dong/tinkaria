@@ -4,15 +4,13 @@ import { ProjectAgent } from "./project-agent"
 import { SessionIndex } from "./session-index"
 import { TaskLedger } from "./task-ledger"
 import { TranscriptSearchIndex } from "./transcript-search"
-import { ResourceRegistry } from "./resource-registry"
 
 function createAgent() {
   const sessions = new SessionIndex()
   const tasks = new TaskLedger()
   const search = new TranscriptSearchIndex()
-  const resources = new ResourceRegistry()
-  const agent = new ProjectAgent({ sessions, tasks, search, resources })
-  return { agent, sessions, tasks, search, resources }
+  const agent = new ProjectAgent({ sessions, tasks, search })
+  return { agent, sessions, tasks, search }
 }
 
 describe("ProjectAgent", () => {
@@ -66,25 +64,7 @@ describe("ProjectAgent", () => {
     })
   })
 
-  describe("queryResources", () => {
-    test("returns registered resources", () => {
-      const { agent, resources } = createAgent()
-      resources.registerResource({ name: "postgres", kind: "database", managedBy: "zerobased", connectionString: "pg://..." })
-      const result = agent.queryResources()
-      expect(result.length).toBe(1)
-    })
-  })
-
   describe("delegate", () => {
-    test("returns deterministic answer for resource query", async () => {
-      const { agent, resources } = createAgent()
-      resources.registerResource({ name: "postgres", kind: "database", managedBy: "zerobased", connectionString: "pg://localhost" })
-
-      const result = await agent.delegate("what resources are available?", "p1")
-      expect(result.status).toBe("ok")
-      expect(result.message).toContain("postgres")
-    })
-
     test("returns task info for task query", async () => {
       const { agent } = createAgent()
       agent.claimTask("implement auth", "chat-1", "feat/auth")

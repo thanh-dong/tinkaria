@@ -76,13 +76,4 @@ describe("TaskLedger", () => {
     expect(abandoned.length).toBe(0)
   })
 
-  test("listBySession filters tasks by owner", () => {
-    const ledger = new TaskLedger()
-    ledger.claim("task A", "chat-1", null)
-    ledger.claim("task B", "chat-2", null)
-    ledger.claim("task C", "chat-1", null)
-
-    expect(ledger.listBySession("chat-1").length).toBe(2)
-    expect(ledger.listBySession("chat-2").length).toBe(1)
-  })
 })

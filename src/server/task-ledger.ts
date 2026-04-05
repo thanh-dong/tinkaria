@@ -41,10 +41,6 @@ export class TaskLedger {
     return [...this.tasks.values()].map((e) => ({ ...e, outputs: [...e.outputs] }))
   }
 
-  listBySession(chatId: string): TaskEntry[] {
-    return this.list().filter((t) => t.ownedBy === chatId)
-  }
-
   complete(id: string, outputs: string[]): TaskEntry | null {
     const entry = this.tasks.get(id)
     if (!entry) return null
@@ -71,7 +67,7 @@ export class TaskLedger {
     const cutoff = new Date(Date.now() - this.abandonTimeoutMs).toISOString()
     const abandoned: TaskEntry[] = []
     for (const entry of this.tasks.values()) {
-      if ((entry.status === "claimed" || entry.status === "in_progress") && entry.updatedAt < cutoff) {
+      if (entry.status === "claimed" && entry.updatedAt < cutoff) {
         entry.status = "abandoned"
         entry.updatedAt = new Date().toISOString()
         abandoned.push({ ...entry, outputs: [...entry.outputs] })

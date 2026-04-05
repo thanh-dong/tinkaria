@@ -23,7 +23,6 @@ import { SessionOrchestrator } from "./orchestration"
 import { SessionIndex } from "./session-index"
 import { TaskLedger } from "./task-ledger"
 import { TranscriptSearchIndex } from "./transcript-search"
-import { ResourceRegistry } from "./resource-registry"
 import { ProjectAgent } from "./project-agent"
 import { createProjectAgentRouter } from "./project-agent-routes"
 
@@ -118,14 +117,17 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
   const sessionIndex = new SessionIndex()
   const taskLedger = new TaskLedger()
   const transcriptSearch = new TranscriptSearchIndex()
-  const resourceRegistry = new ResourceRegistry()
   const projectAgent = new ProjectAgent({
     sessions: sessionIndex,
     tasks: taskLedger,
     search: transcriptSearch,
-    resources: resourceRegistry,
   })
   const projectAgentRouter = createProjectAgentRouter(projectAgent)
+
+  // Periodic task abandonment detection (every 60s)
+  const abandonInterval = setInterval(() => {
+    taskLedger.detectAbandoned()
+  }, 60_000)
 
   const publisher = await createNatsPublisher({
     nc: natsBridge.nc,
@@ -242,6 +244,7 @@ export async function startKannaServer(options: StartKannaServerOptions = {}) {
   }
 
   const shutdown = async () => {
+    clearInterval(abandonInterval)
     for (const chatId of [...agent.activeTurns.keys()]) {
       await agent.cancel(chatId)
     }

@@ -25,9 +25,18 @@ function extractFilePath(tool: NormalizedToolCall): string | null {
   }
 }
 
+const MAX_COMMANDS_RUN = 200
+const BRANCH_RE = /^git\s+(?:checkout(?:\s+-b)?|switch(?:\s+-c)?)\s+(\S+)/
+
 function extractCommand(tool: NormalizedToolCall): string | null {
   if (tool.toolKind === "bash") return tool.input.command
   return null
+}
+
+function extractBranch(tool: NormalizedToolCall): string | null {
+  if (tool.toolKind !== "bash") return null
+  const match = BRANCH_RE.exec(tool.input.command)
+  return match ? match[1] : null
 }
 
 export class SessionIndex {
@@ -63,8 +72,16 @@ export class SessionIndex {
       const filePath = extractFilePath(entry.tool)
       if (filePath) session.filesTouched.add(filePath)
 
+      const branch = extractBranch(entry.tool)
+      if (branch) session.branch = branch
+
       const command = extractCommand(entry.tool)
-      if (command) session.commandsRun.push(command)
+      if (command) {
+        session.commandsRun.push(command)
+        if (session.commandsRun.length > MAX_COMMANDS_RUN + 10) {
+          session.commandsRun = session.commandsRun.slice(-MAX_COMMANDS_RUN)
+        }
+      }
     }
 
     if (entry.kind === "result") {

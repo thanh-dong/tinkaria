@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test"
 import { SessionIndex } from "./session-index"
 import { TaskLedger } from "./task-ledger"
 import { TranscriptSearchIndex } from "./transcript-search"
-import { ResourceRegistry } from "./resource-registry"
 import { ProjectAgent } from "./project-agent"
 import { createProjectAgentRouter } from "./project-agent-routes"
 import type { TranscriptEntry } from "../shared/types"
@@ -35,8 +34,7 @@ describe("project agent integration", () => {
     const sessions = new SessionIndex()
     const tasks = new TaskLedger()
     const search = new TranscriptSearchIndex()
-    const resources = new ResourceRegistry()
-    const agent = new ProjectAgent({ sessions, tasks, search, resources })
+    const agent = new ProjectAgent({ sessions, tasks, search })
     const router = createProjectAgentRouter(agent)
     const state = makeState()
 
@@ -80,13 +78,6 @@ describe("project agent integration", () => {
     const tasksBody = await tasksRes.json() as Array<Record<string, unknown>>
     expect(tasksBody.length).toBe(1)
 
-    // Register resource and query
-    resources.registerResource({ name: "postgres", kind: "database", managedBy: "zerobased", connectionString: "pg://localhost:5432" })
-    const resourcesRes = await router(new Request("http://localhost/api/project/resources"))
-    const resourcesBody = await resourcesRes.json() as Array<Record<string, unknown>>
-    expect(resourcesBody.length).toBe(1)
-    expect(resourcesBody[0].name).toBe("postgres")
-
     // Delegate via HTTP
     const delegateRes = await router(new Request("http://localhost/api/project/delegate", {
       method: "POST",
@@ -102,8 +93,7 @@ describe("project agent integration", () => {
     const sessions = new SessionIndex()
     const tasks = new TaskLedger()
     const search = new TranscriptSearchIndex()
-    const resources = new ResourceRegistry()
-    const agent = new ProjectAgent({ sessions, tasks, search, resources })
+    const agent = new ProjectAgent({ sessions, tasks, search })
     const router = createProjectAgentRouter(agent)
 
     // Claim

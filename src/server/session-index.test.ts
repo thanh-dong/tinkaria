@@ -245,4 +245,116 @@ describe("SessionIndex", () => {
     const sessions = index.getSessionsByProject("p1")
     expect(sessions[0].provider).toBe("claude")
   })
+
+  describe("branch detection", () => {
+    test("detects branch from git checkout <branch>", () => {
+      const index = new SessionIndex()
+      const state = createState([makeChat("c1")])
+
+      index.onMessageAppended("c1", timestamped({ kind: "user_prompt", content: "switch branch" }), state)
+      index.onMessageAppended("c1", timestamped(toolCallEntry({
+        kind: "tool",
+        toolKind: "bash",
+        toolName: "Bash",
+        toolId: crypto.randomUUID(),
+        input: { command: "git checkout feat/auth" },
+      }) as Omit<TranscriptEntry, "_id" | "createdAt">), state)
+
+      expect(index.getSession("c1")!.branch).toBe("feat/auth")
+    })
+
+    test("detects branch from git checkout -b <branch>", () => {
+      const index = new SessionIndex()
+      const state = createState([makeChat("c1")])
+
+      index.onMessageAppended("c1", timestamped({ kind: "user_prompt", content: "new branch" }), state)
+      index.onMessageAppended("c1", timestamped(toolCallEntry({
+        kind: "tool",
+        toolKind: "bash",
+        toolName: "Bash",
+        toolId: crypto.randomUUID(),
+        input: { command: "git checkout -b feat/new" },
+      }) as Omit<TranscriptEntry, "_id" | "createdAt">), state)
+
+      expect(index.getSession("c1")!.branch).toBe("feat/new")
+    })
+
+    test("detects branch from git switch <branch>", () => {
+      const index = new SessionIndex()
+      const state = createState([makeChat("c1")])
+
+      index.onMessageAppended("c1", timestamped({ kind: "user_prompt", content: "switch" }), state)
+      index.onMessageAppended("c1", timestamped(toolCallEntry({
+        kind: "tool",
+        toolKind: "bash",
+        toolName: "Bash",
+        toolId: crypto.randomUUID(),
+        input: { command: "git switch feat/auth" },
+      }) as Omit<TranscriptEntry, "_id" | "createdAt">), state)
+
+      expect(index.getSession("c1")!.branch).toBe("feat/auth")
+    })
+
+    test("detects branch from git switch -c <branch>", () => {
+      const index = new SessionIndex()
+      const state = createState([makeChat("c1")])
+
+      index.onMessageAppended("c1", timestamped({ kind: "user_prompt", content: "create branch" }), state)
+      index.onMessageAppended("c1", timestamped(toolCallEntry({
+        kind: "tool",
+        toolKind: "bash",
+        toolName: "Bash",
+        toolId: crypto.randomUUID(),
+        input: { command: "git switch -c feat/new" },
+      }) as Omit<TranscriptEntry, "_id" | "createdAt">), state)
+
+      expect(index.getSession("c1")!.branch).toBe("feat/new")
+    })
+
+    test("last branch switch wins", () => {
+      const index = new SessionIndex()
+      const state = createState([makeChat("c1")])
+
+      index.onMessageAppended("c1", timestamped({ kind: "user_prompt", content: "work" }), state)
+      index.onMessageAppended("c1", timestamped(toolCallEntry({
+        kind: "tool",
+        toolKind: "bash",
+        toolName: "Bash",
+        toolId: crypto.randomUUID(),
+        input: { command: "git checkout feat/first" },
+      }) as Omit<TranscriptEntry, "_id" | "createdAt">), state)
+      index.onMessageAppended("c1", timestamped(toolCallEntry({
+        kind: "tool",
+        toolKind: "bash",
+        toolName: "Bash",
+        toolId: crypto.randomUUID(),
+        input: { command: "git switch feat/second" },
+      }) as Omit<TranscriptEntry, "_id" | "createdAt">), state)
+
+      expect(index.getSession("c1")!.branch).toBe("feat/second")
+    })
+  })
+
+  describe("commandsRun cap", () => {
+    test("caps commandsRun, keeping most recent", () => {
+      const index = new SessionIndex()
+      const state = createState([makeChat("c1")])
+
+      index.onMessageAppended("c1", timestamped({ kind: "user_prompt", content: "work" }), state)
+
+      for (let i = 0; i < 250; i++) {
+        index.onMessageAppended("c1", timestamped(toolCallEntry({
+          kind: "tool",
+          toolKind: "bash",
+          toolName: "Bash",
+          toolId: crypto.randomUUID(),
+          input: { command: `cmd-${i}` },
+        }) as Omit<TranscriptEntry, "_id" | "createdAt">), state)
+      }
+
+      const session = index.getSession("c1")!
+      expect(session.commandsRun.length).toBeLessThanOrEqual(210)
+      expect(session.commandsRun.at(-1)).toBe("cmd-249")
+    })
+  })
 })
