@@ -4,8 +4,7 @@ import { useContentViewer } from "./ContentViewerContext"
 const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg"])
 
 export function isEmbedLanguage(language: string | null): boolean {
-  if (language === null) return false
-  return EMBED_LANGUAGES.has(language)
+  return language !== null && EMBED_LANGUAGES.has(language)
 }
 
 interface EmbedRendererProps {
@@ -212,7 +211,6 @@ function SvgEmbed({ source }: { source: string }) {
   const [localMode, setLocalMode] = useState<"render" | "source">("render")
 
   const embedState = viewer !== null && viewer.state.type === "embed" ? viewer.state : null
-  const isInOverlay = embedState !== null
   const mode = embedState ? embedState.renderMode : localMode
   const zoom = embedState ? embedState.zoom : 1
 
@@ -223,7 +221,7 @@ function SvgEmbed({ source }: { source: string }) {
 
   return (
     <div className="space-y-3 p-3">
-      {!isInOverlay ? (
+      {!embedState ? (
         <div aria-label="SVG display mode" className="flex items-center gap-1 rounded-md bg-muted/50 p-1 text-xs">
           <button
             type="button"
@@ -248,27 +246,18 @@ function SvgEmbed({ source }: { source: string }) {
         </div>
       ) : null}
 
-      {mode === "render" ? (
-        parsed.ok ? (
-          <div style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}>
-            <img
-              data-svg-render="true"
-              alt=""
-              src={svgDataUrl ?? undefined}
-              className="block h-auto max-h-[320px] max-w-full rounded-md border border-border/60 bg-background p-3 w-auto"
-            />
-            <script type="text/plain" data-svg-source="true">
-              {source}
-            </script>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="text-xs text-destructive">{parsed.message}</div>
-            <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
-              {source}
-            </pre>
-          </div>
-        )
+      {mode === "render" && parsed.ok ? (
+        <div style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}>
+          <img
+            data-svg-render="true"
+            alt=""
+            src={svgDataUrl ?? undefined}
+            className="block h-auto max-h-[320px] max-w-full rounded-md border border-border/60 bg-background p-3 w-auto"
+          />
+          <script type="text/plain" data-svg-source="true">
+            {source}
+          </script>
+        </div>
       ) : (
         <div className="space-y-2">
           {!parsed.ok ? (
@@ -304,7 +293,7 @@ function MermaidDiagram({ source }: { source: string }) {
 
         const id = `mermaid-${crypto.randomUUID().slice(0, 8)}`
         const { svg } = await mermaid.default.render(id, source)
-        if (!cancelled && container) {
+        if (!cancelled) {
           container.innerHTML = svg
         }
       } catch (err) {
