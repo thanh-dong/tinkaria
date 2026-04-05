@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import { EmbedRenderer, isEmbedLanguage } from "./EmbedRenderer"
+import { ContentViewerContext, type ContentViewerContextValue } from "./ContentViewerContext"
 
 describe("isEmbedLanguage", () => {
   test("returns true for mermaid", () => {
@@ -82,5 +83,56 @@ describe("EmbedRenderer", () => {
 
     expect(html).toContain("data-svg-render")
     expect(html).not.toContain("SVG render error")
+  })
+})
+
+describe("EmbedRenderer with ContentViewerContext", () => {
+  test("svg hides inline controls when viewer context is present", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "render", zoom: 1 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="svg" source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'} />
+      </ContentViewerContext.Provider>
+    )
+    expect(html).not.toContain('aria-label="SVG display mode"')
+    expect(html).toContain("data-svg-render")
+  })
+
+  test("svg uses context renderMode instead of local state", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "source", zoom: 1 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="svg" source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'} />
+      </ContentViewerContext.Provider>
+    )
+    expect(html).not.toContain("data-svg-render")
+    expect(html).toContain("&lt;svg")
+  })
+
+  test("svg applies zoom transform from context", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "render", zoom: 1.5 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="svg" source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'} />
+      </ContentViewerContext.Provider>
+    )
+    expect(html).toContain("scale(1.5)")
+  })
+
+  test("svg falls back to local state when no context", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="svg" source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'} />
+    )
+    expect(html).toContain('aria-label="SVG display mode"')
+    expect(html).toContain("data-svg-render")
   })
 })

@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react"
+import { useContentViewer } from "./ContentViewerContext"
 
 const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg"])
 
@@ -207,7 +208,13 @@ function readSvgTag(
 }
 
 function SvgEmbed({ source }: { source: string }) {
-  const [mode, setMode] = useState<"render" | "source">("render")
+  const viewer = useContentViewer()
+  const [localMode, setLocalMode] = useState<"render" | "source">("render")
+
+  const isInOverlay = viewer !== null && viewer.state.type === "embed"
+  const mode = isInOverlay ? viewer.state.renderMode : localMode
+  const zoom = isInOverlay ? viewer.state.zoom : 1
+
   const parsed = parseSvgMarkup(source)
   const svgDataUrl = parsed.ok
     ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(parsed.markup)}`
@@ -215,32 +222,34 @@ function SvgEmbed({ source }: { source: string }) {
 
   return (
     <div className="space-y-3 p-3">
-      <div aria-label="SVG display mode" className="flex items-center gap-1 rounded-md bg-muted/50 p-1 text-xs">
-        <button
-          type="button"
-          aria-pressed={mode === "render"}
-          onClick={() => setMode("render")}
-          className={`rounded px-2 py-1 transition-colors ${
-            mode === "render" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-          }`}
-        >
-          Render
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === "source"}
-          onClick={() => setMode("source")}
-          className={`rounded px-2 py-1 transition-colors ${
-            mode === "source" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-          }`}
-        >
-          Source
-        </button>
-      </div>
+      {!isInOverlay ? (
+        <div aria-label="SVG display mode" className="flex items-center gap-1 rounded-md bg-muted/50 p-1 text-xs">
+          <button
+            type="button"
+            aria-pressed={localMode === "render"}
+            onClick={() => setLocalMode("render")}
+            className={`rounded px-2 py-1 transition-colors ${
+              localMode === "render" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            }`}
+          >
+            Render
+          </button>
+          <button
+            type="button"
+            aria-pressed={localMode === "source"}
+            onClick={() => setLocalMode("source")}
+            className={`rounded px-2 py-1 transition-colors ${
+              localMode === "source" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            }`}
+          >
+            Source
+          </button>
+        </div>
+      ) : null}
 
       {mode === "render" ? (
         parsed.ok ? (
-          <>
+          <div style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}>
             <img
               data-svg-render="true"
               alt=""
@@ -250,7 +259,7 @@ function SvgEmbed({ source }: { source: string }) {
             <script type="text/plain" data-svg-source="true">
               {source}
             </script>
-          </>
+          </div>
         ) : (
           <div className="space-y-2">
             <div className="text-xs text-destructive">{parsed.message}</div>
