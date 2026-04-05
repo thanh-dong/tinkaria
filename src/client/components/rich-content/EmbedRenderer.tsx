@@ -211,9 +211,10 @@ function SvgEmbed({ source }: { source: string }) {
   const viewer = useContentViewer()
   const [localMode, setLocalMode] = useState<"render" | "source">("render")
 
-  const isInOverlay = viewer !== null && viewer.state.type === "embed"
-  const mode = isInOverlay ? viewer.state.renderMode : localMode
-  const zoom = isInOverlay ? viewer.state.zoom : 1
+  const embedState = viewer !== null && viewer.state.type === "embed" ? viewer.state : null
+  const isInOverlay = embedState !== null
+  const mode = embedState ? embedState.renderMode : localMode
+  const zoom = embedState ? embedState.zoom : 1
 
   const parsed = parseSvgMarkup(source)
   const svgDataUrl = parsed.ok
