@@ -1,5 +1,24 @@
 # Kanna Tasks
 
+## Completed: Homepage Welcome-Back Sessions
+
+**Status**: Verified. The `/` homepage now behaves like a return-to-work surface: it welcomes the user back, shows recent sessions first, and lets them resume directly instead of leading with a block of project statistics.
+
+**Root cause**:
+1. `src/client/components/LocalDev.tsx` opened the connected homepage with an `Overview` stats grid, so the first thing users saw was counts and renderer status instead of their recent work.
+2. The home route did not consume the existing per-project session snapshots already available in `useTinkariaState`, so the homepage could not surface session resume affordances even though the sidebar already had them.
+
+**Fix**:
+1. Updated `src/client/app/LocalProjectsPage.tsx` to pass project session snapshots into `LocalDev` and route homepage resume actions through existing chat/session navigation behavior.
+2. Added homepage recent-session derivation and resume cards in `src/client/components/LocalDev.tsx`, with copy that explicitly welcomes the user back and prioritizes session return.
+3. Kept the project/workspace list available below the welcome-back section, while demoting the statistics grid so it no longer owns the first-screen emphasis.
+4. Added regression coverage in `src/client/components/LocalDev.test.tsx` for recent-session ordering and the welcome-back homepage render.
+
+**Verified**:
+1. `bun test src/client/components/LocalDev.test.tsx`
+2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+3. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
 ## Completed: Queued Draft Persistence And Composer Submit Anchoring
 
 **Status**: Verified. Queued drafts now survive refresh as local per-chat pending state, self-clean on age/size/orphan conditions, retain their original submit options, and render with a distinct pending treatment above the composer. Composer submit now also keeps the transcript anchored when the user is already near the bottom, including the queue path used by `Ctrl/Cmd+Enter`.
@@ -217,6 +236,27 @@
 4. Keep assistant markdown as the fallback contract.
 
 ## In Progress: Tauri Companion / Native Webview Research
+
+## Completed: Homepage Cleanup
+
+**Status**: Verified. `/` is now a cleaner launchpad instead of a mixed onboarding/diagnostics surface. The connected homepage focuses on machine/project context and actionable project cards, while the disconnected state keeps a single clear setup path.
+
+**Root cause**:
+1. `src/client/components/LocalDev.tsx` mixed setup instructions, desktop smoke diagnostics, and project picking on the same homepage.
+2. Connected project cards only exposed a basename, which made the page weak as a real workspace selector.
+3. Desktop-renderer diagnostics were taking prime homepage space even though renderer-specific detail already lives on the companion route.
+
+**Fix**:
+1. Replaced the connected `Desktop Smoke` card with a compact overview row covering total projects, saved/discovered split, and desktop-renderer status.
+2. Reworked the project grid so cards now show title, full path, source label, and chat count, sorted by recent activity first.
+3. Simplified the disconnected state to one status block plus two focused setup cards instead of the previous explanatory flow diagram.
+4. Removed now-unused homepage external-link plumbing from `LocalProjectsPage`.
+5. Added focused homepage helper/test coverage in `src/client/components/LocalDev.test.tsx`.
+
+**Verified**:
+1. `bun test src/client/components/LocalDev.test.tsx`
+2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+3. `bun run build`
 
 **Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-tauri-native-webview-companion-design.md`
 **Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-02-tauri-native-webview-companion.md`

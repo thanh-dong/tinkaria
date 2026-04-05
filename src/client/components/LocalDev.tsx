@@ -1,28 +1,27 @@
-import { useMemo, useState, type ComponentType, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import {
-  ArrowLeftRight,
   Check,
-  ChevronRight,
   CodeXml,
   Copy,
+  FolderOpen,
   Folder,
+  History,
   Loader2,
-  Monitor,
   Plus,
+  Sparkles,
   SquarePen,
-  Terminal,
 } from "lucide-react"
-import { Streamdown } from "streamdown"
-import remarkGfm from "remark-gfm"
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
-import type { DesktopRenderersSnapshot, LocalProjectsSnapshot } from "../../shared/types"
+import type {
+  DesktopRenderersSnapshot,
+  DiscoveredSession,
+  LocalProjectsSnapshot,
+} from "../../shared/types"
 import type { SocketStatus } from "../app/socket-interface"
 import { PageHeader } from "../app/PageHeader"
 import { getPathBasename } from "../lib/formatters"
 import { cn } from "../lib/utils"
 import { NewProjectModal } from "./NewProjectModal"
-import { createMarkdownComponents, OpenLocalLinkProvider } from "./messages/shared"
-import { remarkRichContentHint } from "./rich-content/remarkRichContentHint"
 import { Button } from "./ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
 
@@ -35,7 +34,8 @@ interface LocalDevProps {
   commandError: string | null
   onOpenProject: (localPath: string) => Promise<void>
   onCreateProject: (project: { mode: "new" | "existing"; localPath: string; title: string }) => Promise<void>
-  onOpenExternalLink: (href: string) => boolean
+  sessionsForProject?: (projectId: string) => DiscoveredSession[]
+  onResumeSession?: (projectId: string, session: DiscoveredSession) => Promise<void>
 }
 
 export function getDesktopRendererStatusLabel(desktopRenderers: DesktopRenderersSnapshot): string {
@@ -44,13 +44,74 @@ export function getDesktopRendererStatusLabel(desktopRenderers: DesktopRenderers
     : "Waiting for a desktop renderer"
 }
 
-export function getDesktopSmokeMarkdown(): string {
-  return [
-    "Use these links to test desktop steering from the main app surface.",
-    "",
-    "- [Local smoke target](http://127.0.0.1:3210/)",
-    "- [Remote smoke target](https://example.com/)",
-  ].join("\n")
+export function getHomepageProjectCounts(snapshot: LocalProjectsSnapshot | null) {
+  const projects = snapshot?.projects ?? []
+
+  return {
+    total: projects.length,
+    saved: projects.filter((project) => project.source === "saved").length,
+    discovered: projects.filter((project) => project.source === "discovered").length,
+  }
+}
+
+interface HomepageRecentSession {
+  projectId: string
+  projectTitle: string
+  session: DiscoveredSession
+}
+
+function getSessionDisplayTitle(session: DiscoveredSession): string {
+  if (session.title) return session.title
+  if (session.lastExchange?.question) return session.lastExchange.question
+  return session.sessionId
+}
+
+function getRelativeTimeLabel(timestamp: number, now = Date.now()): string {
+  const delta = now - timestamp
+  const minutes = Math.floor(delta / 60_000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+export function getHomepageRecentSessions(
+  snapshot: LocalProjectsSnapshot | null,
+  sessionsForProject?: (projectId: string) => DiscoveredSession[],
+): HomepageRecentSession[] {
+  if (!snapshot || !sessionsForProject) {
+    return []
+  }
+
+  return snapshot.projects
+    .flatMap((project) =>
+      sessionsForProject(project.localPath).map((session) => ({
+        projectId: project.localPath,
+        projectTitle: project.title || getPathBasename(project.localPath),
+        session,
+      }))
+    )
+    .sort((left, right) => right.session.modifiedAt - left.session.modifiedAt)
+    .slice(0, 3)
+}
+
+export function getSortedHomepageProjects(snapshot: LocalProjectsSnapshot | null) {
+  return [...(snapshot?.projects ?? [])].sort((left, right) => {
+    const leftRank = left.lastOpenedAt ?? 0
+    const rightRank = right.lastOpenedAt ?? 0
+
+    if (leftRank !== rightRank) {
+      return rightRank - leftRank
+    }
+
+    return left.title.localeCompare(right.title)
+  })
+}
+
+function getProjectSourceLabel(source: "saved" | "discovered"): string {
+  return source === "saved" ? "Saved" : "Discovered"
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -77,8 +138,7 @@ function CopyButton({ text }: { text: string }) {
 function CodeBlock({ children }: { children: string }) {
   return (
     <div className="grid grid-cols-[1fr_auto] items-center group bg-background border border-border text-foreground rounded-xl p-1.5 pl-3 font-mono text-sm">
-      <pre className="inline-flex items-center gap-2 overflow-x-auto">
-        <ChevronRight className="inline h-4 w-4 opacity-40" />
+      <pre className="overflow-x-auto">
         <code>{children}</code>
       </pre>
       <CopyButton text={children} />
@@ -98,60 +158,105 @@ function SectionHeader({ children }: { children: ReactNode }) {
   )
 }
 
-function HowItWorksItem({
-  icon: Icon,
-  title,
-  subtitle,
-  iconClassName,
+function StatCard({
+  eyebrow,
+  value,
+  detail,
 }: {
-  icon: ComponentType<{ className?: string }>
-  title: string
-  subtitle: string
-  iconClassName?: string
+  eyebrow: string
+  value: string
+  detail: string
 }) {
   return (
-    <div className="flex flex-col items-center gap-0">
-      <div className="p-3 mb-2 rounded-xl bg-background border border-border">
-        <Icon className={iconClassName || "h-8 w-8 text-muted-foreground"} />
+    <InfoCard>
+      <div className="space-y-1">
+        <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</div>
+        <div className="text-xl font-semibold text-foreground">{value}</div>
+        <div className="text-sm text-muted-foreground">{detail}</div>
       </div>
-      <span className="text-sm font-medium">{title}</span>
-      <span className="text-xs text-muted-foreground">{subtitle}</span>
-    </div>
+    </InfoCard>
   )
 }
 
-function HowItWorksConnector() {
-  return <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-}
-
-function Step({
-  number,
+function ActionCard({
+  icon: Icon,
   title,
-  children,
+  description,
+  action,
 }: {
-  number: number
+  icon: typeof Sparkles
   title: string
-  children: ReactNode
+  description: string
+  action: ReactNode
 }) {
   return (
-    <div className="flex gap-4">
-      <div className="flex-1 min-w-0">
-        <div className="grid grid-cols-[auto_1fr] items-baseline gap-3">
-          <div className="flex-shrink-0 flex items-center justify-center font-medium text-logo">{number}.</div>
-          <h3 className="font-medium text-foreground mb-2">{title}</h3>
+    <InfoCard>
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl border border-border bg-background p-2">
+            <Icon className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-medium text-foreground">{title}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          </div>
         </div>
-        <div className="text-muted-foreground text-sm space-y-3">{children}</div>
+        {action}
       </div>
-    </div>
+    </InfoCard>
+  )
+}
+
+function RecentSessionCard({
+  item,
+  onResume,
+}: {
+  item: HomepageRecentSession
+  onResume: () => void
+}) {
+  return (
+    <InfoCard>
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl border border-border bg-background p-2">
+            <History className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="truncate font-medium text-foreground">{getSessionDisplayTitle(item.session)}</h3>
+              <span className="shrink-0 text-xs text-muted-foreground">{getRelativeTimeLabel(item.session.modifiedAt)}</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Back to {item.projectTitle}</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border bg-background px-2 py-0.5">
+                {item.session.provider}
+              </span>
+              <span className="rounded-full border border-border bg-background px-2 py-0.5">
+                {item.session.source === "kanna" ? "Tinkaria" : "CLI"}
+              </span>
+            </div>
+          </div>
+        </div>
+        <Button onClick={onResume} className="w-full">
+          Resume session
+        </Button>
+      </div>
+    </InfoCard>
   )
 }
 
 function ProjectCard({
+  title,
   localPath,
+  source,
+  chatCount,
   loading,
   onClick,
 }: {
+  title: string
   localPath: string
+  source: "saved" | "discovered"
+  chatCount: number
   loading: boolean
   onClick: () => void
 }) {
@@ -160,21 +265,38 @@ function ProjectCard({
       <TooltipTrigger asChild>
         <button
           className={cn(
-            "border border-border hover:border-primary/30 group rounded-lg bg-card px-4 py-3 flex items-center gap-3 w-full text-left hover:bg-muted/50 transition-colors",
+            "border border-border hover:border-primary/30 group rounded-2xl bg-card px-4 py-4 w-full text-left hover:bg-muted/50 transition-colors",
             loading && "opacity-50 cursor-not-allowed"
           )}
           disabled={loading}
           onClick={onClick}
         >
-          <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          <span className="font-medium text-foreground truncate flex-1">
-            {getPathBasename(localPath)}
-          </span>
-          {loading ? (
-            <Loader2 className="h-4 w-4 text-muted-foreground group-hover:text-primary animate-spin flex-shrink-0" />
-          ) : (
-            <SquarePen className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-          )}
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-xl border border-border bg-background p-2">
+              <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground truncate">{title || getPathBasename(localPath)}</div>
+                  <div className="mt-1 text-xs text-muted-foreground truncate">{localPath}</div>
+                </div>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 text-muted-foreground group-hover:text-primary animate-spin flex-shrink-0" />
+                ) : (
+                  <SquarePen className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border bg-background px-2 py-0.5">
+                  {getProjectSourceLabel(source)}
+                </span>
+                <span className="rounded-full border border-border bg-background px-2 py-0.5">
+                  {chatCount} {chatCount === 1 ? "chat" : "chats"}
+                </span>
+              </div>
+            </div>
+          </div>
         </button>
       </TooltipTrigger>
       <TooltipContent>
@@ -193,11 +315,17 @@ export function LocalDev({
   commandError,
   onOpenProject,
   onCreateProject,
-  onOpenExternalLink,
+  sessionsForProject,
+  onResumeSession,
 }: LocalDevProps) {
   const [newProjectOpen, setNewProjectOpen] = useState(false)
 
-  const projects = useMemo(() => snapshot?.projects ?? [], [snapshot?.projects])
+  const projects = useMemo(() => getSortedHomepageProjects(snapshot), [snapshot])
+  const projectCounts = useMemo(() => getHomepageProjectCounts(snapshot), [snapshot])
+  const recentSessions = useMemo(
+    () => getHomepageRecentSessions(snapshot, sessionsForProject),
+    [snapshot, sessionsForProject]
+  )
   const isConnecting = connectionStatus === "connecting" || !ready
   const isConnected = connectionStatus === "connected" && ready
   const desktopRendererStatusLabel = getDesktopRendererStatusLabel(desktopRenderers)
@@ -212,7 +340,7 @@ export function LocalDev({
             title={isConnecting ? `Connecting ${APP_NAME}` : `Connect ${APP_NAME}`}
             subtitle={isConnecting
               ? `${APP_NAME} is starting up and loading your local projects.`
-              : `Run ${APP_NAME} directly on your machine with full access to your local files and agent project history.`}
+              : `Run ${APP_NAME} on this machine to unlock local files, saved projects, and chat history.`}
           />
           <div className="max-w-2xl w-full mx-auto pb-12 px-6">
             <SectionHeader>Status</SectionHeader>
@@ -235,49 +363,32 @@ export function LocalDev({
 
             {!isConnecting ? (
               <div className="mb-10">
-              <SectionHeader>How it works</SectionHeader>
-              <InfoCard>
-                <div className="flex items-center justify-around gap-6 py-4 px-2">
-                  <HowItWorksItem icon={Terminal} title={`${APP_NAME} CLI`} subtitle="On Your Machine" />
-                  <HowItWorksConnector />
-                  <HowItWorksItem icon={Monitor} title={`${APP_NAME} Server`} subtitle="Local WebSocket" />
-                  <HowItWorksConnector />
-                  <HowItWorksItem icon={CodeXml} title={`${APP_NAME} UI`} subtitle="Project Chat" />
-                </div>
-              </InfoCard>
-              </div>
-            ) : null}
-
-            {!isConnecting ? (
-              <div className="mb-10">
-              <SectionHeader>Setup</SectionHeader>
-              <InfoCard>
+                <SectionHeader>Setup</SectionHeader>
                 <div className="space-y-4">
-                  <Step number={1} title={`Start ${APP_NAME}`}>
-                    <p>Run this command in your terminal:</p>
-                    <CodeBlock>{getCliInvocation()}</CodeBlock>
-                  </Step>
-
-                  <Step number={2} title="Open the local UI">
-                    <p>{APP_NAME} serves the app locally and opens the Local Projects page in an app-style browser window.</p>
-                    <CodeBlock>http://localhost:3210/local</CodeBlock>
-                  </Step>
-
-                  <div className="mt-8">
-                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Notes</h3>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex gap-4">
-                        <code className="font-mono text-foreground whitespace-nowrap">{getCliInvocation("").trim()}</code>
-                        <span className="text-muted-foreground">Start in the current directory</span>
+                  <ActionCard
+                    icon={Sparkles}
+                    title={`Start ${APP_NAME}`}
+                    description="This page will reconnect automatically once the local server is running."
+                    action={<CodeBlock>{getCliInvocation()}</CodeBlock>}
+                  />
+                  <ActionCard
+                    icon={FolderOpen}
+                    title="Useful variants"
+                    description="Use the current directory directly, or keep the server headless."
+                    action={(
+                      <div className="space-y-3 text-sm text-muted-foreground">
+                        <div className="space-y-1">
+                          <div className="font-medium text-foreground">Start in the current directory</div>
+                          <CodeBlock>{getCliInvocation("").trim()}</CodeBlock>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="font-medium text-foreground">Start without opening the browser</div>
+                          <CodeBlock>{getCliInvocation("--no-open")}</CodeBlock>
+                        </div>
                       </div>
-                      <div className="flex gap-4">
-                        <code className="font-mono text-foreground whitespace-nowrap">{getCliInvocation("--no-open")}</code>
-                        <span className="text-muted-foreground">Start the server without opening the browser</span>
-                      </div>
-                    </div>
-                  </div>
+                    )}
+                  />
                 </div>
-              </InfoCard>
               </div>
             ) : null}
           </div>
@@ -286,43 +397,62 @@ export function LocalDev({
         <>
           <PageHeader
             title={snapshot?.machine.displayName ?? "Local Projects"}
-            subtitle={`${APP_NAME} is connected, choose a project below to get started.`}
+            subtitle="Welcome back. Resume a session or jump into the right workspace."
           />
 
           <div className="w-full px-6 mb-10">
-            <div className="mb-10">
-              <div className="flex items-baseline justify-between mb-3">
-                <h2 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider">Desktop Smoke</h2>
-                <span className="text-xs text-muted-foreground">{desktopRendererStatusLabel}</span>
+            {recentSessions.length > 0 ? (
+              <div className="mb-10">
+                <SectionHeader>Welcome Back</SectionHeader>
+                <div className="mb-3">
+                  <h2 className="text-xl font-semibold text-foreground">Pick up where you left off</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Your latest sessions are first so you can get back to work without digging through stats.
+                  </p>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {recentSessions.map((item) => (
+                    <RecentSessionCard
+                      key={`${item.projectId}:${item.session.sessionId}`}
+                      item={item}
+                      onResume={() => {
+                        void onResumeSession?.(item.projectId, item.session)
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
-              <InfoCard>
-                <OpenLocalLinkProvider onOpenExternalLink={onOpenExternalLink}>
-                  <div className="text-pretty prose prose-sm dark:prose-invert max-w-none">
-                    <Streamdown
-                      components={createMarkdownComponents()}
-                      linkSafety={{ enabled: false }}
-                      remarkPlugins={[remarkGfm, remarkRichContentHint]}
-                    >
-                      {getDesktopSmokeMarkdown()}
-                    </Streamdown>
-                  </div>
-                </OpenLocalLinkProvider>
-              </InfoCard>
+            ) : null}
+
+            <div className="mb-10">
+              <SectionHeader>Projects</SectionHeader>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <StatCard eyebrow="Projects" value={String(projectCounts.total)} detail="Workspaces available on this machine" />
+                <StatCard eyebrow="Saved" value={String(projectCounts.saved)} detail="Explicitly tracked projects" />
+                <StatCard eyebrow="Discovered" value={String(projectCounts.discovered)} detail="Projects picked up from usage" />
+                <StatCard eyebrow="Desktop" value={desktopRendererStatusLabel} detail="Native renderer status" />
+              </div>
             </div>
 
-            <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider">Projects</h2>
+            <div className="mb-3 flex items-baseline justify-between gap-4">
+              <div>
+                <h2 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider">Workspaces</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Recent work first, with enough context to choose the right place to continue.</p>
+              </div>
               <Button variant="default" size="sm" onClick={() => setNewProjectOpen(true)}>
                 <Plus className="h-4 w-4 mr-1.5" />
                 Add Project
               </Button>
             </div>
             {projects.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 3xl:grid-cols-5 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 3xl:grid-cols-5 gap-3">
                 {projects.map((project) => (
                   <ProjectCard
                     key={project.localPath}
+                    title={project.title}
                     localPath={project.localPath}
+                    source={project.source}
+                    chatCount={project.chatCount}
                     loading={startingLocalPath === project.localPath}
                     onClick={() => {
                       void onOpenProject(project.localPath)
@@ -333,7 +463,7 @@ export function LocalDev({
             ) : (
               <InfoCard>
                 <p className="text-sm text-muted-foreground">
-                  No local projects discovered yet. Open one with Claude or Codex, or create a new project here.
+                  No local projects yet. Add a workspace here or start {APP_NAME} inside a project directory to seed one automatically.
                 </p>
               </InfoCard>
             )}
