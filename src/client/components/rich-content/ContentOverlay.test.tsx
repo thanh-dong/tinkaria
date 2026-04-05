@@ -23,6 +23,9 @@ describe("ContentOverlay", () => {
     expect(getContentOverlayUiIdentityProps()).toEqual({
       "data-ui-id": "rich-content.viewer.area",
     })
+    expect(getContentOverlayUiIdentityProps("content-preview.dialog")).toEqual({
+      "data-ui-id": "content-preview.dialog",
+    })
   })
 
   test("mobile dialog classes add slide-up animation and dvh height", () => {

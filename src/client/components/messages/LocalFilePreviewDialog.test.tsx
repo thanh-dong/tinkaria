@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
+import { getContentOverlayUiIdentityProps } from "../rich-content/ContentOverlay"
 import {
   LOCAL_FILE_PREVIEW_DIALOG_UI_ID,
   LocalFilePreviewContent,
+  getLocalFilePreviewType,
   getLocalFilePreviewDialogUiIdentityProps,
 } from "./LocalFilePreviewDialog"
 
@@ -66,5 +68,17 @@ describe("LocalFilePreviewDialog", () => {
     expect(getLocalFilePreviewDialogUiIdentityProps()).toEqual({
       "data-ui-id": "content-preview.dialog",
     })
+  })
+
+  test("uses rich content viewer types that match the previewed file", () => {
+    expect(getLocalFilePreviewType("/tmp/README.md")).toBe("markdown")
+    expect(getLocalFilePreviewType("/tmp/diagram.svg")).toBe("embed")
+    expect(getLocalFilePreviewType("/tmp/app.ts")).toBe("code")
+  })
+
+  test("reuses the rich content overlay identity contract for local file previews", () => {
+    expect(getLocalFilePreviewDialogUiIdentityProps()).toEqual(
+      getContentOverlayUiIdentityProps(LOCAL_FILE_PREVIEW_DIALOG_UI_ID)
+    )
   })
 })

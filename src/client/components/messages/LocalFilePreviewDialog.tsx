@@ -1,8 +1,9 @@
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
-import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
+import { ContentOverlay } from "../rich-content/ContentOverlay"
 import { remarkRichContentHint } from "../rich-content/remarkRichContentHint"
+import type { RichContentType } from "../rich-content/types"
 import { createMarkdownComponents } from "./shared"
 
 export interface LocalFilePreview {
@@ -16,6 +17,10 @@ const LOCAL_FILE_PREVIEW_DIALOG_UI_ID = "content-preview.dialog"
 
 function isMarkdownFile(path: string): boolean {
   return /\.(md|markdown|mdx)$/i.test(path)
+}
+
+function isSvgFile(path: string): boolean {
+  return /\.svg$/i.test(path)
 }
 
 function inferCodeLanguage(path: string): string | null {
@@ -58,6 +63,16 @@ function getDialogTitle(preview: LocalFilePreview): string {
   if (!preview.line) return preview.path
   if (!preview.column) return `${preview.path}:${preview.line}`
   return `${preview.path}:${preview.line}:${preview.column}`
+}
+
+function getLocalFilePreviewType(path: string): RichContentType {
+  if (isMarkdownFile(path)) {
+    return "markdown"
+  }
+  if (isSvgFile(path)) {
+    return "embed"
+  }
+  return "code"
 }
 
 interface LocalFilePreviewDialogProps {
@@ -108,26 +123,21 @@ export function LocalFilePreviewDialog({
   onOpenLocalLink,
 }: LocalFilePreviewDialogProps) {
   return (
-    <Dialog
+    <ContentOverlay
       open={preview !== null}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
           onClose()
         }
       }}
+      title={preview ? getDialogTitle(preview) : "File preview"}
+      type={preview ? getLocalFilePreviewType(preview.path) : "code"}
+      rawContent={preview?.content}
+      rootUiId={LOCAL_FILE_PREVIEW_DIALOG_UI_ID}
     >
-      <DialogContent size="xl" {...getLocalFilePreviewDialogUiIdentityProps()}>
-        <DialogHeader>
-          <DialogTitle className="truncate text-sm">
-            {preview ? getDialogTitle(preview) : "File preview"}
-          </DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          {preview ? <LocalFilePreviewContent preview={preview} onOpenLocalLink={onOpenLocalLink} /> : null}
-        </DialogBody>
-      </DialogContent>
-    </Dialog>
+      {preview ? <LocalFilePreviewContent preview={preview} onOpenLocalLink={onOpenLocalLink} /> : null}
+    </ContentOverlay>
   )
 }
 
-export { LOCAL_FILE_PREVIEW_DIALOG_UI_ID, getLocalFilePreviewDialogUiIdentityProps }
+export { LOCAL_FILE_PREVIEW_DIALOG_UI_ID, getLocalFilePreviewDialogUiIdentityProps, getLocalFilePreviewType }

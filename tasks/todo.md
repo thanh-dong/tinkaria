@@ -1,5 +1,39 @@
 # Kanna Tasks
 
+## Completed: Chat File Preview Uses Rich Content Overlay
+
+**Status**: Verified. Local file previews opened from the chat page now use the same rich-content modal shell as inline rich content blocks, so file previews no longer diverge in modal chrome or affordances.
+
+**Root cause**:
+1. `src/client/components/messages/LocalFilePreviewDialog.tsx` rendered previews through a bespoke dialog shell instead of the shared `ContentOverlay` used by rich content blocks.
+2. That separate shell meant chat file previews missed the shared overlay affordances and presentation contract already used elsewhere for code, markdown, embed, and diff content.
+
+**Fix**:
+1. Switched `LocalFilePreviewDialog` to render through `ContentOverlay` while preserving the existing `content-preview.dialog` UI identity tag.
+2. Added local preview content-type inference so markdown, SVG/embed, and code previews enter the shared overlay with the correct rich-content mode.
+3. Extended `ContentOverlay` with an optional root UI identity override and an explicit copy-button label so the shared shell can be reused by chat file preview safely.
+4. Added regression coverage for the overlay identity override and local preview type mapping.
+
+**Verified**:
+1. `bun test src/client/components/messages/LocalFilePreviewDialog.test.tsx src/client/components/rich-content/ContentOverlay.test.tsx`
+2. `bun test src/client/components/messages/FileContentView.test.tsx`
+3. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Provisioned: Tinkerlet Main/Node Split
+
+**Status**: Design recorded, not implemented. Added C3 ADR `adr-20260405-tinkerlet-main-node-split` as the control-plane/worker-plane proposal for externalizing agent execution without moving durable state out of the main server boundary.
+
+**Decision**:
+1. `main` keeps HTTP/UI, embedded NATS, event store, read models, orchestration state, approvals, and authoritative transcript ownership.
+2. `node` becomes a leased worker that advertises capabilities, runs provider turns, and emits events/results back to `main`.
+3. `project-agent` stays in `main`; it is coordination/query logic over shared state, not worker execution.
+
+**Next**:
+1. First implementation slice should extract an `AgentRuntime` interface from `src/server/agent.ts`.
+2. Add one local external `node` worker process over NATS and route Codex turns through it first.
+3. Only after the local worker path is stable should we add node registry, leases/heartbeats, and multi-machine placement.
+
 ## Completed: Cross-Session Prompt Guidance
 
 **Status**: Verified. The shared provider web-context prompt now tells both Claude and Codex how cross-session agent work actually behaves in Tinkaria, so delegated work is described as explicit orchestration between separate chats instead of implicit shared context.

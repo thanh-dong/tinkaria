@@ -30,13 +30,22 @@ interface ContentOverlayProps {
   type: RichContentType
   children: ReactNode
   rawContent?: string
+  rootUiId?: string
 }
 
-function getContentOverlayUiIdentityProps() {
-  return getUiIdentityAttributeProps(CONTENT_OVERLAY_ROOT_UI_ID)
+function getContentOverlayUiIdentityProps(rootUiId = CONTENT_OVERLAY_ROOT_UI_ID) {
+  return getUiIdentityAttributeProps(rootUiId)
 }
 
-export function ContentOverlay({ open, onOpenChange, title, type, children, rawContent }: ContentOverlayProps) {
+export function ContentOverlay({
+  open,
+  onOpenChange,
+  title,
+  type,
+  children,
+  rawContent,
+  rootUiId,
+}: ContentOverlayProps) {
   const [copied, setCopied] = useState(false)
   const isMobile = useIsMobile()
   const [viewerState, dispatch] = useReducer(viewerReducer, type, createInitialState)
@@ -59,7 +68,7 @@ export function ContentOverlay({ open, onOpenChange, title, type, children, rawC
       <DialogContent
         size={isMobile ? "fullscreen" : DESKTOP_DIALOG_SIZE}
         className={cn(isMobile && MOBILE_DIALOG_CLASSES)}
-        {...getContentOverlayUiIdentityProps()}
+        {...getContentOverlayUiIdentityProps(rootUiId)}
       >
         <ContentViewerContext.Provider key={type} value={{ state: viewerState, dispatch }}>
           <DialogHeader className={cn(isMobile && "pt-[env(safe-area-inset-top)]")}>
@@ -85,6 +94,7 @@ export function ContentOverlay({ open, onOpenChange, title, type, children, rawC
                     copied && "hover:!bg-transparent"
                   )}
                   onClick={handleCopy}
+                  aria-label={copied ? "Copied" : "Copy content"}
                 >
                   {copied ? (
                     <Check className={cn(isMobile ? "h-5 w-5" : "h-3.5 w-3.5", "text-green-400")} />
