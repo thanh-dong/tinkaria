@@ -149,7 +149,7 @@ export class NatsSocket implements TinkariaTransport {
   }
 
   ensureHealthyConnection(): Promise<void> {
-    if (!this.nc) {
+    if (!this.nc || this.currentStatus !== "connected") {
       void this.reconnectNow()
     }
     return Promise.resolve()

@@ -134,9 +134,31 @@ export function getUiUpdateRestartReconnectAction(
 }
 
 export const TRANSCRIPT_TAIL_SIZE = 200
+export const PWA_RESUME_STALE_AFTER_MS = 15_000
+const RESUME_REFRESH_DEDUP_WINDOW_MS = 1_000
 
 export function computeTailOffset(messageCount: number, tailSize = TRANSCRIPT_TAIL_SIZE): number {
   return Math.max(0, messageCount - tailSize)
+}
+
+function isStandalonePwaDisplay(): boolean {
+  if (typeof window === "undefined") return false
+
+  const isIOSStandalone = "standalone" in navigator && (navigator as Navigator & { standalone?: boolean }).standalone === true
+  const isDisplayStandalone = window.matchMedia("(display-mode: standalone)").matches
+  return isIOSStandalone || isDisplayStandalone
+}
+
+export function shouldRefreshStaleSessionOnResume(args: {
+  isStandalone: boolean
+  hiddenAt: number | null
+  resumedAt: number
+  connectionStatus: SocketStatus
+}): boolean {
+  if (!args.isStandalone) return false
+  if (args.connectionStatus !== "connected") return true
+  if (args.hiddenAt === null) return false
+  return Math.max(0, args.resumedAt - args.hiddenAt) >= PWA_RESUME_STALE_AFTER_MS
 }
 
 // --- Per-chat message cache ---
@@ -458,7 +480,10 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [localFilePreview, setLocalFilePreview] = useState<LocalFilePreview | null>(null)
   const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
   const [sessionsWindowDays, setSessionsWindowDays] = useState<Map<string, number>>(new Map())
+  const [chatRefreshNonce, setChatRefreshNonce] = useState(0)
   const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
+  const backgroundedAtRef = useRef<number | null>(null)
+  const lastResumeRefreshAtRef = useRef(0)
   const editorLabel = getEditorPresetLabel(useTerminalPreferencesStore((store) => store.editorPreset))
   const lastSeenMessageAt = useChatReadStateStore((store) => (
     activeChatId ? store.lastSeenMessageAtByChat[activeChatId] : undefined
@@ -574,6 +599,64 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       window.removeEventListener("focus", handleWindowFocus)
     }
   }, [socket, updateSnapshot?.lastCheckedAt])
+
+  useEffect(() => {
+    function maybeRefreshAfterResume(trigger: "focus" | "online" | "pageshow" | "visibilitychange") {
+      const resumedAt = Date.now()
+      if (!shouldRefreshStaleSessionOnResume({
+        isStandalone: isStandalonePwaDisplay(),
+        hiddenAt: backgroundedAtRef.current,
+        resumedAt,
+        connectionStatus,
+      })) return
+
+      if (resumedAt - lastResumeRefreshAtRef.current < RESUME_REFRESH_DEDUP_WINDOW_MS) return
+      lastResumeRefreshAtRef.current = resumedAt
+      backgroundedAtRef.current = null
+
+      logTinkariaState("refreshing stale session after app resume", {
+        trigger,
+        activeChatId,
+        connectionStatus,
+      })
+      void socket.ensureHealthyConnection()
+      setChatRefreshNonce((current) => current + 1)
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        backgroundedAtRef.current = Date.now()
+        return
+      }
+
+      if (document.visibilityState === "visible") {
+        maybeRefreshAfterResume("visibilitychange")
+      }
+    }
+
+    function handleWindowFocus() {
+      maybeRefreshAfterResume("focus")
+    }
+
+    function handleWindowOnline() {
+      maybeRefreshAfterResume("online")
+    }
+
+    function handlePageShow() {
+      maybeRefreshAfterResume("pageshow")
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("focus", handleWindowFocus)
+    window.addEventListener("online", handleWindowOnline)
+    window.addEventListener("pageshow", handlePageShow)
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("focus", handleWindowFocus)
+      window.removeEventListener("online", handleWindowOnline)
+      window.removeEventListener("pageshow", handlePageShow)
+    }
+  }, [activeChatId, connectionStatus, socket])
 
   useEffect(() => {
     return socket.subscribe<KeybindingsSnapshot>({ type: "keybindings" }, (snapshot) => {
@@ -707,7 +790,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         })
       }
     }
-  }, [activeChatId, socket])
+  }, [activeChatId, chatRefreshNonce, socket])
 
   useEffect(() => {
     if (!activeChatId) return

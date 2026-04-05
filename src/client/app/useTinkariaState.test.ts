@@ -17,7 +17,9 @@ import {
   resolveComposeIntent,
   resolveDesktopWebviewOpenCommand,
   shouldAutoFollowTranscript,
+  shouldRefreshStaleSessionOnResume,
   shouldStickToBottomOnComposerSubmit,
+  PWA_RESUME_STALE_AFTER_MS,
   TRANSCRIPT_TAIL_SIZE,
 } from "./useTinkariaState"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarData } from "../../shared/types"
@@ -125,6 +127,44 @@ describe("shouldStickToBottomOnComposerSubmit", () => {
     expect(shouldStickToBottomOnComposerSubmit(0)).toBe(true)
     expect(shouldStickToBottomOnComposerSubmit(96)).toBe(true)
     expect(shouldStickToBottomOnComposerSubmit(97)).toBe(false)
+  })
+})
+
+describe("shouldRefreshStaleSessionOnResume", () => {
+  test("returns false outside standalone/PWA mode", () => {
+    expect(shouldRefreshStaleSessionOnResume({
+      isStandalone: false,
+      hiddenAt: 1,
+      resumedAt: 1 + PWA_RESUME_STALE_AFTER_MS + 1,
+      connectionStatus: "connected",
+    })).toBe(false)
+  })
+
+  test("returns true when a standalone session resumes after a long background gap", () => {
+    expect(shouldRefreshStaleSessionOnResume({
+      isStandalone: true,
+      hiddenAt: 100,
+      resumedAt: 100 + PWA_RESUME_STALE_AFTER_MS,
+      connectionStatus: "connected",
+    })).toBe(true)
+  })
+
+  test("returns true when the socket is not connected on resume", () => {
+    expect(shouldRefreshStaleSessionOnResume({
+      isStandalone: true,
+      hiddenAt: null,
+      resumedAt: Date.now(),
+      connectionStatus: "disconnected",
+    })).toBe(true)
+  })
+
+  test("returns false for short connected resumes", () => {
+    expect(shouldRefreshStaleSessionOnResume({
+      isStandalone: true,
+      hiddenAt: 100,
+      resumedAt: 100 + PWA_RESUME_STALE_AFTER_MS - 1,
+      connectionStatus: "connected",
+    })).toBe(false)
   })
 })
 
