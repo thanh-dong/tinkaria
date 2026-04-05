@@ -45,7 +45,23 @@ describe("getWebContextPrompt", () => {
     for (const provider of ["claude", "codex"] as const) {
       const prompt = getWebContextPrompt(provider)
       expect(prompt).toContain("Rich content")
+      expect(prompt).toContain("Use rich transcript formatting proactively")
       expect(prompt).toContain("Plan mode")
+    }
+  })
+
+  test("describes cross-session orchestration as explicit tool-mediated chat coordination", () => {
+    for (const provider of ["claude", "codex"] as const) {
+      const prompt = getWebContextPrompt(provider)
+      expect(prompt).toContain("spawn_agent")
+      expect(prompt).toContain("send_input")
+      expect(prompt).toContain("wait_agent")
+      expect(prompt).toContain("separate chats")
+      expect(prompt).toContain("same project")
+      expect(prompt).toContain("not hidden shared memory")
+      expect(prompt).toContain("final result")
+      expect(prompt).toContain("only that chat's final result")
+      expect(prompt).toContain("Do not assume delegated chats share live intermediate reasoning")
     }
   })
 
@@ -54,6 +70,9 @@ describe("getWebContextPrompt", () => {
     const disabledPrompt = getWebContextPrompt("codex", { presentContentEnabled: false })
 
     expect(enabledPrompt).toContain("present_content")
+    expect(enabledPrompt).toContain("implementation plans")
+    expect(enabledPrompt).toContain("comparison tables")
+    expect(enabledPrompt).toContain("concise status summaries")
     expect(disabledPrompt).not.toContain("present_content")
   })
 

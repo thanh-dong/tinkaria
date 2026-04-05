@@ -217,6 +217,15 @@ describe("CodexAppServerManager", () => {
             }),
           })
         )
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("only that chat's final result")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
+          "Do not assume delegated chats share live intermediate reasoning"
+        )
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
+          "Use rich transcript formatting proactively"
+        )
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("implementation plans")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("comparison tables")
         child.writeServerMessage({
           id: message.id,
           result: { turn: { id: "turn-1", status: "completed", error: null } },

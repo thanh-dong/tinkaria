@@ -1,5 +1,26 @@
 # Kanna Tasks
 
+## Completed: Cross-Session Prompt Guidance
+
+**Status**: Verified. The shared provider web-context prompt now tells both Claude and Codex how cross-session agent work actually behaves in Tinkaria, so delegated work is described as explicit orchestration between separate chats instead of implicit shared context.
+
+**Root cause**:
+1. `src/server/agent.ts` only described the browser/web UI context and rich transcript affordances, but it did not explain the runtime semantics of cross-session work.
+2. The orchestration layer already had concrete `spawn_agent`, `send_input`, `wait_agent`, and `close_agent` behavior, yet the prompt layer did not teach those constraints or the fact that delegated chats are separate sessions in the same project.
+
+**Fix**:
+1. Added prompt guidance in `src/server/agent.ts` describing cross-session work as explicit orchestration between separate chats in the same project, not hidden shared memory.
+2. Documented the intended semantics of `spawn_agent`, `send_input`, `wait_agent`, and `close_agent`, plus the existence of busy/depth/concurrency limits.
+3. Strengthened the prompt defensively so `wait_agent` is described as returning only the delegated chat's final result and delegated chats are explicitly called out as not sharing live intermediate reasoning or mutable in-memory context.
+4. Expanded rich-content guidance so the shared prompt encourages proactive use of tables, Mermaid diagrams, and structured markdown when they improve clarity, and Codex-specific `present_content` guidance now covers implementation plans, comparison tables, diagrams, code samples, checklists, design notes, and concise status summaries.
+5. Added regression coverage in `src/server/agent.test.ts` asserting both Claude and Codex prompts include the cross-session orchestration contract, and extended `src/server/codex-app-server.test.ts` to assert the exact defensive/rich-content `developer_instructions` sent on Codex `turn/start`.
+
+**Verified**:
+1. `bun test src/server/agent.test.ts`
+2. `bun test src/server/orchestration.test.ts`
+3. `bun test src/server/codex-app-server.test.ts`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
 ## Completed: Sidebar Provider Glyph
 
 **Status**: Verified. Sidebar chat rows now show a tiny provider glyph beside the kebab menu so Claude vs Codex is visible at a glance without adding row text or changing the existing status indicators.

@@ -43,13 +43,19 @@ export function getWebContextPrompt(
   const promptLines = [
     `You are operating within ${APP_NAME}, a web-based interface for ${PROVIDER_NAMES[provider]}.`,
     "Rich content (markdown tables, syntax-highlighted code blocks, Mermaid diagrams) renders natively in the browser.",
+    "Use rich transcript formatting proactively when it improves clarity, such as tables for comparisons, Mermaid diagrams for flows, and structured markdown for plans, checklists, or summaries.",
     "The user has a sidebar with chat history and project management — multiple concurrent chats are supported.",
     "Plan mode renders a visual approval UI with approve/reject controls.",
+    "Cross-session agent work is explicit orchestration between separate chats in the same project, not hidden shared memory.",
+    "Use spawn_agent to start a separate chat for delegated work, send_input to message an existing delegated chat, wait_agent to receive only that chat's final result, and close_agent to dispose it when done.",
+    "Do not assume delegated chats share live intermediate reasoning, transcript state, or mutable in-memory context with your current chat; communicate needed context explicitly.",
+    "Delegated chats may already be busy, and orchestration is bounded by depth and concurrency limits.",
   ]
 
   if (provider === "codex" && options?.presentContentEnabled) {
     promptLines.push(
-      "When you need to intentionally present a structured artifact in the transcript, call the `present_content` dynamic tool instead of only describing the content in assistant text."
+      "When you need to intentionally present a structured artifact in the transcript, call the `present_content` dynamic tool instead of only describing the content in assistant text.",
+      "Use `present_content` for bounded artifacts that benefit from a dedicated card, such as implementation plans, comparison tables, diagrams, code samples, checklists, design notes, or concise status summaries."
     )
   }
 
