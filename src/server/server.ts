@@ -1,5 +1,5 @@
 import path from "node:path"
-import { APP_NAME, getRuntimeProfile } from "../shared/branding"
+import { APP_NAME, getRuntimeProfile, LOG_PREFIX } from "../shared/branding"
 import { EventStore } from "./event-store"
 import { AgentCoordinator } from "./agent"
 import { discoverProjects, type DiscoveredProject } from "./discovery"
@@ -65,16 +65,13 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   const natsBridge = await NatsBridge.create({ token: authToken })
   await ensureTerminalEventsStream(natsBridge.nc)
   await ensureChatMessageStream(natsBridge.nc)
+
+  // Codex kit: registry + runtime created now, daemon started in background after HTTP is up
   const projectKitRegistry = new ProjectKitRegistry(natsBridge.nc)
-  const localCodexKit = await LocalCodexKitDaemon.start({
-    natsUrl: natsBridge.natsUrl,
-    authToken,
-  })
   const codexRuntime = new RemoteCodexRuntime({
     nc: natsBridge.nc,
     registry: projectKitRegistry,
   })
-  await projectKitRegistry.waitForAvailableKit()
 
   // Use indirection to break the circular dependency:
   // agent -> onStateChange -> publisher.broadcastSnapshots
@@ -220,6 +217,18 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     }
   }
 
+  // Start Codex kit daemon in background — not on the critical path for HTTP
+  let localCodexKit: LocalCodexKitDaemon | null = null
+  void LocalCodexKitDaemon.start({
+    natsUrl: natsBridge.natsUrl,
+    authToken,
+  }).then((daemon) => {
+    localCodexKit = daemon
+  }).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(LOG_PREFIX, `Codex kit daemon failed to start: ${message}`)
+  })
+
   const shutdown = async () => {
     clearInterval(abandonInterval)
     for (const chatId of [...agent.activeTurns.keys()]) {
@@ -230,7 +239,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     publisher.dispose()
     terminals.closeAll()
     projectKitRegistry.dispose()
-    await localCodexKit.dispose()
+    await localCodexKit?.dispose()
     await natsBridge.dispose()
     await store.compact()
     server.stop(true)

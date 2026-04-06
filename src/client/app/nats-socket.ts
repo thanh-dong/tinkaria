@@ -37,7 +37,7 @@ export class NatsSocket implements TinkariaTransport {
   private readonly statusListeners = new Set<StatusListener>()
   private currentStatus: SocketStatus = "disconnected"
   private reconnectTimer: number | null = null
-  private reconnectDelayMs = 750
+  private reconnectDelayMs = 250
   private resolvedToken: string | undefined = undefined
   private counter = 0
 
@@ -307,8 +307,8 @@ export class NatsSocket implements TinkariaTransport {
     this.reconnecting = true
     this.reconnectTimer = window.setTimeout(() => {
       this.resetConnection()
-      void this.connect()
-      this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 5_000)
+      void this.discoverAndConnect()
+      this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 3_000)
     }, this.reconnectDelayMs)
   }
 
