@@ -1,5 +1,181 @@
 # Kanna Tasks
 
+## Completed: Session Picker Runtime Usage Details
+
+**Status**: Verified. Session resume surfaces now expose runtime metadata already present in provider session logs, so you can see model, token usage/context left, and subscription-window usage percentages without resuming blindly.
+
+**Root cause**:
+1. `DiscoveredSession` only surfaced title, provider, source, and timestamps, even though Codex session logs already include `token_count`, `model_context_window`, and rate-limit percentages.
+2. The existing session UI in the sidebar/homepage picker had no place to show deeper runtime clues, so session selection lacked the operational context you asked for.
+
+**Fix**:
+1. Extended session discovery to parse lightweight runtime metadata from CLI session logs: Claude model identity and Codex model, cumulative token usage, remaining context, and primary/secondary usage-window percentages.
+2. Added reusable runtime badges to the session picker rows and homepage recent-session cards so the extra metadata rides on the existing UI instead of adding a new panel.
+3. Added focused regression coverage for both the parser and the picker rendering.
+
+**Verified**:
+1. `bun test src/server/session-discovery.test.ts`
+2. `bun test src/client/components/chat-ui/SessionPicker.test.tsx`
+3. `bun test src/client/components/LocalDev.test.tsx`
+4. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+5. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Completed: Current Session Runtime Details In Navbar
+
+**Status**: Verified. The active chat navbar now shows the same kind of runtime metadata for the current session: subscription type when available, model, token usage, context left, and subscription-window usage percentages.
+
+**Root cause**:
+1. The previous change only enriched discovered/resumable sessions; the active chat snapshot still exposed only title/status/provider/session token.
+2. Live runtime usage was already present in the provider session files, but there was no command path to inspect the current chat’s active session and no UI surface for it.
+
+**Fix**:
+1. Added `chat.getSessionRuntime` so the client can inspect the active chat’s session file and reuse the same runtime parser used by session discovery.
+2. Updated `useTinkariaState` to fetch current-session runtime metadata on active chat changes and poll every 5 seconds while a turn is in progress.
+3. Extended `ChatNavbar` to render the active session’s runtime badges, prefixed with transcript-derived subscription type when present.
+
+**Verified**:
+1. `bun test src/server/nats-responders.test.ts`
+2. `bun test src/client/components/chat-ui/ChatNavbar.test.tsx`
+3. `bun test src/server/session-discovery.test.ts src/server/nats-responders.test.ts src/client/components/chat-ui/SessionPicker.test.tsx src/client/components/chat-ui/ChatNavbar.test.tsx src/client/components/LocalDev.test.tsx`
+4. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+5. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Completed: Auto-Upgrade Diashort Links Into Rich Embed Cards
+
+**Status**: Verified for the targeted transcript slice. Assistant text that includes bare Diashort links now keeps the prose intact while appending a rich embedded card automatically, so the UI still lands on a direct embed even when the model emits a plain link instead of `present_content`.
+
+**Root cause**:
+1. The direct-embed prompt guidance improved agent incentives, but ordinary assistant text still only autolinked Diashort URLs.
+2. That meant the fallback path for “model forgot to call `present_content`” still degraded to a plain link despite the browser already having a Diashort embed renderer.
+
+**Fix**:
+1. Updated `src/client/components/messages/TextMessage.tsx` to detect unique Diashort URLs in assistant text and append one rich embed card per unique link.
+2. Reused the existing `EmbedRenderer` `diashort` format so share links normalize to `/e/...` embeds through the same rich-content surface.
+3. Added focused regression coverage in `src/client/components/messages/TextMessage.test.tsx` for embed-card creation and duplicate-link deduplication.
+4. Updated C3 `c3-111 messages` so the architecture map reflects that assistant prose can auto-upgrade embeddable links into artifact cards.
+
+**Verified**:
+1. `bun test src/client/components/messages/TextMessage.test.tsx`
+2. `bun test src/client/components/rich-content/EmbedRenderer.test.tsx`
+3. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Completed: Direct Embed Prompt And Rich Content Path
+
+**Status**: Verified for the targeted prompt/rendering slice. Agents now have explicit prompt guidance to prefer direct rich embeds over bare links when appropriate, and the rich-content pipeline can render direct remote embeds through `present_content`, including Diashort share-link normalization to embed URLs.
+
+**Root cause**:
+1. The prompt told agents that rich content and `present_content` existed, but it did not explicitly bias them toward direct embeds/cards over plain links for embeddable artifacts.
+2. The client rich-content pipeline could render local embed formats like Mermaid/SVG, but it did not have a first-class remote embed path for hosted artifact URLs such as Diashort `/e/...`.
+3. Diashort links in normal assistant text remained plain links, so even when an embed-capable artifact existed, the product nudged the model toward link-sharing instead of direct presentation.
+
+**Fix**:
+1. Updated `src/server/agent.ts` prompt guidance so rich-content instructions explicitly prefer direct embeds/cards over bare links and call out Diashort embed URLs via `present_content`.
+2. Extended `src/client/components/rich-content/EmbedRenderer.tsx` with remote embed support for `iframe` and `diashort` formats, including defensive URL validation and Diashort `/d/...` -> `/e/...` normalization.
+3. Added transcript coverage so `src/client/components/messages/PresentContentMessage.tsx` renders direct embed artifacts through the same dedicated `present_content` path.
+4. Updated the C3 topology for `prompt-context`, `rich-content`, and `present-content` so the architecture map now reflects the new embed-first behavior.
+
+**Verified**:
+1. `bun test src/server/agent.test.ts`
+2. `bun test src/server/codex-app-server.test.ts`
+3. `bun test src/client/components/rich-content/EmbedRenderer.test.tsx`
+4. `bun test src/client/components/messages/PresentContentMessage.test.tsx`
+5. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+6. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+**Notes**:
+1. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage` is currently below 100% because the active worktree also contains an unrelated `src-tauri/**` removal that has not been remapped yet.
+
+## Completed: Remove Tauri Companion In Favor Of PWA
+
+**Status**: Verified. The obsolete tauri companion/runtime path is gone. Tinkaria is now documented and modeled as a browser/PWA-first product, with the old native companion files, protocol hooks, and UI affordances removed.
+
+**Decision**:
+1. Treat the PWA as the replacement for the old companion flow.
+2. Remove companion-only runtime/protocol/UI/package surface instead of leaving dormant desktop plumbing behind.
+3. Keep the rest of the browser app behavior unchanged.
+
+**Fix**:
+1. Removed `src-tauri/**`, tauri package scripts/dependencies, and the stale tauri/native-webview design docs.
+2. Removed the companion route, manifest/bootstrap helpers, desktop renderer registry/protocol, and native-webview command path.
+3. Simplified sidebar/navbar/homepage surfaces back to normal browser/PWA behavior and updated the affected tests.
+4. Deleted obsolete C3 entities `c3-3`, `c3-105`, `c3-301`, and `rule-tauri-companion-native-runtime`, and rewrote the affected component goals.
+
+**Verified**:
+1. `bun install`
+2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+3. `bun test src/client/app/App.test.tsx src/client/app/TinkariaSidebar.test.tsx src/client/components/chat-ui/ChatNavbar.test.tsx src/client/components/LocalDev.test.tsx src/client/app/useTinkariaState.test.ts src/server/nats-publisher.test.ts src/server/nats-responders.test.ts src/server/nats-streams.test.ts src/shared/nats-subjects.test.ts src/shared/vite-config.test.ts src/client/app/ChatPage.test.ts`
+4. `bun run build`
+5. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Completed: C3 Component Split For Prompt, Orchestration, And Rich Content Surfaces
+
+**Status**: Verified. The C3 topology now exposes the recently clarified agent-prompt and structured-content concerns as first-class components instead of hiding them inside coarse `agent`, `codex`, and `messages` buckets.
+
+**Fix**:
+1. Added new server components `c3-206 orchestration` and `c3-207 prompt-context` to make cross-session delegation and provider prompt composition visible as separate responsibilities.
+2. Added new client components `c3-107 rich-content` and `c3-106 present-content` so shared artifact rendering primitives and the dedicated `present_content` transcript path have stable homes in the codemap.
+3. Updated `c3-210 agent`, `c3-216 codex`, and `c3-111 messages` to point at those new components explicitly, clarifying who owns prompt composition, orchestration semantics, Codex dynamic artifact output, and transcript rendering.
+4. Mapped `bin/tinkaria-project` into `c3-222 project-agent` so the codemap returned to full coverage.
+
+**Verified**:
+1. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+2. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage` -> `100%`
+
+## In Progress: Remove Embedded Terminal And Settings Surfaces
+
+**Status**: Browser-facing slice verified. ADR `adr-20260406-remove-terminal-and-settings` created. `[ASSUMED]` implement now, with scope limited to the browser product surfaces for embedded terminal access, terminal buttons/shortcuts/layout, and settings navigation/routes.
+
+**Scope**:
+1. Remove the embedded terminal workspace from the chat page layout and navbar controls.
+2. Remove terminal-specific client stores/preferences usage and terminal-related keyboard handling from the chat surface.
+3. Remove settings navigation and route entrypoints from the app shell/sidebar.
+4. Update targeted tests/types/C3 docs to match the reduced surface.
+
+**Current findings**:
+1. A delegated review found an early `ChatNavbar.tsx` parse break during the first pass; that was caused by a malformed JSX branch while removing terminal controls.
+2. Backend inspection confirmed that terminal access is not isolated to a standalone route. The browser UI can remove terminal surfaces without changing the generic NATS transport, but true terminal removal would also require shared protocol/server/NATS cleanup.
+3. The current branch is already mid-removal of the old tauri/native-webview/desktop path, so preserving those APIs while editing terminal/settings is the wrong assumption for this worktree.
+4. The active task should therefore align with current branch reality: remove terminal/settings browser surfaces without reintroducing already-removed desktop/Tauri runtime plumbing.
+
+**Implemented**:
+1. Removed settings route entrypoints and deleted `SettingsPage` plus its test/button helper.
+2. Removed the embedded terminal from `ChatPage` layout and from `ChatNavbar` controls, leaving only chat/right-sidebar/browser external actions.
+3. Replaced the sidebar footer settings button with a passive connection-status summary.
+4. Simplified `useTinkariaState` client typing so browser-surface external actions no longer advertise `open_terminal`.
+5. Updated `App.test.tsx` and the existing app/chat/sidebar/navbar tests to reflect the reduced surface.
+
+**Residual follow-up**:
+1. `src/client/lib/keybindings.ts`, `src/shared/types.ts`, and the unused terminal workspace/store files still define terminal concepts, but the browser surface no longer uses them.
+2. If terminal decommissioning should be total rather than UI-only, do it as a separate explicit slice across shared protocol/server responders/NATS subjects.
+
+**Verify**:
+1. `bun test src/client/app/App.test.tsx src/client/app/ChatPage.test.ts src/client/app/TinkariaSidebar.test.tsx src/client/components/chat-ui/ChatNavbar.test.tsx`
+2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+3. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
+## Provisioned: Project-Bound Kit Execution Profiles
+
+**Status**: Design recorded, not implemented. Added C3 ADR `adr-20260406-kit-isolation-by-project` to define how the hub/kit split should support different prompt/skill/runtime behavior per project without moving durable state out of the hub.
+
+**Decision**:
+1. Do not model isolation as `one project = one physical kit`.
+2. Introduce an immutable `ExecutionProfile` advertised by kits and selected by projects via a `ProjectExecutionPolicy`.
+3. Persist profile affinity on chats/sessions so provider thread tokens are never resumed under a different prompt/skill/runtime profile.
+4. Keep orchestration, approvals, transcript order, and `project-agent` in the hub; kits only own execution-bound concerns.
+5. Treat profile changes as new-thread boundaries rather than a mid-thread toggle.
+
+**Why**:
+1. Current `AgentCoordinator` already binds turns to project `localPath` plus persisted `sessionToken`, which is compatible with profile affinity.
+2. Claude already consumes `user`/`project`/`local` settings by cwd, while Codex already runs a per-chat app-server by cwd, so the runtime boundary is close to supporting profile isolation.
+3. The current Codex launcher still inherits `process.env`, which would leak global config across profiles unless the kit runtime assembles a curated per-profile environment.
+
+**Next**:
+1. Add `ExecutionProfile` and `ProjectExecutionPolicy` types to hub-owned state.
+2. Persist `profileId` on chats when a turn starts and require profile-compatible resume/scheduling.
+3. Extend kit registration to advertise supported profile ids and runtime metadata.
+4. Replace implicit provider env inheritance with curated per-profile env/config roots before treating the isolation story as real.
+
 ## Completed: Chat File Preview Uses Rich Content Overlay
 
 **Status**: Verified. Local file previews opened from the chat page now use the same rich-content modal shell as inline rich content blocks, so file previews no longer diverge in modal chrome or affordances.
@@ -20,19 +196,20 @@
 3. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
 4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
 
-## Provisioned: Tinkerlet Main/Node Split
+## Design: Hub/Kit Split
 
-**Status**: Design recorded, not implemented. Added C3 ADR `adr-20260405-tinkerlet-main-node-split` as the control-plane/worker-plane proposal for externalizing agent execution without moving durable state out of the main server boundary.
+**Status**: Design recorded, not implemented. Added C3 ADR `adr-20260406-hub-kit-runtime-split` as the hub/kit proposal for externalizing agent execution without moving durable state out of the main runtime boundary.
 
 **Decision**:
-1. `main` keeps HTTP/UI, embedded NATS, event store, read models, orchestration state, approvals, and authoritative transcript ownership.
-2. `node` becomes a leased worker that advertises capabilities, runs provider turns, and emits events/results back to `main`.
-3. `project-agent` stays in `main`; it is coordination/query logic over shared state, not worker execution.
+1. `hub` keeps HTTP/UI, embedded NATS, event store, read models, orchestration state, approvals, and authoritative transcript ownership.
+2. `kit` becomes a long-lived leased execution daemon that advertises capabilities, runs many provider turns across many projects/chats, and emits events/results back to the `hub`.
+3. `project-agent` stays in the `hub`; it is coordination/query logic over shared state, not worker execution.
+4. ADR naming now explicitly separates orchestration tool names, conceptual hub/kit lifecycle verbs, and the existing `kanna.*` transport namespace so implementation does not infer wire subjects from design shorthand.
 
 **Next**:
 1. First implementation slice should extract an `AgentRuntime` interface from `src/server/agent.ts`.
-2. Add one local external `node` worker process over NATS and route Codex turns through it first.
-3. Only after the local worker path is stable should we add node registry, leases/heartbeats, and multi-machine placement.
+2. Add one local external `kit` daemon over NATS and route Codex turns through it first.
+3. Only after the local worker path is stable should we add kit registry, leases/heartbeats, and multi-machine placement.
 
 ## Completed: Cross-Session Prompt Guidance
 
@@ -76,23 +253,23 @@
 
 ## Completed: PWA Stale Session Resume Refresh
 
-**Status**: Verified. Standalone/PWA chat sessions now treat long background gaps and broken reconnect states as stale, then proactively refresh the active chat on foreground so transcript tails are fetched again instead of staying frozen mid-session.
+**Status**: Verified. Standalone/PWA chat sessions now treat long background gaps and broken reconnect states as stale, then proactively refresh the client state on foreground so the sidebar, local project lists, active chat transcript/runtime, and open session pickers all rehydrate without a full reload.
 
 **Root cause**:
-1. `src/client/app/useTinkariaState.ts` only revalidated transcript cache on explicit socket disconnects or sidebar timestamp deltas, so a suspended mobile PWA could resume with a cached mid-turn transcript that still looked current.
-2. `src/client/app/nats-socket.ts` exposed `ensureHealthyConnection()`, but it only forced a reconnect when the underlying NATS handle was missing, not when the transport had already fallen into a non-connected status.
+1. `src/client/app/useTinkariaState.ts` originally only revalidated the active chat transcript cache on explicit socket disconnects or sidebar timestamp deltas, so a suspended mobile PWA could resume with a stale sidebar or runtime state even after the earlier stale-chat recovery landed.
+2. Open session picker snapshots, local-project snapshots, and current-session runtime reads were not part of the stale-resume fan-out, so foregrounding could still leave parts of the UI behind the latest server state unless the socket happened to fully reconnect.
+3. `src/client/app/nats-socket.ts` exposed `ensureHealthyConnection()`, but reconnect alone was not enough when the transport stayed nominally connected and therefore did not naturally reissue all initial snapshot fetches.
 
 **Fix**:
-1. Added a standalone/PWA stale-resume policy in `src/client/app/useTinkariaState.ts` keyed off `visibilitychange`, `focus`, `online`, and `pageshow`, with a 15-second background threshold plus reconnect-state fallback.
-2. Added a deduped active-chat refresh nonce so foreground recovery re-runs the chat subscription and refetches the transcript tail without adding cached API data or service-worker fetch caching.
-3. Tightened `src/client/app/nats-socket.ts` so `ensureHealthyConnection()` reconnects whenever the socket status is not `connected`.
-4. Added regression coverage in `src/client/app/useTinkariaState.test.ts` for the stale-resume decision boundary.
+1. Kept the standalone/PWA stale-resume policy in `src/client/app/useTinkariaState.ts` keyed off `visibilitychange`, `focus`, `online`, and `pageshow`, with the existing 15-second background threshold plus reconnect-state fallback.
+2. Widened the resume refresh nonce so foreground recovery re-subscribes not just the active chat, but also the shell-level `sidebar`, `local-projects`, and `update` snapshots plus the active session runtime fetch path.
+3. Added a deduped session-picker refresh fan-out so any currently open `sessions` snapshots are explicitly refreshed on resume even when the transport never dropped hard enough to trigger a full reconnect cycle.
+4. Kept `src/client/app/nats-socket.ts` reconnect behavior aligned with the earlier stale-resume change and added regression coverage in `src/client/app/useTinkariaState.test.ts` for the new refresh target deduplication.
 
 **Verified**:
 1. `bun test src/client/app/useTinkariaState.test.ts`
 2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
-3. `bun run build`
-4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+3. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
 
 ## Completed: Homepage Welcome-Back Sessions
 
@@ -266,12 +443,12 @@
 
 ## Completed: Vite Dev Watch Ignore Scope
 
-**Status**: Verified. The Vite dev server is now configured to ignore unrelated Markdown files and the entire `src-tauri` tree, so edits in docs/specs/tasks and the desktop shell no longer get picked up by the web client watcher.
+**Status**: Verified. The Vite dev server is now configured to ignore unrelated Markdown files, so docs/specs/tasks edits no longer get picked up by the web client watcher.
 
-**Root cause**: `vite.config.ts` did not constrain `server.watch`, so the default watcher still observed repository Markdown churn and the unrelated Tauri subtree.
+**Root cause**: `vite.config.ts` did not constrain `server.watch`, so the default watcher still observed repository Markdown churn.
 
 **Fix**:
-1. Added a `DEV_WATCH_IGNORED` pattern list in `vite.config.ts` covering `**/*.md`, `**/*.markdown`, `**/*.mdx`, and `**/src-tauri/**`.
+1. Added a `DEV_WATCH_IGNORED` pattern list in `vite.config.ts` covering `**/*.md`, `**/*.markdown`, and `**/*.mdx`.
 2. Wired that list into `server.watch.ignored` in the Vite config.
 3. Added `src/shared/vite-config.test.ts` to lock the watch-ignore contract.
 
@@ -329,19 +506,17 @@
 3. Render it with a dedicated transcript component that reuses `RichContentBlock`, markdown rendering, and embeds.
 4. Keep assistant markdown as the fallback contract.
 
-## In Progress: Tauri Companion / Native Webview Research
-
 ## Completed: Homepage Cleanup
 
 **Status**: Verified. `/` is now a cleaner launchpad instead of a mixed onboarding/diagnostics surface. The connected homepage focuses on machine/project context and actionable project cards, while the disconnected state keeps a single clear setup path.
 
 **Root cause**:
-1. `src/client/components/LocalDev.tsx` mixed setup instructions, desktop smoke diagnostics, and project picking on the same homepage.
+1. `src/client/components/LocalDev.tsx` mixed setup instructions, stale companion diagnostics, and project picking on the same homepage.
 2. Connected project cards only exposed a basename, which made the page weak as a real workspace selector.
-3. Desktop-renderer diagnostics were taking prime homepage space even though renderer-specific detail already lives on the companion route.
+3. Ancillary status cards were taking prime homepage space instead of the resume/project actions that matter first.
 
 **Fix**:
-1. Replaced the connected `Desktop Smoke` card with a compact overview row covering total projects, saved/discovered split, and desktop-renderer status.
+1. Replaced the connected `Desktop Smoke` card with a compact overview row covering total projects, saved/discovered split, and recent-session context.
 2. Reworked the project grid so cards now show title, full path, source label, and chat count, sorted by recent activity first.
 3. Simplified the disconnected state to one status block plus two focused setup cards instead of the previous explanatory flow diagram.
 4. Removed now-unused homepage external-link plumbing from `LocalProjectsPage`.
@@ -351,91 +526,6 @@
 1. `bun test src/client/components/LocalDev.test.tsx`
 2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
 3. `bun run build`
-
-**Spec**: `/home/lagz0ne/dev/kanna/docs/superpowers/specs/2026-04-02-tauri-native-webview-companion-design.md`
-**Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-02-tauri-native-webview-companion.md`
-**Next Plan**: `/home/lagz0ne/dev/kanna/docs/superpowers/plans/2026-04-03-tauri-two-window-desktop.md`
-
-**Status**: Companion registration, desktop renderer snapshots, the first real steering path, tray/logging lifecycle, and the dedicated desktop settings route are implemented. The bootstrap path is now server-first: the Windows companion no longer depends on a local bootstrap file, normalizes the discovered companion server back to the public `5174` origin, and prefers `/auth/token` + `/nats-ws` there. Task 2 from the two-window desktop plan is now in place in the native runtime: Tauri opens a borderless `main-shell` window pointed at the browser-hosted server route, registers native maximize/fullscreen commands, hides the primary shell on close instead of exiting, and exposes a tray `Open Tinkaria` restore path. The Tauri capability file now grants remote IPC/window access to the `main-shell` route on `http://127.0.0.1:5174/*` / `http://localhost:5174/*`. The browser-hosted shell chrome is now reduced to the existing sidebar header only: the desktop maximize/fullscreen controls reveal only while hovering the Tinkaria logo/header cluster, alongside the collapse affordance, and that same cluster acts as the drag region. Current blocker: the public `/nats-ws` surface on the running dev server still returns `HTTP 200` instead of upgrading, so the Windows companion cannot complete native NATS attach yet. A defensive legacy fallback exists, but the old direct `natsWsUrl` from the WSL-hosted manifest is not reachable from Windows (`os error 10061`), which confirms the public proxy path must work for cross-WSL desktop attach.
-
-**Summary**: Research how to incorporate Tauri so controlled content uses native webviews instead of iframes. The approved direction is now companion-only: the main server stays browser-first, exposes a single main-server surface for browser/desktop settings, advertises the native NATS attach target through the companion manifest/bootstrap, and Tauri attaches as a native peer that provides tray lifecycle, settings access, and managed native webviews.
-
-**Current decisions**:
-1. Prefer hybrid architecture eventually, but start with a smaller-scope Tauri companion/shell.
-2. Controlled content should support local and LAN/Tailscale targets first, with optional proxied remote targets later.
-3. UX should support both docked and pop-out controlled webviews.
-4. Runtime discovery/control should be NATS-first; avoid relying on HTTP for coordination.
-5. Companion discovery should attach to the public server origin first; local bootstrap files are no longer a valid cross-WSL contract.
-6. Tauri should stay companion-only for now: tray lifecycle, settings access, reconnect behavior, and native webviews, not frontend ownership.
-7. Browser-facing companion UX should be server-first: `/desktop/:rendererId` is the dedicated desktop route, outside the normal sidebar/settings shell.
-8. Public companion discovery no longer needs a separate NATS WebSocket URL because the main server fronts the browser `/nats-ws` path.
-9. The companion must be defensive against stale manifest payloads during migration: prefer the discovered manifest origin for `serverUrl`, but optionally parse legacy `natsWsUrl`/`authToken` fields as compatibility fallback.
-
-**Regression note (2026-04-02)**:
-1. The committed baseline did not include the `desktop-renderers` snapshot topic in the shared/server snapshot pipeline, which explains the `Unknown topic type: desktop-renderers` runtime error on stale code paths.
-2. The current dirty worktree already contains the runtime support in `src/shared/protocol.ts` and `src/server/nats-publisher.ts`.
-3. Added regression coverage so the desktop renderer snapshot path is exercised in `src/server/nats-publisher.test.ts`, `src/shared/nats-subjects.test.ts`, and `src/server/nats-streams.test.ts`.
-
-**Verified**:
-1. `bun test src/server/nats-publisher.test.ts src/shared/nats-subjects.test.ts src/server/nats-streams.test.ts`
-2. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
-3. `bun test src/shared/desktop-companion.test.ts`
-4. `bun -e 'import { startKannaServer } from "./src/server/server"; ... fetch("http://127.0.0.1:5220/desktop-companion.json") ...'`
-5. `bun test src/shared/desktop-bootstrap.test.ts src/server/desktop-bootstrap.test.ts src/shared/desktop-companion.test.ts`
-6. `cargo test --manifest-path src-tauri/Cargo.toml`
-7. `cargo check --manifest-path src-tauri/Cargo.toml`
-8. `bun run build`
-9. `agent-browser open http://127.0.0.1:5174/settings/general`
-10. `agent-browser snapshot`
-11. `agent-browser errors --clear`
-12. Windows smoke: rebuilt `src-tauri/target/x86_64-pc-windows-gnu/debug/tinkaria-desktop.exe`, staged it under `C:\Users\duc\AppData\Local\Temp\tinkaria-desktop-smoke\`, refreshed `C:\Users\duc\.tinkaria-dev\data\desktop-bootstrap.json`, and verified `Get-Process -Id 10708` returned `ProcessName : tinkaria-desktop` with the process still alive after launch.
-13. `cargo test --manifest-path src-tauri/Cargo.toml`
-14. `cargo check --manifest-path src-tauri/Cargo.toml`
-15. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu`
-16. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
-17. `cargo test --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
-18. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
-19. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
-20. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage` -> `100%`
-21. `bun test src/client/app/App.test.tsx src/client/app/DesktopCompanionPage.test.tsx src/shared/desktop-companion.test.ts src/client/app/useTinkariaState.test.ts`
-22. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
-23. `cargo test --manifest-path src-tauri/Cargo.toml settings::tests::settings_window_document_is_local_and_branded --target-dir /tmp/tinkaria-tauri-target`
-24. `cargo test --manifest-path src-tauri/Cargo.toml manifest::tests::parses_desktop_companion_manifest_json --target-dir /tmp/tinkaria-tauri-target`
-25. `bun run build`
-26. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
-27. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
-28. `agent-browser open http://127.0.0.1:5175/desktop/desktop:LAGZ0NE`
-29. `agent-browser errors --clear`
-30. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
-31. `bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage` -> `100%`
-32. `bun test src/shared/desktop-companion.test.ts`
-33. `cargo test --manifest-path src-tauri/Cargo.toml manifest::tests::derives_server_url_from_manifest_url --target-dir /tmp/tinkaria-tauri-target`
-34. `cargo test --manifest-path src-tauri/Cargo.toml manifest::tests::resolves_legacy_transport_fields_when_present --target-dir /tmp/tinkaria-tauri-target`
-35. `cargo test --manifest-path src-tauri/Cargo.toml settings::tests::companion_settings_route_targets_a_specific_renderer --target-dir /tmp/tinkaria-tauri-target`
-36. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
-37. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
-38. `bun run build`
-39. `agent-browser open http://127.0.0.1:5174/desktop/desktop:LAGZ0NE`
-40. `agent-browser errors`
-41. `curl -i -N -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: SGVsbG8sIHdvcmxkIQ==' http://127.0.0.1:5174/nats-ws` -> returned `HTTP/1.1 200 OK` with the Vite shell instead of `101`
-42. `bun -e 'const ws = new WebSocket("ws://127.0.0.1:43659"); ...'` -> `open`
-43. `curl -sSf http://127.0.0.1:5174/auth/token`
-44. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
-45. Windows launch smoke via `cmd.exe /C start "" "C:\Users\duc\AppData\Local\Temp\tinkaria-desktop-release\tinkaria-desktop-20260403b.exe"` plus live log inspection under `C:\Users\duc\.tinkaria\logs\companion.log`
-46. RED: `cargo test --manifest-path src-tauri/Cargo.toml primary_shell_window_title_uses_tinkaria_branding --target-dir /tmp/tinkaria-tauri-target` -> failed (`left: "Tinkaria Companion"`, `right: "Tinkaria"`)
-47. GREEN: `cargo test --manifest-path src-tauri/Cargo.toml primary_shell_ --target-dir /tmp/tinkaria-tauri-target`
-48. RED: `cargo test --manifest-path src-tauri/Cargo.toml primary_shell_close_requests_are_hidden_instead_of_exiting --target-dir /tmp/tinkaria-tauri-target` -> failed because `should_hide_primary_shell_on_close_requested` did not exist
-49. GREEN: `cargo test --manifest-path src-tauri/Cargo.toml primary_shell_close_requests_are_hidden_instead_of_exiting --target-dir /tmp/tinkaria-tauri-target`
-50. RED: `cargo test --manifest-path src-tauri/Cargo.toml tray_menu_ids_cover_diagnostics_surfaces --target-dir /tmp/tinkaria-tauri-target` -> failed because `OPEN_MAIN_SHELL_MENU_ID` did not exist
-51. GREEN: `cargo test --manifest-path src-tauri/Cargo.toml tray_menu_ids_cover_diagnostics_surfaces --target-dir /tmp/tinkaria-tauri-target`
-52. `cargo test --manifest-path src-tauri/Cargo.toml settings::tests::settings_window_close_requests_are_hidden_instead_of_exiting --target-dir /tmp/tinkaria-tauri-target`
-53. `cargo check --manifest-path src-tauri/Cargo.toml --target-dir /tmp/tinkaria-tauri-target`
-54. `cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --release --target-dir /tmp/tinkaria-tauri-win-target`
-55. `agent-browser open http://127.0.0.1:5174/desktop/desktop:LAGZ0NE`
-56. `agent-browser errors`
-57. Windows launch smoke via `Start-Process -FilePath 'C:\Users\duc\AppData\Local\Temp\tinkaria-desktop-release\tinkaria-desktop-1775208584.exe'`
-58. Windows process check: `Get-Process tinkaria-desktop*` -> PID `8744` for `tinkaria-desktop-1775208584`
-59. `bun test src/client/app/App.test.tsx`
 60. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
 61. `bun run build`
 62. `agent-browser open http://127.0.0.1:5174`
