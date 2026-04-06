@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.0-rc.1 - 2026-04-06
+
+This release simplifies Tinkaria into a browser/PWA-first product, removes obsolete desktop/editor integration paths, and improves transcript stability and rendering performance.
+
+### Breaking Changes
+
+- Removed the experimental Tauri desktop companion and native webview/runtime plumbing.
+- Removed the browser settings route and embedded terminal UI surfaces.
+- Removed editor handoff and `open_editor` infrastructure, including configurable keybindings and editor preset handling.
+- Renamed the internal transport namespace from `kanna.*` to `runtime.*`.
+- Removed legacy `~/.kanna*` startup migration support from the active runtime.
+
+### Added
+
+- Integrated `@chenglou/pretext` for transcript height estimation to reduce layout shift and scroll jank in long chats.
+- Added font-readiness and cached message-height estimation utilities for transcript virtualization.
+
+### Changed
+
+- Repositioned Tinkaria as PWA/browser-first across docs, package surface, and architecture.
+- Simplified chat, navbar, sidebar, and app-shell flows after removing desktop/settings/terminal UI branches.
+- Kept core keyboard shortcuts as direct built-ins instead of routing through the old keybinding system.
+- Tightened C3 topology by removing stale terminal components and wiring defensive rules across affected components.
+
+### Fixed
+
+- Fixed blank chat transcript remounts when the latest transcript tail contains only non-rendered/tool-result entries by backfilling older renderable history.
+- Hardened defensive parsing and validation around JSON decoding, CLI port handling, and responder file reads.
+- Removed residual brand-coupled runtime naming and obsolete branding-migration code.
+
+### Verification
+
+- `git log @{u}..HEAD`
+- `git diff --shortstat @{u}..HEAD`
+- `git status --short`
+- `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`
+
 ## 1.0.0-rc - 2026-04-02
 
 This release marks the transition from `Kanna` to `Tinkaria` and rolls up the current verified release surface into the first release candidate under the new product identity.
