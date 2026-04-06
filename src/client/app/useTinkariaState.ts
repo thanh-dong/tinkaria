@@ -230,6 +230,24 @@ export function getInitialChatReadAnchor(args: {
   return { kind: "tail" }
 }
 
+export function getLockedInitialChatReadAnchor(
+  current: InitialChatReadAnchor,
+  next: InitialChatReadAnchor,
+  initialScrollCompleted: boolean,
+): InitialChatReadAnchor {
+  if (initialScrollCompleted) return current
+  if (next.kind === "wait") return current
+  return current.kind === "wait" ? next : current
+}
+
+export function isSameReadBlockBoundary(
+  left: ReadBlockBoundary | null,
+  right: ReadBlockBoundary | null,
+): boolean {
+  if (!left || !right) return left === right
+  return left.messageId === right.messageId && left.blockIndex === right.blockIndex
+}
+
 function useTinkariaSocket(): TinkariaTransport {
   const socketRef = useRef<TinkariaTransport | null>(null)
   if (!socketRef.current) {
@@ -671,6 +689,8 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const inputRef = useRef<HTMLDivElement>(null)
   const initialScrollCompletedRef = useRef(false)
   const initialScrollFrameRef = useRef<number | null>(null)
+  const scrollStateFrameRef = useRef<number | null>(null)
+  const lastTrackedReadBoundaryRef = useRef<ReadBlockBoundary | null>(null)
   const activeQueuedText = getQueuedText(submitPipeline, activeChatId)
 
   function updateSubmitPipeline(updater: (current: SubmitPipelineState) => SubmitPipelineState): SubmitPipelineState {
@@ -1098,7 +1118,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const isProcessing = isProcessingStatus(runtime?.status)
   const canCancel = canCancelStatus(runtime?.status)
   const hasResolvedActiveSidebarChat = !activeChatId || activeSidebarChat !== null
-  const initialChatReadAnchor = getInitialChatReadAnchor({
+  const nextInitialChatReadAnchor = getInitialChatReadAnchor({
     activeChatId,
     sidebarReady,
     hasSidebarChat: hasResolvedActiveSidebarChat,
@@ -1108,6 +1128,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     lastSeenMessageAt,
     lastMessageAt: activeSidebarChat?.lastMessageAt,
   })
+  const [initialChatReadAnchor, setInitialChatReadAnchor] = useState<InitialChatReadAnchor>({ kind: "wait" })
 
   useEffect(() => {
     initialScrollCompletedRef.current = false
@@ -1115,9 +1136,34 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       window.cancelAnimationFrame(initialScrollFrameRef.current)
       initialScrollFrameRef.current = null
     }
-    if (initialChatReadAnchor.kind === "wait") return
-    setIsAtBottom(initialChatReadAnchor.kind === "tail")
-  }, [activeChatId, initialChatReadAnchor])
+    if (scrollStateFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollStateFrameRef.current)
+      scrollStateFrameRef.current = null
+    }
+    lastTrackedReadBoundaryRef.current = null
+    setInitialChatReadAnchor({ kind: "wait" })
+  }, [activeChatId])
+
+  useEffect(() => () => {
+    if (initialScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(initialScrollFrameRef.current)
+    }
+    if (scrollStateFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollStateFrameRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (initialScrollCompletedRef.current) return
+
+    setInitialChatReadAnchor((current) => {
+      const lockedAnchor = getLockedInitialChatReadAnchor(current, nextInitialChatReadAnchor, initialScrollCompletedRef.current)
+      if (lockedAnchor.kind !== "wait" && current.kind === "wait") {
+        setIsAtBottom(lockedAnchor.kind === "tail")
+      }
+      return lockedAnchor
+    })
+  }, [nextInitialChatReadAnchor])
 
   const transcriptPaddingBottom = FIXED_TRANSCRIPT_PADDING_BOTTOM
   const showScrollButton = !isAtBottom && messages.length > 0
@@ -1262,6 +1308,12 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     if (!activeChatId) return
     const lastMessageAt = activeSidebarChat?.lastMessageAt
     if (!initialScrollCompletedRef.current || !isAtBottom || lastMessageAt === undefined) return
+    lastTrackedReadBoundaryRef.current = latestReadableMessage
+      ? {
+          messageId: latestReadableMessage.id,
+          blockIndex: Math.max(0, getReadableBlockCount(latestReadableMessage) - 1),
+        }
+      : null
     markChatRead(activeChatId, {
       messageId: latestReadableMessage?.id,
       blockIndex: latestReadableMessage ? Math.max(0, getReadableBlockCount(latestReadableMessage) - 1) : undefined,
@@ -1270,15 +1322,25 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   }, [activeChatId, activeSidebarChat?.lastMessageAt, isAtBottom, latestReadableMessage, markChatRead])
 
   function updateScrollState() {
-    const element = scrollRef.current
-    if (!element) return
-    const distance = element.scrollHeight - element.scrollTop - element.clientHeight
-    const nextIsAtBottom = shouldAutoFollowTranscript(distance)
-    setIsAtBottom(nextIsAtBottom)
-    if (!activeChatId || nextIsAtBottom) return
-    const boundary = getVisibleReadBlockBoundary(element)
-    if (!boundary) return
-    markChatRead(activeChatId, boundary)
+    if (scrollStateFrameRef.current !== null) return
+
+    scrollStateFrameRef.current = window.requestAnimationFrame(() => {
+      scrollStateFrameRef.current = null
+
+      const element = scrollRef.current
+      if (!element) return
+
+      const distance = element.scrollHeight - element.scrollTop - element.clientHeight
+      const nextIsAtBottom = shouldAutoFollowTranscript(distance)
+      setIsAtBottom((current) => current === nextIsAtBottom ? current : nextIsAtBottom)
+      if (!activeChatId || nextIsAtBottom) return
+
+      const boundary = getVisibleReadBlockBoundary(element)
+      if (!boundary || isSameReadBlockBoundary(lastTrackedReadBoundaryRef.current, boundary)) return
+
+      lastTrackedReadBoundaryRef.current = boundary
+      markChatRead(activeChatId, boundary)
+    })
   }
 
   function enableAutoFollow(behavior: ScrollBehavior) {

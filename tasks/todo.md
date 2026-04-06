@@ -21,6 +21,8 @@ This file is a handoff, not a changelog. Keep only active work, blockers, and th
 
 ## Verified Baseline
 
+- Chat transcript unread-anchor restore no longer re-arms during normal read-state updates; upward scrolling no longer fights the user with bottom-snap jiggle. Verified on 2026-04-06 with targeted Bun tests, `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`.
+- Chat transcript read-boundary tracking is now frame-coalesced and boundary-deduped, so manual scrolling and smooth scroll-to-bottom no longer fight persisted read-state writes. Verified on 2026-04-06 with targeted Bun tests, `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`.
 - Codex runtime now crosses a real hub-to-kit seam with project-to-kit assignment.
 - Active chat navbar can now show status-bar style repo context: cwd basename, branch, and live git dirty counts, plus rough runtime/session usage badges.
 - Chat navbar no longer exposes the obsolete open-folder or diff/right-sidebar buttons; that area is now free for future reuse.

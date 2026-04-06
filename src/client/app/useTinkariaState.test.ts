@@ -11,6 +11,8 @@ import {
   getNextReadableBoundary,
   getReadableBlockCount,
   getInitialChatReadAnchor,
+  isSameReadBlockBoundary,
+  getLockedInitialChatReadAnchor,
   getLastReadableMessage,
   getNewestRemainingChatId,
   getReadTimestampToPersistAfterReply,
@@ -646,6 +648,54 @@ describe("getInitialChatReadAnchor", () => {
       hasSidebarChat: false,
       messages: [],
     })).toEqual({ kind: "tail" })
+  })
+})
+
+describe("getLockedInitialChatReadAnchor", () => {
+  test("locks the first resolved unread anchor for the active chat", () => {
+    expect(getLockedInitialChatReadAnchor(
+      { kind: "wait" },
+      { kind: "block", messageId: "assistant-1", blockIndex: 1 },
+      false,
+    )).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
+
+    expect(getLockedInitialChatReadAnchor(
+      { kind: "block", messageId: "assistant-1", blockIndex: 1 },
+      { kind: "block", messageId: "assistant-2", blockIndex: 0 },
+      false,
+    )).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
+  })
+
+  test("ignores follow-up anchor changes after the initial scroll completed", () => {
+    expect(getLockedInitialChatReadAnchor(
+      { kind: "block", messageId: "assistant-1", blockIndex: 1 },
+      { kind: "tail" },
+      true,
+    )).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
+  })
+})
+
+describe("isSameReadBlockBoundary", () => {
+  test("returns true only when both message id and block index match", () => {
+    expect(isSameReadBlockBoundary(
+      { messageId: "assistant-1", blockIndex: 0 },
+      { messageId: "assistant-1", blockIndex: 0 },
+    )).toBe(true)
+
+    expect(isSameReadBlockBoundary(
+      { messageId: "assistant-1", blockIndex: 0 },
+      { messageId: "assistant-1", blockIndex: 1 },
+    )).toBe(false)
+
+    expect(isSameReadBlockBoundary(
+      { messageId: "assistant-1", blockIndex: 0 },
+      { messageId: "assistant-2", blockIndex: 0 },
+    )).toBe(false)
+  })
+
+  test("treats two missing boundaries as equal", () => {
+    expect(isSameReadBlockBoundary(null, null)).toBe(true)
+    expect(isSameReadBlockBoundary({ messageId: "assistant-1", blockIndex: 0 }, null)).toBe(false)
   })
 })
 
