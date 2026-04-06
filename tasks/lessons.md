@@ -1,11 +1,11 @@
 # Session Lessons
 
-- 2026-04-06: Before “preserving” a subsystem during a cleanup, check whether the current branch has already removed it. Task scope must align with the actual worktree, not with stale assumptions about older architecture.
-- 2026-04-06: When removing a UI surface, distinguish browser-surface removal from protocol/runtime removal. Embedded terminal UI can be deleted independently, but true terminal decommissioning requires an explicit shared-protocol/server slice.
-- 2026-04-06: After delegating review, fold blocking findings back into `tasks/todo.md` immediately so the handoff reflects parse breaks, scope drift, and branch-state constraints instead of only the intended plan.
-- 2026-04-06: Do not preserve or extend the old tauri companion/native-webview path by default. The product direction is browser/PWA-first unless the user explicitly reopens a native-runtime effort.
-- 2026-04-02: For Tauri companion/shell research around Kanna, do not assume HTTP discovery is acceptable. The intended control plane is NATS-only once auth and broker coordinates are available.
-- 2026-04-03: For the Tauri companion, distinguish the browser-facing attach surface from the native transport. The main server now fronts browser WebSocket access on one server URL, so public companion/settings UX should be server-first and avoid separate WS-port discovery, but the native Rust companion may still legitimately require a raw `nats://` bootstrap until its transport changes.
-- 2026-04-03: For busy composer controls, keep the queue affordance explicit as `Queue`, keep queued content above the composer only, and preserve `ArrowUp` as the restore path instead of adding transcript-level queued placeholders.
-- 2026-04-03: Persist queued drafts as local per-chat pending state with self-cleaning rules and original submit options; do not promote them into transcript/server state just to survive refresh.
-- 2026-04-03: For Windows Tauri companion work from WSL, never rely on a bootstrap file or random embedded NATS WS port that lives only inside the WSL filesystem/network namespace. The only valid cross-boundary attach path is the public server origin, and when debugging attach failures, prove the public `/nats-ws` endpoint actually returns `101 Switching Protocols` from Windows-facing clients before changing native code again.
+Keep this file short and durable. Merge repeats. Drop stale one-off notes before adding new entries.
+
+- [2026-04-06] Match task scope to the current worktree, not to stale assumptions. Before preserving or deleting a subsystem, prove it still exists on the active branch.
+- [2026-04-06] Separate browser-surface cleanup from protocol/runtime decommissioning. Removing embedded terminal UI does not by itself remove terminal infrastructure.
+- [2026-04-06] Feed blocking review findings back into `tasks/todo.md` immediately so the handoff reflects real blockers, scope drift, and branch constraints.
+- [2026-04-06] Default product direction is browser/PWA-first. Do not preserve or extend tauri/native-companion paths unless the user explicitly reopens that effort.
+- [2026-04-03] For attach/connectivity work, prefer the public server-origin path. Do not rely on WSL-local bootstrap files or hidden WS ports; prove the Windows-facing `/nats-ws` endpoint returns `101 Switching Protocols` before changing native code.
+- [2026-04-03] Keep queued drafts as local per-chat pending state with cleanup rules and original submit options. Do not promote them into transcript/server state just to survive refresh.
+- [2026-04-03] Busy-composer UX should keep the queue affordance explicit as `Queue`, keep queued content above the composer only, and preserve `ArrowUp` as the restore path.

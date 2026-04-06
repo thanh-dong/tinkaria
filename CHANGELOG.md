@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.0-rc.2 - 2026-04-06
+
+This release candidate rolls the latest chat/runtime polish into the browser-first surface and introduces the first hub-to-kit execution seam for Codex turns.
+
+### Added
+
+- Added a local Codex kit daemon, project-to-kit registry, and remote Codex runtime bridge over NATS so Codex sessions can run through a stable hub-to-kit boundary.
+- Added NATS subjects and server coverage for Codex kit registration, session lifecycle, turn streaming, interrupts, and tool-response relays.
+- Added regression tests covering project-to-kit assignment and project-aware Codex session startup.
+
+### Changed
+
+- Agent coordination now starts Codex sessions through a runtime abstraction that carries `projectId` across the session boundary.
+- Server startup now boots the default local Codex kit daemon and waits for kit availability before serving Codex runtime work.
+- Chat navbar cleanup now removes the leftover finder and right-sidebar action cluster from the browser surface.
+
+### Fixed
+
+- Fixed chat navbar repo/runtime metadata polish by shipping the runtime badges and live repo dirty-count context added after `rc.1`.
+- Fixed last-read transcript restore so refresh no longer jumps users to the wrong read position.
+
+### Verification
+
+- `bun test src/server/agent.test.ts src/server/local-codex-kit.test.ts src/client/app/ChatPage.test.ts src/client/components/chat-ui/ChatNavbar.test.tsx`
+- `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+- `bun run build`
+- `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`
+
 ## 1.0.0-rc.1 - 2026-04-06
 
 This release simplifies Tinkaria into a browser/PWA-first product, removes obsolete desktop/editor integration paths, and improves transcript stability and rendering performance.

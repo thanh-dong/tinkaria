@@ -1,8 +1,7 @@
-import { FolderOpen, Menu, PanelLeft, PanelRight, SquarePen, Terminal } from "lucide-react"
+import { Menu, PanelLeft, SquarePen } from "lucide-react"
 import { TinkariaSidebarMark } from "../branding/TinkariaSidebarMark"
 import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
-import { HotkeyTooltip, HotkeyTooltipContent, HotkeyTooltipTrigger } from "../ui/tooltip"
 import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import type { AccountInfo, CurrentRepoStatusSnapshot, DiscoveredSessionRuntime } from "../../../shared/types"
@@ -15,14 +14,6 @@ interface Props {
   onExpandSidebar: () => void
   onNewChat: () => void
   localPath?: string
-  embeddedTerminalVisible?: boolean
-  onToggleEmbeddedTerminal?: () => void
-  rightSidebarVisible?: boolean
-  onToggleRightSidebar?: () => void
-  onOpenFinder?: () => void
-  finderShortcut?: string[]
-  terminalShortcut?: string[]
-  rightSidebarShortcut?: string[]
   currentSessionRuntime?: DiscoveredSessionRuntime | null
   currentRepoStatus?: CurrentRepoStatusSnapshot | null
   accountInfo?: AccountInfo | null
@@ -68,22 +59,12 @@ export function ChatNavbar({
   onExpandSidebar,
   onNewChat,
   localPath,
-  embeddedTerminalVisible = false,
-  onToggleEmbeddedTerminal,
-  rightSidebarVisible = false,
-  onToggleRightSidebar,
-  onOpenFinder,
-  finderShortcut,
-  terminalShortcut,
-  rightSidebarShortcut,
   currentSessionRuntime,
   currentRepoStatus,
   accountInfo,
 }: Props) {
   const navbarAreaId = createUiIdentity("chat.navbar", "area")
   const newChatActionId = createUiIdentity("chat.navbar.new-chat", "action")
-  const terminalToggleActionId = createUiIdentity("chat.navbar.terminal-toggle", "action")
-  const rightSidebarToggleActionId = createUiIdentity("chat.navbar.right-sidebar-toggle", "action")
   const currentSessionLabels = [
     ...(getPathLabel(localPath, currentRepoStatus) ? [getPathLabel(localPath, currentRepoStatus)!] : []),
     ...getRepoLabels(currentRepoStatus),
@@ -163,67 +144,6 @@ export function ChatNavbar({
                 </span>
               ))}
             </div>
-          ) : null}
-        </div>
-
-        <div className="flex items-center gap-1 flex-shrink-0 border border-border rounded-full px-1.5 py-1 backdrop-blur-lg">
-          {localPath && (onOpenFinder || onToggleEmbeddedTerminal) ? (
-            <>
-              {onOpenFinder ? (
-                <HotkeyTooltip>
-                  <HotkeyTooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onOpenFinder}
-                      title="Open in Finder"
-                      className="border border-border/0"
-                    >
-                      <FolderOpen className="h-4.5 w-4.5" />
-                    </Button>
-                  </HotkeyTooltipTrigger>
-                  <HotkeyTooltipContent side="bottom" shortcut={finderShortcut} />
-                </HotkeyTooltip>
-              ) : null}
-              {onToggleEmbeddedTerminal ? (
-                <HotkeyTooltip>
-                  <HotkeyTooltipTrigger asChild>
-                    <Button
-                      {...getUiIdentityAttributeProps(terminalToggleActionId)}
-                      variant="ghost"
-                      size="icon"
-                      onClick={onToggleEmbeddedTerminal}
-                      className={cn(
-                        "border border-border/0",
-                        embeddedTerminalVisible && "text-white"
-                      )}
-                    >
-                      <Terminal className="h-4.5 w-4.5" />
-                    </Button>
-                  </HotkeyTooltipTrigger>
-                  <HotkeyTooltipContent side="bottom" shortcut={terminalShortcut} />
-                </HotkeyTooltip>
-              ) : null}
-            </>
-          ) : null}
-          {onToggleRightSidebar ? (
-            <HotkeyTooltip>
-              <HotkeyTooltipTrigger asChild>
-                <Button
-                  {...getUiIdentityAttributeProps(rightSidebarToggleActionId)}
-                  variant="ghost"
-                  size="icon"
-                  onClick={onToggleRightSidebar}
-                  className={cn(
-                    "border border-border/0",
-                    rightSidebarVisible && "text-white"
-                  )}
-                >
-                  <PanelRight className="h-4.5 w-4.5" />
-                </Button>
-              </HotkeyTooltipTrigger>
-              <HotkeyTooltipContent side="bottom" shortcut={rightSidebarShortcut} />
-            </HotkeyTooltip>
           ) : null}
         </div>
       </div>

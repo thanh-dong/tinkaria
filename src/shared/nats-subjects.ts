@@ -29,6 +29,38 @@ export function commandSubject(commandType: string): string {
   return `${PREFIX}.cmd.${commandType}`
 }
 
+export function codexKitRegisterSubject(): string {
+  return `${PREFIX}.kit.register`
+}
+
+export function codexKitHeartbeatSubject(kitId: string): string {
+  return `${PREFIX}.kit.heartbeat.${kitId}`
+}
+
+export function codexKitSessionEnsureSubject(kitId: string): string {
+  return `${PREFIX}.kit.cmd.${kitId}.session.ensure`
+}
+
+export function codexKitTurnStartSubject(kitId: string): string {
+  return `${PREFIX}.kit.cmd.${kitId}.turn.start`
+}
+
+export function codexKitToolRespondSubject(kitId: string): string {
+  return `${PREFIX}.kit.cmd.${kitId}.tool.respond`
+}
+
+export function codexKitTurnInterruptSubject(kitId: string): string {
+  return `${PREFIX}.kit.cmd.${kitId}.turn.interrupt`
+}
+
+export function codexKitSessionStopSubject(kitId: string): string {
+  return `${PREFIX}.kit.cmd.${kitId}.session.stop`
+}
+
+export function codexKitTurnEventsSubject(chatId: string): string {
+  return `${PREFIX}.kit.evt.turn.${chatId}`
+}
+
 /** Wildcard: all snapshot subjects */
 export const ALL_SNAPSHOTS = `${SNAP_PREFIX}>`
 

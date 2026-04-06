@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { AgentCoordinator, getWebContextPrompt, normalizeClaudeStreamMessage } from "./agent"
+import type { CodexRuntime } from "./codex-runtime"
 import type { HarnessTurn } from "./harness-types"
 import type { TranscriptEntry } from "../shared/types"
 
@@ -185,6 +186,66 @@ describe("AgentCoordinator codex integration", () => {
 
     await waitFor(() => store.chat.title === "Generated title")
     expect(store.messages[0]?.kind).toBe("user_prompt")
+  })
+
+  test("passes project id through the codex runtime session boundary", async () => {
+    const startedSessions: Array<{ chatId: string; projectId: string }> = []
+    const runtime: CodexRuntime = {
+      async startSession(args) {
+        startedSessions.push({ chatId: args.chatId, projectId: args.projectId })
+      },
+      async startTurn(): Promise<HarnessTurn> {
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession() {},
+    }
+
+    const store = createFakeStore()
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexRuntime: runtime,
+    })
+
+    await coordinator.send({
+      type: "chat.send",
+      chatId: "chat-1",
+      provider: "codex",
+      content: "first message",
+      model: "gpt-5.4",
+    })
+
+    expect(startedSessions).toEqual([{ chatId: "chat-1", projectId: "project-1" }])
   })
 
   test("does not overwrite a manual rename when background title generation finishes later", async () => {

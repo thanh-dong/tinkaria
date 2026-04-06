@@ -10,6 +10,7 @@ import { normalizeToolCall } from "../shared/tools"
 import type { ClientCommand } from "../shared/protocol"
 import { EventStore } from "./event-store"
 import { CodexAppServerManager } from "./codex-app-server"
+import { InProcessCodexRuntime, type CodexRuntime } from "./codex-runtime"
 import { generateTitleForChat } from "./generate-title"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
 import {
@@ -110,6 +111,7 @@ interface AgentCoordinatorArgs {
   onStateChange: () => void
   onMessageAppended?: (chatId: string, entry: TranscriptEntry) => void
   codexManager?: CodexAppServerManager
+  codexRuntime?: CodexRuntime
   generateTitle?: (messageContent: string, cwd: string) => Promise<string | null>
   orchestrator?: SessionOrchestrator
 }
@@ -392,7 +394,7 @@ export class AgentCoordinator {
   private readonly store: EventStore
   private readonly onStateChange: () => void
   private readonly onMessageAppended: ((chatId: string, entry: TranscriptEntry) => void) | undefined
-  private readonly codexManager: CodexAppServerManager
+  private readonly codexRuntime: CodexRuntime
   private readonly generateTitle: (messageContent: string, cwd: string) => Promise<string | null>
   orchestrator: SessionOrchestrator | undefined
   readonly activeTurns = new Map<string, ActiveTurn>()
@@ -401,7 +403,7 @@ export class AgentCoordinator {
     this.store = args.store
     this.onStateChange = args.onStateChange
     this.onMessageAppended = args.onMessageAppended
-    this.codexManager = args.codexManager ?? new CodexAppServerManager()
+    this.codexRuntime = args.codexRuntime ?? new InProcessCodexRuntime(args.codexManager ?? new CodexAppServerManager())
     this.generateTitle = args.generateTitle ?? generateTitleForChat
     this.orchestrator = args.orchestrator
   }
@@ -521,14 +523,15 @@ export class AgentCoordinator {
         chatId: args.chatId,
       })
     } else {
-      await this.codexManager.startSession({
+      await this.codexRuntime.startSession({
         chatId: args.chatId,
+        projectId: project.id,
         cwd: project.localPath,
         model: args.model,
         serviceTier: args.serviceTier,
         sessionToken: chat.sessionToken,
       })
-      turn = await this.codexManager.startTurn({
+      turn = await this.codexRuntime.startTurn({
         chatId: args.chatId,
         content: args.content,
         model: args.model,
@@ -741,7 +744,7 @@ export class AgentCoordinator {
 
   async disposeChat(chatId: string) {
     await this.cancel(chatId)
-    this.codexManager.stopSession(chatId)
+    this.codexRuntime.stopSession(chatId)
   }
 
   async respondTool(command: Extract<ClientCommand, { type: "chat.respondTool" }>) {

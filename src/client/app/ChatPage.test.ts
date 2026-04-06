@@ -6,7 +6,6 @@ import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
 import { TextMessage } from "../components/messages/TextMessage"
 import type { ProcessedTextMessage } from "../components/messages/types"
 import { createUiIdentity, getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
-import { TooltipProvider } from "../components/ui/tooltip"
 import {
   ChatEmptyStateBrandMark,
   getAvailableSkillsFromMessages,
@@ -264,28 +263,18 @@ describe("getChatPageUiIdentities", () => {
   test("renders curated navbar area and action ids on the stable visible controls", () => {
     const navbarAreaId = createUiIdentity("chat.navbar", "area")
     const newChatActionId = createUiIdentity("chat.navbar.new-chat", "action")
-    const terminalToggleActionId = createUiIdentity("chat.navbar.terminal-toggle", "action")
-    const rightSidebarToggleActionId = createUiIdentity("chat.navbar.right-sidebar-toggle", "action")
     const html = renderToStaticMarkup(
-      createElement(
-        TooltipProvider,
-        undefined,
-        createElement(ChatNavbar, {
-          sidebarCollapsed: false,
-          onOpenSidebar: () => {},
-          onCollapseSidebar: () => {},
-          onExpandSidebar: () => {},
-          onNewChat: () => {},
-          localPath: "/tmp/project",
-          onToggleEmbeddedTerminal: () => {},
-          onToggleRightSidebar: () => {},
-        })
-      )
+      createElement(ChatNavbar, {
+        sidebarCollapsed: false,
+        onOpenSidebar: () => {},
+        onCollapseSidebar: () => {},
+        onExpandSidebar: () => {},
+        onNewChat: () => {},
+        localPath: "/tmp/project",
+      })
     )
 
     expect(html).toMatch(new RegExp(`<div[^>]*data-ui-id="${navbarAreaId}"`))
     expect(html).toMatch(new RegExp(`<button[^>]*data-ui-id="${newChatActionId}"`))
-    expect(html).toMatch(new RegExp(`<button[^>]*data-ui-id="${terminalToggleActionId}"`))
-    expect(html).toMatch(new RegExp(`<button[^>]*data-ui-id="${rightSidebarToggleActionId}"`))
   })
 })

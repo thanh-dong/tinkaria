@@ -19,6 +19,7 @@ import { TaskLedger } from "./task-ledger"
 import { TranscriptSearchIndex } from "./transcript-search"
 import { ProjectAgent } from "./project-agent"
 import { createProjectAgentRouter } from "./project-agent-routes"
+import { LocalCodexKitDaemon, ProjectKitRegistry, RemoteCodexRuntime } from "./local-codex-kit"
 
 export interface StartTinkariaServerOptions {
   port?: number
@@ -64,6 +65,16 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   const natsBridge = await NatsBridge.create({ token: authToken })
   await ensureTerminalEventsStream(natsBridge.nc)
   await ensureChatMessageStream(natsBridge.nc)
+  const projectKitRegistry = new ProjectKitRegistry(natsBridge.nc)
+  const localCodexKit = await LocalCodexKitDaemon.start({
+    natsUrl: natsBridge.natsUrl,
+    authToken,
+  })
+  const codexRuntime = new RemoteCodexRuntime({
+    nc: natsBridge.nc,
+    registry: projectKitRegistry,
+  })
+  await projectKitRegistry.waitForAvailableKit()
 
   // Use indirection to break the circular dependency:
   // agent -> onStateChange -> publisher.broadcastSnapshots
@@ -74,6 +85,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   const agent = new AgentCoordinator({
     store,
     onStateChange: () => broadcast(),
+    codexRuntime,
     onMessageAppended: (chatId, entry) => {
       publishMessage(chatId, entry)
       sessionIndex.onMessageAppended(chatId, entry, store.state)
@@ -217,6 +229,8 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     responders.dispose()
     publisher.dispose()
     terminals.closeAll()
+    projectKitRegistry.dispose()
+    await localCodexKit.dispose()
     await natsBridge.dispose()
     await store.compact()
     server.stop(true)

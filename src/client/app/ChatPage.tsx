@@ -314,13 +314,6 @@ export function ChatPage() {
           currentSessionRuntime={state.currentSessionRuntime}
           currentRepoStatus={state.currentRepoStatus}
           accountInfo={state.currentAccountInfo}
-          rightSidebarVisible={showRightSidebar}
-          onToggleRightSidebar={projectId ? () => toggleRightSidebar(projectId) : undefined}
-          onOpenFinder={() => {
-            void state.handleOpenExternal("open_finder")
-          }}
-          finderShortcut={["cmd+alt+f", "ctrl+alt+f"]}
-          rightSidebarShortcut={["cmd+b", "ctrl+b"]}
         />
 
         <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(uiIdentities.transcript)}>

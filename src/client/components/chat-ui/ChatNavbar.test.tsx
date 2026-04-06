@@ -30,6 +30,7 @@ describe("ChatNavbar", () => {
     )
 
     expect(html).toContain('title="Compose"')
+    expect(html).not.toContain('title="Open in Finder"')
     expect(html).not.toContain('title="Move window"')
     expect(html).not.toContain('title="Toggle maximize"')
   })
