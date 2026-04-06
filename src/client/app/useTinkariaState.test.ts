@@ -11,7 +11,6 @@ import {
   getNextReadableBoundary,
   getReadableBlockCount,
   getInitialChatReadAnchor,
-  isSameReadBlockBoundary,
   getLockedInitialChatReadAnchor,
   getLastReadableMessage,
   getNewestRemainingChatId,
@@ -672,30 +671,6 @@ describe("getLockedInitialChatReadAnchor", () => {
       { kind: "tail" },
       true,
     )).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
-  })
-})
-
-describe("isSameReadBlockBoundary", () => {
-  test("returns true only when both message id and block index match", () => {
-    expect(isSameReadBlockBoundary(
-      { messageId: "assistant-1", blockIndex: 0 },
-      { messageId: "assistant-1", blockIndex: 0 },
-    )).toBe(true)
-
-    expect(isSameReadBlockBoundary(
-      { messageId: "assistant-1", blockIndex: 0 },
-      { messageId: "assistant-1", blockIndex: 1 },
-    )).toBe(false)
-
-    expect(isSameReadBlockBoundary(
-      { messageId: "assistant-1", blockIndex: 0 },
-      { messageId: "assistant-2", blockIndex: 0 },
-    )).toBe(false)
-  })
-
-  test("treats two missing boundaries as equal", () => {
-    expect(isSameReadBlockBoundary(null, null)).toBe(true)
-    expect(isSameReadBlockBoundary({ messageId: "assistant-1", blockIndex: 0 }, null)).toBe(false)
   })
 })
 
