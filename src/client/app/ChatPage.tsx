@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, type CSSProperties } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { ArrowDown } from "lucide-react"
 import { useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
 import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
+import { ForkSessionDialog } from "../components/chat-ui/ForkSessionDialog"
 import { RightSidebar } from "../components/chat-ui/RightSidebar"
 import { LocalFilePreviewDialog } from "../components/messages/LocalFilePreviewDialog"
 import { ProcessingMessage } from "../components/messages/ProcessingMessage"
@@ -191,6 +192,7 @@ export function ChatPage() {
 
   const availableSkills = useMemo(() => getAvailableSkillsFromMessages(state.messages), [state.messages])
   const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
+  const [forkDialogOpen, setForkDialogOpen] = useState(false)
   const shouldRenderRightSidebarLayout = Boolean(projectId)
   const {
     isAnimating: isRightSidebarAnimating,
@@ -309,11 +311,22 @@ export function ChatPage() {
           onOpenSidebar={state.openSidebar}
           onCollapseSidebar={state.collapseSidebar}
           onExpandSidebar={state.expandSidebar}
-          onNewChat={state.handleCompose}
+          onForkSession={() => setForkDialogOpen(true)}
           localPath={state.navbarLocalPath}
           currentSessionRuntime={state.currentSessionRuntime}
           currentRepoStatus={state.currentRepoStatus}
           accountInfo={state.currentAccountInfo}
+        />
+
+        <ForkSessionDialog
+          open={forkDialogOpen}
+          onOpenChange={setForkDialogOpen}
+          defaultProvider={state.runtime?.provider ?? "claude"}
+          defaultModel={state.availableProviders.find(
+            (p) => p.id === (state.runtime?.provider ?? "claude")
+          )?.models[0]?.id ?? "sonnet"}
+          availableProviders={state.availableProviders}
+          onFork={state.handleForkSession}
         />
 
         <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(uiIdentities.transcript)}>
