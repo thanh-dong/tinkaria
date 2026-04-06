@@ -10,7 +10,7 @@ describe("ChatNavbar", () => {
         onOpenSidebar={() => {}}
         onCollapseSidebar={() => {}}
         onExpandSidebar={() => {}}
-        onNewChat={() => {}}
+        onForkSession={() => {}}
       />,
     )
 
@@ -18,21 +18,19 @@ describe("ChatNavbar", () => {
     expect(html).not.toContain("lucide-flower")
   })
 
-  test("keeps compose in the browser runtime", () => {
+  test("renders a fork-session button instead of compose", () => {
     const html = renderToStaticMarkup(
       <ChatNavbar
         sidebarCollapsed={false}
         onOpenSidebar={() => {}}
         onCollapseSidebar={() => {}}
         onExpandSidebar={() => {}}
-        onNewChat={() => {}}
+        onForkSession={() => {}}
       />,
     )
 
-    expect(html).toContain('title="Compose"')
-    expect(html).not.toContain('title="Open in Finder"')
-    expect(html).not.toContain('title="Move window"')
-    expect(html).not.toContain('title="Toggle maximize"')
+    expect(html).toContain('title="Fork session"')
+    expect(html).not.toContain('title="Compose"')
   })
 
   test("renders current session runtime details in the navbar", () => {
@@ -42,7 +40,7 @@ describe("ChatNavbar", () => {
         onOpenSidebar={() => {}}
         onCollapseSidebar={() => {}}
         onExpandSidebar={() => {}}
-        onNewChat={() => {}}
+        onForkSession={() => {}}
         localPath="/workspace/kanna"
         accountInfo={{ subscriptionType: "pro" }}
         currentRepoStatus={{

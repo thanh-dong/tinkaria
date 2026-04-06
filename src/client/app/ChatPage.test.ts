@@ -248,33 +248,33 @@ describe("getChatPageUiIdentities", () => {
         onOpenSidebar: () => {},
         onCollapseSidebar: () => {},
         onExpandSidebar: () => {},
-        onNewChat: () => {},
+        onForkSession: () => {},
       })
     )
 
     const identityIndex = html.indexOf('data-ui-id="chat.navbar"')
-    const composeButtonIndex = html.indexOf('title="Compose"')
+    const forkButtonIndex = html.indexOf('title="Fork session"')
 
     expect(identityIndex).toBeGreaterThan(-1)
-    expect(composeButtonIndex).toBeGreaterThan(-1)
-    expect(identityIndex).toBeLessThan(composeButtonIndex)
+    expect(forkButtonIndex).toBeGreaterThan(-1)
+    expect(identityIndex).toBeLessThan(forkButtonIndex)
   })
 
   test("renders curated navbar area and action ids on the stable visible controls", () => {
     const navbarAreaId = createUiIdentity("chat.navbar", "area")
-    const newChatActionId = createUiIdentity("chat.navbar.new-chat", "action")
+    const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
     const html = renderToStaticMarkup(
       createElement(ChatNavbar, {
         sidebarCollapsed: false,
         onOpenSidebar: () => {},
         onCollapseSidebar: () => {},
         onExpandSidebar: () => {},
-        onNewChat: () => {},
+        onForkSession: () => {},
         localPath: "/tmp/project",
       })
     )
 
     expect(html).toMatch(new RegExp(`<div[^>]*data-ui-id="${navbarAreaId}"`))
-    expect(html).toMatch(new RegExp(`<button[^>]*data-ui-id="${newChatActionId}"`))
+    expect(html).toMatch(new RegExp(`<button[^>]*data-ui-id="${forkSessionActionId}"`))
   })
 })

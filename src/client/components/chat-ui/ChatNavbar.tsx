@@ -1,4 +1,4 @@
-import { Menu, PanelLeft, SquarePen } from "lucide-react"
+import { GitFork, Menu, PanelLeft } from "lucide-react"
 import { TinkariaSidebarMark } from "../branding/TinkariaSidebarMark"
 import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
@@ -12,7 +12,7 @@ interface Props {
   onOpenSidebar: () => void
   onCollapseSidebar: () => void
   onExpandSidebar: () => void
-  onNewChat: () => void
+  onForkSession: () => void
   localPath?: string
   currentSessionRuntime?: DiscoveredSessionRuntime | null
   currentRepoStatus?: CurrentRepoStatusSnapshot | null
@@ -68,14 +68,14 @@ export function ChatNavbar({
   onOpenSidebar,
   onCollapseSidebar,
   onExpandSidebar,
-  onNewChat,
+  onForkSession,
   localPath,
   currentSessionRuntime,
   currentRepoStatus,
   accountInfo,
 }: Props) {
   const navbarAreaId = createUiIdentity("chat.navbar", "area")
-  const newChatActionId = createUiIdentity("chat.navbar.new-chat", "action")
+  const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
   const pathLabel = getPathLabel(localPath, currentRepoStatus)
   const repoLabels = getRepoLabels(currentRepoStatus)
   const primaryRuntimeLabel = getPrimaryRuntimeLabel(currentSessionRuntime)
@@ -137,13 +137,13 @@ export function ChatNavbar({
             </Button>
           ) : null}
           <Button
-            {...getUiIdentityAttributeProps(newChatActionId)}
+            {...getUiIdentityAttributeProps(forkSessionActionId)}
             variant="ghost"
             size="icon"
-            onClick={onNewChat}
-            title="Compose"
+            onClick={onForkSession}
+            title="Fork session"
           >
-            <SquarePen className="size-4.5" />
+            <GitFork className="size-4.5" />
           </Button>
         </div>
 
