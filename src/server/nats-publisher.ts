@@ -11,12 +11,10 @@ import type { ChatMessageEvent, SessionsSnapshot, TranscriptEntry } from "../sha
 import type { AgentCoordinator } from "./agent"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
-import type { KeybindingsManager } from "./keybindings"
 import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSessionsSnapshot, deriveSidebarData } from "./read-models"
 import { discoverSessions } from "./session-discovery"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
-import type { DesktopRenderersRegistry } from "./desktop-renderers"
 
 const encoder = new TextEncoder()
 
@@ -39,12 +37,10 @@ export interface CreateNatsPublisherArgs {
   store: EventStore
   agent: AgentCoordinator
   terminals: TerminalManager
-  keybindings: KeybindingsManager
   refreshDiscovery: () => Promise<DiscoveredProject[]>
   getDiscoveredProjects: () => DiscoveredProject[]
   machineDisplayName: string
   updateManager: UpdateManager | null
-  desktopRenderers: DesktopRenderersRegistry
 }
 
 export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
@@ -53,11 +49,9 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     store,
     agent,
     terminals,
-    keybindings,
     getDiscoveredProjects,
     machineDisplayName,
     updateManager,
-    desktopRenderers,
   } = args
 
   const js = jetstream(nc)
@@ -117,10 +111,6 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         return deriveSidebarData(store.state, agent.getActiveStatuses())
       case "local-projects":
         return deriveLocalProjectsSnapshot(store.state, getDiscoveredProjects(), machineDisplayName)
-      case "desktop-renderers":
-        return desktopRenderers.getSnapshot()
-      case "keybindings":
-        return keybindings.getSnapshot()
       case "update":
         return updateManager?.getSnapshot() ?? DEFAULT_UPDATE_SNAPSHOT
       case "chat":
@@ -226,10 +216,6 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     })
   })
 
-  const disposeKeybindingEvents = keybindings.onChange(() => {
-    publishSnapshot({ type: "keybindings" }, keybindings.getSnapshot())
-  })
-
   const disposeUpdateEvents = updateManager?.onChange(() => {
     publishSnapshot({ type: "update" }, updateManager.getSnapshot())
   }) ?? (() => {})
@@ -243,7 +229,6 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     refreshSessions,
     dispose() {
       disposeTerminalEvents()
-      disposeKeybindingEvents()
       disposeUpdateEvents()
       for (const timer of sessionsPollTimers.values()) {
         clearInterval(timer)

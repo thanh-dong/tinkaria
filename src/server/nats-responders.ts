@@ -5,7 +5,6 @@ import type { AgentCoordinator } from "./agent"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
 import { openExternal } from "./external-open"
-import type { KeybindingsManager } from "./keybindings"
 import { ensureProjectDirectory, resolveLocalPath } from "./paths"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
@@ -14,7 +13,7 @@ import { commandSubject } from "../shared/nats-subjects"
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
 import { findSessionFile, importCliTranscript } from "./session-discovery"
-import type { DesktopRenderersRegistry } from "./desktop-renderers"
+import { inspectSessionRuntime } from "./session-discovery"
 
 const encoder = new TextEncoder()
 const MAX_LOCAL_FILE_PREVIEW_BYTES = 256 * 1024
@@ -28,7 +27,6 @@ export interface RegisterRespondersArgs {
   store: EventStore
   agent: AgentCoordinator
   terminals: TerminalManager
-  keybindings: KeybindingsManager
   refreshDiscovery: () => Promise<DiscoveredProject[]>
   /** @deprecated Unused by responders -- kept for interface compatibility with tests */
   getDiscoveredProjects?: () => DiscoveredProject[]
@@ -36,43 +34,33 @@ export interface RegisterRespondersArgs {
   machineDisplayName?: string
   updateManager: UpdateManager | null
   publisher: NatsPublisher
-  desktopRenderers: DesktopRenderersRegistry
   onStateChange: () => void
 }
 
 /** Command types that do NOT mutate state and should NOT trigger onStateChange */
 const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "system.ping",
-  "desktop.register",
-  "desktop.unregister",
   "terminal.input",
   "terminal.resize",
   "terminal.create",
-  "settings.readKeybindings",
   "update.check",
   "update.install",
   "system.readLocalFilePreview",
   "chat.getMessages",
+  "chat.getSessionRuntime",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
   "sessions.refresh",
 ])
 
-/**
- * Commands handled by the Bun backend. Desktop-owned commands like `webview.open`
- * and `webview.close` must not be subscribed here so Tauri can be the sole responder.
- */
+/** Commands handled by the Bun backend. */
 const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "project.open",
   "project.create",
   "project.remove",
-  "desktop.register",
-  "desktop.unregister",
   "system.ping",
   "update.check",
   "update.install",
-  "settings.readKeybindings",
-  "settings.writeKeybindings",
   "system.openExternal",
   "system.readLocalFilePreview",
   "chat.create",
@@ -81,6 +69,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.send",
   "chat.cancel",
   "chat.respondTool",
+  "chat.getSessionRuntime",
   "terminal.create",
   "terminal.input",
   "terminal.resize",
@@ -98,11 +87,9 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
     store,
     agent,
     terminals,
-    keybindings,
     refreshDiscovery,
     updateManager,
     publisher,
-    desktopRenderers,
     onStateChange,
   } = args
 
@@ -140,20 +127,6 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       case "system.ping":
         return undefined
 
-      case "desktop.register":
-        return desktopRenderers.register({
-          rendererId: command.rendererId,
-          machineName: command.machineName,
-          capabilities: command.capabilities,
-          serverUrl: command.serverUrl ?? null,
-          natsUrl: command.natsUrl ?? null,
-          lastError: command.lastError ?? null,
-        })
-
-      case "desktop.unregister":
-        desktopRenderers.unregister(command.rendererId)
-        return undefined
-
       case "update.check": {
         if (!updateManager) {
           return {
@@ -175,12 +148,6 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         }
         return updateManager.installUpdate()
       }
-
-      case "settings.readKeybindings":
-        return keybindings.getSnapshot()
-
-      case "settings.writeKeybindings":
-        return keybindings.write(command.bindings)
 
       case "project.open": {
         await ensureProjectDirectory(command.localPath)
@@ -281,6 +248,20 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         })
       }
 
+      case "chat.getSessionRuntime": {
+        const chat = store.getChat(command.chatId)
+        if (!chat?.sessionToken || !chat.provider) {
+          return { runtime: null }
+        }
+        const project = store.getProject(chat.projectId)
+        if (!project) {
+          return { runtime: null }
+        }
+        return {
+          runtime: await inspectSessionRuntime(chat.sessionToken, chat.provider, project.localPath),
+        }
+      }
+
       case "snapshot.subscribe": {
         publisher.addSubscription(command.subscriptionId, command.topic)
         if (command.topic.type === "local-projects") {
@@ -325,7 +306,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       }
 
       default: {
-        throw new Error(`Unknown command type: ${command.type}`)
+        throw new Error("Unknown command type")
       }
     }
   }

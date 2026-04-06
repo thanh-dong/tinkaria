@@ -11,11 +11,11 @@ import {
   getInitialChatScrollTarget,
   getNewestRemainingChatId,
   getReadTimestampToPersistAfterReply,
+  getResumeRefreshSessionProjectIds,
   isChatRead,
   normalizeLocalFilePreviewErrorMessage,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
-  resolveDesktopWebviewOpenCommand,
   shouldAutoFollowTranscript,
   shouldRefreshStaleSessionOnResume,
   shouldStickToBottomOnComposerSubmit,
@@ -168,6 +168,14 @@ describe("shouldRefreshStaleSessionOnResume", () => {
   })
 })
 
+describe("getResumeRefreshSessionProjectIds", () => {
+  test("deduplicates open session picker project ids while preserving first-seen order", () => {
+    expect(
+      getResumeRefreshSessionProjectIds(["project-2", "project-1", "project-2", "project-3", "project-1"])
+    ).toEqual(["project-2", "project-1", "project-3"])
+  })
+})
+
 describe("getUiUpdateRestartReconnectAction", () => {
   test("waits for reconnect after the socket disconnects", () => {
     expect(getUiUpdateRestartReconnectAction("awaiting_disconnect", "disconnected")).toBe("awaiting_reconnect")
@@ -235,109 +243,6 @@ describe("resolveComposeIntent", () => {
         fallbackLocalProjectPath: null,
       })
     ).toBeNull()
-  })
-})
-
-describe("resolveDesktopWebviewOpenCommand", () => {
-  test("returns null when no native desktop renderer is available", () => {
-    expect(resolveDesktopWebviewOpenCommand({
-      href: "https://example.com/demo",
-      desktopRenderers: {
-        renderers: [
-          {
-            rendererId: "desktop-1",
-            machineName: "Workstation",
-            capabilities: ["something_else"],
-            serverUrl: null,
-            natsUrl: null,
-            lastError: null,
-            connectedAt: 10,
-            lastSeenAt: 10,
-          },
-        ],
-      },
-    })).toBeNull()
-  })
-
-  test("targets the first available renderer for localhost content", () => {
-    expect(resolveDesktopWebviewOpenCommand({
-      href: "http://127.0.0.1:3210/local",
-      desktopRenderers: {
-        renderers: [
-          {
-            rendererId: "desktop-1",
-            machineName: "Workstation",
-            capabilities: ["native_webview"],
-            serverUrl: null,
-            natsUrl: null,
-            lastError: null,
-            connectedAt: 10,
-            lastSeenAt: 10,
-          },
-        ],
-      },
-    })).toEqual({
-      type: "webview.open",
-      rendererId: "desktop-1",
-      webviewId: "controlled-content",
-      targetKind: "local-port",
-      target: "http://127.0.0.1:3210/local",
-      dockState: "docked",
-    })
-  })
-
-  test("classifies private network hosts as lan-host targets", () => {
-    expect(resolveDesktopWebviewOpenCommand({
-      href: "http://192.168.1.10:8080",
-      desktopRenderers: {
-        renderers: [
-          {
-            rendererId: "desktop-1",
-            machineName: "Workstation",
-            capabilities: ["native_webview"],
-            serverUrl: null,
-            natsUrl: null,
-            lastError: null,
-            connectedAt: 10,
-            lastSeenAt: 10,
-          },
-        ],
-      },
-    })).toEqual({
-      type: "webview.open",
-      rendererId: "desktop-1",
-      webviewId: "controlled-content",
-      targetKind: "lan-host",
-      target: "http://192.168.1.10:8080/",
-      dockState: "docked",
-    })
-  })
-
-  test("classifies public https targets as proxied-remote", () => {
-    expect(resolveDesktopWebviewOpenCommand({
-      href: "https://example.com/demo",
-      desktopRenderers: {
-        renderers: [
-          {
-            rendererId: "desktop-1",
-            machineName: "Workstation",
-            capabilities: ["native_webview"],
-            serverUrl: null,
-            natsUrl: null,
-            lastError: null,
-            connectedAt: 10,
-            lastSeenAt: 10,
-          },
-        ],
-      },
-    })).toEqual({
-      type: "webview.open",
-      rendererId: "desktop-1",
-      webviewId: "controlled-content",
-      targetKind: "proxied-remote",
-      target: "https://example.com/demo",
-      dockState: "docked",
-    })
   })
 })
 

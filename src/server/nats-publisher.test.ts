@@ -6,7 +6,6 @@ import { snapshotSubject, snapshotKvKey, KV_BUCKET } from "../shared/nats-subjec
 import { createEmptyState } from "./events"
 import { Kvm } from "@nats-io/kv"
 import type { SubscriptionTopic } from "../shared/protocol"
-import { DesktopRenderersRegistry } from "./desktop-renderers"
 
 let server: NatsServer | null = null
 let nc: NatsConnection | null = null
@@ -36,15 +35,10 @@ function mockArgs(overrides: Partial<CreateNatsPublisherArgs> = {}): CreateNatsP
       getSnapshot: () => null,
       onEvent: () => () => {},
     } as unknown as CreateNatsPublisherArgs["terminals"],
-    keybindings: {
-      getSnapshot: () => ({ bindings: [] }),
-      onChange: () => () => {},
-    } as unknown as CreateNatsPublisherArgs["keybindings"],
     refreshDiscovery: async () => [],
     getDiscoveredProjects: () => [],
     machineDisplayName: "test-machine",
     updateManager: null,
-    desktopRenderers: new DesktopRenderersRegistry(),
     ...overrides,
   }
 }
@@ -83,41 +77,6 @@ describe("createNatsPublisher", () => {
 
     const data = JSON.parse(msgs[0])
     expect(data).toHaveProperty("projectGroups")
-
-    publisher.dispose()
-  })
-
-  test("publishes desktop renderer snapshots", async () => {
-    server = await NatsServer.start({ jetstream: true })
-    nc = await connect({ servers: server.url })
-
-    const desktopRenderers = new DesktopRenderersRegistry()
-    desktopRenderers.register({
-      rendererId: "desktop-1",
-      machineName: "Workstation",
-      capabilities: ["native_webview"],
-    }, 100)
-
-    const publisher = await createNatsPublisher(mockArgs({ desktopRenderers }))
-    const topic: SubscriptionTopic = { type: "desktop-renderers" }
-    const sub = nc.subscribe(snapshotSubject(topic))
-
-    publisher.addSubscription("sub-1", topic)
-    publisher.getSnapshot(topic)
-
-    const msgs = await collectMessages(sub, 1)
-    expect(msgs.length).toBe(1)
-    expect(JSON.parse(msgs[0])).toEqual({
-      renderers: [
-        {
-          rendererId: "desktop-1",
-          machineName: "Workstation",
-          capabilities: ["native_webview"],
-          connectedAt: 100,
-          lastSeenAt: 100,
-        },
-      ],
-    })
 
     publisher.dispose()
   })
@@ -173,20 +132,20 @@ describe("createNatsPublisher", () => {
     const publisher = await createNatsPublisher(mockArgs())
 
     publisher.addSubscription("sub-1", { type: "sidebar" })
-    publisher.addSubscription("sub-2", { type: "keybindings" })
+    publisher.addSubscription("sub-2", { type: "local-projects" })
 
     const sidebarSub = nc.subscribe(snapshotSubject({ type: "sidebar" }))
-    const keybindingsSub = nc.subscribe(snapshotSubject({ type: "keybindings" }))
+    const localProjectsSub = nc.subscribe(snapshotSubject({ type: "local-projects" }))
 
     publisher.broadcastSnapshots()
 
-    const [sidebarMsgs, keybindingsMsgs] = await Promise.all([
+    const [sidebarMsgs, localProjectsMsgs] = await Promise.all([
       collectMessages(sidebarSub, 1),
-      collectMessages(keybindingsSub, 1),
+      collectMessages(localProjectsSub, 1),
     ])
 
     expect(sidebarMsgs.length).toBe(1)
-    expect(keybindingsMsgs.length).toBe(1)
+    expect(localProjectsMsgs.length).toBe(1)
 
     publisher.dispose()
   })

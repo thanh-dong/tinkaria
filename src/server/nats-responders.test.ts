@@ -31,6 +31,9 @@ function createMockStore() {
     state: {},
     openProject: async (_path: string, _title?: string) => ({ id: "proj-1" }),
     getProject: (id: string) => (id === "proj-1" ? { id: "proj-1", localPath: "/tmp/test-project" } : null),
+    getChat: (id: string) => (id === "chat-1"
+      ? { id: "chat-1", projectId: "proj-1", provider: "codex", sessionToken: "session-1" }
+      : null),
     removeProject: async () => {},
     createChat: async (_projectId: string) => ({ id: "chat-1" }),
     renameChat: async () => {},
@@ -73,25 +76,6 @@ function createMockTerminals() {
   }
 }
 
-function createMockKeybindings() {
-  const snapshot = {
-    bindings: {
-      toggleEmbeddedTerminal: ["cmd+j"],
-      toggleRightSidebar: ["ctrl+b"],
-      openInFinder: ["cmd+alt+f"],
-      openInEditor: ["cmd+shift+o"],
-      addSplitTerminal: ["cmd+shift+j"],
-    },
-    warning: null,
-    filePathDisplay: "~/.tinkaria/keybindings.json",
-  }
-  return {
-    getSnapshot: () => snapshot,
-    write: async () => snapshot,
-    onChange: () => () => {},
-  }
-}
-
 function createMockUpdateManager() {
   const snapshot = {
     currentVersion: "1.0.0",
@@ -107,37 +91,6 @@ function createMockUpdateManager() {
     installUpdate: async () => ({ success: true, version: "1.1.0" }),
     getSnapshot: () => snapshot,
     onChange: () => () => {},
-  }
-}
-
-function createMockDesktopRenderers() {
-  return {
-    register: ({
-      rendererId,
-      machineName,
-      capabilities,
-      serverUrl,
-      natsUrl,
-      lastError,
-    }: {
-      rendererId: string
-      machineName: string
-      capabilities: string[]
-      serverUrl?: string | null
-      natsUrl?: string | null
-      lastError?: string | null
-    }) => ({
-      rendererId,
-      machineName,
-      capabilities,
-      serverUrl: serverUrl ?? null,
-      natsUrl: natsUrl ?? null,
-      lastError: lastError ?? null,
-      connectedAt: 100,
-      lastSeenAt: 100,
-    }),
-    unregister: () => {},
-    getSnapshot: () => ({ renderers: [] }),
   }
 }
 
@@ -180,7 +133,6 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
     store: createMockStore() as never,
     agent: createMockAgent() as never,
     terminals: createMockTerminals() as never,
-    keybindings: createMockKeybindings() as never,
     refreshDiscovery: async () => [],
     getDiscoveredProjects: () => [],
     machineDisplayName: "Test Machine",
@@ -194,7 +146,6 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
       refreshSessions: async () => {},
       dispose: () => {},
     },
-    desktopRenderers: createMockDesktopRenderers() as never,
     onStateChange: () => {},
     ...overrides,
   }
@@ -229,44 +180,6 @@ describe("nats-responders", () => {
     expect(changed).toBe(false)
   })
 
-  test("desktop.register returns the renderer snapshot", async () => {
-    const { clientNc } = await setup()
-    const res = await sendCommand(clientNc, {
-      type: "desktop.register",
-      rendererId: "desktop-1",
-      machineName: "Workstation",
-      capabilities: ["native_webview"],
-      serverUrl: "http://127.0.0.1:5175",
-      natsUrl: "nats://127.0.0.1:4222",
-      lastError: null,
-    })
-
-    expect(res.ok).toBe(true)
-    expect(res.result).toEqual({
-      rendererId: "desktop-1",
-      machineName: "Workstation",
-      capabilities: ["native_webview"],
-      serverUrl: "http://127.0.0.1:5175",
-      natsUrl: "nats://127.0.0.1:4222",
-      lastError: null,
-      connectedAt: 100,
-      lastSeenAt: 100,
-    })
-  })
-
-  test("settings.readKeybindings returns snapshot", async () => {
-    const { clientNc } = await setup()
-    const res = await sendCommand(clientNc, { type: "settings.readKeybindings" })
-    expect(res.ok).toBe(true)
-    expect(res.result).toEqual(createMockKeybindings().getSnapshot())
-  })
-
-  test("settings.readKeybindings does not trigger onStateChange", async () => {
-    let changed = false
-    const { clientNc } = await setup({ onStateChange: () => { changed = true } })
-    await sendCommand(clientNc, { type: "settings.readKeybindings" })
-    expect(changed).toBe(false)
-  })
 
   test("system.readLocalFilePreview returns local file content", async () => {
     tempDir = await mkdtemp(path.join(tmpdir(), "kanna-preview-"))
@@ -294,25 +207,21 @@ describe("nats-responders", () => {
     expect(changed).toBe(false)
   })
 
-  test("settings.writeKeybindings returns updated snapshot", async () => {
+  test("chat.getSessionRuntime returns null when the session file cannot be inspected", async () => {
     const { clientNc } = await setup()
-    const res = await sendCommand(clientNc, {
-      type: "settings.writeKeybindings",
-      bindings: { toggleEmbeddedTerminal: ["ctrl+j"] },
-    })
+    const res = await sendCommand(clientNc, { type: "chat.getSessionRuntime", chatId: "chat-1" })
+
     expect(res.ok).toBe(true)
-    expect(res.result).toBeDefined()
+    expect(res.result).toEqual({ runtime: null })
   })
 
-  test("settings.writeKeybindings triggers onStateChange", async () => {
+  test("chat.getSessionRuntime does not trigger onStateChange", async () => {
     let changed = false
     const { clientNc } = await setup({ onStateChange: () => { changed = true } })
-    await sendCommand(clientNc, {
-      type: "settings.writeKeybindings",
-      bindings: { toggleEmbeddedTerminal: ["ctrl+j"] },
-    })
-    expect(changed).toBe(true)
+    await sendCommand(clientNc, { type: "chat.getSessionRuntime", chatId: "chat-1" })
+    expect(changed).toBe(false)
   })
+
 
   test("update.check returns snapshot when manager exists", async () => {
     const { clientNc } = await setup()
@@ -596,28 +505,11 @@ describe("nats-responders", () => {
     const create = await sendCommand(clientNc, { type: "chat.create", projectId: "proj-1" })
     expect(create.ok).toBe(true)
 
-    const read = await sendCommand(clientNc, { type: "settings.readKeybindings" })
+    const read = await sendCommand(clientNc, { type: "update.check" })
     expect(read.ok).toBe(true)
 
     // Only chat.create should have triggered onStateChange
     expect(changeCount).toBe(1)
-  })
-
-  test("desktop-owned webview commands are not handled by the Bun responder", async () => {
-    const { clientNc } = await setup()
-
-    try {
-      await clientNc.request(commandSubject("webview.open"), encode({
-        type: "webview.open",
-        webviewId: "preview",
-        targetKind: "local-port",
-        target: "http://127.0.0.1:3210",
-        dockState: "docked",
-      }), { timeout: 300 })
-      expect.unreachable("webview.open should not be handled by the Bun responder")
-    } catch (error) {
-      expect(error).toBeDefined()
-    }
   })
 
   test("snapshot.subscribe registers subscription and returns snapshot", async () => {
@@ -670,7 +562,7 @@ describe("nats-responders", () => {
     await sendCommand(clientNc, {
       type: "snapshot.subscribe",
       subscriptionId: "sub-1",
-      topic: { type: "keybindings" },
+      topic: { type: "sidebar" },
     })
     expect(changed).toBe(false)
   })

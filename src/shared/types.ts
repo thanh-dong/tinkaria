@@ -239,21 +239,6 @@ export interface LocalProjectsSnapshot {
   projects: LocalProjectSummary[]
 }
 
-export interface DesktopRendererSnapshot {
-  rendererId: string
-  machineName: string
-  capabilities: string[]
-  serverUrl: string | null
-  natsUrl: string | null
-  lastError: string | null
-  connectedAt: number
-  lastSeenAt: number
-}
-
-export interface DesktopRenderersSnapshot {
-  renderers: DesktopRendererSnapshot[]
-}
-
 export type UpdateStatus =
   | "idle"
   | "checking"
@@ -284,27 +269,6 @@ export interface UpdateInstallResult {
   errorCode: UpdateInstallErrorCode | null
   userTitle: string | null
   userMessage: string | null
-}
-
-export type KeybindingAction =
-  | "toggleEmbeddedTerminal"
-  | "toggleRightSidebar"
-  | "openInFinder"
-  | "openInEditor"
-  | "addSplitTerminal"
-
-export const DEFAULT_KEYBINDINGS: Record<KeybindingAction, string[]> = {
-  toggleEmbeddedTerminal: ["cmd+j", "ctrl+`"],
-  toggleRightSidebar: ["cmd+b", "ctrl+b"],
-  openInFinder: ["cmd+alt+f", "ctrl+alt+f"],
-  openInEditor: ["cmd+shift+o", "ctrl+shift+o"],
-  addSplitTerminal: ["cmd+/", "ctrl+/"],
-}
-
-export interface KeybindingsSnapshot {
-  bindings: Record<KeybindingAction, string[]>
-  warning: string | null
-  filePathDisplay: string
 }
 
 export interface McpServerInfo {

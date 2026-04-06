@@ -6,8 +6,6 @@ import {
   ALL_SNAPSHOTS,
   ALL_TERMINAL_EVENTS,
   ALL_COMMANDS,
-  nativeWebviewSnapshotTopic,
-  nativeWebviewEventSubject,
 } from "./nats-subjects"
 
 describe("snapshotSubject", () => {
@@ -21,14 +19,6 @@ describe("snapshotSubject", () => {
 
   test("update", () => {
     expect(snapshotSubject({ type: "update" })).toBe("kanna.snap.update")
-  })
-
-  test("desktop-renderers", () => {
-    expect(snapshotSubject({ type: "desktop-renderers" })).toBe("kanna.snap.desktop-renderers")
-  })
-
-  test("keybindings", () => {
-    expect(snapshotSubject({ type: "keybindings" })).toBe("kanna.snap.keybindings")
   })
 
   test("chat with chatId", () => {
@@ -67,15 +57,5 @@ describe("wildcards", () => {
 
   test("ALL_COMMANDS", () => {
     expect(ALL_COMMANDS).toBe("kanna.cmd.>")
-  })
-})
-
-describe("native webview subjects", () => {
-  test("builds native webview snapshot subjects", () => {
-    expect(nativeWebviewSnapshotTopic("preview")).toBe("kanna.snap.webview.preview")
-  })
-
-  test("builds native webview event subjects", () => {
-    expect(nativeWebviewEventSubject("preview")).toBe("kanna.evt.webview.preview")
   })
 })

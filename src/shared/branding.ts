@@ -49,14 +49,6 @@ export function getDataDirDisplay(env: RuntimeEnv = getRuntimeEnv()) {
   return `${getDataRootDirDisplay(env)}/data`
 }
 
-export function getKeybindingsFilePath(homeDir: string, env: RuntimeEnv = getRuntimeEnv()) {
-  return `${getDataRootDir(homeDir, env)}/keybindings.json`
-}
-
-export function getKeybindingsFilePathDisplay(env: RuntimeEnv = getRuntimeEnv()) {
-  return `${getDataRootDirDisplay(env)}/keybindings.json`
-}
-
 export function getCliInvocation(arg?: string) {
   return arg ? `${CLI_COMMAND} ${arg}` : CLI_COMMAND
 }

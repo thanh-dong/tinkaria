@@ -29,14 +29,6 @@ export function commandSubject(commandType: string): string {
   return `${PREFIX}.cmd.${commandType}`
 }
 
-export function nativeWebviewSnapshotTopic(webviewId: string): string {
-  return `${PREFIX}.snap.webview.${webviewId}`
-}
-
-export function nativeWebviewEventSubject(webviewId: string): string {
-  return `${PREFIX}.evt.webview.${webviewId}`
-}
-
 /** Wildcard: all snapshot subjects */
 export const ALL_SNAPSHOTS = `${SNAP_PREFIX}>`
 

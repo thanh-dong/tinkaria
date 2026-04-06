@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
-import { PROVIDERS, type AgentProvider, type AskUserQuestionAnswerMap, type DesktopRenderersSnapshot, type KeybindingsSnapshot, type ModelOptions, type ProviderCatalogEntry, type SessionsSnapshot, type UpdateInstallResult, type UpdateSnapshot } from "../../shared/types"
+import {
+  PROVIDERS,
+  type AgentProvider,
+  type AskUserQuestionAnswerMap,
+  type CurrentSessionSnapshot,
+  type ModelOptions,
+  type ProviderCatalogEntry,
+  type SessionsSnapshot,
+  type UpdateInstallResult,
+  type UpdateSnapshot,
+} from "../../shared/types"
 import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
 import { useChatReadStateStore } from "../stores/chatReadStateStore"
 import { useRightSidebarStore } from "../stores/rightSidebarStore"
 import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
-import { getEditorPresetLabel, useTerminalPreferencesStore } from "../stores/terminalPreferencesStore"
 import { useChatInputStore } from "../stores/chatInputStore"
 import type { ChatMessageEvent, ChatRuntime, ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
@@ -32,7 +41,6 @@ import {
 } from "./useTinkariaState.machine"
 import { NatsSocket } from "./nats-socket"
 import type { TinkariaTransport, SocketStatus } from "./socket-interface"
-import type { NativeWebviewCommand, NativeWebviewTargetKind } from "../../shared/native-webview"
 
 export function getNewestRemainingChatId(projectGroups: SidebarData["projectGroups"], activeChatId: string): string | null {
   const projectGroup = projectGroups.find((group) => group.chats.some((chat) => chat.chatId === activeChatId))
@@ -159,6 +167,10 @@ export function shouldRefreshStaleSessionOnResume(args: {
   if (args.connectionStatus !== "connected") return true
   if (args.hiddenAt === null) return false
   return Math.max(0, args.resumedAt - args.hiddenAt) >= PWA_RESUME_STALE_AFTER_MS
+}
+
+export function getResumeRefreshSessionProjectIds(openSessionProjectIds: Iterable<string>): string[] {
+  return [...new Set(openSessionProjectIds)]
 }
 
 // --- Per-chat message cache ---
@@ -295,59 +307,6 @@ export function resolveComposeIntent(params: {
   return null
 }
 
-const CONTROLLED_CONTENT_WEBVIEW_ID = "controlled-content"
-
-function isPrivateIpv4(hostname: string): boolean {
-  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true
-  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true
-  const match = hostname.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/)
-  if (!match) return false
-  const secondOctet = Number.parseInt(match[1], 10)
-  return secondOctet >= 16 && secondOctet <= 31
-}
-
-function resolveNativeWebviewTargetKind(url: URL): NativeWebviewTargetKind {
-  const hostname = url.hostname.toLowerCase()
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || isPrivateIpv4(hostname)) {
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
-      ? "local-port"
-      : "lan-host"
-  }
-  if (!hostname.includes(".") || hostname.endsWith(".local")) {
-    return "lan-host"
-  }
-  return "proxied-remote"
-}
-
-export function resolveDesktopWebviewOpenCommand(args: {
-  href: string
-  desktopRenderers: DesktopRenderersSnapshot
-}): Extract<NativeWebviewCommand, { type: "webview.open" }> | null {
-  const renderer = args.desktopRenderers.renderers.find((candidate) => candidate.capabilities.includes("native_webview"))
-  if (!renderer) return null
-
-  let url: URL
-  try {
-    url = new URL(args.href)
-  } catch {
-    return null
-  }
-
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return null
-  }
-
-  return {
-    type: "webview.open",
-    rendererId: renderer.rendererId,
-    webviewId: CONTROLLED_CONTENT_WEBVIEW_ID,
-    targetKind: resolveNativeWebviewTargetKind(url),
-    target: url.toString(),
-    dockState: "docked",
-  }
-}
-
 export function getActiveChatSnapshot(chatSnapshot: ChatSnapshot | null, activeChatId: string | null): ChatSnapshot | null {
   if (!chatSnapshot) return null
   if (!activeChatId) return null
@@ -369,8 +328,6 @@ export interface TinkariaState {
   localProjects: LocalProjectsSnapshot | null
   updateSnapshot: UpdateSnapshot | null
   chatSnapshot: ChatSnapshot | null
-  keybindings: KeybindingsSnapshot | null
-  desktopRenderers: DesktopRenderersSnapshot
   connectionStatus: SocketStatus
   sidebarReady: boolean
   localProjectsReady: boolean
@@ -383,6 +340,8 @@ export interface TinkariaState {
   messages: HydratedTranscriptMessage[]
   latestToolIds: ReturnType<typeof getLatestToolIds>
   runtime: ChatSnapshot["runtime"] | null
+  currentSessionRuntime: CurrentSessionSnapshot["runtime"]
+  currentAccountInfo: Extract<HydratedTranscriptMessage, { kind: "account_info" }>["accountInfo"] | null
   availableProviders: ProviderCatalogEntry[]
   isProcessing: boolean
   canCancel: boolean
@@ -390,7 +349,6 @@ export interface TinkariaState {
   transcriptPaddingBottom: number
   showScrollButton: boolean
   navbarLocalPath?: string
-  editorLabel: string
   hasSelectedProject: boolean
   chatHasKnownMessages: boolean
   localFilePreview: LocalFilePreview | null
@@ -416,8 +374,8 @@ export interface TinkariaState {
   restoreQueuedText: () => string
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
   handleRemoveProject: (projectId: string) => Promise<void>
-  handleOpenExternal: (action: "open_finder" | "open_terminal" | "open_editor") => Promise<void>
-  handleOpenExternalPath: (action: "open_finder" | "open_editor", localPath: string) => Promise<void>
+  handleOpenExternal: (action: "open_finder") => Promise<void>
+  handleOpenExternalPath: (action: "open_finder", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
   handleOpenExternalLink: (href: string) => boolean
   handleRenameChat: (chatId: string, title: string) => Promise<void>
@@ -450,12 +408,11 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [localProjects, setLocalProjects] = useState<LocalProjectsSnapshot | null>(null)
   const [updateSnapshot, setUpdateSnapshot] = useState<UpdateSnapshot | null>(null)
   const [chatSnapshot, setChatSnapshot] = useState<ChatSnapshot | null>(null)
+  const [currentSessionRuntime, setCurrentSessionRuntime] = useState<CurrentSessionSnapshot["runtime"]>(null)
   const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
   const [messages, setMessages] = useState<HydratedTranscriptMessage[]>([])
   const messagesRef = useRef<HydratedTranscriptMessage[]>(messages)
   const messageCountRef = useRef(0)
-  const [keybindings, setKeybindings] = useState<KeybindingsSnapshot | null>(null)
-  const [desktopRenderers, setDesktopRenderers] = useState<DesktopRenderersSnapshot>({ renderers: [] })
   const [connectionStatus, setConnectionStatus] = useState<SocketStatus>("connecting")
   const [sidebarReady, setSidebarReady] = useState(false)
   const [localProjectsReady, setLocalProjectsReady] = useState(false)
@@ -480,11 +437,10 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [localFilePreview, setLocalFilePreview] = useState<LocalFilePreview | null>(null)
   const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
   const [sessionsWindowDays, setSessionsWindowDays] = useState<Map<string, number>>(new Map())
-  const [chatRefreshNonce, setChatRefreshNonce] = useState(0)
+  const [resumeRefreshNonce, setResumeRefreshNonce] = useState(0)
   const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
   const backgroundedAtRef = useRef<number | null>(null)
   const lastResumeRefreshAtRef = useRef(0)
-  const editorLabel = getEditorPresetLabel(useTerminalPreferencesStore((store) => store.editorPreset))
   const lastSeenMessageAt = useChatReadStateStore((store) => (
     activeChatId ? store.lastSeenMessageAtByChat[activeChatId] : undefined
   ))
@@ -540,7 +496,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       setSidebarReady(true)
       setCommandError(null)
     })
-  }, [socket])
+  }, [resumeRefreshNonce, socket])
 
   useEffect(() => {
     return socket.subscribe<LocalProjectsSnapshot>({ type: "local-projects" }, (snapshot) => {
@@ -548,21 +504,14 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       setLocalProjectsReady(true)
       setCommandError(null)
     })
-  }, [socket])
+  }, [resumeRefreshNonce, socket])
 
   useEffect(() => {
     return socket.subscribe<UpdateSnapshot>({ type: "update" }, (snapshot) => {
       setUpdateSnapshot(snapshot)
       setCommandError(null)
     })
-  }, [socket])
-
-  useEffect(() => {
-    return socket.subscribe<DesktopRenderersSnapshot>({ type: "desktop-renderers" }, (snapshot) => {
-      setDesktopRenderers(snapshot)
-      setCommandError(null)
-    })
-  }, [socket])
+  }, [resumeRefreshNonce, socket])
 
   useEffect(() => {
     if (connectionStatus !== "connected") return
@@ -620,7 +569,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         connectionStatus,
       })
       void socket.ensureHealthyConnection()
-      setChatRefreshNonce((current) => current + 1)
+      setResumeRefreshNonce((current) => current + 1)
     }
 
     function handleVisibilityChange() {
@@ -659,11 +608,14 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   }, [activeChatId, connectionStatus, socket])
 
   useEffect(() => {
-    return socket.subscribe<KeybindingsSnapshot>({ type: "keybindings" }, (snapshot) => {
-      setKeybindings(snapshot)
-      setCommandError(null)
-    })
-  }, [socket])
+    if (resumeRefreshNonce === 0) return
+
+    for (const projectId of getResumeRefreshSessionProjectIds(activeSessionsSubs.current.keys())) {
+      void socket.command({ type: "sessions.refresh", projectId }).catch((error) => {
+        setCommandError(error instanceof Error ? error.message : String(error))
+      })
+    }
+  }, [resumeRefreshNonce, socket])
 
   useEffect(() => {
     if (!activeChatId) {
@@ -790,7 +742,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         })
       }
     }
-  }, [activeChatId, chatRefreshNonce, socket])
+  }, [activeChatId, resumeRefreshNonce, socket])
 
   useEffect(() => {
     if (!activeChatId) return
@@ -857,6 +809,10 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   }, [activeChatId, activeChatSnapshot, chatSnapshot, pendingChatId])
   const latestToolIds = useMemo(() => getLatestToolIds(messages), [messages])
   const runtime = activeChatSnapshot?.runtime ?? null
+  const currentAccountInfo = useMemo(() => {
+    const firstAccountInfo = messages.find((message) => message.kind === "account_info")
+    return firstAccountInfo?.accountInfo ?? null
+  }, [messages])
   const availableProviders = activeChatSnapshot?.availableProviders ?? PROVIDERS
   const isProcessing = isProcessingStatus(runtime?.status)
   const canCancel = canCancelStatus(runtime?.status)
@@ -934,6 +890,51 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
     return () => window.cancelAnimationFrame(frameId)
   }, [activeChatId, inputHeight, isAtBottom, messages.length, runtime?.status])
+
+  useEffect(() => {
+    const provider = activeChatSnapshot?.runtime.provider
+    const sessionToken = activeChatSnapshot?.runtime.sessionToken
+    if (!activeChatId || !provider || !sessionToken) {
+      setCurrentSessionRuntime(null)
+      return
+    }
+
+    const chatId = activeChatId
+    let cancelled = false
+
+    async function refreshCurrentSessionRuntime() {
+      try {
+        const result = await socket.command<CurrentSessionSnapshot>({
+          type: "chat.getSessionRuntime",
+          chatId,
+        })
+        if (!cancelled) {
+          setCurrentSessionRuntime(result.runtime)
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentSessionRuntime(null)
+        }
+      }
+    }
+
+    void refreshCurrentSessionRuntime()
+
+    if (!isProcessing) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const interval = window.setInterval(() => {
+      void refreshCurrentSessionRuntime()
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [activeChatId, activeChatSnapshot?.runtime.provider, activeChatSnapshot?.runtime.sessionToken, isProcessing, resumeRefreshNonce, socket])
 
   useEffect(() => {
     if (!activeChatId || !isAtBottom) return
@@ -1257,7 +1258,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     }
   }
 
-  async function handleOpenExternal(action: "open_finder" | "open_terminal" | "open_editor") {
+  async function handleOpenExternal(action: "open_finder") {
     const localPath = runtime?.localPath ?? localProjects?.projects[0]?.localPath ?? sidebarData.projectGroups[0]?.localPath
     if (!localPath) return
     try {
@@ -1288,7 +1289,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     }
   }
 
-  async function handleOpenExternalPath(action: "open_finder" | "open_editor", localPath: string) {
+  async function handleOpenExternalPath(action: "open_finder", localPath: string) {
     try {
       await openExternal({
         action,
@@ -1300,35 +1301,18 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   }
 
   function handleOpenExternalLink(href: string): boolean {
-    const command = resolveDesktopWebviewOpenCommand({
-      href,
-      desktopRenderers,
-    })
-    if (!command) return false
-
-    void socket.command(command).catch((error) => {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    })
-    return true
+    void href
+    return false
   }
 
   async function openExternal(command: {
-    action: "open_finder" | "open_terminal" | "open_editor"
+    action: "open_finder"
     localPath: string
-    line?: number
-    column?: number
   }) {
-    const preferences = useTerminalPreferencesStore.getState()
     setCommandError(null)
     await socket.command({
       type: "system.openExternal",
       ...command,
-      editor: command.action === "open_editor"
-        ? {
-            preset: preferences.editorPreset,
-            commandTemplate: preferences.editorCommandTemplate,
-          }
-        : undefined,
     })
   }
 
@@ -1452,8 +1436,6 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     localProjects,
     updateSnapshot,
     chatSnapshot,
-    keybindings,
-    desktopRenderers,
     connectionStatus,
     sidebarReady,
     localProjectsReady,
@@ -1466,6 +1448,8 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     messages,
     latestToolIds,
     runtime,
+    currentSessionRuntime,
+    currentAccountInfo,
     availableProviders,
     isProcessing,
     canCancel,
@@ -1473,7 +1457,6 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     transcriptPaddingBottom,
     showScrollButton,
     navbarLocalPath,
-    editorLabel,
     hasSelectedProject,
     chatHasKnownMessages,
     localFilePreview,

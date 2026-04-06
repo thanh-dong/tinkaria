@@ -5,7 +5,6 @@ import {
   DEV_DATA_ROOT_NAME,
   getDataDir,
   getDataRootDir,
-  getKeybindingsFilePath,
   getRuntimeProfile,
   LOG_PREFIX,
 } from "../shared/branding"
@@ -25,10 +24,6 @@ export function getLegacyDataRootDir(homeDir: string, env: RuntimeEnv = undefine
 
 export function getLegacyDataDir(homeDir: string, env: RuntimeEnv = undefined) {
   return `${getLegacyDataRootDir(homeDir, env)}/data`
-}
-
-export function getLegacyKeybindingsFilePath(homeDir: string, env: RuntimeEnv = undefined) {
-  return `${getLegacyDataRootDir(homeDir, env)}/keybindings.json`
 }
 
 export async function ensureTinkariaBrandingPaths(
@@ -51,6 +46,5 @@ export async function ensureTinkariaBrandingPaths(
   return {
     migrated,
     dataDir: getDataDir(homeDir, env),
-    keybindingsFilePath: getKeybindingsFilePath(homeDir, env),
   }
 }

@@ -6,7 +6,6 @@ import path from "node:path"
 import {
   ensureTinkariaBrandingPaths,
   getLegacyDataRootName,
-  getLegacyKeybindingsFilePath,
   getLegacyDataDir,
 } from "./branding-migration"
 
@@ -27,7 +26,6 @@ describe("branding migration", () => {
 
     await mkdir(legacyDataDir, { recursive: true })
     await Bun.write(path.join(legacyDataDir, "snapshot.json"), "{\"ok\":true}\n")
-    await Bun.write(getLegacyKeybindingsFilePath(homeDir, {}), "{}\n")
 
     const progress: string[] = []
     const result = await ensureTinkariaBrandingPaths(homeDir, {}, (message) => {
@@ -36,10 +34,8 @@ describe("branding migration", () => {
 
     expect(result.migrated).toBe(true)
     expect(result.dataDir).toBe(path.join(homeDir, ".tinkaria", "data"))
-    expect(result.keybindingsFilePath).toBe(path.join(homeDir, ".tinkaria", "keybindings.json"))
     expect(existsSync(legacyRootDir)).toBe(false)
     expect(existsSync(path.join(homeDir, ".tinkaria", "data", "snapshot.json"))).toBe(true)
-    expect(existsSync(path.join(homeDir, ".tinkaria", "keybindings.json"))).toBe(true)
     expect(progress.some((message) => message.includes(getLegacyDataRootName({})))).toBe(true)
   })
 
@@ -52,6 +48,5 @@ describe("branding migration", () => {
 
     expect(result.migrated).toBe(false)
     expect(result.dataDir).toBe(path.join(homeDir, ".tinkaria", "data"))
-    expect(result.keybindingsFilePath).toBe(path.join(homeDir, ".tinkaria", "keybindings.json"))
   })
 })

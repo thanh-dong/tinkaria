@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useEffect, useMemo, useRef, type CSSProperties } from "react"
 import { ArrowDown } from "lucide-react"
 import { useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
 import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
 import { RightSidebar } from "../components/chat-ui/RightSidebar"
-import { TerminalWorkspace } from "../components/chat-ui/TerminalWorkspace"
 import { LocalFilePreviewDialog } from "../components/messages/LocalFilePreviewDialog"
 import { ProcessingMessage } from "../components/messages/ProcessingMessage"
 import { Card, CardContent } from "../components/ui/card"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../components/ui/resizable"
 import { ScrollArea } from "../components/ui/scroll-area"
 import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
-import { actionMatchesEvent, getResolvedKeybindings } from "../lib/keybindings"
 import { cn } from "../lib/utils"
 import {
   DEFAULT_PROJECT_RIGHT_SIDEBAR_LAYOUT,
@@ -20,12 +18,7 @@ import {
   RIGHT_SIDEBAR_MIN_SIZE_PERCENT,
   useRightSidebarStore,
 } from "../stores/rightSidebarStore"
-import { DEFAULT_PROJECT_TERMINAL_LAYOUT, useTerminalLayoutStore } from "../stores/terminalLayoutStore"
-import { useTerminalPreferencesStore } from "../stores/terminalPreferencesStore"
-import { shouldCloseTerminalPane } from "./terminalLayoutResize"
-import { TERMINAL_TOGGLE_ANIMATION_DURATION_MS } from "./terminalToggleAnimation"
 import { useRightSidebarToggleAnimation } from "./useRightSidebarToggleAnimation"
-import { useTerminalToggleAnimation } from "./useTerminalToggleAnimation"
 import type { TinkariaState } from "./useTinkariaState"
 import { TinkariaTranscript } from "./TinkariaTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
@@ -104,7 +97,6 @@ export function getAvailableSkillsFromMessages(messages: HydratedTranscriptMessa
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i]
     if (message.kind !== "system_init") continue
-    // Prefer skills from debug payload, fall back to slashCommands
     return getSkillsFromDebugRaw(message.debugRaw) ?? message.slashCommands
   }
   return []
@@ -187,50 +179,19 @@ export function ChatEmptyStateBrandMark() {
 
 export function ChatPage() {
   const state = useOutletContext<TinkariaState>()
-  const layoutRootRef = useRef<HTMLDivElement>(null)
   const chatCardRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const mobileSidebarSwipeRef = useRef<MobileSidebarSwipeState | null>(null)
-  const [fixedTerminalHeight, setFixedTerminalHeight] = useState(0)
   const projectId = state.runtime?.projectId ?? null
-  const projectTerminalLayout = useTerminalLayoutStore((store) => (projectId ? store.projects[projectId] : undefined))
-  const terminalLayout = projectTerminalLayout ?? DEFAULT_PROJECT_TERMINAL_LAYOUT
   const projectRightSidebarLayout = useRightSidebarStore((store) => (projectId ? store.projects[projectId] : undefined))
   const rightSidebarLayout = projectRightSidebarLayout ?? DEFAULT_PROJECT_RIGHT_SIDEBAR_LAYOUT
-  const addTerminal = useTerminalLayoutStore((store) => store.addTerminal)
-  const removeTerminal = useTerminalLayoutStore((store) => store.removeTerminal)
-  const toggleVisibility = useTerminalLayoutStore((store) => store.toggleVisibility)
-  const resetMainSizes = useTerminalLayoutStore((store) => store.resetMainSizes)
-  const setMainSizes = useTerminalLayoutStore((store) => store.setMainSizes)
-  const setTerminalSizes = useTerminalLayoutStore((store) => store.setTerminalSizes)
   const toggleRightSidebar = useRightSidebarStore((store) => store.toggleVisibility)
   const setRightSidebarSize = useRightSidebarStore((store) => store.setSize)
-  const scrollback = useTerminalPreferencesStore((store) => store.scrollbackLines)
-  const minColumnWidth = useTerminalPreferencesStore((store) => store.minColumnWidth)
-  const keybindings = state.keybindings
-  const resolvedKeybindings = useMemo(() => getResolvedKeybindings(keybindings), [keybindings])
   const uiIdentities = getChatPageUiIdentities()
 
   const availableSkills = useMemo(() => getAvailableSkillsFromMessages(state.messages), [state.messages])
-
-  const hasTerminals = terminalLayout.terminals.length > 0
-  const showTerminalPane = Boolean(projectId && terminalLayout.isVisible && hasTerminals)
-  const shouldRenderTerminalLayout = Boolean(projectId && hasTerminals)
   const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
   const shouldRenderRightSidebarLayout = Boolean(projectId)
-  const {
-    isAnimating: isTerminalAnimating,
-    mainPanelGroupRef,
-    terminalFocusRequestVersion,
-    terminalPanelRef,
-    terminalVisualRef,
-  } = useTerminalToggleAnimation({
-    showTerminalPane,
-    shouldRenderTerminalLayout,
-    projectId,
-    terminalLayout,
-    chatInputRef,
-  })
   const {
     isAnimating: isRightSidebarAnimating,
     panelGroupRef: rightSidebarPanelGroupRef,
@@ -249,37 +210,6 @@ export function ChatPage() {
     enabled: state.hasSelectedProject && state.runtime?.status !== "waiting_for_user" && !state.sidebarOpen,
     canCancel: state.canCancel,
   })
-
-  const handleToggleEmbeddedTerminal = () => {
-    if (!projectId) return
-    if (hasTerminals) {
-      toggleVisibility(projectId)
-      return
-    }
-
-    addTerminal(projectId)
-  }
-
-  const handleTerminalResize = (layout: Record<string, number>) => {
-    if (!projectId || !showTerminalPane || isTerminalAnimating.current) {
-      return
-    }
-
-    const chatSize = layout.chat
-    const terminalSize = layout.terminal
-    if (!Number.isFinite(chatSize) || !Number.isFinite(terminalSize)) {
-      return
-    }
-
-    const containerHeight = layoutRootRef.current?.getBoundingClientRect().height ?? 0
-    if (shouldCloseTerminalPane(containerHeight, terminalSize)) {
-      resetMainSizes(projectId)
-      toggleVisibility(projectId)
-      return
-    }
-
-    setMainSizes(projectId, [chatSize, terminalSize])
-  }
 
   const handleMobileSidebarPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch") {
@@ -328,53 +258,23 @@ export function ChatPage() {
   useEffect(() => {
     function handleGlobalKeydown(event: KeyboardEvent) {
       if (!projectId) return
-      if (actionMatchesEvent(resolvedKeybindings, "toggleEmbeddedTerminal", event)) {
-        event.preventDefault()
-        handleToggleEmbeddedTerminal()
-        return
-      }
+      const mod = event.metaKey || event.ctrlKey
 
-      if (actionMatchesEvent(resolvedKeybindings, "toggleRightSidebar", event)) {
+      if (mod && event.key === "b") {
         event.preventDefault()
         toggleRightSidebar(projectId)
         return
       }
 
-      if (actionMatchesEvent(resolvedKeybindings, "openInFinder", event)) {
+      if (mod && event.altKey && event.key === "f") {
         event.preventDefault()
         void state.handleOpenExternal("open_finder")
-        return
-      }
-
-      if (actionMatchesEvent(resolvedKeybindings, "openInEditor", event)) {
-        event.preventDefault()
-        void state.handleOpenExternal("open_editor")
-        return
-      }
-
-      if (actionMatchesEvent(resolvedKeybindings, "addSplitTerminal", event)) {
-        event.preventDefault()
-        addTerminal(projectId)
       }
     }
 
     window.addEventListener("keydown", handleGlobalKeydown)
     return () => window.removeEventListener("keydown", handleGlobalKeydown)
-  }, [addTerminal, handleToggleEmbeddedTerminal, projectId, resolvedKeybindings, toggleRightSidebar, toggleVisibility])
-
-  useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      state.updateScrollState()
-    })
-    const timeoutId = window.setTimeout(() => {
-      state.updateScrollState()
-    }, TERMINAL_TOGGLE_ANIMATION_DURATION_MS)
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      window.clearTimeout(timeoutId)
-    }
-  }, [shouldRenderTerminalLayout, showTerminalPane, state.updateScrollState])
+  }, [projectId, state, toggleRightSidebar])
 
   useEffect(() => {
     function handleResize() {
@@ -384,25 +284,6 @@ export function ChatPage() {
     window.addEventListener("resize", handleResize)
     return () => window.removeEventListener("resize", handleResize)
   }, [state.updateScrollState])
-
-  useEffect(() => {
-    const element = layoutRootRef.current
-    if (!element || !shouldRenderTerminalLayout) return
-
-    const updateHeight = () => {
-      const containerHeight = element.getBoundingClientRect().height
-      if (containerHeight <= 0) return
-      const nextHeight = containerHeight * (terminalLayout.mainSizes[1] / 100)
-      if (nextHeight <= 0) return
-      setFixedTerminalHeight((current) => (Math.abs(current - nextHeight) < 1 ? current : nextHeight))
-    }
-
-    const observer = new ResizeObserver(updateHeight)
-    observer.observe(element)
-    updateHeight()
-
-    return () => observer.disconnect()
-  }, [projectId, shouldRenderTerminalLayout, terminalLayout.mainSizes])
 
   const clampRightSidebarSize = (size: number) => {
     if (!Number.isFinite(size)) {
@@ -430,18 +311,15 @@ export function ChatPage() {
           onExpandSidebar={state.expandSidebar}
           onNewChat={state.handleCompose}
           localPath={state.navbarLocalPath}
-          embeddedTerminalVisible={showTerminalPane}
-          onToggleEmbeddedTerminal={projectId ? handleToggleEmbeddedTerminal : undefined}
+          currentSessionRuntime={state.currentSessionRuntime}
+          accountInfo={state.currentAccountInfo}
           rightSidebarVisible={showRightSidebar}
           onToggleRightSidebar={projectId ? () => toggleRightSidebar(projectId) : undefined}
-          onOpenExternal={(action) => {
-            void state.handleOpenExternal(action)
+          onOpenFinder={() => {
+            void state.handleOpenExternal("open_finder")
           }}
-          editorLabel={state.editorLabel}
-          finderShortcut={resolvedKeybindings.bindings.openInFinder}
-          editorShortcut={resolvedKeybindings.bindings.openInEditor}
-          terminalShortcut={resolvedKeybindings.bindings.toggleEmbeddedTerminal}
-          rightSidebarShortcut={resolvedKeybindings.bindings.toggleRightSidebar}
+          finderShortcut={["cmd+alt+f", "ctrl+alt+f"]}
+          rightSidebarShortcut={["cmd+b", "ctrl+b"]}
         />
 
         <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(uiIdentities.transcript)}>
@@ -572,7 +450,6 @@ export function ChatPage() {
 
   return (
     <div
-      ref={layoutRootRef}
       className="flex-1 flex flex-col min-w-0 relative"
       onPointerDown={handleMobileSidebarPointerDown}
       onPointerMove={handleMobileSidebarPointerMove}
@@ -615,64 +492,7 @@ export function ChatPage() {
             minSize="50%"
             className="min-h-0 min-w-0"
           >
-            {shouldRenderTerminalLayout ? (
-              <ResizablePanelGroup
-                key={projectId}
-                groupRef={mainPanelGroupRef}
-                orientation="vertical"
-                className="flex-1 min-h-0"
-                onLayoutChanged={handleTerminalResize}
-              >
-                <ResizablePanel id="chat" defaultSize={`${terminalLayout.mainSizes[0]}%`} minSize="25%" className="min-h-0">
-                  {chatCard}
-                </ResizablePanel>
-                <ResizableHandle
-                  withHandle
-                  orientation="vertical"
-                  disabled={!showTerminalPane}
-                  className={cn(!showTerminalPane && "pointer-events-none opacity-0")}
-                />
-                <ResizablePanel
-                  id="terminal"
-                  defaultSize={`${terminalLayout.mainSizes[1]}%`}
-                  minSize="0%"
-                  className="min-h-0"
-                  elementRef={terminalPanelRef}
-                >
-                  <div
-                    ref={terminalVisualRef}
-                    className="h-full min-h-0 overflow-hidden relative"
-                    data-terminal-open={showTerminalPane ? "true" : "false"}
-                    data-terminal-animated="false"
-                    data-terminal-visual
-                    style={{
-                      "--terminal-toggle-duration": `${TERMINAL_TOGGLE_ANIMATION_DURATION_MS}ms`,
-                    } as CSSProperties}
-                  >
-                    <div style={fixedTerminalHeight > 0 ? { height: `${fixedTerminalHeight}px` } : undefined}>
-                      <TerminalWorkspace
-                        projectId={projectId}
-                        layout={terminalLayout}
-                        onAddTerminal={addTerminal}
-                        socket={state.socket}
-                        connectionStatus={state.connectionStatus}
-                        scrollback={scrollback}
-                        minColumnWidth={minColumnWidth}
-                        splitTerminalShortcut={resolvedKeybindings.bindings.addSplitTerminal}
-                        focusRequestVersion={terminalFocusRequestVersion}
-                        onRemoveTerminal={(currentProjectId, terminalId) => {
-                          void state.socket.command({ type: "terminal.close", terminalId }).catch(() => {})
-                          removeTerminal(currentProjectId, terminalId)
-                        }}
-                        onTerminalLayout={setTerminalSizes}
-                      />
-                    </div>
-                  </div>
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            ) : (
-              chatCard
-            )}
+            {chatCard}
           </ResizablePanel>
           <ResizableHandle
             withHandle
@@ -693,75 +513,14 @@ export function ChatPage() {
               data-right-sidebar-open={showRightSidebar ? "true" : "false"}
               data-right-sidebar-animated="false"
               data-right-sidebar-visual
-              style={{
-                "--terminal-toggle-duration": `${TERMINAL_TOGGLE_ANIMATION_DURATION_MS}ms`,
-              } as CSSProperties}
             >
-              <RightSidebar
-                onClose={() => toggleRightSidebar(projectId)}
-              />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : shouldRenderTerminalLayout && projectId ? (
-        <ResizablePanelGroup
-          key={projectId}
-          groupRef={mainPanelGroupRef}
-          orientation="vertical"
-          className="flex-1 min-h-0"
-          onLayoutChanged={handleTerminalResize}
-        >
-          <ResizablePanel id="chat" defaultSize={`${terminalLayout.mainSizes[0]}%`} minSize="25%" className="min-h-0">
-            {chatCard}
-          </ResizablePanel>
-          <ResizableHandle
-            withHandle
-            orientation="vertical"
-            disabled={!showTerminalPane}
-            className={cn(!showTerminalPane && "pointer-events-none opacity-0")}
-          />
-          <ResizablePanel
-            id="terminal"
-            defaultSize={`${terminalLayout.mainSizes[1]}%`}
-            minSize="0%"
-            className="min-h-0"
-            elementRef={terminalPanelRef}
-          >
-            <div
-              ref={terminalVisualRef}
-              className="h-full min-h-0 overflow-hidden relative"
-              data-terminal-open={showTerminalPane ? "true" : "false"}
-              data-terminal-animated="false"
-              data-terminal-visual
-              style={{
-                "--terminal-toggle-duration": `${TERMINAL_TOGGLE_ANIMATION_DURATION_MS}ms`,
-              } as CSSProperties}
-            >
-              <div style={fixedTerminalHeight > 0 ? { height: `${fixedTerminalHeight}px` } : undefined}>
-                <TerminalWorkspace
-                  projectId={projectId}
-                  layout={terminalLayout}
-                  onAddTerminal={addTerminal}
-                  socket={state.socket}
-                  connectionStatus={state.connectionStatus}
-                  scrollback={scrollback}
-                  minColumnWidth={minColumnWidth}
-                  splitTerminalShortcut={resolvedKeybindings.bindings.addSplitTerminal}
-                  focusRequestVersion={terminalFocusRequestVersion}
-                  onRemoveTerminal={(currentProjectId, terminalId) => {
-                    void state.socket.command({ type: "terminal.close", terminalId }).catch(() => {})
-                    removeTerminal(currentProjectId, terminalId)
-                  }}
-                  onTerminalLayout={setTerminalSizes}
-                />
-              </div>
+              <RightSidebar onClose={() => toggleRightSidebar(projectId)} />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (
         chatCard
       )}
-
     </div>
   )
 }
