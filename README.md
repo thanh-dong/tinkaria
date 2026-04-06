@@ -97,11 +97,11 @@ The browser connects to an embedded NATS server over WebSocket. Tinkaria uses th
 
 | Namespace | Pattern | Purpose |
 |-----------|---------|---------|
-| Snapshots | `kanna.snap.*` | Push state for sidebar, chat, settings, terminals |
-| Events | `kanna.evt.*` | JetStream-backed terminal and chat event streams |
-| Commands | `kanna.cmd.*` | Request/reply mutations from browser to server |
+| Snapshots | `runtime.snap.*` | Push state for sidebar, chat, settings, terminals |
+| Events | `runtime.evt.*` | JetStream-backed terminal and chat event streams |
+| Commands | `runtime.cmd.*` | Request/reply mutations from browser to server |
 
-The `kanna.*` subject prefix is an internal protocol detail carried forward from earlier iterations. The product and UI branding are `Tinkaria`.
+The `runtime.*` subject prefix keeps the internal transport namespace generic and separate from product branding.
 
 Key patterns:
 
@@ -133,8 +133,6 @@ Tinkaria stores local state under:
 
 - prod: `~/.tinkaria/data`
 - dev: `~/.tinkaria-dev/data`
-
-On startup, Tinkaria will migrate older `~/.kanna` and `~/.kanna-dev` roots forward automatically.
 
 Main files:
 

@@ -6,7 +6,7 @@ This release marks the transition from `Kanna` to `Tinkaria` and rolls up the cu
 
 ### Highlights
 
-- Rebranded the project from `Kanna` to `Tinkaria`, including package/bin identity, app branding, logo assets, and compatibility handling for existing local data roots.
+- Rebranded the project from `Kanna` to `Tinkaria`, including package/bin identity, app branding, and logo assets.
 - Added session discovery and resume flows with session picker UI, cross-window session search, transcript import, and resume/refresh transport commands.
 - Expanded transcript rendering with rich-content blocks, immersive overlays, Mermaid/embed support, local preview handling, and typed `present_content` transcript support.
 - Improved chat/runtime correctness by disposing provider runtime state on delete, retaining read state after reply, and clearing queued drafts after queued flush.
@@ -22,7 +22,7 @@ This release marks the transition from `Kanna` to `Tinkaria` and rolls up the cu
 - Rich transcript primitives including `RichContentBlock`, `ContentOverlay`, `EmbedRenderer`, and rich-content auto-expand hints.
 - Local transcript file preview routing and in-app preview dialog support.
 - Tauri shell/bootstrap files and desktop renderer/native webview protocol groundwork.
-- `Tinkaria` branding assets, shared brand mark components, and startup migration support for legacy `~/.kanna*` data roots.
+- `Tinkaria` branding assets and shared brand mark components.
 
 ### Changed
 

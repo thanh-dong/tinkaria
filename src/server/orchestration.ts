@@ -225,7 +225,7 @@ export function createOrchestrationMcpServer(
   callerChatId: string,
 ) {
   return createSdkMcpServer({
-    name: "tinkaria-orchestration",
+    name: "session-orchestration",
     tools: [
       tool(
         "spawn_agent",

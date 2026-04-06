@@ -1,9 +1,9 @@
 import type { SubscriptionTopic } from "./protocol"
 
-const PREFIX = "kanna"
+const PREFIX = "runtime"
 const SNAP_PREFIX = `${PREFIX}.snap.`
 
-/** Map a subscription topic to a KV key (also the subject suffix after `kanna.snap.`) */
+/** Map a subscription topic to a KV key (also the subject suffix after `runtime.snap.`) */
 export function snapshotKvKey(topic: SubscriptionTopic): string {
   switch (topic.type) {
     case "chat": return `chat.${topic.chatId}`
@@ -42,4 +42,4 @@ export const ALL_CHAT_MESSAGE_EVENTS = `${PREFIX}.evt.chat.>`
 export const ALL_COMMANDS = `${PREFIX}.cmd.>`
 
 /** KV bucket name for snapshot caching */
-export const KV_BUCKET = "kanna_snapshots"
+export const KV_BUCKET = "runtime_snapshots"

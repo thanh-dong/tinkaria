@@ -345,7 +345,7 @@ async function startClaudeTurn(args: {
 
   const mcpServers: Record<string, McpServerConfig> | undefined =
     args.orchestrator && args.chatId
-      ? { "tinkaria-orchestration": createOrchestrationMcpServer(args.orchestrator, args.chatId) }
+      ? { "session-orchestration": createOrchestrationMcpServer(args.orchestrator, args.chatId) }
       : undefined
 
   const q = query({

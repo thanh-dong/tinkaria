@@ -62,8 +62,8 @@ describe("NatsBridge", () => {
     const testClient = await connect({ servers: bridge.natsUrl })
     const received: Array<{ subject: string; data: unknown }> = []
 
-    const sub1 = testClient.subscribe("kanna.snap.sidebar")
-    const sub2 = testClient.subscribe("kanna.snap.chat.abc")
+    const sub1 = testClient.subscribe("runtime.snap.sidebar")
+    const sub2 = testClient.subscribe("runtime.snap.chat.abc")
 
     // Collect in background
     const collect = async (sub: AsyncIterable<{ data: Uint8Array; subject: string }>, count: number) => {
@@ -79,14 +79,14 @@ describe("NatsBridge", () => {
 
     await testClient.flush()
 
-    bridge.publish("kanna.snap.sidebar", { type: "sidebar" })
-    bridge.publish("kanna.snap.chat.abc", { type: "chat", chatId: "abc" })
+    bridge.publish("runtime.snap.sidebar", { type: "sidebar" })
+    bridge.publish("runtime.snap.chat.abc", { type: "chat", chatId: "abc" })
 
     await Promise.all([p1, p2])
 
     expect(received).toHaveLength(2)
-    expect(received.find((r) => r.subject === "kanna.snap.sidebar")?.data).toEqual({ type: "sidebar" })
-    expect(received.find((r) => r.subject === "kanna.snap.chat.abc")?.data).toEqual({ type: "chat", chatId: "abc" })
+    expect(received.find((r) => r.subject === "runtime.snap.sidebar")?.data).toEqual({ type: "sidebar" })
+    expect(received.find((r) => r.subject === "runtime.snap.chat.abc")?.data).toEqual({ type: "chat", chatId: "abc" })
 
     await testClient.drain()
   })
@@ -113,7 +113,7 @@ describe("NatsBridge", () => {
     const testClient = await connect({ servers: bridge.natsUrl })
     const received: string[] = []
 
-    const sub = testClient.subscribe("kanna.snap.>")
+    const sub = testClient.subscribe("runtime.snap.>")
 
     const collect = async (count: number) => {
       let n = 0
@@ -126,15 +126,15 @@ describe("NatsBridge", () => {
     const p = collect(3)
     await testClient.flush()
 
-    bridge.publish("kanna.snap.sidebar", {})
-    bridge.publish("kanna.snap.update", {})
-    bridge.publish("kanna.snap.chat.xyz", {})
+    bridge.publish("runtime.snap.sidebar", {})
+    bridge.publish("runtime.snap.update", {})
+    bridge.publish("runtime.snap.chat.xyz", {})
 
     await p
 
-    expect(received).toContain("kanna.snap.sidebar")
-    expect(received).toContain("kanna.snap.update")
-    expect(received).toContain("kanna.snap.chat.xyz")
+    expect(received).toContain("runtime.snap.sidebar")
+    expect(received).toContain("runtime.snap.update")
+    expect(received).toContain("runtime.snap.chat.xyz")
 
     await testClient.drain()
   })

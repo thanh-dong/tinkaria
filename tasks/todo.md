@@ -1,4 +1,61 @@
-# Kanna Tasks
+# Tinkaria Tasks
+
+## Completed: Kanna Residue Cleanup Pass
+
+**Status**: Verified. The remaining non-compatibility `Kanna`/`kanna` residue in active code and C3 has been reduced to intentional compatibility surfaces and historical docs/specs.
+
+**Scope**:
+1. Renamed the last internal code symbols still using `Kanna` naming, including transcript/server entrypoint types and functions.
+2. Renamed discovered-session semantics from `source: "kanna"` / `kannaChatId` to `source: "tinkaria"` / `chatId` across shared types, session discovery, and the session-picker/homepage consumers.
+3. Renamed safe internal string residues such as the UI-update session storage key, chat-focus custom event, cursor keyframes, and orchestration MCP server name.
+4. Updated C3 entity goals so the active topology describes `Tinkaria` instead of `Kanna`, and restored C3 codemap coverage to `100%`.
+
+**Intentional leftovers**:
+1. Historical ADRs/specs/plans and changelog/fork-lineage references still mention `Kanna` where they describe past work or upstream provenance.
+
+**Verified**:
+1. `bun test src/server/session-discovery.test.ts`
+2. `bun test src/client/components/chat-ui/SessionPicker.test.tsx src/client/components/LocalDev.test.tsx`
+3. `bun test src/server/agent.test.ts src/server/orchestration.test.ts`
+4. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+5. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+6. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage`
+
+## Completed: Generic Transport Namespace
+
+**Status**: Verified. The internal transport namespace is now generic instead of brand-coupled.
+
+**Fix**:
+1. Renamed NATS subjects from `kanna.*` to `runtime.*` in the shared subject helpers and transport tests.
+2. Renamed the KV snapshot bucket from `kanna_snapshots` to `runtime_snapshots`.
+3. Renamed the orchestration MCP server name from a branded identifier to `session-orchestration`.
+4. Updated the architecture README so the internal transport namespace is described as generic rather than product-branded.
+
+**Compatibility note**:
+1. Historical docs and changelog entries may still mention the older transport naming where they describe past work.
+
+**Verified**:
+1. `bun test src/shared/nats-subjects.test.ts`
+2. `bun test src/server/nats-streams.test.ts src/server/nats-bridge.test.ts src/server/nats-publisher.test.ts`
+3. `bun test src/server/agent.test.ts src/server/orchestration.test.ts`
+4. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+5. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+6. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage`
+
+## Completed: Remove Legacy Kanna Data-Root Migration
+
+**Status**: Verified. The obsolete `~/.kanna*` startup migration path has been removed from the active runtime and active docs.
+
+**Fix**:
+1. Deleted the orphaned `src/server/branding-migration.ts` module and its dedicated test because nothing in the runtime still called it.
+2. Removed active README/changelog/todo claims that Tinkaria still migrates old `~/.kanna*` roots on startup.
+3. Kept historical specs/plans/ADR notes intact where they record past migration behavior rather than current runtime behavior.
+
+**Verified**:
+1. `bun test src/shared/branding.test.ts src/server/cli-runtime.test.ts src/server/event-store.test.ts`
+2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+3. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+4. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh coverage`
 
 ## Completed: Session Picker Runtime Usage Details
 

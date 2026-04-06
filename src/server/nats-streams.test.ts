@@ -30,7 +30,7 @@ describe("nats-streams", () => {
     const jsm = await jetstreamManager(nc)
     const info = await jsm.streams.info(TERMINAL_EVENTS_STREAM)
     expect(info.config.name).toBe(TERMINAL_EVENTS_STREAM)
-    expect(info.config.subjects).toContain("kanna.evt.terminal.>")
+    expect(info.config.subjects).toContain("runtime.evt.terminal.>")
     expect(info.config.storage).toBe("memory")
   })
 
@@ -59,7 +59,7 @@ describe("nats-streams", () => {
     const { jetstream } = await import("@nats-io/jetstream")
     const js = jetstream(nc)
     await js.publish(
-      "kanna.evt.terminal.term-1",
+      "runtime.evt.terminal.term-1",
       encoder.encode(JSON.stringify({ type: "terminal.output", terminalId: "term-1", data: "hello" }))
     )
 
@@ -69,7 +69,7 @@ describe("nats-streams", () => {
 })
 
 describe("KV snapshot bucket", () => {
-  test("can create and read from kanna_snapshots bucket", async () => {
+  test("can create and read from runtime_snapshots bucket", async () => {
     server = await NatsServer.start({ jetstream: true })
     nc = await connect({ servers: server.url })
 

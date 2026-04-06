@@ -217,7 +217,7 @@ describe("createNatsPublisher", () => {
 
     const publisher = await createNatsPublisher(mockArgs({ terminals }))
 
-    const sub = nc.subscribe("kanna.evt.terminal.term-1")
+    const sub = nc.subscribe("runtime.evt.terminal.term-1")
 
     // Simulate terminal event
     for (const cb of eventCallbacks) {
