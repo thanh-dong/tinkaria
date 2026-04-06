@@ -609,6 +609,7 @@ export interface TinkariaState {
   handleRefreshSessions: (projectId: string) => void
   handleShowMoreSessions: (projectId: string) => void
   handleCompose: () => void
+  handleForkSession: (context: string, provider: AgentProvider, model: string) => Promise<void>
   handleAskUserQuestion: (
     toolUseId: string,
     questions: AskUserQuestionItem[],
@@ -1753,6 +1754,35 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     navigate("/")
   }
 
+  async function handleForkSession(context: string, provider: AgentProvider, model: string) {
+    const projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
+    if (!projectId) {
+      throw new Error("Open a project first")
+    }
+
+    const result = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
+
+    const providerDefaults = useChatPreferencesStore.getState().providerDefaults
+    const defaults = providerDefaults[provider]
+    const modelOptions: ModelOptions = provider === "claude"
+      ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
+      : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
+
+    await socket.command({
+      type: "chat.send",
+      chatId: result.chatId,
+      provider,
+      content: context,
+      model,
+      modelOptions,
+    })
+
+    setPendingChatId(result.chatId)
+    navigate(`/chat/${result.chatId}`)
+    setSidebarOpen(false)
+    setCommandError(null)
+  }
+
   async function handleAskUserQuestion(
     toolUseId: string,
     questions: AskUserQuestionItem[],
@@ -1863,6 +1893,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     handleRefreshSessions,
     handleShowMoreSessions,
     handleCompose,
+    handleForkSession,
     handleAskUserQuestion,
     handleExitPlanMode,
   }
