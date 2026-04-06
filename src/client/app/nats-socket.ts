@@ -139,7 +139,12 @@ export class NatsSocket implements TinkariaTransport {
     const payload = encoder.encode(JSON.stringify(command))
     const reply = await this.nc.request(subject, payload, { timeout: 30_000 })
     const decoded = await decompressPayload(reply.data)
-    const response: NatsCommandResponse = JSON.parse(decoder.decode(decoded))
+    let response: NatsCommandResponse
+    try {
+      response = JSON.parse(decoder.decode(decoded))
+    } catch {
+      throw new Error("Invalid JSON response from server")
+    }
 
     if (!response.ok) {
       throw new Error(response.error ?? "Command failed")

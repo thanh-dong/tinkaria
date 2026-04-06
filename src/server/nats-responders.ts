@@ -348,8 +348,12 @@ async function readLocalFilePreview(localPath: string) {
     throw new Error(`File too large to preview: ${resolvedPath}`)
   }
 
-  return {
-    localPath: resolvedPath,
-    content: await Bun.file(resolvedPath).text(),
+  try {
+    return {
+      localPath: resolvedPath,
+      content: await Bun.file(resolvedPath).text(),
+    }
+  } catch {
+    throw new Error(`Failed to read file: ${resolvedPath}`)
   }
 }

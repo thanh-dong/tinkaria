@@ -325,7 +325,11 @@ export class EventStore {
     for (const rawLine of text.split("\n")) {
       const line = rawLine.trim()
       if (!line) continue
-      entries.push(JSON.parse(line) as TranscriptEntry)
+      try {
+        entries.push(JSON.parse(line) as TranscriptEntry)
+      } catch {
+        // Skip malformed JSONL lines — one bad line must not crash transcript loading
+      }
     }
     return entries
   }

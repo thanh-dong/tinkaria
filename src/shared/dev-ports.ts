@@ -25,7 +25,9 @@ export function resolveDevPorts(args: string[]) {
       throw new Error("Missing value for --port")
     }
 
-    clientPort = Number(next)
+    const parsed = Number(next)
+    if (!Number.isFinite(parsed)) throw new Error(`Invalid port: ${next}`)
+    clientPort = parsed
     index += 1
   }
 

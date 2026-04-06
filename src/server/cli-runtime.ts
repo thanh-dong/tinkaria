@@ -107,7 +107,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
     if (arg === "--port") {
       const next = argv[index + 1]
       if (!next) throw new Error("Missing value for --port")
-      port = Number(next)
+      const parsed = Number(next)
+      if (!Number.isFinite(parsed)) throw new Error(`Invalid port: ${next}`)
+      port = parsed
       index += 1
       continue
     }
