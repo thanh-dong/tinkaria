@@ -61,7 +61,7 @@ function groupMessages(messages: HydratedTranscriptMessage[]): RenderItem[] {
   return result
 }
 
-interface KannaTranscriptProps {
+interface TinkariaTranscriptProps {
   messages: HydratedTranscriptMessage[]
   scrollRef: RefObject<HTMLDivElement | null>
   isLoading: boolean
@@ -87,7 +87,7 @@ export function TinkariaTranscript({
   onOpenExternalLink,
   onAskUserQuestionSubmit,
   onExitPlanModeConfirm,
-}: KannaTranscriptProps) {
+}: TinkariaTranscriptProps) {
   // Precompute first-occurrence indices to avoid O(n) findIndex per render
   const firstIndices = useMemo(() => {
     let systemInit = -1

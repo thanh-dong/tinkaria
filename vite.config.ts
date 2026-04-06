@@ -7,7 +7,6 @@ const DEV_WATCH_IGNORED = [
   "**/*.md",
   "**/*.markdown",
   "**/*.mdx",
-  "**/src-tauri/**",
 ]
 
 export function getAllowedHosts() {
@@ -48,9 +47,6 @@ export default defineConfig({
         target: `http://${backendTargetHost}:${backendPort}`,
       },
       "/auth/token": {
-        target: `http://${backendTargetHost}:${backendPort}`,
-      },
-      "/desktop-companion.json": {
         target: `http://${backendTargetHost}:${backendPort}`,
       },
       "/nats-ws": {

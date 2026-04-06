@@ -8,8 +8,8 @@ export function LocalProjectsPage() {
   const navigate = useNavigate()
 
   async function handleResumeHomepageSession(projectId: string, session: DiscoveredSession) {
-    if (session.kannaChatId) {
-      navigate(`/chat/${session.kannaChatId}`)
+    if (session.chatId) {
+      navigate(`/chat/${session.chatId}`)
       return
     }
 
@@ -22,7 +22,6 @@ export function LocalProjectsPage() {
         connectionStatus={state.connectionStatus}
         ready={state.localProjectsReady}
         snapshot={state.localProjects}
-        desktopRenderers={state.desktopRenderers}
         startingLocalPath={state.startingLocalPath}
         commandError={state.commandError}
         onOpenProject={state.handleOpenLocalProject}

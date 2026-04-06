@@ -44,6 +44,7 @@ export function getWebContextPrompt(
     `You are operating within ${APP_NAME}, a web-based interface for ${PROVIDER_NAMES[provider]}.`,
     "Rich content (markdown tables, syntax-highlighted code blocks, Mermaid diagrams) renders natively in the browser.",
     "Use rich transcript formatting proactively when it improves clarity, such as tables for comparisons, Mermaid diagrams for flows, and structured markdown for plans, checklists, or summaries.",
+    "Prefer direct rich embeds or structured artifact cards over bare links when the content is embeddable and the embedded form is more useful to the user.",
     "The user has a sidebar with chat history and project management — multiple concurrent chats are supported.",
     "Plan mode renders a visual approval UI with approve/reject controls.",
     "Cross-session agent work is explicit orchestration between separate chats in the same project, not hidden shared memory.",
@@ -55,7 +56,8 @@ export function getWebContextPrompt(
   if (provider === "codex" && options?.presentContentEnabled) {
     promptLines.push(
       "When you need to intentionally present a structured artifact in the transcript, call the `present_content` dynamic tool instead of only describing the content in assistant text.",
-      "Use `present_content` for bounded artifacts that benefit from a dedicated card, such as implementation plans, comparison tables, diagrams, code samples, checklists, design notes, or concise status summaries."
+      "Use `present_content` for bounded artifacts that benefit from a dedicated card, such as implementation plans, comparison tables, diagrams, code samples, checklists, design notes, concise status summaries, or direct embeds.",
+      "If you reference a Diashort artifact, prefer an embedded `/e/...` URL via `present_content` over a plain `/d/...` share link when the embedded view is the better user experience."
     )
   }
 
@@ -343,7 +345,7 @@ async function startClaudeTurn(args: {
 
   const mcpServers: Record<string, McpServerConfig> | undefined =
     args.orchestrator && args.chatId
-      ? { "kanna-orchestration": createOrchestrationMcpServer(args.orchestrator, args.chatId) }
+      ? { "tinkaria-orchestration": createOrchestrationMcpServer(args.orchestrator, args.chatId) }
       : undefined
 
   const q = query({

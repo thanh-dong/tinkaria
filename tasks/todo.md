@@ -156,25 +156,25 @@
 
 ## Provisioned: Project-Bound Kit Execution Profiles
 
-**Status**: Design recorded, not implemented. Added C3 ADR `adr-20260406-kit-isolation-by-project` to define how the hub/kit split should support different prompt/skill/runtime behavior per project without moving durable state out of the hub.
+**Status**: Design recorded, not implemented. Rewrote C3 ADR `adr-20260406-kit-isolation-by-project` in a simpler form: `kit` is the long-running execution daemon, and each kit can expose different agent settings while the hub stays the source of truth.
 
 **Decision**:
-1. Do not model isolation as `one project = one physical kit`.
-2. Introduce an immutable `ExecutionProfile` advertised by kits and selected by projects via a `ProjectExecutionPolicy`.
-3. Persist profile affinity on chats/sessions so provider thread tokens are never resumed under a different prompt/skill/runtime profile.
-4. Keep orchestration, approvals, transcript order, and `project-agent` in the hub; kits only own execution-bound concerns.
-5. Treat profile changes as new-thread boundaries rather than a mid-thread toggle.
+1. `kit` is the execution unit: a daemon connected to the hub that runs agent work.
+2. The minimal system can run with exactly one kit, representing the system-wide agent executor.
+3. Each kit can carry different agent settings such as system prompt, skills, tools, env/config roots, and provider-facing runtime behavior.
+4. The hub keeps transcripts, orchestration, approvals, and scheduling; kits do not own durable state.
+5. Long-running chats/sessions should stay on the same kit when possible; moving to a meaningfully different kit should start a fresh provider session.
 
 **Why**:
-1. Current `AgentCoordinator` already binds turns to project `localPath` plus persisted `sessionToken`, which is compatible with profile affinity.
-2. Claude already consumes `user`/`project`/`local` settings by cwd, while Codex already runs a per-chat app-server by cwd, so the runtime boundary is close to supporting profile isolation.
-3. The current Codex launcher still inherits `process.env`, which would leak global config across profiles unless the kit runtime assembles a curated per-profile environment.
+1. It keeps the hub small and conceptually clean: hub coordinates, kit executes.
+2. It supports both the smallest topology (`1 hub + 1 kit`) and future multi-kit setups with the same model.
+3. It gives us one obvious place to hang prompt/skill/tool/runtime differences instead of scattering them across hub code.
 
 **Next**:
-1. Add `ExecutionProfile` and `ProjectExecutionPolicy` types to hub-owned state.
-2. Persist `profileId` on chats when a turn starts and require profile-compatible resume/scheduling.
-3. Extend kit registration to advertise supported profile ids and runtime metadata.
-4. Replace implicit provider env inheritance with curated per-profile env/config roots before treating the isolation story as real.
+1. Extract the execution boundary from the current in-process agent runtime.
+2. Define a kit registration shape that includes its settings identity.
+3. Run one local kit daemon connected back to the hub.
+4. Route Codex work through that kit first while keeping transcript/orchestration truth in the hub.
 
 ## Completed: Chat File Preview Uses Rich Content Overlay
 

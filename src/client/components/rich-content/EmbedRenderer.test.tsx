@@ -16,6 +16,14 @@ describe("isEmbedLanguage", () => {
     expect(isEmbedLanguage("svg")).toBe(true)
   })
 
+  test("returns true for iframe", () => {
+    expect(isEmbedLanguage("iframe")).toBe(true)
+  })
+
+  test("returns true for diashort", () => {
+    expect(isEmbedLanguage("diashort")).toBe(true)
+  })
+
   test("returns false for typescript", () => {
     expect(isEmbedLanguage("typescript")).toBe(false)
   })
@@ -84,6 +92,33 @@ describe("EmbedRenderer", () => {
     expect(html).toContain("data-svg-render")
     expect(html).not.toContain("SVG render error")
   })
+
+  test("renders iframe embeds directly", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="iframe" source="https://example.com/embed/widget" />
+    )
+
+    expect(html).toContain('data-remote-embed="true"')
+    expect(html).toContain('src="https://example.com/embed/widget"')
+  })
+
+  test("normalizes diashort share links into embed links", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="diashort" source="https://diashort.apps.quickable.co/d/abc123" />
+    )
+
+    expect(html).toContain('data-remote-embed="true"')
+    expect(html).toContain('data-remote-embed-url="https://diashort.apps.quickable.co/e/abc123"')
+  })
+
+  test("shows source fallback for invalid remote embed URLs", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="iframe" source="javascript:alert(1)" />
+    )
+
+    expect(html).toContain("Embed URL is invalid or unsupported")
+    expect(html).not.toContain('data-remote-embed="true"')
+  })
 })
 
 describe("EmbedRenderer with ContentViewerContext", () => {
@@ -134,5 +169,19 @@ describe("EmbedRenderer with ContentViewerContext", () => {
     )
     expect(html).toContain('aria-label="SVG display mode"')
     expect(html).toContain("data-svg-render")
+  })
+
+  test("iframe uses context renderMode instead of local state", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "source", zoom: 1 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="iframe" source="https://example.com/embed/widget" />
+      </ContentViewerContext.Provider>
+    )
+    expect(html).not.toContain('data-remote-embed="true"')
+    expect(html).toContain("https://example.com/embed/widget")
   })
 })

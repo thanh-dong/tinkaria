@@ -7,11 +7,11 @@ const mockSessions: DiscoveredSession[] = [
   {
     sessionId: "sess-1",
     provider: "claude",
-    source: "kanna",
+    source: "tinkaria",
     title: "Fix auth bug",
     lastExchange: { question: "Fix the auth bug", answer: "Done" },
     modifiedAt: Date.now() - 3600_000,
-    kannaChatId: "chat-1",
+    chatId: "chat-1",
   },
   {
     sessionId: "sess-2",
@@ -20,7 +20,7 @@ const mockSessions: DiscoveredSession[] = [
     title: "",
     lastExchange: { question: "Add unit tests for login", answer: "Here are the tests" },
     modifiedAt: Date.now() - 7200_000,
-    kannaChatId: null,
+    chatId: null,
     runtime: {
       model: "gpt-5.4",
       tokenUsage: {
@@ -101,7 +101,7 @@ describe("SessionPickerContent", () => {
       title: "",
       lastExchange: { question: "Recover the archived release session", answer: "Loaded" },
       modifiedAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
-      kannaChatId: null,
+      chatId: null,
     }
 
     const html = renderToStaticMarkup(
@@ -127,11 +127,11 @@ describe("getVisibleSessions", () => {
     const recentSession: DiscoveredSession = {
       sessionId: "sess-recent",
       provider: "claude",
-      source: "kanna",
+      source: "tinkaria",
       title: "Recent session",
       lastExchange: { question: "Recent session", answer: "Done" },
       modifiedAt: now - 60_000,
-      kannaChatId: "chat-recent",
+      chatId: "chat-recent",
     }
     const oldSession: DiscoveredSession = {
       sessionId: "sess-old",
@@ -140,7 +140,7 @@ describe("getVisibleSessions", () => {
       title: "",
       lastExchange: { question: "Recover archived release work", answer: "Loaded" },
       modifiedAt: now - 30 * 24 * 60 * 60 * 1000,
-      kannaChatId: null,
+      chatId: null,
     }
 
     const defaultView = getVisibleSessions({

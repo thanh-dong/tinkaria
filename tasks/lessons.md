@@ -1,5 +1,9 @@
 # Session Lessons
 
+- 2026-04-06: Before “preserving” a subsystem during a cleanup, check whether the current branch has already removed it. Task scope must align with the actual worktree, not with stale assumptions about older architecture.
+- 2026-04-06: When removing a UI surface, distinguish browser-surface removal from protocol/runtime removal. Embedded terminal UI can be deleted independently, but true terminal decommissioning requires an explicit shared-protocol/server slice.
+- 2026-04-06: After delegating review, fold blocking findings back into `tasks/todo.md` immediately so the handoff reflects parse breaks, scope drift, and branch-state constraints instead of only the intended plan.
+- 2026-04-06: Do not preserve or extend the old tauri companion/native-webview path by default. The product direction is browser/PWA-first unless the user explicitly reopens a native-runtime effort.
 - 2026-04-02: For Tauri companion/shell research around Kanna, do not assume HTTP discovery is acceptable. The intended control plane is NATS-only once auth and broker coordinates are available.
 - 2026-04-03: For the Tauri companion, distinguish the browser-facing attach surface from the native transport. The main server now fronts browser WebSocket access on one server URL, so public companion/settings UX should be server-first and avoid separate WS-port discovery, but the native Rust companion may still legitimately require a raw `nats://` bootstrap until its transport changes.
 - 2026-04-03: For busy composer controls, keep the queue affordance explicit as `Queue`, keep queued content above the composer only, and preserve `ArrowUp` as the restore path instead of adding transcript-level queued placeholders.

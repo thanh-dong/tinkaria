@@ -126,55 +126,6 @@ Useful commands:
 | `bun run dev:client` | Vite client only |
 | `bun run dev:server` | Bun server only |
 | `bun run start` | Production server |
-| `bun run tauri:dev` | Experimental Tauri shell |
-| `bun run tauri:build` | Build the Tauri shell |
-
-## Tauri Desktop
-
-The repo includes an experimental Tauri shell under `src-tauri/`.
-
-Current scope:
-
-- hosts the existing Tinkaria UI in a desktop shell
-- registers as a desktop renderer over NATS
-- answers targeted native `webview.open` commands
-- lets transcript smoke links prefer a native controlled webview when the companion is connected
-
-From WSL:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-
-bun run start
-bun run tauri:dev
-```
-
-### Windows Smoke Loop
-
-Current fastest manual loop:
-
-1. In PowerShell, start Tinkaria:
-
-```powershell
-bun install
-bun run start
-```
-
-2. In a second PowerShell window, start the companion:
-
-```powershell
-bun run tauri:dev
-```
-
-3. Open the root page in the browser or use the Tauri main window.
-4. On the Local Projects page, use the `Desktop Smoke` card.
-5. Click `Local smoke target` or `Remote smoke target`.
-
-Expected behavior:
-
-- if the Tauri companion is connected, the click is steered to a native controlled webview
-- if no desktop renderer is connected, the link falls back to the normal browser path
 
 ## Data Storage
 

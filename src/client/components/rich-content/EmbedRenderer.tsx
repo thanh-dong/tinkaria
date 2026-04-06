@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react"
 import { useContentViewer } from "./ContentViewerContext"
 
-const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg"])
+const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort"])
 
 export function isEmbedLanguage(language: string | null): boolean {
   return language !== null && EMBED_LANGUAGES.has(language)
@@ -22,6 +22,10 @@ export const EmbedRenderer = memo(function EmbedRenderer({
 
   if (format === "svg") {
     return <SvgEmbed source={source} />
+  }
+
+  if (format === "iframe" || format === "diashort") {
+    return <RemoteEmbed format={format} source={source} />
   }
 
   // D2 and other formats: show source as fallback
@@ -151,6 +155,92 @@ function parseSvgMarkup(source: string): SvgParseResult {
   }
 
   return { ok: true, markup: trimmed.slice(rootStart, rootEnd) }
+}
+
+function normalizeRemoteEmbedSource(format: string, source: string): string | null {
+  try {
+    const url = new URL(source)
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null
+
+    if (format === "diashort" || url.hostname === "diashort.apps.quickable.co") {
+      const match = url.pathname.match(/^\/(?:d|e)\/([^/?#]+)/)
+      if (!match) return null
+      const embedUrl = new URL(`/e/${match[1]}`, url.origin)
+      for (const [key, value] of url.searchParams.entries()) {
+        embedUrl.searchParams.set(key, value)
+      }
+      return embedUrl.toString()
+    }
+
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function RemoteEmbed({ format, source }: { format: string; source: string }) {
+  const viewer = useContentViewer()
+  const [localMode, setLocalMode] = useState<"render" | "source">("render")
+
+  const embedState = viewer !== null && viewer.state.type === "embed" ? viewer.state : null
+  const mode = embedState ? embedState.renderMode : localMode
+  const zoom = embedState ? embedState.zoom : 1
+  const embedUrl = normalizeRemoteEmbedSource(format, source)
+
+  return (
+    <div className="space-y-3 p-3">
+      {!embedState ? (
+        <div aria-label="Embed display mode" className="flex items-center gap-1 rounded-md bg-muted/50 p-1 text-xs">
+          <button
+            type="button"
+            aria-pressed={localMode === "render"}
+            onClick={() => setLocalMode("render")}
+            className={`rounded px-2 py-1 transition-colors ${
+              localMode === "render" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            }`}
+          >
+            Render
+          </button>
+          <button
+            type="button"
+            aria-pressed={localMode === "source"}
+            onClick={() => setLocalMode("source")}
+            className={`rounded px-2 py-1 transition-colors ${
+              localMode === "source" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            }`}
+          >
+            Source
+          </button>
+        </div>
+      ) : null}
+
+      {mode === "render" && embedUrl ? (
+        <div
+          style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
+          className="overflow-hidden rounded-md border border-border/60 bg-background"
+        >
+          <iframe
+            data-remote-embed="true"
+            data-remote-embed-url={embedUrl}
+            src={embedUrl}
+            title="Embedded content"
+            sandbox="allow-scripts allow-same-origin"
+            referrerPolicy="no-referrer"
+            className="block h-[420px] w-full border-0 bg-background"
+          />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {!embedUrl ? (
+            <div className="text-xs text-destructive">Embed URL is invalid or unsupported</div>
+          ) : null}
+          <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
+            {embedUrl ?? source}
+          </pre>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function findTagEnd(source: string, start: number): number {

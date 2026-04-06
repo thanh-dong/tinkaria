@@ -452,7 +452,7 @@
     }
   }
 
-  @keyframes kanna-cursor-blink {
+  @keyframes tinkaria-cursor-blink {
     0%,
     49% {
       opacity: 1;
@@ -464,7 +464,7 @@
     }
   }
 
-  @keyframes kanna-cursor-fade-out {
+  @keyframes tinkaria-cursor-fade-out {
     from {
       opacity: 1;
     }
@@ -504,8 +504,8 @@
     height: 1.05em;
     background-color: white;
     animation:
-      kanna-cursor-blink 0.9s step-end infinite,
-      kanna-cursor-fade-out 0.24s ease-out forwards;
+      tinkaria-cursor-blink 0.9s step-end infinite,
+      tinkaria-cursor-fade-out 0.24s ease-out forwards;
     animation-delay: 0s, var(--tinkaria-typewriter-duration-ms);
   }
 

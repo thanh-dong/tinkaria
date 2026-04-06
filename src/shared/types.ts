@@ -192,11 +192,11 @@ export interface SidebarData {
 export interface DiscoveredSession {
   sessionId: string
   provider: AgentProvider
-  source: "kanna" | "cli"
+  source: "tinkaria" | "cli"
   title: string
   lastExchange: { question: string; answer: string } | null
   modifiedAt: number
-  kannaChatId: string | null
+  chatId: string | null
   runtime?: DiscoveredSessionRuntime
 }
 

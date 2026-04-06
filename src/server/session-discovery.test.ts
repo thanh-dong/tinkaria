@@ -14,7 +14,7 @@ afterEach(async () => {
   )
 })
 
-async function makeTempDir(prefix = "kanna-session-discovery-") {
+async function makeTempDir(prefix = "tinkaria-session-discovery-") {
   const dir = await mkdtemp(join(tmpdir(), prefix))
   tempDirs.push(dir)
   return dir
@@ -46,7 +46,7 @@ describe("scanClaudeSessions", () => {
     expect(sessions[0].lastExchange).not.toBeNull()
     expect(sessions[0].lastExchange!.question).toContain("add tests")
     expect(sessions[0].lastExchange!.answer).toContain("tests")
-    expect(sessions[0].kannaChatId).toBeNull()
+    expect(sessions[0].chatId).toBeNull()
     expect(sessions[0].runtime?.model).toBeUndefined()
   })
 
@@ -159,31 +159,31 @@ describe("scanCodexSessions", () => {
 })
 
 describe("resolveTitle", () => {
-  test("uses kanna title when source is kanna and title is not default", () => {
-    expect(resolveTitle("Fix the bug", "kanna", null, 1000)).toBe("Fix the bug")
+  test("uses Tinkaria title when source is Tinkaria and title is not default", () => {
+    expect(resolveTitle("Fix the bug", "tinkaria", null, 1000)).toBe("Fix the bug")
   })
 
   test("falls through 'New Chat' title to lastExchange", () => {
     expect(
-      resolveTitle("New Chat", "kanna", { question: "Why is auth broken?", answer: "Because..." }, 1000)
+      resolveTitle("New Chat", "tinkaria", { question: "Why is auth broken?", answer: "Because..." }, 1000)
     ).toBe("Why is auth broken?")
   })
 
   test("truncates lastExchange.question to 80 chars", () => {
     const longQuestion = "a".repeat(100)
     expect(
-      resolveTitle("New Chat", "kanna", { question: longQuestion, answer: "" }, 1000)
+      resolveTitle("New Chat", "tinkaria", { question: longQuestion, answer: "" }, 1000)
     ).toHaveLength(80)
   })
 
   test("falls back to formatted date when no title or exchange", () => {
-    const result = resolveTitle("New Chat", "kanna", null, 1711900200000)
+    const result = resolveTitle("New Chat", "tinkaria", null, 1711900200000)
     expect(result).toContain("Mar")
   })
 })
 
 describe("mergeSessions", () => {
-  test("deduplicates CLI sessions when Kanna has matching sessionToken", () => {
+  test("deduplicates CLI sessions when Tinkaria has matching sessionToken", () => {
     const cliSessions: DiscoveredSession[] = [
       {
         sessionId: "shared-id",
@@ -192,33 +192,33 @@ describe("mergeSessions", () => {
         title: "CLI title",
         lastExchange: { question: "q", answer: "a" },
         modifiedAt: 1000,
-        kannaChatId: null,
+        chatId: null,
       },
     ]
-    const kannaSessions: DiscoveredSession[] = [
+    const tinkariaSessions: DiscoveredSession[] = [
       {
         sessionId: "shared-id",
         provider: "claude",
-        source: "kanna",
-        title: "Kanna title",
+        source: "tinkaria",
+        title: "Tinkaria title",
         lastExchange: { question: "q", answer: "a" },
         modifiedAt: 2000,
-        kannaChatId: "chat-123",
+        chatId: "chat-123",
       },
     ]
 
-    const merged = mergeSessions(cliSessions, kannaSessions)
+    const merged = mergeSessions(cliSessions, tinkariaSessions)
 
     expect(merged).toHaveLength(1)
-    expect(merged[0].source).toBe("kanna")
-    expect(merged[0].kannaChatId).toBe("chat-123")
+    expect(merged[0].source).toBe("tinkaria")
+    expect(merged[0].chatId).toBe("chat-123")
   })
 
   test("sorts by modifiedAt descending", () => {
     const sessions: DiscoveredSession[] = [
-      { sessionId: "old", provider: "claude", source: "cli", title: "old", lastExchange: null, modifiedAt: 1000, kannaChatId: null },
-      { sessionId: "new", provider: "claude", source: "cli", title: "new", lastExchange: null, modifiedAt: 3000, kannaChatId: null },
-      { sessionId: "mid", provider: "claude", source: "cli", title: "mid", lastExchange: null, modifiedAt: 2000, kannaChatId: null },
+      { sessionId: "old", provider: "claude", source: "cli", title: "old", lastExchange: null, modifiedAt: 1000, chatId: null },
+      { sessionId: "new", provider: "claude", source: "cli", title: "new", lastExchange: null, modifiedAt: 3000, chatId: null },
+      { sessionId: "mid", provider: "claude", source: "cli", title: "mid", lastExchange: null, modifiedAt: 2000, chatId: null },
     ]
 
     const merged = mergeSessions(sessions, [])
@@ -232,10 +232,10 @@ describe("discoverSessions", () => {
     const store = new EventStore(tempDir)
     await store.initialize()
 
-    // Create a Kanna chat with sessionToken
-    const project = await store.openProject("/home/user/dev/kanna", "kanna")
+    // Create a Tinkaria chat with sessionToken
+    const project = await store.openProject("/home/user/dev/tinkaria", "tinkaria")
     const chat = await store.createChat(project.id)
-    await store.setSessionToken(chat.id, "kanna-session-token")
+    await store.setSessionToken(chat.id, "tinkaria-session-token")
     await store.setChatProvider(chat.id, "claude")
 
     // Create a mock Claude projects dir
@@ -250,19 +250,19 @@ describe("discoverSessions", () => {
 
     const snapshot = await discoverSessions({
       projectId: project.id,
-      projectPath: "/home/user/dev/kanna",
+      projectPath: "/home/user/dev/tinkaria",
       store,
       claudeProjectDir: claudeDir,
       codexSessionsDir: "/nonexistent",
     })
 
     expect(snapshot.projectId).toBe(project.id)
-    expect(snapshot.sessions.length).toBeGreaterThanOrEqual(2) // 1 kanna + 1 cli
-    expect(snapshot.sessions.some((s) => s.source === "kanna")).toBe(true)
+    expect(snapshot.sessions.length).toBeGreaterThanOrEqual(2) // 1 tinkaria + 1 cli
+    expect(snapshot.sessions.some((s) => s.source === "tinkaria")).toBe(true)
     expect(snapshot.sessions.some((s) => s.source === "cli")).toBe(true)
   })
 
-  test("returns only CLI sessions when no Kanna chats have sessionToken", async () => {
+  test("returns only CLI sessions when no Tinkaria chats have sessionToken", async () => {
     const tempDir = await makeTempDir()
     const store = new EventStore(tempDir)
     await store.initialize()
@@ -291,7 +291,7 @@ describe("discoverSessions", () => {
     expect(snapshot.sessions[0].sessionId).toBe("sess-abc")
   })
 
-  test("deduplicates when Kanna sessionToken matches CLI session ID", async () => {
+  test("deduplicates when Tinkaria sessionToken matches CLI session ID", async () => {
     const tempDir = await makeTempDir()
     const store = new EventStore(tempDir)
     await store.initialize()
@@ -303,7 +303,7 @@ describe("discoverSessions", () => {
 
     const claudeDir = join(tempDir, "claude-projects")
     await mkdir(claudeDir, { recursive: true })
-    // CLI session with same ID as Kanna sessionToken
+    // CLI session with same ID as Tinkaria sessionToken
     await writeFile(
       join(claudeDir, "shared-session-id.jsonl"),
       JSON.stringify({ type: "user", message: { content: "Shared" } }) + "\n"
@@ -317,10 +317,10 @@ describe("discoverSessions", () => {
       codexSessionsDir: null,
     })
 
-    // Should be deduped: Kanna wins over CLI
+    // Should be deduped: Tinkaria wins over CLI
     expect(snapshot.sessions).toHaveLength(1)
-    expect(snapshot.sessions[0].source).toBe("kanna")
-    expect(snapshot.sessions[0].kannaChatId).toBe(chat.id)
+    expect(snapshot.sessions[0].source).toBe("tinkaria")
+    expect(snapshot.sessions[0].chatId).toBe(chat.id)
   })
 
   test("returns empty sessions when no dirs and no chats with tokens", async () => {

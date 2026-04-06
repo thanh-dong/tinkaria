@@ -20,7 +20,7 @@ import { TranscriptSearchIndex } from "./transcript-search"
 import { ProjectAgent } from "./project-agent"
 import { createProjectAgentRouter } from "./project-agent-routes"
 
-export interface StartKannaServerOptions {
+export interface StartTinkariaServerOptions {
   port?: number
   host?: string
   strictPort?: boolean
@@ -32,7 +32,7 @@ export interface StartKannaServerOptions {
   }
 }
 
-export async function startKannaServer(options: StartKannaServerOptions = {}) {
+export async function startTinkariaServer(options: StartTinkariaServerOptions = {}) {
   const port = options.port ?? 3210
   const hostname = options.host ?? "127.0.0.1"
   const strictPort = options.strictPort ?? false

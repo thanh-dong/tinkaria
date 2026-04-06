@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react"
-import { Grip, Loader2, Maximize2, Menu, PanelLeft, Plus, Settings, X } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
+import { Loader2, Menu, PanelLeft, Plus, X } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import { Button } from "../components/ui/button"
@@ -37,43 +37,6 @@ interface TinkariaSidebarProps {
   onResumeSession: (projectId: string, sessionId: string, provider: AgentProvider) => void
   onRefreshSessions: (projectId: string) => void
   onShowMoreSessions: (projectId: string) => void
-}
-
-const DESKTOP_SIDEBAR_SHELL_TITLE = "Tinkaria"
-
-type DesktopShellRuntimeWindow = {
-  __TAURI_INTERNALS__: object
-}
-
-interface DesktopShellWindowApi {
-  isMaximized(): Promise<boolean>
-  toggleMaximize(): Promise<void>
-  startDragging(): Promise<void>
-}
-
-export function hasDesktopShellRuntime(value: unknown): value is DesktopShellRuntimeWindow {
-  return typeof value === "object"
-    && value !== null
-    && "__TAURI_INTERNALS__" in value
-    && typeof (value as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ === "object"
-    && (value as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== null
-}
-
-export function shouldShowDesktopSidebarShellControls(windowLike: unknown): boolean {
-  return hasDesktopShellRuntime(windowLike)
-}
-
-export function getDesktopSidebarShellTitle(): string {
-  return DESKTOP_SIDEBAR_SHELL_TITLE
-}
-
-async function getDesktopShellWindowApi(windowLike: unknown): Promise<DesktopShellWindowApi | null> {
-  if (!hasDesktopShellRuntime(windowLike)) {
-    return null
-  }
-
-  const { getCurrentWindow } = await import("@tauri-apps/api/window")
-  return getCurrentWindow()
 }
 
 export function TinkariaSidebar({
@@ -251,8 +214,7 @@ export function TinkariaSidebar({
 
   const hasVisibleChats = activeVisibleCount > 0
   const isLocalProjectsActive = location.pathname === "/"
-  const isSettingsActive = location.pathname.startsWith("/settings")
-  const isUtilityPageActive = isLocalProjectsActive || isSettingsActive
+  const isUtilityPageActive = isLocalProjectsActive
   const isConnecting = connectionStatus === "connecting" || !ready
   const statusLabel = isConnecting ? "Connecting" : connectionStatus === "connected" ? "Connected" : "Disconnected"
   const statusDotClass = connectionStatus === "connected" ? "bg-emerald-500" : "bg-amber-500"
@@ -261,37 +223,6 @@ export function TinkariaSidebar({
     ? updateSnapshot.latestVersion === `${updateSnapshot.currentVersion}-dev`
     : false
   const isUpdating = updateSnapshot?.status === "updating" || updateSnapshot?.status === "restart_pending"
-  const showDesktopShellControls = shouldShowDesktopSidebarShellControls(
-    typeof window === "undefined" ? null : window,
-  )
-  const [isDesktopMaximized, setIsDesktopMaximized] = useState(false)
-
-  async function handleDesktopMovePointerDown(event: ReactMouseEvent<HTMLButtonElement>) {
-    if (event.button !== 0) {
-      return
-    }
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    const desktopWindow = await getDesktopShellWindowApi(window)
-    if (!desktopWindow) {
-      return
-    }
-
-    await desktopWindow.startDragging()
-  }
-
-  async function handleDesktopMaximizeToggle() {
-    const desktopWindow = await getDesktopShellWindowApi(window)
-    if (!desktopWindow) {
-      return
-    }
-
-    const nextValue = !(await desktopWindow.isMaximized())
-    await desktopWindow.toggleMaximize()
-    setIsDesktopMaximized(nextValue)
-  }
 
   return (
     <>
@@ -308,10 +239,7 @@ export function TinkariaSidebar({
 
       {collapsed && isUtilityPageActive && (
         <div className="hidden md:flex fixed left-0 top-0 h-full z-40 items-start pt-4 pl-5 border-l border-border/0">
-          <div
-            className="group/desktop-collapsed-shell flex items-center gap-1 rounded-full bg-background/80 pr-1 backdrop-blur-sm"
-            data-tauri-drag-region={showDesktopShellControls ? "true" : undefined}
-          >
+          <div className="group/desktop-collapsed-shell flex items-center gap-1 rounded-full bg-background/80 pr-1 backdrop-blur-sm">
             <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
               <TinkariaSidebarMark className="absolute inset-0 size-full" imageClassName="size-5" />
               <Button
@@ -324,32 +252,6 @@ export function TinkariaSidebar({
                 <PanelLeft className="h-4 w-4 text-slate-500/85 dark:text-slate-300/85" />
               </Button>
             </div>
-            {showDesktopShellControls ? (
-              <div className="flex items-center gap-1 opacity-0 pointer-events-none translate-x-1 transition-all duration-200 group-hover/desktop-collapsed-shell:pointer-events-auto group-hover/desktop-collapsed-shell:translate-x-0 group-hover/desktop-collapsed-shell:opacity-100">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-full"
-                  title="Toggle maximize"
-                  onClick={() => {
-                    void handleDesktopMaximizeToggle()
-                  }}
-                >
-                  <Maximize2 className={cn("size-4", isDesktopMaximized && "opacity-60")} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-full"
-                  title="Move window"
-                  onMouseDown={(event) => {
-                    void handleDesktopMovePointerDown(event)
-                  }}
-                >
-                  <Grip className="size-4" />
-                </Button>
-              </div>
-            ) : null}
           </div>
         </div>
       )}
@@ -371,10 +273,7 @@ export function TinkariaSidebar({
         onPointerCancel={handleSwipePointerEnd}
       >
         <div className=" pl-3 pr-[7px] h-[64px] max-h-[64px] md:h-[55px] md:max-h-[55px] border-b flex items-center justify-between">
-          <div
-            className="group/sidebar-shell flex min-w-0 items-center gap-2"
-            data-tauri-drag-region={showDesktopShellControls ? "true" : undefined}
-          >
+          <div className="group/sidebar-shell flex min-w-0 items-center gap-2">
             <div className="relative hidden md:flex h-8 w-8 shrink-0 items-center justify-center">
               <TinkariaSidebarMark
                 className="absolute inset-0 size-full"
@@ -383,7 +282,7 @@ export function TinkariaSidebar({
             </div>
             <TinkariaSidebarMark className="h-5 w-5 sm:h-6 sm:w-6 md:hidden" imageClassName="h-4 w-4 sm:h-5 sm:w-5" />
             <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">
-              {showDesktopShellControls ? getDesktopSidebarShellTitle() : APP_NAME}
+              {APP_NAME}
             </span>
           </div>
           <div className="flex items-center">
@@ -495,24 +394,9 @@ export function TinkariaSidebar({
         </div>
 
         <div className="border-t border-border p-2">
-            <button
-            type="button"
-            onClick={() => {
-              navigate("/settings/general")
-              onClose()
-            }}
-            className={cn(
-              "w-full rounded-xl rounded-t-md border px-3 py-2 text-left transition-colors",
-              isSettingsActive
-                ? "bg-muted border-border"
-                : "border-border/0 hover:bg-muted hover:border-border active:bg-muted/80"
-            )}
-          >
-            <div className="flex items- justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Settings</span>
-              </div>
+          <div className="w-full rounded-xl border border-border/0 px-3 py-2 text-left">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-muted-foreground">Connection</span>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{statusLabel}</span>
                 {isConnecting ? (
@@ -522,7 +406,7 @@ export function TinkariaSidebar({
                 )}
               </div>
             </div>
-          </button>
+          </div>
         </div>
       </div>
 

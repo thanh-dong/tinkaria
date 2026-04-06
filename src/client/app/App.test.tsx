@@ -9,7 +9,6 @@ import {
   getUiIdentityOverlayHighlightRect,
   getUiIdentityOverlayPointerHandoffDelayMs,
   shouldIgnoreUiIdentityOverlayPointerTarget,
-  shouldRedirectToChangelog,
 } from "./App"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProjectsSection"
@@ -29,16 +28,6 @@ function createOverlayStackElement(args: {
   } as Element
 }
 
-describe("shouldRedirectToChangelog", () => {
-  test("redirects only from the root route when the version is unseen", () => {
-    expect(shouldRedirectToChangelog("/", "0.12.0", null)).toBe(true)
-    expect(shouldRedirectToChangelog("/", "0.12.0", "0.11.0")).toBe(true)
-    expect(shouldRedirectToChangelog("/settings/general", "0.12.0", "0.11.0")).toBe(false)
-    expect(shouldRedirectToChangelog("/chat/1", "0.12.0", "0.11.0")).toBe(false)
-    expect(shouldRedirectToChangelog("/", "0.12.0", "0.12.0")).toBe(false)
-  })
-})
-
 describe("getUiIdentityOverlayCopyDurationMs", () => {
   test("uses a short-lived copied confirmation window", () => {
     expect(getUiIdentityOverlayCopyDurationMs()).toBe(1200)
@@ -52,15 +41,13 @@ describe("getUiIdentityOverlayPointerHandoffDelayMs", () => {
 })
 
 describe("getGlobalUiIdentityIds", () => {
-  test("returns the stable chat, settings, sidebar, and menu surface identities", () => {
+  test("returns the stable chat/sidebar/menu surface identities", () => {
     const getGlobalUiIdentityIds = (AppModule as Record<string, unknown>).getGlobalUiIdentityIds
 
     expect(typeof getGlobalUiIdentityIds).toBe("function")
     expect((getGlobalUiIdentityIds as () => unknown)()).toEqual({
       sidebar: "chat.sidebar",
-      terminal: "chat.terminal-workspace",
       rightSidebar: "chat.right-sidebar",
-      settings: "settings.page",
       chatRow: "sidebar.chat-row",
       projectGroup: "sidebar.project-group",
       chatRowMenu: "sidebar.chat-row.menu",
@@ -248,7 +235,7 @@ describe("bindUiIdentityOverlayWindowEvents", () => {
         return null
       },
       getAttribute(name: string) {
-        return name === "data-ui-id" ? "settings.page" : null
+        return name === "data-ui-id" ? "chat.right-sidebar" : null
       },
       parentElement: null,
     }

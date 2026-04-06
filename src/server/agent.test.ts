@@ -46,6 +46,7 @@ describe("getWebContextPrompt", () => {
       const prompt = getWebContextPrompt(provider)
       expect(prompt).toContain("Rich content")
       expect(prompt).toContain("Use rich transcript formatting proactively")
+      expect(prompt).toContain("Prefer direct rich embeds or structured artifact cards over bare links")
       expect(prompt).toContain("Plan mode")
     }
   })
@@ -73,6 +74,9 @@ describe("getWebContextPrompt", () => {
     expect(enabledPrompt).toContain("implementation plans")
     expect(enabledPrompt).toContain("comparison tables")
     expect(enabledPrompt).toContain("concise status summaries")
+    expect(enabledPrompt).toContain("direct embeds")
+    expect(enabledPrompt).toContain("Diashort artifact")
+    expect(enabledPrompt).toContain("`/e/...`")
     expect(disabledPrompt).not.toContain("present_content")
   })
 

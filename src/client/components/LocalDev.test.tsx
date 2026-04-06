@@ -3,31 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { TooltipProvider } from "./ui/tooltip"
 import {
   LocalDev,
-  getDesktopRendererStatusLabel,
   getHomepageProjectCounts,
   getHomepageRecentSessions,
   getSortedHomepageProjects,
 } from "./LocalDev"
-
-describe("getDesktopRendererStatusLabel", () => {
-  test("reports when a native desktop renderer is available", () => {
-    expect(getDesktopRendererStatusLabel({
-      renderers: [
-        {
-          rendererId: "desktop-1",
-          machineName: "Workstation",
-          capabilities: ["native_webview"],
-          connectedAt: 1,
-          lastSeenAt: 1,
-        },
-      ],
-    })).toBe("Desktop renderer ready")
-  })
-
-  test("reports when no native desktop renderer is connected", () => {
-    expect(getDesktopRendererStatusLabel({ renderers: [] })).toBe("Waiting for a desktop renderer")
-  })
-})
 
 describe("getHomepageProjectCounts", () => {
   test("summarizes saved and discovered project totals for the homepage overview", () => {
@@ -72,11 +51,11 @@ describe("getHomepageRecentSessions", () => {
         return [{
           sessionId: "alpha-1",
           provider: "codex",
-          source: "kanna",
+          source: "tinkaria",
           title: "Alpha session",
           lastExchange: null,
           modifiedAt: 5,
-          kannaChatId: "chat-alpha-1",
+          chatId: "chat-alpha-1",
         }]
       }
 
@@ -87,7 +66,7 @@ describe("getHomepageRecentSessions", () => {
         title: "Beta session",
         lastExchange: null,
         modifiedAt: 9,
-        kannaChatId: null,
+        chatId: null,
       }]
     }).map((item) => item.session.sessionId)).toEqual(["beta-1", "alpha-1"])
   })
@@ -122,17 +101,6 @@ describe("LocalDev homepage", () => {
               },
             ],
           }}
-          desktopRenderers={{
-            renderers: [
-              {
-                rendererId: "desktop-1",
-                machineName: "Workstation",
-                capabilities: ["native_webview"],
-                connectedAt: 1,
-                lastSeenAt: 1,
-              },
-            ],
-          }}
           startingLocalPath={null}
           commandError={null}
           onOpenProject={async () => {}}
@@ -142,11 +110,11 @@ describe("LocalDev homepage", () => {
               return [{
                 sessionId: "session-alpha",
                 provider: "codex",
-                source: "kanna",
+                source: "tinkaria",
                 title: "Fix homepage copy",
                 lastExchange: null,
                 modifiedAt: Date.now() - 60_000,
-                kannaChatId: "chat-alpha",
+                chatId: "chat-alpha",
               }]
             }
 
@@ -157,7 +125,7 @@ describe("LocalDev homepage", () => {
               title: "Investigate desktop shell",
               lastExchange: null,
               modifiedAt: Date.now() - 120_000,
-              kannaChatId: null,
+              chatId: null,
             }]
           }}
           onResumeSession={async () => {}}

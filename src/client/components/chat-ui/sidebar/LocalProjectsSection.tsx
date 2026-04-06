@@ -154,8 +154,8 @@ function SortableProjectGroup({
             isLoading={false}
             windowDays={sessionsWindowDays ?? 7}
             onSelectSession={(session) => {
-              if (session.kannaChatId) {
-                onNavigateToChat?.(session.kannaChatId)
+              if (session.chatId) {
+                onNavigateToChat?.(session.chatId)
               } else {
                 onResumeSession?.(groupKey, session.sessionId, session.provider)
               }

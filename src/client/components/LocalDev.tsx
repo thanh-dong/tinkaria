@@ -13,7 +13,6 @@ import {
 } from "lucide-react"
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
 import type {
-  DesktopRenderersSnapshot,
   DiscoveredSession,
   LocalProjectsSnapshot,
 } from "../../shared/types"
@@ -21,6 +20,7 @@ import type { SocketStatus } from "../app/socket-interface"
 import { PageHeader } from "../app/PageHeader"
 import { getPathBasename } from "../lib/formatters"
 import { cn } from "../lib/utils"
+import { SessionRuntimeBadges } from "./chat-ui/SessionRuntimeBadges"
 import { NewProjectModal } from "./NewProjectModal"
 import { Button } from "./ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
@@ -29,19 +29,12 @@ interface LocalDevProps {
   connectionStatus: SocketStatus
   ready: boolean
   snapshot: LocalProjectsSnapshot | null
-  desktopRenderers: DesktopRenderersSnapshot
   startingLocalPath: string | null
   commandError: string | null
   onOpenProject: (localPath: string) => Promise<void>
   onCreateProject: (project: { mode: "new" | "existing"; localPath: string; title: string }) => Promise<void>
   sessionsForProject?: (projectId: string) => DiscoveredSession[]
   onResumeSession?: (projectId: string, session: DiscoveredSession) => Promise<void>
-}
-
-export function getDesktopRendererStatusLabel(desktopRenderers: DesktopRenderersSnapshot): string {
-  return desktopRenderers.renderers.some((renderer) => renderer.capabilities.includes("native_webview"))
-    ? "Desktop renderer ready"
-    : "Waiting for a desktop renderer"
 }
 
 export function getHomepageProjectCounts(snapshot: LocalProjectsSnapshot | null) {
@@ -232,9 +225,10 @@ function RecentSessionCard({
                 {item.session.provider}
               </span>
               <span className="rounded-full border border-border bg-background px-2 py-0.5">
-                {item.session.source === "kanna" ? "Tinkaria" : "CLI"}
+                {item.session.source === "tinkaria" ? "Tinkaria" : "CLI"}
               </span>
             </div>
+            <SessionRuntimeBadges session={item.session} className="mt-2 flex flex-wrap gap-2" />
           </div>
         </div>
         <Button onClick={onResume} className="w-full">
@@ -310,7 +304,6 @@ export function LocalDev({
   connectionStatus,
   ready,
   snapshot,
-  desktopRenderers,
   startingLocalPath,
   commandError,
   onOpenProject,
@@ -328,7 +321,6 @@ export function LocalDev({
   )
   const isConnecting = connectionStatus === "connecting" || !ready
   const isConnected = connectionStatus === "connected" && ready
-  const desktopRendererStatusLabel = getDesktopRendererStatusLabel(desktopRenderers)
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto">
@@ -430,7 +422,7 @@ export function LocalDev({
                 <StatCard eyebrow="Projects" value={String(projectCounts.total)} detail="Workspaces available on this machine" />
                 <StatCard eyebrow="Saved" value={String(projectCounts.saved)} detail="Explicitly tracked projects" />
                 <StatCard eyebrow="Discovered" value={String(projectCounts.discovered)} detail="Projects picked up from usage" />
-                <StatCard eyebrow="Desktop" value={desktopRendererStatusLabel} detail="Native renderer status" />
+                <StatCard eyebrow="Sessions" value={String(recentSessions.length)} detail="Recent resumable sessions surfaced first" />
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react"
-import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom"
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom"
 import {
   buildUiIdentityStack,
   isUiIdentityOverlayActive,
@@ -13,22 +13,14 @@ import {
   type UiIdentityOverlayAnchorRect,
 } from "../components/ui/UiIdentityOverlay"
 import { TooltipProvider } from "../components/ui/tooltip"
-import { SDK_CLIENT_APP } from "../../shared/branding"
 import { TinkariaSidebar } from "./TinkariaSidebar"
 import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalProjectsPage"
-import { SettingsPage } from "./SettingsPage"
-import { DesktopCompanionPage } from "./DesktopCompanionPage"
 import { TinkariaStateContext } from "./TinkariaStateContext"
 import { useTinkariaState } from "./useTinkariaState"
 
-const VERSION_SEEN_STORAGE_KEY = "kanna:last-seen-version"
 const UI_IDENTITY_OVERLAY_COPY_DURATION_MS = 1200
 const UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS = 320
-
-export function shouldRedirectToChangelog(pathname: string, currentVersion: string, seenVersion: string | null) {
-  return pathname === "/" && Boolean(currentVersion) && seenVersion !== currentVersion
-}
 
 export function getUiIdentityOverlayCopyDurationMs() {
   return UI_IDENTITY_OVERLAY_COPY_DURATION_MS
@@ -41,9 +33,7 @@ export function getUiIdentityOverlayPointerHandoffDelayMs() {
 export function getGlobalUiIdentityIds() {
   return {
     sidebar: "chat.sidebar",
-    terminal: "chat.terminal-workspace",
     rightSidebar: "chat.right-sidebar",
-    settings: "settings.page",
     chatRow: "sidebar.chat-row",
     projectGroup: "sidebar.project-group",
     chatRowMenu: "sidebar.chat-row.menu",
@@ -314,21 +304,11 @@ function UiIdentityOverlayController() {
 
 function TinkariaLayout() {
   const location = useLocation()
-  const navigate = useNavigate()
   const state = useContext(TinkariaStateContext)
   if (!state) {
     throw new Error("Tinkaria layout requires app state context")
   }
   const showMobileOpenButton = location.pathname === "/"
-  const currentVersion = SDK_CLIENT_APP.split("/")[1] ?? "unknown"
-
-  useEffect(() => {
-    const seenVersion = window.localStorage.getItem(VERSION_SEEN_STORAGE_KEY)
-    const shouldRedirect = shouldRedirectToChangelog(location.pathname, currentVersion, seenVersion)
-    window.localStorage.setItem(VERSION_SEEN_STORAGE_KEY, currentVersion)
-    if (!shouldRedirect) return
-    navigate("/settings/changelog", { replace: true })
-  }, [currentVersion, location.pathname, navigate])
 
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden">
@@ -390,11 +370,9 @@ function AppInner() {
   return (
     <TinkariaStateContext.Provider value={state}>
       <Routes>
-        <Route path="/desktop/:rendererId" element={<DesktopCompanionPage />} />
         <Route element={<TinkariaLayout />}>
           <Route path="/" element={<LocalProjectsPage />} />
-          <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
-          <Route path="/settings/:sectionId" element={<SettingsPage />} />
+          <Route path="/settings/*" element={<Navigate to="/" replace />} />
           <Route path="/chat/:chatId" element={<ChatPage />} />
         </Route>
       </Routes>

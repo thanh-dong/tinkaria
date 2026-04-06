@@ -102,7 +102,6 @@ describe("KV snapshot bucket", () => {
   test("snapshotKvKey maps topics correctly", () => {
     expect(snapshotKvKey({ type: "sidebar" })).toBe("sidebar")
     expect(snapshotKvKey({ type: "local-projects" })).toBe("local-projects")
-    expect(snapshotKvKey({ type: "desktop-renderers" })).toBe("desktop-renderers")
     expect(snapshotKvKey({ type: "chat", chatId: "abc" })).toBe("chat.abc")
     expect(snapshotKvKey({ type: "terminal", terminalId: "t1" })).toBe("terminal.t1")
   })

@@ -282,7 +282,7 @@ export async function scanClaudeSessions(
       title: titleCandidate ?? formatDateTitle(modifiedAt),
       lastExchange,
       modifiedAt,
-      kannaChatId: null,
+      chatId: null,
       ...(runtime ? { runtime } : {}),
     })
   }
@@ -350,7 +350,7 @@ export async function scanCodexSessions(
       title: titleCandidate ?? formatDateTitle(modifiedAt),
       lastExchange,
       modifiedAt,
-      kannaChatId: null,
+      chatId: null,
       ...(runtime ? { runtime } : {}),
     })
   }
@@ -369,11 +369,11 @@ export function formatDateTitle(ms: number): string {
 
 export function resolveTitle(
   rawTitle: string,
-  source: "kanna" | "cli",
+  source: "tinkaria" | "cli",
   lastExchange: LastExchange | null,
   modifiedAt: number
 ): string {
-  if (source === "kanna" && rawTitle !== "New Chat" && rawTitle.trim() !== "") {
+  if (source === "tinkaria" && rawTitle !== "New Chat" && rawTitle.trim() !== "") {
     return rawTitle
   }
 
@@ -386,7 +386,7 @@ export function resolveTitle(
 
 export function mergeSessions(
   cliSessions: DiscoveredSession[],
-  kannaSessions: DiscoveredSession[]
+  tinkariaSessions: DiscoveredSession[]
 ): DiscoveredSession[] {
   const bySessionId = new Map<string, DiscoveredSession>()
 
@@ -394,7 +394,7 @@ export function mergeSessions(
     bySessionId.set(session.sessionId, session)
   }
 
-  for (const session of kannaSessions) {
+  for (const session of tinkariaSessions) {
     bySessionId.set(session.sessionId, session)
   }
 
@@ -420,23 +420,23 @@ export async function discoverSessions(
     codexSessionsDir ? scanCodexSessions(codexSessionsDir, projectPath) : Promise.resolve([]),
   ])
 
-  // 2. Collect Kanna chats with sessionToken
-  const kannaChats = store.listChatsByProject(projectId)
-  const kannaSessions: DiscoveredSession[] = kannaChats
+  // 2. Collect Tinkaria chats with sessionToken
+  const tinkariaChats = store.listChatsByProject(projectId)
+  const tinkariaSessions: DiscoveredSession[] = tinkariaChats
     .filter((chat) => chat.sessionToken !== null)
     .map((chat) => ({
       sessionId: chat.sessionToken!,
       provider: (chat.provider ?? "claude") as AgentProvider,
-      source: "kanna" as const,
-      title: resolveTitle(chat.title, "kanna", null, chat.lastMessageAt ?? chat.updatedAt),
+      source: "tinkaria" as const,
+      title: resolveTitle(chat.title, "tinkaria", null, chat.lastMessageAt ?? chat.updatedAt),
       lastExchange: null,
       modifiedAt: chat.lastMessageAt ?? chat.updatedAt,
-      kannaChatId: chat.id,
+      chatId: chat.id,
     }))
 
-  // 3. Merge + dedup (Kanna wins over CLI)
+  // 3. Merge + dedup (Tinkaria wins over CLI)
   const allCliSessions = [...claudeCliSessions, ...codexCliSessions]
-  const sessions = mergeSessions(allCliSessions, kannaSessions)
+  const sessions = mergeSessions(allCliSessions, tinkariaSessions)
 
   return { projectId, projectPath, sessions }
 }

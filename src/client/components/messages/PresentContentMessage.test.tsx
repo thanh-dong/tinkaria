@@ -86,6 +86,33 @@ describe("PresentContentMessage", () => {
     expect(html).toContain("graph TD")
   })
 
+  test("renders direct embed artifacts through the remote embed path", () => {
+    const html = renderToStaticMarkup(
+      <PresentContentMessage
+        message={createMessage({
+          id: "tool-embed",
+          toolId: "tool-embed",
+          input: {
+            title: "Architecture Preview",
+            kind: "diagram",
+            format: "diashort",
+            source: "https://diashort.apps.quickable.co/d/abc123",
+          },
+          result: {
+            accepted: true,
+            title: "Architecture Preview",
+            kind: "diagram",
+            format: "diashort",
+            source: "https://diashort.apps.quickable.co/d/abc123",
+          },
+        })}
+      />
+    )
+
+    expect(html).toContain('data-remote-embed="true"')
+    expect(html).toContain("diashort.apps.quickable.co/e/abc123")
+  })
+
   test("renders code success content in a RichContentBlock", () => {
     const html = renderToStaticMarkup(
       <PresentContentMessage

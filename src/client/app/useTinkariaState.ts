@@ -265,7 +265,7 @@ export function shouldFlushQueuedText(args: {
 }
 
 const FIXED_TRANSCRIPT_PADDING_BOTTOM = 320
-const UI_UPDATE_RESTART_STORAGE_KEY = "kanna:ui-update-restart"
+const UI_UPDATE_RESTART_STORAGE_KEY = "tinkaria:ui-update-restart"
 
 function getUiUpdateRestartPhase() {
   return window.sessionStorage.getItem(UI_UPDATE_RESTART_STORAGE_KEY)

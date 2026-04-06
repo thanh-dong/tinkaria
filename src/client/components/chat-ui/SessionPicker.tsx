@@ -25,8 +25,8 @@ function sessionDisplayTitle(session: DiscoveredSession): string {
   return session.sessionId
 }
 
-function SourceIcon({ source }: { source: "kanna" | "cli" }) {
-  return source === "kanna" ? (
+function SourceIcon({ source }: { source: "tinkaria" | "cli" }) {
+  return source === "tinkaria" ? (
     <Flower className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
   ) : (
     <Terminal className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
