@@ -47,6 +47,10 @@ const defaultOpenExternalLink: OpenExternalLinkHandler = () => false
 const OpenLocalLinkContext = createContext<OpenLocalLinkHandler>(defaultOpenLocalLink)
 const OpenExternalLinkContext = createContext<OpenExternalLinkHandler>(defaultOpenExternalLink)
 
+export function getReadBlockAnchorId(messageId: string, blockIndex: number): string {
+  return `read-block-${messageId}-${blockIndex}`
+}
+
 export function OpenLocalLinkProvider({
   children,
   onOpenLocalLink,
@@ -385,14 +389,45 @@ export function createMarkdownComponents(options?: {
   onOpenLocalLink?: OpenLocalLinkHandler
   onOpenExternalLink?: OpenExternalLinkHandler
   renderRichContentBlocks?: boolean
+  readBlockMessageId?: string
 }) {
   const renderRichContentBlocks = options?.renderRichContentBlocks ?? true
+  let readBlockIndex = 0
+
+  function getReadBlockProps() {
+    const messageId = options?.readBlockMessageId
+    if (!messageId) return {}
+    const blockIndex = readBlockIndex++
+    return {
+      id: getReadBlockAnchorId(messageId, blockIndex),
+      "data-read-anchor-message-id": messageId,
+      "data-read-anchor-block-index": String(blockIndex),
+    }
+  }
 
   return {
     ...markdownComponents,
+    h1: ({ children }: { children?: ReactNode }) => (
+      <h1 {...getReadBlockProps()} className="text-[20px] font-normal leading-tight mt-5 mb-3 first:mt-0 last:mb-0">{children}</h1>
+    ),
+    h2: ({ children }: { children?: ReactNode }) => (
+      <h2 {...getReadBlockProps()} className="text-[18px] font-normal leading-tight mt-5 mb-3 first:mt-0 last:mb-0">{children}</h2>
+    ),
+    h3: ({ children }: { children?: ReactNode }) => (
+      <h3 {...getReadBlockProps()} className="text-[16px] font-normal leading-tight mt-5 mb-3 first:mt-0 last:mb-0">{children}</h3>
+    ),
+    h4: ({ children }: { children?: ReactNode }) => (
+      <h4 {...getReadBlockProps()} className="text-[16px] font-normal leading-tight mt-5 mb-3 first:mt-0 last:mb-0">{children}</h4>
+    ),
+    h5: ({ children }: { children?: ReactNode }) => (
+      <h5 {...getReadBlockProps()} className="text-[16px] font-normal leading-tight mt-5 mb-3 first:mt-0 last:mb-0">{children}</h5>
+    ),
+    h6: ({ children }: { children?: ReactNode }) => (
+      <h6 {...getReadBlockProps()} className="text-[16px] font-normal leading-tight mt-5 mb-3 first:mt-0 last:mb-0">{children}</h6>
+    ),
     pre: ({ children, ...props }: ComponentPropsWithoutRef<"pre">) => {
       if (renderRichContentBlocks) {
-        return markdownComponents.pre({ children, ...props })
+        return <div {...getReadBlockProps()}>{markdownComponents.pre({ children, ...props })}</div>
       }
 
       const textContent = extractText(children)
@@ -401,18 +436,55 @@ export function createMarkdownComponents(options?: {
 
       if (isEmbed && language) {
         return (
-          <div className="my-2 overflow-x-auto max-w-full min-w-0">
+          <div {...getReadBlockProps()} className="my-2 overflow-x-auto max-w-full min-w-0">
             <EmbedRenderer format={language} source={textContent} />
           </div>
         )
       }
 
       return (
-        <div className="relative overflow-x-auto max-w-full min-w-0 no-code-highlight group/pre my-2">
+        <div {...getReadBlockProps()} className="relative overflow-x-auto max-w-full min-w-0 no-code-highlight group/pre my-2">
           <pre className="min-w-0 rounded-xl border border-border bg-muted/30 py-2.5 px-3.5 [.no-pre-highlight_&]:bg-background" {...props}>{children}</pre>
         </div>
       )
     },
+    table: ({ children, ...props }: ComponentPropsWithoutRef<"table">) => (
+      <div {...getReadBlockProps()} className="border border-border rounded-xl overflow-x-auto">
+        <table className="table-auto min-w-full divide-y divide-border bg-background" {...props}>{children}</table>
+      </div>
+    ),
+    p: ({ children, ...props }: ComponentPropsWithoutRef<"p">) => (
+      <p {...getReadBlockProps()} className="break-words mt-5 mb-3 first:mt-0 last:mb-0" {...props}>{children}</p>
+    ),
+    li: ({ children, ...props }: ComponentPropsWithoutRef<"li">) => (
+      <li {...getReadBlockProps()} {...props}>{children}</li>
+    ),
+    blockquote: ({ children, ...props }: ComponentPropsWithoutRef<"blockquote">) => (
+      (() => {
+        const childNodes = Children.toArray(children)
+
+        const firstChild = childNodes[0]
+        if (firstChild !== undefined) {
+          childNodes[0] = withChildClassName(firstChild, "mt-0")
+        }
+
+        const lastIndex = childNodes.length - 1
+        const lastChild = childNodes[lastIndex]
+        if (lastChild !== undefined) {
+          childNodes[lastIndex] = withChildClassName(lastChild, "mb-0")
+        }
+
+        return (
+          <blockquote
+            {...getReadBlockProps()}
+            className="my-2 mt-5 mb-3 first:mt-0 last:mb-0 border-l-2 border-border/80 pl-2 text-muted-foreground"
+            {...props}
+          >
+            {childNodes}
+          </blockquote>
+        )
+      })()
+    ),
     a: ({ children, href, onClick, ...props }: ComponentPropsWithoutRef<"a">) => {
       const onOpenLocalLink = options?.onOpenLocalLink ?? useContext(OpenLocalLinkContext)
       const onOpenExternalLink = options?.onOpenExternalLink ?? useContext(OpenExternalLinkContext)

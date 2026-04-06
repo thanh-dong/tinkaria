@@ -8,13 +8,16 @@ import {
   clearChatCache,
   markCachedChatsStale,
   MAX_CACHED_CHATS,
-  getInitialChatScrollTarget,
+  getNextReadableBoundary,
+  getReadableBlockCount,
+  getInitialChatReadAnchor,
+  getLastReadableMessage,
   getNewestRemainingChatId,
   getReadTimestampToPersistAfterReply,
   getResumeRefreshSessionProjectIds,
+  isReadableTranscriptMessage,
   isChatRead,
   normalizeLocalFilePreviewErrorMessage,
-  shouldPersistReadFromViewport,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
   hasRenderableTranscriptHistory,
@@ -28,6 +31,24 @@ import {
 } from "./useTinkariaState"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarData } from "../../shared/types"
 import { createIncrementalHydrator } from "../lib/parseTranscript"
+
+function assistantMessage(id: string): HydratedTranscriptMessage {
+  return {
+    id,
+    kind: "assistant_text",
+    text: `message-${id}`,
+    timestamp: "2026-04-01T00:00:00.000Z",
+  }
+}
+
+function paragraphMessage(id: string, text: string): HydratedTranscriptMessage {
+  return {
+    id,
+    kind: "assistant_text",
+    text,
+    timestamp: "2026-04-01T00:00:00.000Z",
+  }
+}
 
 function createSidebarData(): SidebarData {
   return {
@@ -477,12 +498,14 @@ describe("getReadTimestampToPersistAfterReply", () => {
 
     expect(persistedReadAt).toBe(11)
     expect(isChatRead(persistedReadAt ?? undefined, 11)).toBe(true)
-    expect(getInitialChatScrollTarget({
+    expect(getInitialChatReadAnchor({
       activeChatId: "chat-1",
       sidebarReady: true,
       hasSidebarChat: true,
-      isRead: isChatRead(persistedReadAt ?? undefined, 11),
-    })).toBe("bottom")
+      messages: [assistantMessage("assistant-1")],
+      lastSeenMessageAt: persistedReadAt ?? undefined,
+      lastMessageAt: 11,
+    })).toEqual({ kind: "tail" })
   })
 
   test("does nothing when the chat has no latest message timestamp yet", () => {
@@ -490,52 +513,139 @@ describe("getReadTimestampToPersistAfterReply", () => {
   })
 })
 
-describe("getInitialChatScrollTarget", () => {
-  test("waits for the sidebar row before deciding whether the chat is read", () => {
-    expect(getInitialChatScrollTarget({
-      activeChatId: "chat-1",
-      sidebarReady: false,
-      hasSidebarChat: false,
-      isRead: false,
-    })).toBe("wait")
+describe("read-boundary helpers", () => {
+  test("ignores metadata-only transcript messages when choosing a readable boundary", () => {
+    expect(isReadableTranscriptMessage({
+      id: "status-1",
+      kind: "status",
+      status: "running",
+      timestamp: "2026-04-01T00:00:00.000Z",
+    })).toBe(false)
+    expect(isReadableTranscriptMessage(assistantMessage("assistant-1"))).toBe(true)
   })
 
-  test("opens unread chats at the top without waiting for runtime once the sidebar row is known", () => {
-    expect(getInitialChatScrollTarget({
-      activeChatId: "chat-1",
-      sidebarReady: true,
-      hasSidebarChat: true,
-      isRead: false,
-    })).toBe("top")
+  test("returns the latest readable transcript message", () => {
+    expect(getLastReadableMessage([
+      {
+        id: "status-1",
+        kind: "status",
+        status: "running",
+        timestamp: "2026-04-01T00:00:00.000Z",
+      },
+      assistantMessage("assistant-1"),
+      {
+        id: "status-2",
+        kind: "status",
+        status: "done",
+        timestamp: "2026-04-01T00:00:01.000Z",
+      },
+    ])?.id).toBe("assistant-1")
   })
 
-  test("opens read chats at the bottom once the runtime is ready", () => {
-    expect(getInitialChatScrollTarget({
-      activeChatId: "chat-1",
-      sidebarReady: true,
-      hasSidebarChat: true,
-      isRead: true,
-    })).toBe("bottom")
+  test("counts assistant text paragraphs and list items as readable blocks", () => {
+    expect(getReadableBlockCount(paragraphMessage("assistant-1", "One\n\nTwo\n\nThree"))).toBe(3)
+    expect(getReadableBlockCount(paragraphMessage("assistant-2", "- A\n- B\n- C"))).toBe(3)
+  })
+
+  test("finds the next unread block inside the same long message after the exact last-read block", () => {
+    expect(getNextReadableBoundary({
+      messages: [
+        paragraphMessage("assistant-1", "One\n\nTwo\n\nThree"),
+      ],
+      lastReadMessageId: "assistant-1",
+      lastReadBlockIndex: 0,
+      lastSeenMessageAt: 1,
+      lastMessageAt: 2,
+    })).toEqual({ messageId: "assistant-1", blockIndex: 1 })
+  })
+
+  test("moves to the next message when the last-read block was already the final block of the message", () => {
+    expect(getNextReadableBoundary({
+      messages: [
+        paragraphMessage("assistant-1", "One\n\nTwo"),
+        assistantMessage("assistant-2"),
+      ],
+      lastReadMessageId: "assistant-1",
+      lastReadBlockIndex: 1,
+      lastSeenMessageAt: 1,
+      lastMessageAt: 3,
+    })).toEqual({ messageId: "assistant-2", blockIndex: 0 })
+  })
+
+  test("falls back to the earliest loaded readable message when only legacy timestamp state says the chat is unread", () => {
+    expect(getNextReadableBoundary({
+      messages: [
+        assistantMessage("assistant-1"),
+        assistantMessage("assistant-2"),
+      ],
+      lastSeenMessageAt: 1,
+      lastMessageAt: 2,
+    })).toEqual({ messageId: "assistant-1", blockIndex: 0 })
+  })
+
+  test("returns null when the latest readable block is already the exact read boundary", () => {
+    expect(getNextReadableBoundary({
+      messages: [
+        paragraphMessage("assistant-1", "One\n\nTwo"),
+      ],
+      lastReadMessageId: "assistant-1",
+      lastReadBlockIndex: 1,
+      lastSeenMessageAt: 2,
+      lastMessageAt: 2,
+    })).toBeNull()
   })
 })
 
-describe("shouldPersistReadFromViewport", () => {
-  test("does not persist read state before the initial scroll target is applied", () => {
-    expect(shouldPersistReadFromViewport({
+describe("getInitialChatReadAnchor", () => {
+  test("waits for the sidebar row before deciding whether the chat is read", () => {
+    expect(getInitialChatReadAnchor({
       activeChatId: "chat-1",
-      initialScrollCompleted: false,
-      isAtBottom: true,
-      lastMessageAt: 11,
-    })).toBe(false)
+      sidebarReady: false,
+      hasSidebarChat: false,
+      messages: [assistantMessage("assistant-1")],
+      lastSeenMessageAt: 1,
+      lastMessageAt: 2,
+    })).toEqual({ kind: "wait" })
   })
 
-  test("persists read state once the transcript is settled at the bottom", () => {
-    expect(shouldPersistReadFromViewport({
+  test("anchors unread chats to the first unread message once the sidebar row is known", () => {
+    expect(getInitialChatReadAnchor({
       activeChatId: "chat-1",
-      initialScrollCompleted: true,
-      isAtBottom: true,
-      lastMessageAt: 11,
-    })).toBe(true)
+      sidebarReady: true,
+      hasSidebarChat: true,
+      messages: [
+        paragraphMessage("assistant-1", "One\n\nTwo\n\nThree"),
+        assistantMessage("assistant-2"),
+      ],
+      lastReadMessageId: "assistant-1",
+      lastReadBlockIndex: 0,
+      lastSeenMessageAt: 1,
+      lastMessageAt: 3,
+    })).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
+  })
+
+  test("opens fully read chats at the tail", () => {
+    expect(getInitialChatReadAnchor({
+      activeChatId: "chat-1",
+      sidebarReady: true,
+      hasSidebarChat: true,
+      messages: [
+        assistantMessage("assistant-1"),
+        assistantMessage("assistant-2"),
+      ],
+      lastReadMessageId: "assistant-2",
+      lastSeenMessageAt: 2,
+      lastMessageAt: 2,
+    })).toEqual({ kind: "tail" })
+  })
+
+  test("treats the home route as already resolved", () => {
+    expect(getInitialChatReadAnchor({
+      activeChatId: null,
+      sidebarReady: false,
+      hasSidebarChat: false,
+      messages: [],
+    })).toEqual({ kind: "tail" })
   })
 })
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import type { RefObject } from "react"
+import type { RenderItem } from "../lib/messageHeights"
 import type { HydratedTranscriptMessage } from "../../shared/types"
 
 type PresentContentMessageType = Extract<
@@ -41,12 +42,35 @@ afterEach(() => {
 })
 
 describe("TinkariaTranscript", () => {
+  test("maps an unread message id to the containing render row, including collapsed tool groups", async () => {
+    const { getRenderItemIndexForMessageId } = await import("./TinkariaTranscript")
+
+    const renderItems: RenderItem[] = [
+      { type: "single", index: 0, message: { ...createMessage(), id: "single-1" } },
+      {
+        type: "tool-group",
+        startIndex: 1,
+        messages: [
+          { ...createMessage(), id: "tool-1" },
+          { ...createMessage(), id: "tool-2" },
+        ],
+      },
+      { type: "single", index: 3, message: { ...createMessage(), id: "single-3" } },
+    ]
+
+    expect(getRenderItemIndexForMessageId(renderItems, "single-1")).toBe(0)
+    expect(getRenderItemIndexForMessageId(renderItems, "tool-2")).toBe(1)
+    expect(getRenderItemIndexForMessageId(renderItems, "single-3")).toBe(2)
+    expect(getRenderItemIndexForMessageId(renderItems, "missing")).toBe(-1)
+  })
+
   test("renders present_content through the dedicated transcript message component", async () => {
     await mock.module("@tanstack/react-virtual", () => ({
       useVirtualizer: ({ count }: { count: number }) => ({
         getTotalSize: () => Math.max(1, count) * 80,
         getVirtualItems: () => (count > 0 ? [{ key: 0, index: 0, start: 0 }] : []),
         measureElement: () => {},
+        scrollToIndex: () => {},
       }),
     }))
 

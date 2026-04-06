@@ -1,4 +1,4 @@
-import React, { useMemo, type RefObject } from "react"
+import React, { useLayoutEffect, useMemo, useRef, type RefObject } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import type { AskUserQuestionItem, ProcessedToolCall } from "../components/messages/types"
 import type { AskUserQuestionAnswerMap, HydratedTranscriptMessage } from "../../shared/types"
@@ -20,7 +20,7 @@ import { CompactBoundaryMessage, ContextClearedMessage } from "../components/mes
 import { CompactSummaryMessage } from "../components/messages/CompactSummaryMessage"
 import { StatusMessage } from "../components/messages/StatusMessage"
 import { CollapsedToolGroup } from "../components/messages/CollapsedToolGroup"
-import { OpenLocalLinkProvider } from "../components/messages/shared"
+import { getReadBlockAnchorId, OpenLocalLinkProvider } from "../components/messages/shared"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
 import { SPECIAL_TOOL_NAMES } from "./derived"
 
@@ -59,11 +59,22 @@ function groupMessages(messages: HydratedTranscriptMessage[]): RenderItem[] {
   return result
 }
 
+export function getRenderItemIndexForMessageId(renderItems: RenderItem[], messageId: string): number {
+  return renderItems.findIndex((item) => (
+    item.type === "tool-group"
+      ? item.messages.some((message) => message.id === messageId)
+      : item.message.id === messageId
+  ))
+}
+
 interface TinkariaTranscriptProps {
   messages: HydratedTranscriptMessage[]
   scrollRef: RefObject<HTMLDivElement | null>
   isLoading: boolean
   localPath?: string
+  initialScrollMessageId?: string | null
+  initialScrollBlockIndex?: number | null
+  onInitialScrollMessageResolved?: () => void
   latestToolIds: Record<string, string | null>
   onOpenLocalLink: (target: { path: string; line?: number; column?: number }) => void
   onOpenExternalLink: (href: string) => boolean
@@ -80,6 +91,9 @@ export function TinkariaTranscript({
   scrollRef,
   isLoading,
   localPath,
+  initialScrollMessageId,
+  initialScrollBlockIndex,
+  onInitialScrollMessageResolved,
   latestToolIds,
   onOpenLocalLink,
   onOpenExternalLink,
@@ -99,6 +113,7 @@ export function TinkariaTranscript({
   }, [messages])
 
   const renderItems = useMemo(() => groupMessages(messages), [messages])
+  const lastInitialScrollAnchorRef = useRef<string | null>(null)
 
   const { estimateSize } = useMessageHeights(renderItems, scrollRef)
 
@@ -108,6 +123,28 @@ export function TinkariaTranscript({
     estimateSize,
     overscan: 5,
   })
+
+  useLayoutEffect(() => {
+    if (!initialScrollMessageId) {
+      lastInitialScrollAnchorRef.current = null
+      return
+    }
+    const anchorKey = `${initialScrollMessageId}:${initialScrollBlockIndex ?? 0}`
+    if (lastInitialScrollAnchorRef.current === anchorKey) return
+
+    const renderIndex = getRenderItemIndexForMessageId(renderItems, initialScrollMessageId)
+    if (renderIndex < 0) return
+
+    virtualizer.scrollToIndex(renderIndex, { align: "start", behavior: "auto" })
+    lastInitialScrollAnchorRef.current = anchorKey
+
+    window.requestAnimationFrame(() => {
+      const blockIndex = initialScrollBlockIndex ?? 0
+      const blockNode = document.getElementById(getReadBlockAnchorId(initialScrollMessageId, blockIndex))
+      blockNode?.scrollIntoView({ block: "start", behavior: "auto" })
+      onInitialScrollMessageResolved?.()
+    })
+  }, [initialScrollBlockIndex, initialScrollMessageId, onInitialScrollMessageResolved, renderItems, virtualizer])
 
   function renderMessage(message: HydratedTranscriptMessage, index: number): React.ReactNode {
     if (message.kind === "user_prompt") {

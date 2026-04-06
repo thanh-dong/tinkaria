@@ -25,6 +25,9 @@ import { useAppDialog } from "../components/ui/app-dialog"
 import { createIncrementalHydrator, processTranscriptMessages } from "../lib/parseTranscript"
 import type { IncrementalHydrator } from "../lib/parseTranscript"
 import { canCancelStatus, getLatestToolIds, isProcessingStatus } from "./derived"
+import remarkGfm from "remark-gfm"
+import remarkParse from "remark-parse"
+import { unified } from "unified"
 import {
   clearQueuedSubmit,
   completeQueuedFlush,
@@ -75,26 +78,156 @@ export function getReadTimestampToPersistAfterReply(lastSeenMessageAt?: number, 
   return lastMessageAt
 }
 
-export function getInitialChatScrollTarget(args: {
+export interface ReadBlockBoundary {
+  messageId: string
+  blockIndex: number
+}
+
+export function isReadableTranscriptMessage(message: HydratedTranscriptMessage): boolean {
+  if (message.hidden) return false
+
+  switch (message.kind) {
+    case "system_init":
+    case "account_info":
+    case "status":
+    case "compact_boundary":
+      return false
+    default:
+      return true
+  }
+}
+
+export function getLastReadableMessage(messages: HydratedTranscriptMessage[]): HydratedTranscriptMessage | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (isReadableTranscriptMessage(message)) return message
+  }
+
+  return null
+}
+
+export function getReadableBlockCount(message: HydratedTranscriptMessage): number {
+  if (!isReadableTranscriptMessage(message)) return 0
+  if (message.kind !== "assistant_text") return 1
+
+  try {
+    const tree = unified().use(remarkParse).use(remarkGfm).parse(message.text) as { children?: Array<{ type?: string; children?: unknown[] }> }
+    const nodes = tree.children ?? []
+    let count = 0
+    for (const node of nodes) {
+      if (node.type === "list") {
+        const items = Array.isArray(node.children) ? node.children.length : 0
+        count += Math.max(1, items)
+        continue
+      }
+      count += 1
+    }
+    return Math.max(1, count)
+  } catch {
+    return 1
+  }
+}
+
+export function getVisibleReadBlockBoundary(container: HTMLElement): ReadBlockBoundary | null {
+  const blockNodes = Array.from(container.querySelectorAll<HTMLElement>("[data-read-anchor-message-id][data-read-anchor-block-index]"))
+  if (blockNodes.length === 0) return null
+
+  const viewportRect = container.getBoundingClientRect()
+  const viewportTop = viewportRect.top + 8
+  const viewportBottom = viewportRect.bottom - 8
+
+  let firstBelowTop: { top: number; boundary: ReadBlockBoundary } | null = null
+  let closestAbove: { distance: number; boundary: ReadBlockBoundary } | null = null
+
+  for (const node of blockNodes) {
+    const messageId = node.dataset.readAnchorMessageId
+    const rawBlockIndex = node.dataset.readAnchorBlockIndex
+    const blockIndex = rawBlockIndex ? Number.parseInt(rawBlockIndex, 10) : Number.NaN
+    if (!messageId || !Number.isFinite(blockIndex)) continue
+
+    const rect = node.getBoundingClientRect()
+    if (rect.bottom > viewportTop && rect.top < viewportBottom) {
+      return { messageId, blockIndex }
+    }
+
+    if (rect.top <= viewportTop) {
+      const distance = viewportTop - rect.top
+      if (!closestAbove || distance < closestAbove.distance) {
+        closestAbove = { distance, boundary: { messageId, blockIndex } }
+      }
+      continue
+    }
+
+    if (!firstBelowTop || rect.top < firstBelowTop.top) {
+      firstBelowTop = { top: rect.top, boundary: { messageId, blockIndex } }
+    }
+  }
+
+  return closestAbove?.boundary ?? firstBelowTop?.boundary ?? null
+}
+
+export function getNextReadableBoundary(args: {
+  messages: HydratedTranscriptMessage[]
+  lastReadMessageId?: string
+  lastReadBlockIndex?: number
+  lastSeenMessageAt?: number
+  lastMessageAt?: number
+}): ReadBlockBoundary | null {
+  const readableMessages = args.messages.filter(isReadableTranscriptMessage)
+  if (readableMessages.length === 0) return null
+
+  if (isChatRead(args.lastSeenMessageAt, args.lastMessageAt)) return null
+
+  if (args.lastReadMessageId) {
+    const messageIndex = readableMessages.findIndex((message) => message.id === args.lastReadMessageId)
+    if (messageIndex >= 0) {
+      const currentMessage = readableMessages[messageIndex]
+      const nextBlockIndex = (args.lastReadBlockIndex ?? 0) + 1
+      if (nextBlockIndex < getReadableBlockCount(currentMessage)) {
+        return { messageId: currentMessage.id, blockIndex: nextBlockIndex }
+      }
+
+      const nextMessage = readableMessages[messageIndex + 1]
+      if (nextMessage) {
+        return { messageId: nextMessage.id, blockIndex: 0 }
+      }
+      return null
+    }
+  }
+
+  return { messageId: readableMessages[0].id, blockIndex: 0 }
+}
+
+export type InitialChatReadAnchor =
+  | { kind: "wait" }
+  | { kind: "tail" }
+  | ({ kind: "block" } & ReadBlockBoundary)
+
+export function getInitialChatReadAnchor(args: {
   activeChatId: string | null
   sidebarReady: boolean
   hasSidebarChat: boolean
-  isRead: boolean
-}): "wait" | "top" | "bottom" {
-  if (args.activeChatId && (!args.sidebarReady || !args.hasSidebarChat)) return "wait"
-  return args.isRead ? "bottom" : "top"
-}
-
-export function shouldPersistReadFromViewport(args: {
-  activeChatId: string | null
-  initialScrollCompleted: boolean
-  isAtBottom: boolean
+  messages: HydratedTranscriptMessage[]
+  lastReadMessageId?: string
+  lastReadBlockIndex?: number
+  lastSeenMessageAt?: number
   lastMessageAt?: number
-}): boolean {
-  if (!args.activeChatId) return false
-  if (!args.initialScrollCompleted) return false
-  if (!args.isAtBottom) return false
-  return args.lastMessageAt !== undefined
+}): InitialChatReadAnchor {
+  if (args.activeChatId && (!args.sidebarReady || !args.hasSidebarChat)) return { kind: "wait" }
+
+  const nextBoundary = getNextReadableBoundary({
+    messages: args.messages,
+    lastReadMessageId: args.lastReadMessageId,
+    lastReadBlockIndex: args.lastReadBlockIndex,
+    lastSeenMessageAt: args.lastSeenMessageAt,
+    lastMessageAt: args.lastMessageAt,
+  })
+
+  if (nextBoundary) {
+    return { kind: "block", ...nextBoundary }
+  }
+
+  return { kind: "tail" }
 }
 
 function useTinkariaSocket(): TinkariaTransport {
@@ -425,6 +558,8 @@ export interface TinkariaState {
   queuedText: string
   transcriptPaddingBottom: number
   showScrollButton: boolean
+  initialReadAnchorMessageId: string | null
+  initialReadAnchorBlockIndex: number | null
   navbarLocalPath?: string
   hasSelectedProject: boolean
   chatHasKnownMessages: boolean
@@ -434,6 +569,7 @@ export interface TinkariaState {
   collapseSidebar: () => void
   expandSidebar: () => void
   closeLocalFilePreview: () => void
+  handleInitialReadAnchorScrolled: () => void
   updateScrollState: () => void
   scrollToBottom: () => void
   handleCreateChat: (projectId: string) => Promise<void>
@@ -519,6 +655,12 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
   const backgroundedAtRef = useRef<number | null>(null)
   const lastResumeRefreshAtRef = useRef(0)
+  const lastReadBlockIndex = useChatReadStateStore((store) => (
+    activeChatId ? store.lastReadBlockIndexByChat[activeChatId] : undefined
+  ))
+  const lastReadMessageId = useChatReadStateStore((store) => (
+    activeChatId ? store.lastReadMessageIdByChat[activeChatId] : undefined
+  ))
   const lastSeenMessageAt = useChatReadStateStore((store) => (
     activeChatId ? store.lastSeenMessageAtByChat[activeChatId] : undefined
   ))
@@ -946,6 +1088,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     })
   }, [activeChatId, activeChatSnapshot, chatSnapshot, pendingChatId])
   const latestToolIds = useMemo(() => getLatestToolIds(messages), [messages])
+  const latestReadableMessage = useMemo(() => getLastReadableMessage(messages), [messages])
   const runtime = activeChatSnapshot?.runtime ?? null
   const currentAccountInfo = useMemo(() => {
     const firstAccountInfo = messages.find((message) => message.kind === "account_info")
@@ -955,7 +1098,16 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const isProcessing = isProcessingStatus(runtime?.status)
   const canCancel = canCancelStatus(runtime?.status)
   const hasResolvedActiveSidebarChat = !activeChatId || activeSidebarChat !== null
-  const activeChatIsRead = isChatRead(lastSeenMessageAt, activeSidebarChat?.lastMessageAt)
+  const initialChatReadAnchor = getInitialChatReadAnchor({
+    activeChatId,
+    sidebarReady,
+    hasSidebarChat: hasResolvedActiveSidebarChat,
+    messages,
+    lastReadMessageId,
+    lastReadBlockIndex,
+    lastSeenMessageAt,
+    lastMessageAt: activeSidebarChat?.lastMessageAt,
+  })
 
   useEffect(() => {
     initialScrollCompletedRef.current = false
@@ -963,15 +1115,9 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       window.cancelAnimationFrame(initialScrollFrameRef.current)
       initialScrollFrameRef.current = null
     }
-    setIsAtBottom(activeChatIsRead && hasResolvedActiveSidebarChat)
-  }, [activeChatId, activeChatIsRead, hasResolvedActiveSidebarChat])
-
-  const initialChatScrollTarget = getInitialChatScrollTarget({
-    activeChatId,
-    sidebarReady,
-    hasSidebarChat: hasResolvedActiveSidebarChat,
-    isRead: activeChatIsRead,
-  })
+    if (initialChatReadAnchor.kind === "wait") return
+    setIsAtBottom(initialChatReadAnchor.kind === "tail")
+  }, [activeChatId, initialChatReadAnchor])
 
   const transcriptPaddingBottom = FIXED_TRANSCRIPT_PADDING_BOTTOM
   const showScrollButton = !isAtBottom && messages.length > 0
@@ -989,19 +1135,15 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     ?? fallbackLocalProjectPath
   )
   const chatHasKnownMessages = activeSidebarChat?.lastMessageAt !== undefined
+  const initialReadAnchorMessageId = initialChatReadAnchor.kind === "block" ? initialChatReadAnchor.messageId : null
+  const initialReadAnchorBlockIndex = initialChatReadAnchor.kind === "block" ? initialChatReadAnchor.blockIndex : null
 
   useLayoutEffect(() => {
     if (initialScrollCompletedRef.current) return
 
     const element = scrollRef.current
     if (!element) return
-    if (initialChatScrollTarget === "wait") return
-
-    if (initialChatScrollTarget === "top") {
-      element.scrollTo({ top: 0, behavior: "auto" })
-      initialScrollCompletedRef.current = true
-      return
-    }
+    if (initialChatReadAnchor.kind !== "tail") return
 
     element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
     if (initialScrollFrameRef.current !== null) {
@@ -1014,7 +1156,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       initialScrollFrameRef.current = null
     })
     initialScrollCompletedRef.current = true
-  }, [activeChatId, initialChatScrollTarget, inputHeight, messages.length])
+  }, [activeChatId, initialChatReadAnchor, inputHeight, messages.length])
 
   useEffect(() => {
     if (!initialScrollCompletedRef.current || !isAtBottom) return
@@ -1119,21 +1261,24 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   useEffect(() => {
     if (!activeChatId) return
     const lastMessageAt = activeSidebarChat?.lastMessageAt
-    if (!shouldPersistReadFromViewport({
-      activeChatId,
-      initialScrollCompleted: initialScrollCompletedRef.current,
-      isAtBottom,
+    if (!initialScrollCompletedRef.current || !isAtBottom || lastMessageAt === undefined) return
+    markChatRead(activeChatId, {
+      messageId: latestReadableMessage?.id,
+      blockIndex: latestReadableMessage ? Math.max(0, getReadableBlockCount(latestReadableMessage) - 1) : undefined,
       lastMessageAt,
-    })) return
-    if (lastMessageAt === undefined) return
-    markChatRead(activeChatId, lastMessageAt)
-  }, [activeChatId, activeSidebarChat?.lastMessageAt, isAtBottom, markChatRead])
+    })
+  }, [activeChatId, activeSidebarChat?.lastMessageAt, isAtBottom, latestReadableMessage, markChatRead])
 
   function updateScrollState() {
     const element = scrollRef.current
     if (!element) return
     const distance = element.scrollHeight - element.scrollTop - element.clientHeight
-    setIsAtBottom(shouldAutoFollowTranscript(distance))
+    const nextIsAtBottom = shouldAutoFollowTranscript(distance)
+    setIsAtBottom(nextIsAtBottom)
+    if (!activeChatId || nextIsAtBottom) return
+    const boundary = getVisibleReadBlockBoundary(element)
+    if (!boundary) return
+    markChatRead(activeChatId, boundary)
   }
 
   function enableAutoFollow(behavior: ScrollBehavior) {
@@ -1145,6 +1290,10 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
   function scrollToBottom() {
     enableAutoFollow("smooth")
+  }
+
+  function handleInitialReadAnchorScrolled() {
+    initialScrollCompletedRef.current = true
   }
 
   function keepComposerSubmitAnchored() {
@@ -1320,7 +1469,11 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
       const readTimestampToPersist = getReadTimestampToPersistAfterReply(lastSeenMessageAt, activeSidebarChat?.lastMessageAt)
       if (activeChatId && readTimestampToPersist !== null) {
-        markChatRead(activeChatId, readTimestampToPersist)
+        markChatRead(activeChatId, {
+          messageId: latestReadableMessage?.id,
+          blockIndex: latestReadableMessage ? Math.max(0, getReadableBlockCount(latestReadableMessage) - 1) : undefined,
+          lastMessageAt: readTimestampToPersist,
+        })
       }
 
       setCommandError(null)
@@ -1643,6 +1796,8 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     queuedText: activeQueuedText,
     transcriptPaddingBottom,
     showScrollButton,
+    initialReadAnchorMessageId,
+    initialReadAnchorBlockIndex,
     navbarLocalPath,
     hasSelectedProject,
     chatHasKnownMessages,
@@ -1657,6 +1812,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     collapseSidebar: () => setSidebarCollapsed(true),
     expandSidebar: () => setSidebarCollapsed(false),
     closeLocalFilePreview: () => setLocalFilePreview(null),
+    handleInitialReadAnchorScrolled,
     updateScrollState,
     scrollToBottom,
     handleCreateChat,

@@ -45,4 +45,14 @@ describe("TextMessage", () => {
 
     expect(html.match(/Embedded Diagram/g)?.length).toBe(1)
   })
+
+  test("stamps readable block anchors for paragraph-level restore", () => {
+    const html = renderToStaticMarkup(
+      <TextMessage message={createMessage("First paragraph\n\nSecond paragraph")} />
+    )
+
+    expect(html).toContain('id="read-block-msg-1-0"')
+    expect(html).toContain('id="read-block-msg-1-1"')
+    expect(html).toContain('data-read-anchor-message-id="msg-1"')
+  })
 })
