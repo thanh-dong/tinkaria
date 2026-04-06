@@ -1,5 +1,4 @@
 import { GitFork, Menu, PanelLeft } from "lucide-react"
-import { TinkariaSidebarMark } from "../branding/TinkariaSidebarMark"
 import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
 import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
@@ -97,10 +96,7 @@ export function ChatNavbar({
         {...getUiIdentityAttributeProps(navbarAreaId)}
         className="relative flex items-center gap-2 w-full"
       >
-        <div className={cn(
-          "flex items-center gap-1 flex-shrink-0 rounded-full border border-border/80 bg-background/78 p-1 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]",
-          sidebarCollapsed && "px-1.5"
-        )}>
+        <div className="flex items-center gap-1 flex-shrink-0 rounded-full border border-border/80 bg-background/78 p-1 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
           <Button
             variant="ghost"
             size="icon"
@@ -109,33 +105,15 @@ export function ChatNavbar({
           >
             <Menu className="size-4.5" />
           </Button>
-          {sidebarCollapsed ? (
-            <>
-              <div className="flex items-center justify-center w-[36px] h-[36px]">
-                <TinkariaSidebarMark className="hidden h-5 w-5 md:inline-flex sm:h-6 sm:w-6" imageClassName="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden md:flex"
-                onClick={onExpandSidebar}
-                title="Expand sidebar"
-              >
-                <PanelLeft className="size-4.5" />
-              </Button>
-            </>
-          ) : null}
-          {!sidebarCollapsed ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hidden md:flex"
-              onClick={onCollapseSidebar}
-              title="Collapse sidebar"
-            >
-              <PanelLeft className="size-4.5" />
-            </Button>
-          ) : null}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:flex"
+            onClick={sidebarCollapsed ? onExpandSidebar : onCollapseSidebar}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <PanelLeft className="size-4.5" />
+          </Button>
           <Button
             {...getUiIdentityAttributeProps(forkSessionActionId)}
             variant="ghost"

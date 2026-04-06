@@ -2,31 +2,30 @@ import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import { ChatNavbar } from "./ChatNavbar"
 
+const defaultProps = {
+  onOpenSidebar: () => {},
+  onCollapseSidebar: () => {},
+  onExpandSidebar: () => {},
+  onForkSession: () => {},
+}
+
 describe("ChatNavbar", () => {
-  test("uses the branded tinkaria mark when the sidebar is collapsed", () => {
-    const html = renderToStaticMarkup(
-      <ChatNavbar
-        sidebarCollapsed
-        onOpenSidebar={() => {}}
-        onCollapseSidebar={() => {}}
-        onExpandSidebar={() => {}}
-        onForkSession={() => {}}
-      />,
+  test("pill has no branding mark — consistent width regardless of sidebar state", () => {
+    const collapsed = renderToStaticMarkup(
+      <ChatNavbar sidebarCollapsed {...defaultProps} />,
+    )
+    const expanded = renderToStaticMarkup(
+      <ChatNavbar sidebarCollapsed={false} {...defaultProps} />,
     )
 
-    expect(html).toContain("tinkaria-mark-fine.svg")
-    expect(html).not.toContain("lucide-flower")
+    // No mark image in either state
+    expect(collapsed).not.toContain("tinkaria-mark")
+    expect(expanded).not.toContain("tinkaria-mark")
   })
 
-  test("renders a fork-session button instead of compose", () => {
+  test("renders a fork-session button", () => {
     const html = renderToStaticMarkup(
-      <ChatNavbar
-        sidebarCollapsed={false}
-        onOpenSidebar={() => {}}
-        onCollapseSidebar={() => {}}
-        onExpandSidebar={() => {}}
-        onForkSession={() => {}}
-      />,
+      <ChatNavbar sidebarCollapsed={false} {...defaultProps} />,
     )
 
     expect(html).toContain('title="Fork session"')
@@ -37,10 +36,7 @@ describe("ChatNavbar", () => {
     const html = renderToStaticMarkup(
       <ChatNavbar
         sidebarCollapsed={false}
-        onOpenSidebar={() => {}}
-        onCollapseSidebar={() => {}}
-        onExpandSidebar={() => {}}
-        onForkSession={() => {}}
+        {...defaultProps}
         localPath="/workspace/kanna"
         accountInfo={{ subscriptionType: "pro" }}
         currentRepoStatus={{
