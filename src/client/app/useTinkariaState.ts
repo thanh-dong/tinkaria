@@ -21,7 +21,7 @@ import type { ChatMessageEvent, ChatRuntime, ChatSnapshot, HydratedTranscriptMes
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import type { AskUserQuestionItem } from "../components/messages/types"
 import { useAppDialog } from "../components/ui/app-dialog"
-import { createIncrementalHydrator } from "../lib/parseTranscript"
+import { createIncrementalHydrator, processTranscriptMessages } from "../lib/parseTranscript"
 import type { IncrementalHydrator } from "../lib/parseTranscript"
 import { canCancelStatus, getLatestToolIds, isProcessingStatus } from "./derived"
 import {
@@ -147,6 +147,77 @@ const RESUME_REFRESH_DEDUP_WINDOW_MS = 1_000
 
 export function computeTailOffset(messageCount: number, tailSize = TRANSCRIPT_TAIL_SIZE): number {
   return Math.max(0, messageCount - tailSize)
+}
+
+export function hasRenderableTranscriptHistory(messages: HydratedTranscriptMessage[]): boolean {
+  return messages.some((message) => {
+    if (message.hidden) return false
+
+    switch (message.kind) {
+      case "system_init":
+      case "account_info":
+      case "status":
+      case "compact_boundary":
+        return false
+      default:
+        return true
+    }
+  })
+}
+
+export interface TranscriptWindowDiagnostics {
+  totalCount: number
+  renderableCount: number
+  hiddenCount: number
+  statusCount: number
+  metadataOnlyCount: number
+}
+
+export function summarizeTranscriptWindow(messages: HydratedTranscriptMessage[]): TranscriptWindowDiagnostics {
+  let renderableCount = 0
+  let hiddenCount = 0
+  let statusCount = 0
+  let metadataOnlyCount = 0
+
+  for (const message of messages) {
+    if (message.hidden) {
+      hiddenCount += 1
+      continue
+    }
+
+    switch (message.kind) {
+      case "status":
+        statusCount += 1
+        metadataOnlyCount += 1
+        break
+      case "system_init":
+      case "account_info":
+      case "compact_boundary":
+        metadataOnlyCount += 1
+        break
+      default:
+        renderableCount += 1
+        break
+    }
+  }
+
+  return {
+    totalCount: messages.length,
+    renderableCount,
+    hiddenCount,
+    statusCount,
+    metadataOnlyCount,
+  }
+}
+
+export function shouldBackfillTranscriptWindow(args: {
+  messages: HydratedTranscriptMessage[]
+  messageCount: number
+  offset: number
+}): boolean {
+  if (args.messageCount <= 0) return false
+  if (args.offset <= 0) return false
+  return !hasRenderableTranscriptHistory(args.messages)
 }
 
 function isStandalonePwaDisplay(): boolean {
@@ -636,7 +707,12 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     hydratorRef.current = hydrator
 
     if (restoredFromCache) {
-      logTinkariaState("restoring chat from cache", { activeChatId, cachedMessages: cached.messages.length, stale: cached.stale })
+      logTinkariaState("restoring chat from cache", {
+        activeChatId,
+        cachedMessages: cached.messages.length,
+        cachedDiagnostics: summarizeTranscriptWindow(cached.messages),
+        stale: cached.stale,
+      })
       setMessages(cached.messages)
       setChatSnapshot(null) // will be replaced when snapshot arrives
       setChatReady(true)    // show stale content immediately
@@ -654,30 +730,85 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     const buffer: TranscriptEntry[] = []
     const chatId = activeChatId
 
-    function flushTail(entries: TranscriptEntry[]) {
+    function flushTail(entries: TranscriptEntry[], source: "fetched" | "fallback_empty") {
       if (cancelled) return
       initialFetchDone = true
-      const allEntries = buffer.length > 0 ? [...entries, ...buffer] : entries
+      const bufferedEntries = buffer.length
+      const allEntries = bufferedEntries > 0 ? [...entries, ...buffer] : entries
       buffer.length = 0
       // Only reset on fresh load — cache-restored hydrators skip duplicates via seenEntryIds
       if (!restoredFromCache) {
         hydrator.reset()
       }
       for (const entry of allEntries) hydrator.hydrate(entry)
-      setMessages(hydrator.getMessages())
+      const hydratedMessages = hydrator.getMessages()
+      setMessages(hydratedMessages)
+      logTinkariaState("transcript tail flushed", {
+        chatId,
+        source,
+        restoredFromCache,
+        fetchedEntryCount: entries.length,
+        bufferedEntryCount: bufferedEntries,
+        hydratedDiagnostics: summarizeTranscriptWindow(hydratedMessages),
+      })
     }
 
     async function fetchTail(messageCount: number) {
       if (fetchTriggered) return
       fetchTriggered = true
       try {
-        const offset = computeTailOffset(messageCount)
-        const entries = await socket.command<TranscriptEntry[]>({
+        let offset = computeTailOffset(messageCount)
+        let entries = await socket.command<TranscriptEntry[]>({
           type: "chat.getMessages", chatId, offset, limit: TRANSCRIPT_TAIL_SIZE,
         })
-        flushTail(entries)
-      } catch {
-        flushTail([])
+        let hydratedPreview = processTranscriptMessages(entries)
+
+        logTinkariaState("transcript tail fetched", {
+          chatId,
+          messageCount,
+          offset,
+          rawEntryCount: entries.length,
+          hydratedDiagnostics: summarizeTranscriptWindow(hydratedPreview),
+        })
+
+        while (shouldBackfillTranscriptWindow({
+          messages: hydratedPreview,
+          messageCount,
+          offset,
+        })) {
+          const nextOffset = Math.max(0, offset - TRANSCRIPT_TAIL_SIZE)
+          logTinkariaState("transcript tail needs backfill", {
+            chatId,
+            messageCount,
+            offset,
+            hydratedDiagnostics: summarizeTranscriptWindow(hydratedPreview),
+          })
+          const olderEntries = await socket.command<TranscriptEntry[]>({
+            type: "chat.getMessages",
+            chatId,
+            offset: nextOffset,
+            limit: offset - nextOffset,
+          })
+          if (olderEntries.length === 0) break
+          entries = [...olderEntries, ...entries]
+          offset = nextOffset
+          hydratedPreview = processTranscriptMessages(entries)
+          logTinkariaState("backfilling transcript window", {
+            chatId,
+            messageCount,
+            offset,
+            fetchedEntries: entries.length,
+            hydratedDiagnostics: summarizeTranscriptWindow(hydratedPreview),
+          })
+        }
+
+        flushTail(entries, "fetched")
+      } catch (error) {
+        logTinkariaState("transcript tail fetch failed", {
+          chatId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        flushTail([], "fallback_empty")
       }
     }
 

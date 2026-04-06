@@ -16,6 +16,9 @@ import {
   normalizeLocalFilePreviewErrorMessage,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
+  hasRenderableTranscriptHistory,
+  summarizeTranscriptWindow,
+  shouldBackfillTranscriptWindow,
   shouldAutoFollowTranscript,
   shouldRefreshStaleSessionOnResume,
   shouldStickToBottomOnComposerSubmit,
@@ -305,6 +308,149 @@ describe("computeTailOffset", () => {
 
   test("TRANSCRIPT_TAIL_SIZE is 200", () => {
     expect(TRANSCRIPT_TAIL_SIZE).toBe(200)
+  })
+})
+
+describe("hasRenderableTranscriptHistory", () => {
+  test("returns false for metadata-only transcript slices", () => {
+    const messages: HydratedTranscriptMessage[] = [
+      {
+        kind: "system_init",
+        id: "system-1",
+        timestamp: new Date(1).toISOString(),
+        provider: "codex",
+        model: "gpt-5",
+        tools: [],
+        agents: [],
+        slashCommands: [],
+        mcpServers: [],
+        hidden: false,
+      },
+      {
+        kind: "status",
+        id: "status-1",
+        timestamp: new Date(2).toISOString(),
+        status: "running",
+        hidden: false,
+      },
+    ]
+
+    expect(hasRenderableTranscriptHistory(messages)).toBe(false)
+  })
+
+  test("returns true when transcript slice includes conversation content", () => {
+    const messages: HydratedTranscriptMessage[] = [
+      {
+        kind: "status",
+        id: "status-1",
+        timestamp: new Date(1).toISOString(),
+        status: "running",
+        hidden: false,
+      },
+      {
+        kind: "assistant_text",
+        id: "assistant-1",
+        timestamp: new Date(2).toISOString(),
+        text: "Still here",
+        hidden: false,
+      },
+    ]
+
+    expect(hasRenderableTranscriptHistory(messages)).toBe(true)
+  })
+})
+
+describe("summarizeTranscriptWindow", () => {
+  test("splits renderable, hidden, status, and metadata-only messages", () => {
+    const messages: HydratedTranscriptMessage[] = [
+      {
+        kind: "system_init",
+        id: "system-1",
+        timestamp: new Date(1).toISOString(),
+        provider: "codex",
+        model: "gpt-5",
+        tools: [],
+        agents: [],
+        slashCommands: [],
+        mcpServers: [],
+        hidden: false,
+      },
+      {
+        kind: "status",
+        id: "status-1",
+        timestamp: new Date(2).toISOString(),
+        status: "running",
+        hidden: false,
+      },
+      {
+        kind: "assistant_text",
+        id: "assistant-1",
+        timestamp: new Date(3).toISOString(),
+        text: "Visible",
+        hidden: false,
+      },
+      {
+        kind: "assistant_text",
+        id: "assistant-hidden-1",
+        timestamp: new Date(4).toISOString(),
+        text: "Hidden",
+        hidden: true,
+      },
+    ]
+
+    expect(summarizeTranscriptWindow(messages)).toEqual({
+      totalCount: 4,
+      renderableCount: 1,
+      hiddenCount: 1,
+      statusCount: 1,
+      metadataOnlyCount: 2,
+    })
+  })
+})
+
+describe("shouldBackfillTranscriptWindow", () => {
+  test("backs up when tail slice has no renderable history and older entries exist", () => {
+    const messages: HydratedTranscriptMessage[] = [
+      {
+        kind: "status",
+        id: "status-1",
+        timestamp: new Date(1).toISOString(),
+        status: "running",
+        hidden: false,
+      },
+    ]
+
+    expect(shouldBackfillTranscriptWindow({
+      messages,
+      messageCount: 450,
+      offset: 250,
+    })).toBe(true)
+  })
+
+  test("does not backfill when already at the start of the transcript", () => {
+    expect(shouldBackfillTranscriptWindow({
+      messages: [],
+      messageCount: 50,
+      offset: 0,
+    })).toBe(false)
+  })
+
+  test("does not backfill when the current window already has transcript content", () => {
+    const messages: HydratedTranscriptMessage[] = [
+      {
+        kind: "assistant_text",
+        id: "assistant-1",
+        timestamp: new Date(1).toISOString(),
+        text: "Visible",
+        hidden: false,
+      },
+    ]
+
+    expect(shouldBackfillTranscriptWindow({
+      messages,
+      messageCount: 450,
+      offset: 250,
+    })).toBe(false)
   })
 })
 

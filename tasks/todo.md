@@ -1,5 +1,24 @@
 # Tinkaria Tasks
 
+## Completed: Blank Chat Transcript Backfill For Tool-Heavy Tails
+
+**Status**: Verified. Active chats no longer render as effectively blank when the latest raw transcript window is dominated by non-rendered entries such as tool results or status-only metadata.
+
+**Root cause**:
+1. `useTinkariaState` fetched a fixed raw tail window of 200 transcript entries and hydrated only that slice.
+2. Hydration intentionally drops `tool_result` rows and metadata-only entries, so a tool-heavy tail could collapse into no renderable history even though older visible conversation messages still existed.
+3. The chat page suppresses the generic empty state when sidebar metadata says the chat has history, so the result looked like a blank chat with only runtime status.
+
+**Fix**:
+1. Added a renderable-history heuristic for hydrated transcript windows.
+2. When the initial tail window hydrates to metadata/status only and older raw entries still exist, the client now backfills earlier transcript windows until it finds renderable history or reaches the start.
+3. Added focused regression coverage for the backfill decision logic.
+
+**Verified**:
+1. `bun test src/client/app/useTinkariaState.test.ts`
+2. `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+3. `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
+
 ## Completed: Kanna Residue Cleanup Pass
 
 **Status**: Verified. The remaining non-compatibility `Kanna`/`kanna` residue in active code and C3 has been reduced to intentional compatibility surfaces and historical docs/specs.
@@ -213,25 +232,44 @@
 
 ## Provisioned: Project-Bound Kit Execution Profiles
 
-**Status**: Design recorded, not implemented. Rewrote C3 ADR `adr-20260406-kit-isolation-by-project` in a simpler form: `kit` is the long-running execution daemon, and each kit can expose different agent settings while the hub stays the source of truth.
+**Status**: Design recorded, not implemented. Rewrote C3 ADR `adr-20260406-kit-isolation-by-project` around a resilient NATS-based model: `kit` is the long-running execution daemon, can expose different agent settings, and should survive temporary hub loss by replaying buffered events after reconnect.
 
 **Decision**:
 1. `kit` is the execution unit: a daemon connected to the hub that runs agent work.
 2. The minimal system can run with exactly one kit, representing the system-wide agent executor.
 3. Each kit can carry different agent settings such as system prompt, skills, tools, env/config roots, and provider-facing runtime behavior.
-4. The hub keeps transcripts, orchestration, approvals, and scheduling; kits do not own durable state.
-5. Long-running chats/sessions should stay on the same kit when possible; moving to a meaningfully different kit should start a fresh provider session.
+4. The hub keeps transcripts, orchestration, approvals, scheduling, and durable ingest of turn events; kits do not own durable state.
+5. On hub disconnect, kits keep active work running, stop accepting new work, buffer unacknowledged events locally, then re-register and replay after reconnect.
+6. Recovery relies on stable turn ids, per-turn sequence numbers, hub acknowledgements, and duplicate-safe ingest.
 
 **Why**:
 1. It keeps the hub small and conceptually clean: hub coordinates, kit executes.
 2. It supports both the smallest topology (`1 hub + 1 kit`) and future multi-kit setups with the same model.
 3. It gives us one obvious place to hang prompt/skill/tool/runtime differences instead of scattering them across hub code.
+4. It lets long-running turns survive hub restarts without making the kit the source of truth.
 
 **Next**:
 1. Extract the execution boundary from the current in-process agent runtime.
-2. Define a kit registration shape that includes its settings identity.
-3. Run one local kit daemon connected back to the hub.
-4. Route Codex work through that kit first while keeping transcript/orchestration truth in the hub.
+2. Define the NATS protocol first: `kit.register`, `kit.heartbeat`, `turn.start`, `turn.event`, `turn.complete`, recovery/replay, and hub acknowledgements.
+3. Add per-turn sequence numbers and duplicate-safe hub ingest before relying on recovery.
+4. Implement one local kit daemon with a bounded recovery journal.
+5. Route Codex work through that kit first while keeping transcript/orchestration truth in the hub.
+
+**RED-GREEN Dev Plan**:
+1. `src/shared/protocol.ts`, `src/shared/nats-subjects.ts`, new tests:
+   Add kit protocol types and subject helpers first. Cover registration, heartbeat, replay, ack, and turn envelope shapes with shared-level tests.
+2. New pure state modules under `src/server/` with tests first:
+   Create a hub-side recovery reducer and a kit-side recovery/journal reducer with no NATS dependency. Test duplicate replay, seq gaps, ack regression, reconnect, and recovery window compaction here before wiring transports.
+3. `src/server/events.ts` and `src/server/event-store.ts`, with `src/server/event-store.test.ts`:
+   Extend persisted turn state to track resilient turn metadata such as stable `turnId`, applied sequence progress, and replay-safe ingest markers. Make the store reject or no-op bad ordering explicitly.
+4. `src/server/nats-responders.ts`, `src/server/nats-publisher.ts`, `src/shared/nats-subjects.ts`, with focused NATS tests:
+   Add hub-side NATS handlers for kit register/heartbeat and turn ack/recovery flows. Keep the existing transport as the only wire.
+5. New kit runtime module and tests:
+   Add a local kit daemon bootstrap plus bounded recovery journal. Test disconnect, continue-running behavior, reconnect, and replay from last ack.
+6. `src/server/agent.ts`, `src/server/codex-app-server.ts`, and provider-facing tests:
+   Extract the execution boundary so Codex turns can route through the kit while Claude remains in-process initially.
+7. End-to-end NATS integration tests:
+   Prove one active turn survives hub loss, re-registers, replays safely, and lands in the correct final transcript order.
 
 ## Completed: Chat File Preview Uses Rich Content Overlay
 
