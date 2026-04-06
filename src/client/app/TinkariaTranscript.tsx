@@ -2,6 +2,8 @@ import React, { useMemo, type RefObject } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import type { AskUserQuestionItem, ProcessedToolCall } from "../components/messages/types"
 import type { AskUserQuestionAnswerMap, HydratedTranscriptMessage } from "../../shared/types"
+import { useMessageHeights } from "../lib/useMessageHeights"
+import type { RenderItem } from "../lib/messageHeights"
 import { UserMessage } from "../components/messages/UserMessage"
 import { RawJsonMessage } from "../components/messages/RawJsonMessage"
 import { SystemMessage } from "../components/messages/SystemMessage"
@@ -21,10 +23,6 @@ import { CollapsedToolGroup } from "../components/messages/CollapsedToolGroup"
 import { OpenLocalLinkProvider } from "../components/messages/shared"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
 import { SPECIAL_TOOL_NAMES } from "./derived"
-
-type RenderItem =
-  | { type: "single"; message: HydratedTranscriptMessage; index: number }
-  | { type: "tool-group"; messages: HydratedTranscriptMessage[]; startIndex: number }
 
 function isCollapsibleToolCall(message: HydratedTranscriptMessage) {
   if (message.kind !== "tool") return false
@@ -102,10 +100,12 @@ export function TinkariaTranscript({
 
   const renderItems = useMemo(() => groupMessages(messages), [messages])
 
+  const { estimateSize } = useMessageHeights(renderItems, scrollRef)
+
   const virtualizer = useVirtualizer({
     count: renderItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 80,
+    estimateSize,
     overscan: 5,
   })
 

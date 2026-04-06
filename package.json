@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.91",
+    "@chenglou/pretext": "^0.0.4",
     "@lagz0ne/nats-embedded": "^0.3.1",
     "@nats-io/jetstream": "^3.3.1",
     "@nats-io/kv": "^3.3.1",
