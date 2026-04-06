@@ -14,6 +14,7 @@ import {
   getResumeRefreshSessionProjectIds,
   isChatRead,
   normalizeLocalFilePreviewErrorMessage,
+  shouldPersistReadFromViewport,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
   hasRenderableTranscriptHistory,
@@ -478,16 +479,6 @@ describe("getReadTimestampToPersistAfterReply", () => {
     expect(isChatRead(persistedReadAt ?? undefined, 11)).toBe(true)
     expect(getInitialChatScrollTarget({
       activeChatId: "chat-1",
-      runtime: {
-        chatId: "chat-1",
-        projectId: "project-1",
-        localPath: "/tmp/project-1",
-        title: "Chat 1",
-        status: "idle",
-        provider: "codex",
-        planMode: false,
-        sessionToken: null,
-      },
       sidebarReady: true,
       hasSidebarChat: true,
       isRead: isChatRead(persistedReadAt ?? undefined, 11),
@@ -500,48 +491,18 @@ describe("getReadTimestampToPersistAfterReply", () => {
 })
 
 describe("getInitialChatScrollTarget", () => {
-  test("waits for the runtime before deciding on an existing chat route", () => {
+  test("waits for the sidebar row before deciding whether the chat is read", () => {
     expect(getInitialChatScrollTarget({
       activeChatId: "chat-1",
-      runtime: null,
-      sidebarReady: true,
-      hasSidebarChat: true,
+      sidebarReady: false,
+      hasSidebarChat: false,
       isRead: false,
     })).toBe("wait")
   })
 
-  test("waits for the sidebar row before deciding whether the chat is read", () => {
+  test("opens unread chats at the top without waiting for runtime once the sidebar row is known", () => {
     expect(getInitialChatScrollTarget({
       activeChatId: "chat-1",
-      runtime: {
-        chatId: "chat-1",
-        projectId: "project-1",
-        localPath: "/tmp/project-1",
-        title: "Chat 1",
-        status: "idle",
-        provider: "codex",
-        planMode: false,
-        sessionToken: null,
-      },
-      sidebarReady: false,
-      hasSidebarChat: false,
-      isRead: true,
-    })).toBe("wait")
-  })
-
-  test("opens unread chats at the top once the runtime is ready", () => {
-    expect(getInitialChatScrollTarget({
-      activeChatId: "chat-1",
-      runtime: {
-        chatId: "chat-1",
-        projectId: "project-1",
-        localPath: "/tmp/project-1",
-        title: "Unread chat",
-        status: "idle",
-        provider: "codex",
-        planMode: false,
-        sessionToken: null,
-      },
       sidebarReady: true,
       hasSidebarChat: true,
       isRead: false,
@@ -551,20 +512,30 @@ describe("getInitialChatScrollTarget", () => {
   test("opens read chats at the bottom once the runtime is ready", () => {
     expect(getInitialChatScrollTarget({
       activeChatId: "chat-1",
-      runtime: {
-        chatId: "chat-1",
-        projectId: "project-1",
-        localPath: "/tmp/project-1",
-        title: "Read chat",
-        status: "idle",
-        provider: "claude",
-        planMode: false,
-        sessionToken: null,
-      },
       sidebarReady: true,
       hasSidebarChat: true,
       isRead: true,
     })).toBe("bottom")
+  })
+})
+
+describe("shouldPersistReadFromViewport", () => {
+  test("does not persist read state before the initial scroll target is applied", () => {
+    expect(shouldPersistReadFromViewport({
+      activeChatId: "chat-1",
+      initialScrollCompleted: false,
+      isAtBottom: true,
+      lastMessageAt: 11,
+    })).toBe(false)
+  })
+
+  test("persists read state once the transcript is settled at the bottom", () => {
+    expect(shouldPersistReadFromViewport({
+      activeChatId: "chat-1",
+      initialScrollCompleted: true,
+      isAtBottom: true,
+      lastMessageAt: 11,
+    })).toBe(true)
   })
 })
 

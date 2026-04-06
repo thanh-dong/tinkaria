@@ -18,7 +18,7 @@ import { useChatReadStateStore } from "../stores/chatReadStateStore"
 import { useRightSidebarStore } from "../stores/rightSidebarStore"
 import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
 import { useChatInputStore } from "../stores/chatInputStore"
-import type { ChatMessageEvent, ChatRuntime, ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
+import type { ChatMessageEvent, ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import type { AskUserQuestionItem } from "../components/messages/types"
 import { useAppDialog } from "../components/ui/app-dialog"
@@ -77,20 +77,24 @@ export function getReadTimestampToPersistAfterReply(lastSeenMessageAt?: number, 
 
 export function getInitialChatScrollTarget(args: {
   activeChatId: string | null
-  runtime: ChatRuntime | null
   sidebarReady: boolean
   hasSidebarChat: boolean
   isRead: boolean
 }): "wait" | "top" | "bottom" {
-  if (
-    args.activeChatId
-    && (
-      !args.runtime
-      || !args.sidebarReady
-      || !args.hasSidebarChat
-    )
-  ) return "wait"
+  if (args.activeChatId && (!args.sidebarReady || !args.hasSidebarChat)) return "wait"
   return args.isRead ? "bottom" : "top"
+}
+
+export function shouldPersistReadFromViewport(args: {
+  activeChatId: string | null
+  initialScrollCompleted: boolean
+  isAtBottom: boolean
+  lastMessageAt?: number
+}): boolean {
+  if (!args.activeChatId) return false
+  if (!args.initialScrollCompleted) return false
+  if (!args.isAtBottom) return false
+  return args.lastMessageAt !== undefined
 }
 
 function useTinkariaSocket(): TinkariaTransport {
@@ -964,7 +968,6 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
   const initialChatScrollTarget = getInitialChatScrollTarget({
     activeChatId,
-    runtime,
     sidebarReady,
     hasSidebarChat: hasResolvedActiveSidebarChat,
     isRead: activeChatIsRead,
@@ -1114,8 +1117,14 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   }, [activeChatId, isProcessing, resumeRefreshNonce, socket])
 
   useEffect(() => {
-    if (!activeChatId || !isAtBottom) return
+    if (!activeChatId) return
     const lastMessageAt = activeSidebarChat?.lastMessageAt
+    if (!shouldPersistReadFromViewport({
+      activeChatId,
+      initialScrollCompleted: initialScrollCompletedRef.current,
+      isAtBottom,
+      lastMessageAt,
+    })) return
     if (lastMessageAt === undefined) return
     markChatRead(activeChatId, lastMessageAt)
   }, [activeChatId, activeSidebarChat?.lastMessageAt, isAtBottom, markChatRead])

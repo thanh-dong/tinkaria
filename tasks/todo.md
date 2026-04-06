@@ -18,7 +18,9 @@ This file is a handoff, not a changelog. Keep only active work, blockers, and th
 
 - Codex runtime now crosses a real hub-to-kit seam with project-to-kit assignment.
 - Active chat navbar can now show status-bar style repo context: cwd basename, branch, and live git dirty counts, plus rough runtime/session usage badges.
+- Chat navbar no longer exposes the obsolete open-folder or diff/right-sidebar buttons; that area is now free for future reuse.
 - Transcript hydration now backfills older raw entries when a tool-heavy tail would otherwise render blank chat history.
+- Last-read transcript behavior now decides unread vs read scroll position from the sidebar row without waiting for runtime hydration, and refresh no longer auto-promotes the newest message to read before the initial scroll target settles.
 - Internal branding/transport cleanup is done for active codepaths: Tinkaria naming is primary, transport namespace is generic, and the stale `~/.kanna*` migration path is gone.
 - Session resume and active-chat navbar surfaces now expose runtime metadata already present in provider session logs.
 - Diashort links now prefer rich embed presentation, including direct embed rendering through `present_content` and assistant-text auto-upgrade for bare links.
