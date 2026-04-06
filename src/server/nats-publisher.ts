@@ -64,7 +64,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
   const sessionsPollTimers = new Map<string, ReturnType<typeof setInterval>>()
 
   function encodeClaudeProjectDir(projectPath: string): string {
-    return join(homedir(), ".claude", "projects", `-${projectPath.replace(/\//g, "-")}`)
+    return join(homedir(), ".claude", "projects", projectPath.replace(/\//g, "-"))
   }
 
   async function refreshSessions(projectId: string, projectPath: string): Promise<void> {
