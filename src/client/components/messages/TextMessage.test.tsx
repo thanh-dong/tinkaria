@@ -29,5 +29,20 @@ describe("TextMessage", () => {
 
     expect(html).toContain('href="https://diashort.apps.quickable.co/d/abc123"')
     expect(html).toContain("https://diashort.apps.quickable.co/d/abc123")
+    expect(html).toContain("Embedded Diagram")
+    expect(html).toContain('data-remote-embed="true"')
+    expect(html).toContain("diashort.apps.quickable.co/e/abc123")
+  })
+
+  test("deduplicates repeated diashort links into one embed card", () => {
+    const html = renderToStaticMarkup(
+      <TextMessage
+        message={createMessage(
+          "Same diagram twice: https://diashort.apps.quickable.co/d/abc123 and https://diashort.apps.quickable.co/d/abc123"
+        )}
+      />
+    )
+
+    expect(html.match(/Embedded Diagram/g)?.length).toBe(1)
   })
 })

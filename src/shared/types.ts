@@ -197,6 +197,24 @@ export interface DiscoveredSession {
   lastExchange: { question: string; answer: string } | null
   modifiedAt: number
   kannaChatId: string | null
+  runtime?: DiscoveredSessionRuntime
+}
+
+export interface DiscoveredSessionRuntime {
+  model?: string
+  tokenUsage?: DiscoveredSessionTokenUsage
+  usageBuckets?: DiscoveredSessionUsageBucket[]
+}
+
+export interface DiscoveredSessionTokenUsage {
+  totalTokens: number
+  contextWindow?: number
+  contextLeft?: number
+}
+
+export interface DiscoveredSessionUsageBucket {
+  label: string
+  usedPercent: number
 }
 
 export interface SessionsSnapshot {
@@ -646,6 +664,10 @@ export interface ChatSnapshot {
   runtime: ChatRuntime
   messageCount: number
   availableProviders: ProviderCatalogEntry[]
+}
+
+export interface CurrentSessionSnapshot {
+  runtime: DiscoveredSessionRuntime | null
 }
 
 export interface ChatMessageEvent {

@@ -21,6 +21,18 @@ const mockSessions: DiscoveredSession[] = [
     lastExchange: { question: "Add unit tests for login", answer: "Here are the tests" },
     modifiedAt: Date.now() - 7200_000,
     kannaChatId: null,
+    runtime: {
+      model: "gpt-5.4",
+      tokenUsage: {
+        totalTokens: 4312,
+        contextWindow: 272000,
+        contextLeft: 267688,
+      },
+      usageBuckets: [
+        { label: "5h", usedPercent: 13 },
+        { label: "7d", usedPercent: 7 },
+      ],
+    },
   },
 ]
 
@@ -41,6 +53,27 @@ describe("SessionPickerContent", () => {
 
     expect(html).toContain("Fix auth bug")
     expect(html).toContain("Add unit tests for login")
+  })
+
+  test("renders runtime session details when available", () => {
+    const html = renderToStaticMarkup(
+      <SessionPickerContent
+        sessions={mockSessions}
+        windowDays={7}
+        searchQuery=""
+        onSelectSession={() => {}}
+        onRefresh={() => {}}
+        onSearchChange={() => {}}
+        onShowMore={() => {}}
+        isRefreshing={false}
+      />
+    )
+
+    expect(html).toContain("gpt-5.4")
+    expect(html).toContain("4.3K used")
+    expect(html).toContain("267.7K left")
+    expect(html).toContain("5h 13%")
+    expect(html).toContain("7d 7%")
   })
 
   test("renders empty state when no sessions", () => {

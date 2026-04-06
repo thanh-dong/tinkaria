@@ -4,6 +4,7 @@ import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import type { DiscoveredSession } from "../../../shared/types"
+import { SessionRuntimeBadges } from "./SessionRuntimeBadges"
 
 // --- Helpers ---
 
@@ -187,6 +188,7 @@ export const SessionPickerContent = memo(function SessionPickerContent({
                   <span className="text-xs text-muted-foreground">
                     {relativeTime(session.modifiedAt)}
                   </span>
+                  <SessionRuntimeBadges session={session} />
                 </div>
               </button>
             ))}

@@ -2,7 +2,16 @@ import { readdir, readFile, stat, open } from "node:fs/promises"
 import { join, basename, extname } from "node:path"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import type { AgentProvider, AssistantTextEntry, DiscoveredSession, SessionsSnapshot, TranscriptEntry, UserPromptEntry } from "../shared/types"
+import type {
+  AgentProvider,
+  AssistantTextEntry,
+  DiscoveredSession,
+  DiscoveredSessionTokenUsage,
+  DiscoveredSessionUsageBucket,
+  SessionsSnapshot,
+  TranscriptEntry,
+  UserPromptEntry,
+} from "../shared/types"
 import type { EventStore } from "./event-store"
 
 const TAIL_BYTES = 32 * 1024
@@ -11,6 +20,113 @@ const TITLE_SCAN_LINES = 5
 interface LastExchange {
   question: string
   answer: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function normalizeString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined
+}
+
+function normalizeNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined
+}
+
+function parseJsonLine(line: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(line)
+    return isRecord(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function formatUsageBucketLabel(windowMinutes: number, fallback: string): string {
+  if (windowMinutes % (60 * 24) === 0) return `${windowMinutes / (60 * 24)}d`
+  if (windowMinutes % 60 === 0) return `${windowMinutes / 60}h`
+  return fallback
+}
+
+function extractClaudeRuntime(tailContent: string): DiscoveredSession["runtime"] | undefined {
+  const lines = tailContent.split("\n").filter(Boolean)
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const parsed = parseJsonLine(lines[index])
+    if (!parsed || normalizeString(parsed.type) !== "assistant") continue
+
+    const message = isRecord(parsed.message) ? parsed.message : null
+    const model = normalizeString(message?.model)
+    if (model) {
+      return { model }
+    }
+  }
+
+  return undefined
+}
+
+function extractCodexRuntime(tailContent: string): DiscoveredSession["runtime"] | undefined {
+  const lines = tailContent.split("\n").filter(Boolean)
+  let model: string | undefined
+  let tokenUsage: DiscoveredSessionTokenUsage | undefined
+  let usageBuckets: DiscoveredSessionUsageBucket[] | undefined
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const parsed = parseJsonLine(lines[index])
+    if (!parsed) continue
+
+    const type = normalizeString(parsed.type)
+    if (!model && type === "turn_context") {
+      const payload = isRecord(parsed.payload) ? parsed.payload : null
+      model = normalizeString(payload?.model)
+      continue
+    }
+
+    if ((tokenUsage || usageBuckets) || type !== "event_msg") continue
+
+    const payload = isRecord(parsed.payload) ? parsed.payload : null
+    if (normalizeString(payload?.type) !== "token_count") continue
+
+    const info = isRecord(payload?.info) ? payload.info : null
+    const totalTokenUsage = isRecord(info?.total_token_usage) ? info.total_token_usage : null
+    const totalTokens = normalizeNumber(totalTokenUsage?.total_tokens)
+    const contextWindow = normalizeNumber(info?.model_context_window)
+
+    if (totalTokens !== undefined) {
+      tokenUsage = {
+        totalTokens,
+        ...(contextWindow !== undefined ? { contextWindow } : {}),
+        ...(contextWindow !== undefined ? { contextLeft: Math.max(contextWindow - totalTokens, 0) } : {}),
+      }
+    }
+
+    const rateLimits = isRecord(payload?.rate_limits) ? payload.rate_limits : null
+    if (rateLimits) {
+      const buckets: DiscoveredSessionUsageBucket[] = []
+      for (const [key, labelFallback] of [["primary", "5h"], ["secondary", "7d"]] as const) {
+        const bucket = isRecord(rateLimits[key]) ? rateLimits[key] : null
+        const usedPercent = normalizeNumber(bucket?.used_percent)
+        if (usedPercent === undefined) continue
+        const windowMinutes = normalizeNumber(bucket?.window_minutes)
+        buckets.push({
+          label: windowMinutes !== undefined ? formatUsageBucketLabel(windowMinutes, labelFallback) : labelFallback,
+          usedPercent,
+        })
+      }
+      if (buckets.length > 0) {
+        usageBuckets = buckets
+      }
+    }
+  }
+
+  if (!model && !tokenUsage && !usageBuckets) return undefined
+
+  return {
+    ...(model ? { model } : {}),
+    ...(tokenUsage ? { tokenUsage } : {}),
+    ...(usageBuckets ? { usageBuckets } : {}),
+  }
 }
 
 function extractLastExchange(tailContent: string): LastExchange | null {
@@ -103,6 +219,20 @@ async function readTail(filePath: string, bytes: number): Promise<string> {
   }
 }
 
+async function inspectSessionRuntimeFile(
+  filePath: string,
+  provider: AgentProvider
+): Promise<DiscoveredSession["runtime"] | null> {
+  const tailContent = await readTail(filePath, TAIL_BYTES)
+  if (provider === "claude") {
+    return extractClaudeRuntime(tailContent) ?? null
+  }
+  if (provider === "codex") {
+    return extractCodexRuntime(tailContent) ?? null
+  }
+  return null
+}
+
 async function readHead(filePath: string, lineCount: number): Promise<string[]> {
   const fh = await open(filePath, "r")
   try {
@@ -143,6 +273,7 @@ export async function scanClaudeSessions(
 
     const titleCandidate = extractTitleCandidate(headLines)
     const lastExchange = extractLastExchange(tailContent)
+    const runtime = extractClaudeRuntime(tailContent)
 
     sessions.push({
       sessionId,
@@ -152,6 +283,7 @@ export async function scanClaudeSessions(
       lastExchange,
       modifiedAt,
       kannaChatId: null,
+      ...(runtime ? { runtime } : {}),
     })
   }
 
@@ -206,6 +338,7 @@ export async function scanCodexSessions(
     const modifiedAt = meta.timestamp ?? fileStat.mtimeMs
     const tailContent = await readTail(filePath, TAIL_BYTES)
     const lastExchange = extractLastExchange(tailContent)
+    const runtime = extractCodexRuntime(tailContent)
 
     const titleLines = await readHead(filePath, TITLE_SCAN_LINES + 1)
     const titleCandidate = extractTitleCandidate(titleLines.slice(1))
@@ -218,6 +351,7 @@ export async function scanCodexSessions(
       lastExchange,
       modifiedAt,
       kannaChatId: null,
+      ...(runtime ? { runtime } : {}),
     })
   }
 
@@ -344,6 +478,16 @@ export async function findSessionFile(
   }
 
   return null
+}
+
+export async function inspectSessionRuntime(
+  sessionId: string,
+  provider: AgentProvider,
+  projectPath: string
+): Promise<DiscoveredSession["runtime"] | null> {
+  const filePath = await findSessionFile(sessionId, provider, projectPath)
+  if (!filePath) return null
+  return inspectSessionRuntimeFile(filePath, provider)
 }
 
 export async function importCliTranscript(

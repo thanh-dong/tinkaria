@@ -47,6 +47,28 @@ describe("scanClaudeSessions", () => {
     expect(sessions[0].lastExchange!.question).toContain("add tests")
     expect(sessions[0].lastExchange!.answer).toContain("tests")
     expect(sessions[0].kannaChatId).toBeNull()
+    expect(sessions[0].runtime?.model).toBeUndefined()
+  })
+
+  test("extracts the last Claude model when assistant usage metadata is present", async () => {
+    const claudeDir = await makeTempDir()
+    const sessionFile = join(claudeDir, "with-model.jsonl")
+
+    await writeFile(sessionFile, [
+      JSON.stringify({ type: "user", message: { content: "hello" } }),
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          model: "claude-opus-4-6",
+          content: [{ type: "text", text: "done" }],
+          usage: { input_tokens: 10, output_tokens: 20 },
+        },
+      }),
+    ].join("\n") + "\n")
+
+    const sessions = await scanClaudeSessions(claudeDir)
+
+    expect(sessions[0].runtime?.model).toBe("claude-opus-4-6")
   })
 
   test("skips directories with same UUID names", async () => {
@@ -81,8 +103,23 @@ describe("scanCodexSessions", () => {
     const matchFile = join(dateDir, "session-match.jsonl")
     const matchLines = [
       JSON.stringify({ type: "session_meta", payload: { id: "sess-1", cwd: projectPath, timestamp: Date.now() } }),
+      JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.4" } }),
       JSON.stringify({ type: "user", message: { content: "Fix the tests" } }),
       JSON.stringify({ type: "assistant", message: { content: "Done." } }),
+      JSON.stringify({
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: {
+            total_token_usage: { total_tokens: 4312 },
+            model_context_window: 272000,
+          },
+          rate_limits: {
+            primary: { used_percent: 13, window_minutes: 300 },
+            secondary: { used_percent: 7, window_minutes: 10080 },
+          },
+        },
+      }),
     ]
     await writeFile(matchFile, matchLines.join("\n") + "\n")
 
@@ -101,6 +138,18 @@ describe("scanCodexSessions", () => {
     expect(sessions[0].provider).toBe("codex")
     expect(sessions[0].source).toBe("cli")
     expect(sessions[0].lastExchange!.question).toContain("Fix the tests")
+    expect(sessions[0].runtime).toEqual({
+      model: "gpt-5.4",
+      tokenUsage: {
+        totalTokens: 4312,
+        contextWindow: 272000,
+        contextLeft: 267688,
+      },
+      usageBuckets: [
+        { label: "5h", usedPercent: 13 },
+        { label: "7d", usedPercent: 7 },
+      ],
+    })
   })
 
   test("returns empty array for nonexistent directory", async () => {
