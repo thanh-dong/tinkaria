@@ -5,6 +5,7 @@ import {
   PROVIDERS,
   type AgentProvider,
   type AskUserQuestionAnswerMap,
+  type CurrentRepoStatusSnapshot,
   type CurrentSessionSnapshot,
   type ModelOptions,
   type ProviderCatalogEntry,
@@ -412,6 +413,7 @@ export interface TinkariaState {
   latestToolIds: ReturnType<typeof getLatestToolIds>
   runtime: ChatSnapshot["runtime"] | null
   currentSessionRuntime: CurrentSessionSnapshot["runtime"]
+  currentRepoStatus: CurrentRepoStatusSnapshot | null
   currentAccountInfo: Extract<HydratedTranscriptMessage, { kind: "account_info" }>["accountInfo"] | null
   availableProviders: ProviderCatalogEntry[]
   isProcessing: boolean
@@ -480,6 +482,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [updateSnapshot, setUpdateSnapshot] = useState<UpdateSnapshot | null>(null)
   const [chatSnapshot, setChatSnapshot] = useState<ChatSnapshot | null>(null)
   const [currentSessionRuntime, setCurrentSessionRuntime] = useState<CurrentSessionSnapshot["runtime"]>(null)
+  const [currentRepoStatus, setCurrentRepoStatus] = useState<CurrentRepoStatusSnapshot | null>(null)
   const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
   const [messages, setMessages] = useState<HydratedTranscriptMessage[]>([])
   const messagesRef = useRef<HydratedTranscriptMessage[]>(messages)
@@ -1068,6 +1071,49 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   }, [activeChatId, activeChatSnapshot?.runtime.provider, activeChatSnapshot?.runtime.sessionToken, isProcessing, resumeRefreshNonce, socket])
 
   useEffect(() => {
+    if (!activeChatId) {
+      setCurrentRepoStatus(null)
+      return
+    }
+
+    const chatId = activeChatId
+    let cancelled = false
+
+    async function refreshCurrentRepoStatus() {
+      try {
+        const result = await socket.command<{ repoStatus: CurrentRepoStatusSnapshot | null }>({
+          type: "chat.getRepoStatus",
+          chatId,
+        })
+        if (!cancelled) {
+          setCurrentRepoStatus(result.repoStatus)
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentRepoStatus(null)
+        }
+      }
+    }
+
+    void refreshCurrentRepoStatus()
+
+    if (!isProcessing) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const interval = window.setInterval(() => {
+      void refreshCurrentRepoStatus()
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [activeChatId, isProcessing, resumeRefreshNonce, socket])
+
+  useEffect(() => {
     if (!activeChatId || !isAtBottom) return
     const lastMessageAt = activeSidebarChat?.lastMessageAt
     if (lastMessageAt === undefined) return
@@ -1580,6 +1626,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     latestToolIds,
     runtime,
     currentSessionRuntime,
+    currentRepoStatus,
     currentAccountInfo,
     availableProviders,
     isProcessing,

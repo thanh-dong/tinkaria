@@ -26,7 +26,7 @@ const mockSessions: DiscoveredSession[] = [
       tokenUsage: {
         totalTokens: 4312,
         contextWindow: 272000,
-        contextLeft: 267688,
+        estimatedContextPercent: 16,
       },
       usageBuckets: [
         { label: "5h", usedPercent: 13 },
@@ -70,8 +70,8 @@ describe("SessionPickerContent", () => {
     )
 
     expect(html).toContain("gpt-5.4")
+    expect(html).toContain("~16% ctx")
     expect(html).toContain("4.3K used")
-    expect(html).toContain("267.7K left")
     expect(html).toContain("5h 13%")
     expect(html).toContain("7d 7%")
   })

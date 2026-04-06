@@ -5,7 +5,7 @@ import { CardHeader } from "../ui/card"
 import { HotkeyTooltip, HotkeyTooltipContent, HotkeyTooltipTrigger } from "../ui/tooltip"
 import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
-import type { AccountInfo, DiscoveredSessionRuntime } from "../../../shared/types"
+import type { AccountInfo, CurrentRepoStatusSnapshot, DiscoveredSessionRuntime } from "../../../shared/types"
 import { getRuntimeLabels } from "./SessionRuntimeBadges"
 
 interface Props {
@@ -24,7 +24,41 @@ interface Props {
   terminalShortcut?: string[]
   rightSidebarShortcut?: string[]
   currentSessionRuntime?: DiscoveredSessionRuntime | null
+  currentRepoStatus?: CurrentRepoStatusSnapshot | null
   accountInfo?: AccountInfo | null
+}
+
+function getPathLabel(localPath: string | undefined, repoStatus: CurrentRepoStatusSnapshot | null | undefined): string | null {
+  const source = repoStatus?.localPath ?? localPath
+  if (!source) return null
+  const parts = source.split("/").filter(Boolean)
+  return parts.length > 0 ? parts[parts.length - 1] : source
+}
+
+function getRepoLabels(repoStatus: CurrentRepoStatusSnapshot | null | undefined): string[] {
+  if (!repoStatus) return []
+
+  const labels: string[] = []
+  if (repoStatus.branch) {
+    let branchLabel = repoStatus.branch
+    if (repoStatus.ahead > 0 || repoStatus.behind > 0) {
+      const parts = []
+      if (repoStatus.ahead > 0) parts.push(`+${repoStatus.ahead}`)
+      if (repoStatus.behind > 0) parts.push(`-${repoStatus.behind}`)
+      branchLabel += ` ${parts.join("/")}`
+    }
+    labels.push(branchLabel)
+  }
+
+  if (repoStatus.isRepo) {
+    const dirtyParts = []
+    if (repoStatus.stagedCount > 0) dirtyParts.push(`S${repoStatus.stagedCount}`)
+    if (repoStatus.unstagedCount > 0) dirtyParts.push(`M${repoStatus.unstagedCount}`)
+    if (repoStatus.untrackedCount > 0) dirtyParts.push(`?${repoStatus.untrackedCount}`)
+    labels.push(dirtyParts.length > 0 ? dirtyParts.join(" ") : "clean")
+  }
+
+  return labels
 }
 
 export function ChatNavbar({
@@ -43,6 +77,7 @@ export function ChatNavbar({
   terminalShortcut,
   rightSidebarShortcut,
   currentSessionRuntime,
+  currentRepoStatus,
   accountInfo,
 }: Props) {
   const navbarAreaId = createUiIdentity("chat.navbar", "area")
@@ -50,6 +85,8 @@ export function ChatNavbar({
   const terminalToggleActionId = createUiIdentity("chat.navbar.terminal-toggle", "action")
   const rightSidebarToggleActionId = createUiIdentity("chat.navbar.right-sidebar-toggle", "action")
   const currentSessionLabels = [
+    ...(getPathLabel(localPath, currentRepoStatus) ? [getPathLabel(localPath, currentRepoStatus)!] : []),
+    ...getRepoLabels(currentRepoStatus),
     ...(accountInfo?.subscriptionType ? [accountInfo.subscriptionType] : []),
     ...getRuntimeLabels(currentSessionRuntime ?? null),
   ]

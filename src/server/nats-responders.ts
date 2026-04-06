@@ -14,6 +14,7 @@ import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
 import { findSessionFile, importCliTranscript } from "./session-discovery"
 import { inspectSessionRuntime } from "./session-discovery"
+import { readRepoStatus } from "./repo-status"
 
 const encoder = new TextEncoder()
 const MAX_LOCAL_FILE_PREVIEW_BYTES = 256 * 1024
@@ -48,6 +49,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "system.readLocalFilePreview",
   "chat.getMessages",
   "chat.getSessionRuntime",
+  "chat.getRepoStatus",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
   "sessions.refresh",
@@ -70,6 +72,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.cancel",
   "chat.respondTool",
   "chat.getSessionRuntime",
+  "chat.getRepoStatus",
   "terminal.create",
   "terminal.input",
   "terminal.resize",
@@ -259,6 +262,20 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         }
         return {
           runtime: await inspectSessionRuntime(chat.sessionToken, chat.provider, project.localPath),
+        }
+      }
+
+      case "chat.getRepoStatus": {
+        const chat = store.getChat(command.chatId)
+        if (!chat) {
+          return { repoStatus: null }
+        }
+        const project = store.getProject(chat.projectId)
+        if (!project) {
+          return { repoStatus: null }
+        }
+        return {
+          repoStatus: await readRepoStatus(project.localPath),
         }
       }
 

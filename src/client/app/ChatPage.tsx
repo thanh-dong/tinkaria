@@ -312,6 +312,7 @@ export function ChatPage() {
           onNewChat={state.handleCompose}
           localPath={state.navbarLocalPath}
           currentSessionRuntime={state.currentSessionRuntime}
+          currentRepoStatus={state.currentRepoStatus}
           accountInfo={state.currentAccountInfo}
           rightSidebarVisible={showRightSidebar}
           onToggleRightSidebar={projectId ? () => toggleRightSidebar(projectId) : undefined}

@@ -92,12 +92,20 @@ function extractCodexRuntime(tailContent: string): DiscoveredSession["runtime"] 
     const totalTokenUsage = isRecord(info?.total_token_usage) ? info.total_token_usage : null
     const totalTokens = normalizeNumber(totalTokenUsage?.total_tokens)
     const contextWindow = normalizeNumber(info?.model_context_window)
+    const lastTokenUsage = isRecord(info?.last_token_usage) ? info.last_token_usage : null
+    const lastTokens = normalizeNumber(lastTokenUsage?.total_tokens)
+    const estimatedContextPercent = contextWindow !== undefined
+      ? Math.min(100, Math.round(((lastTokens ?? totalTokens ?? 0) / contextWindow) * 100))
+      : undefined
 
     if (totalTokens !== undefined) {
       tokenUsage = {
         totalTokens,
         ...(contextWindow !== undefined ? { contextWindow } : {}),
-        ...(contextWindow !== undefined ? { contextLeft: Math.max(contextWindow - totalTokens, 0) } : {}),
+        ...(contextWindow !== undefined && totalTokens <= contextWindow
+          ? { contextLeft: Math.max(contextWindow - totalTokens, 0) }
+          : {}),
+        ...(estimatedContextPercent !== undefined ? { estimatedContextPercent } : {}),
       }
     }
 
@@ -236,9 +244,25 @@ async function inspectSessionRuntimeFile(
 async function readHead(filePath: string, lineCount: number): Promise<string[]> {
   const fh = await open(filePath, "r")
   try {
-    const buffer = Buffer.alloc(4096)
-    const { bytesRead } = await fh.read(buffer, 0, 4096, 0)
-    const content = buffer.subarray(0, bytesRead).toString("utf-8")
+    const chunkSize = 4096
+    const chunks: Buffer[] = []
+    let position = 0
+    let newlineCount = 0
+
+    while (newlineCount < lineCount) {
+      const buffer = Buffer.alloc(chunkSize)
+      const { bytesRead } = await fh.read(buffer, 0, chunkSize, position)
+      if (bytesRead === 0) break
+      const chunk = buffer.subarray(0, bytesRead)
+      chunks.push(chunk)
+      position += bytesRead
+
+      for (const byte of chunk) {
+        if (byte === 10) newlineCount += 1
+      }
+    }
+
+    const content = Buffer.concat(chunks).toString("utf-8")
     return content.split("\n").slice(0, lineCount)
   } finally {
     await fh.close()
@@ -395,7 +419,12 @@ export function mergeSessions(
   }
 
   for (const session of tinkariaSessions) {
-    bySessionId.set(session.sessionId, session)
+    const existing = bySessionId.get(session.sessionId)
+    bySessionId.set(session.sessionId, {
+      ...session,
+      ...(existing?.lastExchange && !session.lastExchange ? { lastExchange: existing.lastExchange } : {}),
+      ...(existing?.runtime && !session.runtime ? { runtime: existing.runtime } : {}),
+    })
   }
 
   return [...bySessionId.values()].sort((a, b) => b.modifiedAt - a.modifiedAt)
@@ -442,7 +471,7 @@ export async function discoverSessions(
 }
 
 function encodeClaudeProjectDir(projectPath: string): string {
-  return join(homedir(), ".claude", "projects", `-${projectPath.replace(/\//g, "-")}`)
+  return join(homedir(), ".claude", "projects", projectPath.replace(/\//g, "-"))
 }
 
 export async function findSessionFile(

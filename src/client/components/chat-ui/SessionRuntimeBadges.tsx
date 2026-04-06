@@ -14,6 +14,10 @@ export function getRuntimeLabels(runtime: DiscoveredSessionRuntime | null | unde
     labels.push(runtime.model)
   }
 
+  if (runtime?.tokenUsage?.estimatedContextPercent !== undefined) {
+    labels.push(`~${runtime.tokenUsage.estimatedContextPercent}% ctx`)
+  }
+
   if (runtime?.tokenUsage?.totalTokens !== undefined) {
     labels.push(`${formatCompactNumber(runtime.tokenUsage.totalTokens)} used`)
   }

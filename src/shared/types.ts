@@ -210,6 +210,7 @@ export interface DiscoveredSessionTokenUsage {
   totalTokens: number
   contextWindow?: number
   contextLeft?: number
+  estimatedContextPercent?: number
 }
 
 export interface DiscoveredSessionUsageBucket {
@@ -632,6 +633,17 @@ export interface ChatSnapshot {
 
 export interface CurrentSessionSnapshot {
   runtime: DiscoveredSessionRuntime | null
+}
+
+export interface CurrentRepoStatusSnapshot {
+  localPath: string
+  branch: string | null
+  stagedCount: number
+  unstagedCount: number
+  untrackedCount: number
+  ahead: number
+  behind: number
+  isRepo: boolean
 }
 
 export interface ChatMessageEvent {

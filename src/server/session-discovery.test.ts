@@ -112,6 +112,7 @@ describe("scanCodexSessions", () => {
           type: "token_count",
           info: {
             total_token_usage: { total_tokens: 4312 },
+            last_token_usage: { total_tokens: 2160 },
             model_context_window: 272000,
           },
           rate_limits: {
@@ -144,12 +145,53 @@ describe("scanCodexSessions", () => {
         totalTokens: 4312,
         contextWindow: 272000,
         contextLeft: 267688,
+        estimatedContextPercent: 1,
       },
       usageBuckets: [
         { label: "5h", usedPercent: 13 },
         { label: "7d", usedPercent: 7 },
       ],
     })
+  })
+
+  test("reads long session_meta lines without truncating JSON", async () => {
+    const sessionsDir = await makeTempDir()
+    const dateDir = join(sessionsDir, "2026", "04", "06")
+    await mkdir(dateDir, { recursive: true })
+
+    const projectPath = "/home/user/dev/kanna"
+    const longInstructions = "x".repeat(12_000)
+    const sessionFile = join(dateDir, "session-long-meta.jsonl")
+
+    await writeFile(sessionFile, [
+      JSON.stringify({
+        type: "session_meta",
+        payload: {
+          id: "sess-long",
+          cwd: projectPath,
+          timestamp: Date.now(),
+          base_instructions: { text: longInstructions },
+        },
+      }),
+      JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.4" } }),
+      JSON.stringify({
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: {
+            total_token_usage: { total_tokens: 8000 },
+            last_token_usage: { total_tokens: 52000 },
+            model_context_window: 256000,
+          },
+        },
+      }),
+    ].join("\n") + "\n")
+
+    const sessions = await scanCodexSessions(sessionsDir, projectPath)
+
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0].sessionId).toBe("sess-long")
+    expect(sessions[0].runtime?.tokenUsage?.estimatedContextPercent).toBe(20)
   })
 
   test("returns empty array for nonexistent directory", async () => {
@@ -193,6 +235,13 @@ describe("mergeSessions", () => {
         lastExchange: { question: "q", answer: "a" },
         modifiedAt: 1000,
         chatId: null,
+        runtime: {
+          model: "gpt-5.4",
+          tokenUsage: {
+            totalTokens: 4312,
+            estimatedContextPercent: 18,
+          },
+        },
       },
     ]
     const tinkariaSessions: DiscoveredSession[] = [
@@ -212,6 +261,7 @@ describe("mergeSessions", () => {
     expect(merged).toHaveLength(1)
     expect(merged[0].source).toBe("tinkaria")
     expect(merged[0].chatId).toBe("chat-123")
+    expect(merged[0].runtime?.tokenUsage?.estimatedContextPercent).toBe(18)
   })
 
   test("sorts by modifiedAt descending", () => {

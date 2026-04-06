@@ -222,6 +222,39 @@ describe("nats-responders", () => {
     expect(changed).toBe(false)
   })
 
+  test("chat.getRepoStatus returns repo status for the active project", async () => {
+    tempDir = await mkdtemp(path.join(tmpdir(), "kanna-repo-status-"))
+    const { clientNc } = await setup({
+      store: {
+        ...createMockStore(),
+        getProject: (id: string) => (id === "proj-1" ? { id: "proj-1", localPath: tempDir! } : null),
+      } as never,
+    })
+
+    const res = await sendCommand(clientNc, { type: "chat.getRepoStatus", chatId: "chat-1" })
+
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual({
+      repoStatus: {
+        localPath: tempDir,
+        branch: null,
+        stagedCount: 0,
+        unstagedCount: 0,
+        untrackedCount: 0,
+        ahead: 0,
+        behind: 0,
+        isRepo: false,
+      },
+    })
+  })
+
+  test("chat.getRepoStatus does not trigger onStateChange", async () => {
+    let changed = false
+    const { clientNc } = await setup({ onStateChange: () => { changed = true } })
+    await sendCommand(clientNc, { type: "chat.getRepoStatus", chatId: "chat-1" })
+    expect(changed).toBe(false)
+  })
+
 
   test("update.check returns snapshot when manager exists", async () => {
     const { clientNc } = await setup()
