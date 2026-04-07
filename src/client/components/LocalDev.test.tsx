@@ -5,28 +5,10 @@ import {
   LocalDev,
   getLocalProjectsPageUiIdentityDescriptors,
   getLocalProjectsPageUiIdentities,
-  getHomepageProjectCounts,
   getHomepageRecentSessions,
   getSortedHomepageProjects,
 } from "./LocalDev"
 import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
-
-describe("getHomepageProjectCounts", () => {
-  test("summarizes saved and discovered project totals for the homepage overview", () => {
-    expect(getHomepageProjectCounts({
-      machine: { id: "local", displayName: "Local Projects" },
-      projects: [
-        { localPath: "/tmp/beta", title: "Beta", source: "saved", chatCount: 3, lastOpenedAt: 4 },
-        { localPath: "/tmp/alpha", title: "Alpha", source: "discovered", chatCount: 1, lastOpenedAt: 2 },
-        { localPath: "/tmp/gamma", title: "Gamma", source: "saved", chatCount: 0 },
-      ],
-    })).toEqual({
-      total: 3,
-      saved: 2,
-      discovered: 1,
-    })
-  })
-})
 
 describe("getSortedHomepageProjects", () => {
   test("orders homepage projects by most recently opened first", () => {
@@ -73,6 +55,26 @@ describe("getHomepageRecentSessions", () => {
       }]
     }).map((item) => item.session.sessionId)).toEqual(["beta-1", "alpha-1"])
   })
+
+  test("surfaces up to 5 recent sessions for the homepage", () => {
+    const sessions = getHomepageRecentSessions({
+      machine: { id: "local", displayName: "Local Projects" },
+      projects: [
+        { localPath: "/tmp/proj", title: "Proj", source: "saved", chatCount: 6, lastOpenedAt: 1 },
+      ],
+    }, () => Array.from({ length: 8 }, (_, i) => ({
+      sessionId: `s-${i}`,
+      provider: "claude" as const,
+      source: "tinkaria" as const,
+      title: `Session ${i}`,
+      lastExchange: null,
+      modifiedAt: 100 - i,
+      chatId: `chat-${i}`,
+    })))
+
+    expect(sessions).toHaveLength(5)
+    expect(sessions.map((s) => s.session.sessionId)).toEqual(["s-0", "s-1", "s-2", "s-3", "s-4"])
+  })
 })
 
 describe("LocalDev homepage", () => {
@@ -91,23 +93,26 @@ describe("LocalDev homepage", () => {
     })
   })
 
-  test("exposes stable ui identities for the homepage screen map", () => {
-    expect(getLocalProjectsPageUiIdentities()).toEqual({
+  test("exposes stable ui identities for the homepage screen map without stats", () => {
+    const identities = getLocalProjectsPageUiIdentities()
+
+    expect(identities).toEqual({
       page: "home.page",
       header: "home.header",
       status: "home.status",
       setup: "home.setup",
       recentSessions: "home.recent-sessions",
-      stats: "home.project-stats",
       workspaceGrid: "home.workspace-grid",
       addProjectAction: "home.add-project.action",
       projectCard: "home.project-card",
       recentSessionCard: "home.recent-session-card",
       newProjectDialog: "home.add-project.dialog",
     })
+
+    expect(identities).not.toHaveProperty("stats")
   })
 
-  test("welcomes the user back with recent sessions before project stats", () => {
+  test("renders session-centric homepage with compact session rows and no stats", () => {
     const html = renderToStaticMarkup(
       <TooltipProvider>
         <LocalDev
@@ -167,28 +172,25 @@ describe("LocalDev homepage", () => {
       </TooltipProvider>
     )
 
-    expect(html).toContain("Welcome back")
-    expect(html).toContain("Pick up where you left off")
+    // Session-centric: recent sessions section is present
     expect(html).toContain('data-ui-id="home.page"')
-    expect(html).toContain('data-ui-c3="c3-117"')
-    expect(html).toContain('data-ui-c3-label="projects"')
     expect(html).toContain('data-ui-id="home.header"')
     expect(html).toContain('data-ui-id="home.recent-sessions"')
-    expect(html).toContain('data-ui-id="home.project-stats"')
+    expect(html).toContain('data-ui-id="home.recent-session-card"')
+    expect(html).toContain("Fix homepage copy")
+    expect(html).toContain("Investigate desktop shell")
+
+    // Workspaces still present
     expect(html).toContain('data-ui-id="home.workspace-grid"')
     expect(html).toContain('data-ui-id="home.add-project.action"')
-    expect(html).toContain('data-ui-id="home.recent-session-card"')
     expect(html).toContain('data-ui-id="home.project-card"')
-    expect(html).toContain("Resume session")
-    expect(html).toContain("Fix homepage copy")
-    expect(html).toContain("Projects")
-    expect(html).toContain("Workspaces")
-    expect(html).toContain("Recent work first")
     expect(html).toContain("Alpha")
     expect(html).toContain("/workspace/alpha")
-    expect(html).toContain("Saved")
-    expect(html).toContain("2 chats")
-    expect(html).not.toContain("Overview")
-    expect(html).not.toContain("Desktop Smoke")
+
+    // Stats section is gone
+    expect(html).not.toContain('data-ui-id="home.project-stats"')
+    expect(html).not.toContain("Explicitly tracked projects")
+    expect(html).not.toContain("Projects picked up from usage")
+    expect(html).not.toContain("Workspaces available on this machine")
   })
 })

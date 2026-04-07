@@ -5,11 +5,11 @@ import {
   Copy,
   FolderOpen,
   Folder,
-  History,
   Loader2,
   Plus,
   Sparkles,
   SquarePen,
+  ArrowRight,
 } from "lucide-react"
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
 import type {
@@ -42,16 +42,6 @@ interface LocalDevProps {
   onResumeSession?: (projectId: string, session: DiscoveredSession) => Promise<void>
 }
 
-export function getHomepageProjectCounts(snapshot: LocalProjectsSnapshot | null) {
-  const projects = snapshot?.projects ?? []
-
-  return {
-    total: projects.length,
-    saved: projects.filter((project) => project.source === "saved").length,
-    discovered: projects.filter((project) => project.source === "discovered").length,
-  }
-}
-
 interface HomepageRecentSession {
   projectId: string
   projectTitle: string
@@ -81,11 +71,6 @@ const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
   }),
   recentSessions: createC3UiIdentityDescriptor({
     id: "home.recent-sessions",
-    c3ComponentId: "c3-117",
-    c3ComponentLabel: "projects",
-  }),
-  stats: createC3UiIdentityDescriptor({
-    id: "home.project-stats",
     c3ComponentId: "c3-117",
     c3ComponentLabel: "projects",
   }),
@@ -159,7 +144,7 @@ export function getHomepageRecentSessions(
       }))
     )
     .sort((left, right) => right.session.modifiedAt - left.session.modifiedAt)
-    .slice(0, 3)
+    .slice(0, 5)
 }
 
 export function getSortedHomepageProjects(snapshot: LocalProjectsSnapshot | null) {
@@ -173,10 +158,6 @@ export function getSortedHomepageProjects(snapshot: LocalProjectsSnapshot | null
 
     return left.title.localeCompare(right.title)
   })
-}
-
-function getProjectSourceLabel(source: "saved" | "discovered"): string {
-  return source === "saved" ? "Saved" : "Discovered"
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -223,26 +204,6 @@ function SectionHeader({ children }: { children: ReactNode }) {
   )
 }
 
-function StatCard({
-  eyebrow,
-  value,
-  detail,
-}: {
-  eyebrow: string
-  value: string
-  detail: string
-}) {
-  return (
-    <InfoCard>
-      <div className="space-y-1">
-        <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</div>
-        <div className="text-xl font-semibold text-foreground">{value}</div>
-        <div className="text-sm text-muted-foreground">{detail}</div>
-      </div>
-    </InfoCard>
-  )
-}
-
 function ActionCard({
   icon: Icon,
   title,
@@ -272,7 +233,7 @@ function ActionCard({
   )
 }
 
-function RecentSessionCard({
+function RecentSessionRow({
   item,
   onResume,
 }: {
@@ -280,36 +241,24 @@ function RecentSessionCard({
   onResume: () => void
 }) {
   return (
-    <InfoCard>
-      <div {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.recentSessionCard)}>
-        <div className="space-y-4">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl border border-border bg-background p-2">
-              <History className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="truncate font-medium text-foreground">{getSessionDisplayTitle(item.session)}</h3>
-                <span className="shrink-0 text-xs text-muted-foreground">{getRelativeTimeLabel(item.session.modifiedAt)}</span>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">Back to {item.projectTitle}</p>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full border border-border bg-background px-2 py-0.5">
-                  {item.session.provider}
-                </span>
-                <span className="rounded-full border border-border bg-background px-2 py-0.5">
-                  {item.session.source === "tinkaria" ? "Tinkaria" : "CLI"}
-                </span>
-              </div>
-              <SessionRuntimeBadges session={item.session} className="mt-2 flex flex-wrap gap-2" />
-            </div>
-          </div>
-          <Button onClick={onResume} className="w-full">
-            Resume session
-          </Button>
+    <button
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/50 transition-colors text-left group"
+      onClick={onResume}
+      {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.recentSessionCard)}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="font-medium text-sm text-foreground truncate">
+          {getSessionDisplayTitle(item.session)}
         </div>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-xs text-muted-foreground truncate">{item.projectTitle}</span>
+          <span className="text-xs text-muted-foreground/50">·</span>
+          <span className="text-xs text-muted-foreground shrink-0">{getRelativeTimeLabel(item.session.modifiedAt)}</span>
+        </div>
+        <SessionRuntimeBadges session={item.session} className="mt-1.5 flex flex-wrap gap-1.5" />
       </div>
-    </InfoCard>
+      <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+    </button>
   )
 }
 
@@ -358,7 +307,7 @@ function ProjectCard({
               </div>
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <span className="rounded-full border border-border bg-background px-2 py-0.5">
-                  {getProjectSourceLabel(source)}
+                  {source === "saved" ? "Saved" : "Discovered"}
                 </span>
                 <span className="rounded-full border border-border bg-background px-2 py-0.5">
                   {chatCount} {chatCount === 1 ? "chat" : "chats"}
@@ -389,7 +338,6 @@ export function LocalDev({
   const [newProjectOpen, setNewProjectOpen] = useState(false)
 
   const projects = useMemo(() => getSortedHomepageProjects(snapshot), [snapshot])
-  const projectCounts = useMemo(() => getHomepageProjectCounts(snapshot), [snapshot])
   const recentSessions = useMemo(
     () => getHomepageRecentSessions(snapshot, sessionsForProject),
     [snapshot, sessionsForProject]
@@ -469,22 +417,15 @@ export function LocalDev({
           <PageHeader
             uiId={LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.header}
             title={snapshot?.machine.displayName ?? "Local Projects"}
-            subtitle="Welcome back. Resume a session or jump into the right workspace."
           />
 
           <div className="w-full px-6 mb-10">
             {recentSessions.length > 0 ? (
               <div className="mb-10" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.recentSessions)}>
-                <SectionHeader>Welcome Back</SectionHeader>
-                <div className="mb-3">
-                  <h2 className="text-xl font-semibold text-foreground">Pick up where you left off</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Your latest sessions are first so you can get back to work without digging through stats.
-                  </p>
-                </div>
-                <div className="grid gap-3 lg:grid-cols-3">
+                <SectionHeader>Recent Sessions</SectionHeader>
+                <div className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden">
                   {recentSessions.map((item) => (
-                    <RecentSessionCard
+                    <RecentSessionRow
                       key={`${item.projectId}:${item.session.sessionId}`}
                       item={item}
                       onResume={() => {
@@ -496,21 +437,8 @@ export function LocalDev({
               </div>
             ) : null}
 
-            <div className="mb-10" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.stats)}>
-              <SectionHeader>Projects</SectionHeader>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard eyebrow="Projects" value={String(projectCounts.total)} detail="Workspaces available on this machine" />
-                <StatCard eyebrow="Saved" value={String(projectCounts.saved)} detail="Explicitly tracked projects" />
-                <StatCard eyebrow="Discovered" value={String(projectCounts.discovered)} detail="Projects picked up from usage" />
-                <StatCard eyebrow="Sessions" value={String(recentSessions.length)} detail="Recent resumable sessions surfaced first" />
-              </div>
-            </div>
-
             <div className="mb-3 flex items-baseline justify-between gap-4">
-              <div>
-                <h2 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider">Workspaces</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Recent work first, with enough context to choose the right place to continue.</p>
-              </div>
+              <SectionHeader>Workspaces</SectionHeader>
               <Button
                 variant="default"
                 size="sm"
