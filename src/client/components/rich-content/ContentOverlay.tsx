@@ -5,7 +5,7 @@ import {
 } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { cn } from "../../lib/utils"
-import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps, type UiIdentityDescriptor } from "../../lib/uiIdentityOverlay"
 import { useIsMobile } from "../../hooks/useIsMobile"
 import { ContentViewerContext, viewerReducer, createInitialState } from "./ContentViewerContext"
 import { ViewerToolbar } from "./ViewerToolbar"
@@ -18,6 +18,11 @@ const typeIcons: Record<RichContentType, typeof Code> = {
 
 const CONTENT_OVERLAY_INNER_CLASS_NAME = `${DIALOG_BODY_INSET_CLASS_NAME} pt-4`
 const CONTENT_OVERLAY_ROOT_UI_ID = "rich-content.viewer.area"
+const CONTENT_OVERLAY_ROOT_UI_DESCRIPTOR = createUiIdentityDescriptor({
+  id: CONTENT_OVERLAY_ROOT_UI_ID,
+  c3ComponentId: "c3-107",
+  c3ComponentLabel: "rich-content",
+})
 const DESKTOP_DIALOG_SIZE = "xl" as const
 
 const MOBILE_DIALOG_CLASSES =
@@ -30,10 +35,10 @@ interface ContentOverlayProps {
   type: RichContentType
   children: ReactNode
   rawContent?: string
-  rootUiId?: string
+  rootUiId?: string | UiIdentityDescriptor
 }
 
-function getContentOverlayUiIdentityProps(rootUiId = CONTENT_OVERLAY_ROOT_UI_ID) {
+function getContentOverlayUiIdentityProps(rootUiId: string | UiIdentityDescriptor = CONTENT_OVERLAY_ROOT_UI_DESCRIPTOR) {
   return getUiIdentityAttributeProps(rootUiId)
 }
 

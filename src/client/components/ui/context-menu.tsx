@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu"
-import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { getUiIdentityAttributeProps, type UiIdentityDescriptor } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 
 const ContextMenu = ContextMenuPrimitive.Root
@@ -8,10 +8,10 @@ const ContextMenu = ContextMenuPrimitive.Root
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger
 
 interface ContextMenuContentProps extends React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content> {
-  uiId?: string
+  uiId?: string | UiIdentityDescriptor
 }
 
-export function getContextMenuContentUiIdentityProps(uiId?: string) {
+export function getContextMenuContentUiIdentityProps(uiId?: string | UiIdentityDescriptor) {
   return uiId ? getUiIdentityAttributeProps(uiId) : {}
 }
 

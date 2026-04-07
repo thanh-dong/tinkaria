@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { DEFAULT_NEW_PROJECT_ROOT } from "../../shared/branding"
+import { getUiIdentityAttributeProps, type UiIdentityDescriptor } from "../lib/uiIdentityOverlay"
 import { Button } from "./ui/button"
 import {
   Dialog,
@@ -15,6 +16,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: (project: { mode: Tab; localPath: string; title: string }) => void
+  rootUiId?: string | UiIdentityDescriptor
 }
 
 type Tab = "new" | "existing"
@@ -28,7 +30,7 @@ function toKebab(str: string): string {
     .replace(/^-|-$/g, "")
 }
 
-export function NewProjectModal({ open, onOpenChange, onConfirm }: Props) {
+export function NewProjectModal({ open, onOpenChange, onConfirm, rootUiId }: Props) {
   const [openVersion, setOpenVersion] = useState(0)
 
   function handleOpenChange(nextOpen: boolean) {
@@ -40,7 +42,7 @@ export function NewProjectModal({ open, onOpenChange, onConfirm }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent size="sm">
+      <DialogContent size="sm" {...(rootUiId ? getUiIdentityAttributeProps(rootUiId) : {})}>
         {open ? (
           <NewProjectModalBody
             key={openVersion}

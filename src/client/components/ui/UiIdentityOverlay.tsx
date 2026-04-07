@@ -1,5 +1,9 @@
 import { createPortal } from "react-dom"
-import { UI_IDENTITY_ATTRIBUTE } from "../../lib/uiIdentityOverlay"
+import {
+  formatCopiedUiIdentity,
+  getUiIdentityDescriptorFromElement,
+  type UiIdentityDescriptor,
+} from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 
 export const UI_IDENTITY_OVERLAY_ROOT_ATTRIBUTE = "data-ui-identity-overlay-root"
@@ -25,7 +29,7 @@ interface UiIdentityOverlayProps {
   stack: Element[]
   highlightedId: string | null
   copiedId: string | null
-  onCopy: (id: string) => void
+  onCopy: (descriptor: UiIdentityDescriptor) => void
   onHighlight: (id: string) => void
 }
 
@@ -36,10 +40,6 @@ interface UiIdentityOverlayViewport {
 
 export function getOverlayCopyLabel(id: string, copiedId: string | null): string {
   return copiedId === id ? "Copied" : "Copy"
-}
-
-function getUiIdentityId(element: Element): string | null {
-  return element.getAttribute(UI_IDENTITY_ATTRIBUTE)
 }
 
 export function getUiIdentityOverlayPanelPosition(args: {
@@ -80,11 +80,8 @@ export function getUiIdentityOverlayPanelPosition(args: {
 
 function renderOverlayContent(props: UiIdentityOverlayProps) {
   const rows = props.stack
-    .map((element) => {
-      const id = getUiIdentityId(element)
-      return id ? { id } : null
-    })
-    .filter((entry): entry is { id: string } => entry !== null)
+    .map((element) => getUiIdentityDescriptorFromElement(element))
+    .filter((entry): entry is UiIdentityDescriptor => entry !== null)
 
   if (!props.active || !props.anchorRect || rows.length === 0) {
     return null
@@ -124,20 +121,30 @@ function renderOverlayContent(props: UiIdentityOverlayProps) {
           left: panelPosition.left,
         }}
       >
-        {rows.map(({ id }) => (
+        {rows.map((descriptor) => (
           <button
-            key={id}
+            key={descriptor.id}
             type="button"
             className={cn(
               "pointer-events-auto flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs",
-              props.highlightedId === id ? "bg-accent text-foreground" : "text-muted-foreground"
+              props.highlightedId === descriptor.id ? "bg-accent text-foreground" : "text-muted-foreground"
             )}
-            onMouseEnter={() => props.onHighlight(id)}
-            onFocus={() => props.onHighlight(id)}
-            onClick={() => props.onCopy(id)}
+            onMouseEnter={() => props.onHighlight(descriptor.id)}
+            onFocus={() => props.onHighlight(descriptor.id)}
+            onClick={() => props.onCopy(descriptor)}
+            title={formatCopiedUiIdentity(descriptor)}
           >
-            <span className="font-medium">{id}</span>
-            <span className="text-[11px]">{getOverlayCopyLabel(id, props.copiedId)}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium">{descriptor.id}</span>
+              {descriptor.c3ComponentId ? (
+                <span className="block truncate text-[10px] text-muted-foreground/80">
+                  {descriptor.c3ComponentLabel
+                    ? `${descriptor.c3ComponentId} · ${descriptor.c3ComponentLabel}`
+                    : descriptor.c3ComponentId}
+                </span>
+              ) : null}
+            </span>
+            <span className="shrink-0 text-[11px]">{getOverlayCopyLabel(descriptor.id, props.copiedId)}</span>
           </button>
         ))}
       </div>

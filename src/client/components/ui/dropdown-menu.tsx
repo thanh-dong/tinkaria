@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
-import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { getUiIdentityAttributeProps, type UiIdentityDescriptor } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
@@ -8,10 +8,10 @@ const DropdownMenu = DropdownMenuPrimitive.Root
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 
 interface DropdownMenuContentProps extends React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> {
-  uiId?: string
+  uiId?: string | UiIdentityDescriptor
 }
 
-export function getDropdownMenuContentUiIdentityProps(uiId?: string) {
+export function getDropdownMenuContentUiIdentityProps(uiId?: string | UiIdentityDescriptor) {
   return uiId ? getUiIdentityAttributeProps(uiId) : {}
 }
 

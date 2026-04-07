@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { createMarkdownComponents } from "./shared"
 import { parseSkillsFromContent } from "../../stores/skillCompositionStore"
 import { SkillBadgesReadonly } from "../chat-ui/SkillBadges"
@@ -11,12 +11,17 @@ interface Props {
 }
 
 export const UserMessage = memo(function UserMessage({ content }: Props) {
+  const userPromptDescriptor = createUiIdentityDescriptor({
+    id: "message.user.prompt",
+    c3ComponentId: "c3-111",
+    c3ComponentLabel: "transcript-surfaces",
+  })
   const parsed = useMemo(() => parseSkillsFromContent(content), [content])
 
   return (
     <div
       className="flex flex-col items-end gap-1.5"
-      {...getUiIdentityAttributeProps("message.user.prompt")}
+      {...getUiIdentityAttributeProps(userPromptDescriptor)}
     >
       {parsed.skills ? (
         <SkillBadgesReadonly skills={parsed.skills} />

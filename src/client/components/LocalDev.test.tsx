@@ -3,10 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { TooltipProvider } from "./ui/tooltip"
 import {
   LocalDev,
+  getLocalProjectsPageUiIdentityDescriptors,
+  getLocalProjectsPageUiIdentities,
   getHomepageProjectCounts,
   getHomepageRecentSessions,
   getSortedHomepageProjects,
 } from "./LocalDev"
+import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 
 describe("getHomepageProjectCounts", () => {
   test("summarizes saved and discovered project totals for the homepage overview", () => {
@@ -73,6 +76,37 @@ describe("getHomepageRecentSessions", () => {
 })
 
 describe("LocalDev homepage", () => {
+  test("backs each homepage screen identity with a C3-owned descriptor", () => {
+    const descriptors = getLocalProjectsPageUiIdentityDescriptors()
+
+    expect(getUiIdentityAttributeProps(descriptors.page)).toEqual({
+      "data-ui-id": "home.page",
+      "data-ui-c3": "c3-117",
+      "data-ui-c3-label": "projects",
+    })
+    expect(getUiIdentityAttributeProps(descriptors.newProjectDialog)).toEqual({
+      "data-ui-id": "home.add-project.dialog",
+      "data-ui-c3": "c3-117",
+      "data-ui-c3-label": "projects",
+    })
+  })
+
+  test("exposes stable ui identities for the homepage screen map", () => {
+    expect(getLocalProjectsPageUiIdentities()).toEqual({
+      page: "home.page",
+      header: "home.header",
+      status: "home.status",
+      setup: "home.setup",
+      recentSessions: "home.recent-sessions",
+      stats: "home.project-stats",
+      workspaceGrid: "home.workspace-grid",
+      addProjectAction: "home.add-project.action",
+      projectCard: "home.project-card",
+      recentSessionCard: "home.recent-session-card",
+      newProjectDialog: "home.add-project.dialog",
+    })
+  })
+
   test("welcomes the user back with recent sessions before project stats", () => {
     const html = renderToStaticMarkup(
       <TooltipProvider>
@@ -135,6 +169,16 @@ describe("LocalDev homepage", () => {
 
     expect(html).toContain("Welcome back")
     expect(html).toContain("Pick up where you left off")
+    expect(html).toContain('data-ui-id="home.page"')
+    expect(html).toContain('data-ui-c3="c3-117"')
+    expect(html).toContain('data-ui-c3-label="projects"')
+    expect(html).toContain('data-ui-id="home.header"')
+    expect(html).toContain('data-ui-id="home.recent-sessions"')
+    expect(html).toContain('data-ui-id="home.project-stats"')
+    expect(html).toContain('data-ui-id="home.workspace-grid"')
+    expect(html).toContain('data-ui-id="home.add-project.action"')
+    expect(html).toContain('data-ui-id="home.recent-session-card"')
+    expect(html).toContain('data-ui-id="home.project-card"')
     expect(html).toContain("Resume session")
     expect(html).toContain("Fix homepage copy")
     expect(html).toContain("Projects")

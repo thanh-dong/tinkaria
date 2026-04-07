@@ -1,10 +1,48 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react"
 import { Flower, History, RefreshCw, Search, Terminal } from "lucide-react"
+import {
+  createC3UiIdentityDescriptor,
+  createUiIdentity,
+  getUiIdentityAttributeProps,
+  getUiIdentityIdMap,
+} from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import type { DiscoveredSession } from "../../../shared/types"
 import { SessionRuntimeBadges } from "./SessionRuntimeBadges"
+
+const SESSION_PICKER_UI_DESCRIPTORS = {
+  triggerAction: createC3UiIdentityDescriptor({
+    id: createUiIdentity("sidebar.project-group.sessions", "action"),
+    c3ComponentId: "c3-113",
+    c3ComponentLabel: "sidebar",
+  }),
+  popover: createC3UiIdentityDescriptor({
+    id: createUiIdentity("sidebar.project-group.sessions", "popover"),
+    c3ComponentId: "c3-113",
+    c3ComponentLabel: "sidebar",
+  }),
+  searchInput: createC3UiIdentityDescriptor({
+    id: "sidebar.project-group.sessions.search.input",
+    c3ComponentId: "c3-113",
+    c3ComponentLabel: "sidebar",
+  }),
+  list: createC3UiIdentityDescriptor({
+    id: "sidebar.project-group.sessions.list",
+    c3ComponentId: "c3-113",
+    c3ComponentLabel: "sidebar",
+  }),
+} as const
+const SESSION_PICKER_UI_IDENTITIES = getUiIdentityIdMap(SESSION_PICKER_UI_DESCRIPTORS)
+
+export function getSessionPickerUiIdentities() {
+  return SESSION_PICKER_UI_IDENTITIES
+}
+
+export function getSessionPickerUiIdentityDescriptors() {
+  return SESSION_PICKER_UI_DESCRIPTORS
+}
 
 // --- Helpers ---
 
@@ -135,6 +173,7 @@ export const SessionPickerContent = memo(function SessionPickerContent({
         <div className="relative flex-1">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
           <input
+            {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.searchInput)}
             type="text"
             placeholder="Search sessions..."
             value={searchQuery}
@@ -159,7 +198,11 @@ export const SessionPickerContent = memo(function SessionPickerContent({
       </div>
 
       {/* Session list */}
-      <div ref={listRef} className="max-h-[300px] overflow-y-auto [scrollbar-width:thin] -mx-1">
+      <div
+        ref={listRef}
+        className="max-h-[300px] overflow-y-auto [scrollbar-width:thin] -mx-1"
+        {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.list)}
+      >
         {filtered.length === 0 ? (
           <div className="text-center text-xs text-muted-foreground py-6">
             No sessions found
@@ -254,6 +297,7 @@ export const SessionPicker = memo(function SessionPicker({
           size="icon-sm"
           disabled={disabled}
           className="opacity-0 group-hover/section:opacity-100 transition-opacity"
+          {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.triggerAction)}
         >
           <History className="h-3.5 w-3.5" />
         </Button>
@@ -263,6 +307,7 @@ export const SessionPicker = memo(function SessionPicker({
         sideOffset={8}
         align="start"
         className="w-72 p-3"
+        {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.popover)}
       >
         <SessionPickerContent
           sessions={sessions}

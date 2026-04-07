@@ -2,8 +2,12 @@ import { useContext, useEffect, useMemo, useRef, useState } from "react"
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom"
 import {
   buildUiIdentityStack,
+  createC3UiIdentityDescriptor,
+  formatCopiedUiIdentity,
   isUiIdentityOverlayActive,
   UI_IDENTITY_ATTRIBUTE,
+  type UiIdentityDescriptor,
+  getUiIdentityAttributeProps,
   type UiIdentityModifierState,
 } from "../lib/uiIdentityOverlay"
 import { AppDialogProvider } from "../components/ui/app-dialog"
@@ -21,6 +25,11 @@ import { useTinkariaState } from "./useTinkariaState"
 
 const UI_IDENTITY_OVERLAY_COPY_DURATION_MS = 1200
 const UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS = 320
+const APP_LAYOUT_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
+  id: "app.layout",
+  c3ComponentId: "c3-101",
+  c3ComponentLabel: "app-shell",
+})
 
 export function getUiIdentityOverlayCopyDurationMs() {
   return UI_IDENTITY_OVERLAY_COPY_DURATION_MS
@@ -32,6 +41,7 @@ export function getUiIdentityOverlayPointerHandoffDelayMs() {
 
 export function getGlobalUiIdentityIds() {
   return {
+    appLayout: "app.layout",
     sidebar: "chat.sidebar",
     rightSidebar: "chat.right-sidebar",
     chatRow: "sidebar.chat-row",
@@ -39,6 +49,10 @@ export function getGlobalUiIdentityIds() {
     chatRowMenu: "sidebar.chat-row.menu",
     projectGroupMenu: "sidebar.project-group.menu",
   }
+}
+
+export function getAppLayoutUiIdentityDescriptor() {
+  return APP_LAYOUT_UI_DESCRIPTOR
 }
 
 type UiIdentityOverlayKeyboardEvent = Pick<KeyboardEvent, "altKey" | "shiftKey">
@@ -193,13 +207,13 @@ export function getUiIdentityOverlayAnchorRect(
   }
 }
 
-async function copyUiIdentityToClipboard(id: string): Promise<boolean> {
+async function copyUiIdentityToClipboard(descriptor: UiIdentityDescriptor): Promise<boolean> {
   const clipboard = typeof navigator === "undefined" ? null : navigator.clipboard
   if (!clipboard?.writeText) {
     return false
   }
 
-  return clipboard.writeText(id).then(
+  return clipboard.writeText(formatCopiedUiIdentity(descriptor)).then(
     () => true,
     () => false,
   )
@@ -271,18 +285,18 @@ function UiIdentityOverlayController() {
     }
   }, [])
 
-  function handleCopy(id: string) {
-    void copyUiIdentityToClipboard(id).then((didCopy) => {
+  function handleCopy(descriptor: UiIdentityDescriptor) {
+    void copyUiIdentityToClipboard(descriptor).then((didCopy) => {
       if (!didCopy) {
         return
       }
 
-      setCopiedId(id)
+      setCopiedId(descriptor.id)
       if (copiedTimeoutRef.current !== null) {
         clearTimeout(copiedTimeoutRef.current)
       }
       copiedTimeoutRef.current = setTimeout(() => {
-        setCopiedId((current) => (current === id ? null : current))
+        setCopiedId((current) => (current === descriptor.id ? null : current))
         copiedTimeoutRef.current = null
       }, UI_IDENTITY_OVERLAY_COPY_DURATION_MS)
     })
@@ -311,7 +325,10 @@ function TinkariaLayout() {
   const showMobileOpenButton = location.pathname === "/"
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden">
+    <div
+      className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden"
+      {...getUiIdentityAttributeProps(APP_LAYOUT_UI_DESCRIPTOR)}
+    >
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <TinkariaSidebar
           data={state.sidebarData}

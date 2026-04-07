@@ -11,18 +11,15 @@ import {
 } from "../../../shared/types"
 import { Button } from "../ui/button"
 import { Textarea } from "../ui/textarea"
-import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createUiIdentity, createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import { useIsStandalone } from "../../hooks/useIsStandalone"
 import { useChatInputStore } from "../../stores/chatInputStore"
 import { type ComposerState, useChatPreferencesStore } from "../../stores/chatPreferencesStore"
-import { useSkillCompositionStore, formatContentWithSkills } from "../../stores/skillCompositionStore"
+import { useSkillCompositionStore, computeSkillInsertion, formatSkillCommand } from "../../stores/skillCompositionStore"
 import { CHAT_INPUT_ATTRIBUTE, focusNextChatInput } from "../../app/chatFocusPolicy"
 import { ChatPreferenceControls, type ModelOptionChange } from "./ChatPreferenceControls"
-import { SkillPicker } from "./SkillPicker"
-import { SkillBadges } from "./SkillBadges"
-
-const EMPTY_SKILLS: string[] = []
+import { SkillRibbon } from "./SkillRibbon"
 
 interface Props {
   onSubmit: (
@@ -211,7 +208,6 @@ interface ComposerPreferencesProps {
   composerState: ComposerState
   providerDefaults: ReturnType<typeof useChatPreferencesStore.getState>["providerDefaults"]
   availableProviders: ProviderCatalogEntry[]
-  skillPicker?: React.ReactNode
   setComposerModel: (model: string) => void
   setComposerModelOptions: (modelOptions: Partial<ClaudeModelOptions> | Partial<CodexModelOptions>) => void
   setComposerPlanMode: (planMode: boolean) => void
@@ -223,7 +219,6 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
   composerState,
   providerDefaults,
   availableProviders,
-  skillPicker,
   setComposerModel,
   setComposerModelOptions,
   setComposerPlanMode,
@@ -346,7 +341,6 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
       onPlanModeChange={handlePlanModeChange}
       includePlanMode={showPlanMode}
       className="max-w-[840px] mx-auto"
-      skillPicker={skillPicker}
     />
   )
 }))
@@ -373,11 +367,8 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const setComposerModelOptions = useChatPreferencesStore((s) => s.setComposerModelOptions)
   const setComposerPlanMode = useChatPreferencesStore((s) => s.setComposerPlanMode)
   const resetComposerFromProvider = useChatPreferencesStore((s) => s.resetComposerFromProvider)
-  const skillChatId = chatId ?? "__new__"
-  const selectedSkillsRaw = useSkillCompositionStore((s) => s.selections[skillChatId])
-  const selectedSkills = selectedSkillsRaw ?? EMPTY_SKILLS
-  const toggleSkill = useSkillCompositionStore((s) => s.toggleSkill)
-  const clearSkills = useSkillCompositionStore((s) => s.clearSkills)
+  const ribbonVisible = useSkillCompositionStore((s) => s.ribbonVisible)
+  const toggleRibbon = useSkillCompositionStore((s) => s.toggleRibbon)
   const recordUsage = useSkillCompositionStore((s) => s.recordUsage)
   const [value, setValue] = useState(() => (chatId ? getDraft(chatId) : ""))
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -389,6 +380,26 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const submitActionId = createUiIdentity("chat.composer.submit", "action")
   const cancelActionId = createUiIdentity("chat.composer.cancel", "action")
   const queueActionId = createUiIdentity("chat.composer.queue", "action")
+  const composerAreaDescriptor = createUiIdentityDescriptor({
+    id: composerAreaId,
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const submitActionDescriptor = createUiIdentityDescriptor({
+    id: submitActionId,
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const cancelActionDescriptor = createUiIdentityDescriptor({
+    id: cancelActionId,
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const queueActionDescriptor = createUiIdentityDescriptor({
+    id: queueActionId,
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
 
   function getComposerSnapshot() {
     return composerPreferencesRef.current?.getSnapshot() ?? resolveComposerPreferences({
@@ -439,10 +450,32 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     if (!isTouchDevice) textareaRef.current?.focus()
   }, [chatId, isTouchDevice])
 
+  const resolvedProvider = activeProvider ?? composerState.provider
+
+  function handleSkillInsert(skill: string) {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const command = formatSkillCommand(skill, resolvedProvider)
+    const { value: nextValue, cursorPosition } = computeSkillInsertion(
+      value,
+      textarea.selectionStart,
+      textarea.selectionEnd,
+      command
+    )
+    setValue(nextValue)
+    if (chatId) setDraft(chatId, nextValue)
+    recordUsage([skill])
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.selectionStart = cursorPosition
+      textarea.selectionEnd = cursorPosition
+      autoResize()
+    })
+  }
+
   async function handleSubmit() {
     if (!value.trim()) return
     const rawValue = value
-    const nextValue = formatContentWithSkills(rawValue, selectedSkills)
     const composerSnapshot = getComposerSnapshot()
     let modelOptions: ModelOptions
 
@@ -461,7 +494,6 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       chatId: chatId ?? null,
       activeProvider,
       composerProvider: composerSnapshot.providerPrefs.provider,
-      skills: selectedSkills.length > 0 ? selectedSkills : undefined,
       submitOptions,
     })
 
@@ -469,13 +501,9 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     if (textareaRef.current) textareaRef.current.style.height = "auto"
 
     try {
-      const submitResult = await onSubmit(nextValue, submitOptions)
+      const submitResult = await onSubmit(rawValue, submitOptions)
       if (shouldClearDraftAfterSubmit(submitResult)) {
         if (chatId) clearDraft(chatId)
-        if (selectedSkills.length > 0) recordUsage(selectedSkills)
-        if (submitResult === "sent") {
-          clearSkills(skillChatId)
-        }
       }
     } catch (error) {
       console.error("[ChatInput] Submit failed:", error)
@@ -583,19 +611,22 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
           </div>
         </div>
       ) : null}
-      {selectedSkills.length > 0 ? (
-        <div className={cn("px-3 pb-1.5", isStandalone && "px-5")}>
-          <div className="max-w-[840px] mx-auto pl-4">
-            <SkillBadges
-              skills={selectedSkills}
-              onRemove={(skill) => toggleSkill(skillChatId, skill)}
+      {availableSkills.length > 0 ? (
+        <div className={cn("px-3", isStandalone && "px-5")}>
+          <div className="max-w-[840px] mx-auto">
+            <SkillRibbon
+              skills={availableSkills}
+              provider={resolvedProvider}
+              visible={ribbonVisible}
+              onToggle={toggleRibbon}
+              onInsert={handleSkillInsert}
             />
           </div>
         </div>
       ) : null}
       <div className={cn("px-3 pt-0", isStandalone && "px-5")}>
         <div
-          {...getUiIdentityAttributeProps(composerAreaId)}
+          {...getUiIdentityAttributeProps(composerAreaDescriptor)}
           className="flex items-end gap-2 max-w-[840px] mx-auto border dark:bg-card/40 backdrop-blur-lg border-border rounded-[29px] pr-1.5"
         >
           <Textarea
@@ -617,7 +648,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
           {showQueueAction ? (
             <div className="mb-1 flex items-center gap-2 md:mb-1.5">
               <Button
-                {...getUiIdentityAttributeProps(cancelActionId)}
+                {...getUiIdentityAttributeProps(cancelActionDescriptor)}
                 type="button"
                 aria-label="Stop"
                 onPointerDown={(event) => {
@@ -630,7 +661,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                 <div className="w-3 h-3 md:w-4 md:h-4 rounded-xs bg-current" />
               </Button>
               <Button
-                {...getUiIdentityAttributeProps(queueActionId)}
+                {...getUiIdentityAttributeProps(queueActionDescriptor)}
                 type="button"
                 aria-label="Queue"
                 title="Queue"
@@ -647,7 +678,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
             </div>
           ) : (
             <Button
-              {...getUiIdentityAttributeProps(submitActionId)}
+              {...getUiIdentityAttributeProps(submitActionDescriptor)}
               type="button"
               onPointerDown={(event) => {
                 event.preventDefault()
@@ -677,13 +708,6 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
           setComposerModelOptions={setComposerModelOptions}
           setComposerPlanMode={setComposerPlanMode}
           resetComposerFromProvider={resetComposerFromProvider}
-          skillPicker={availableSkills.length > 0 ? (
-            <SkillPicker
-              availableSkills={availableSkills}
-              selectedSkills={selectedSkills}
-              onToggleSkill={(skill) => toggleSkill(skillChatId, skill)}
-            />
-          ) : undefined}
         />
         <div className="min-w-3"/>
       </div>

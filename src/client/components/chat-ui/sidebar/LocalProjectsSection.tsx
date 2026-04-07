@@ -24,11 +24,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
 import type { SidebarChatRow, SidebarProjectGroup } from "../../../../shared/types"
 import { APP_NAME } from "../../../../shared/branding"
 import { getPathBasename } from "../../../lib/formatters"
-import { getUiIdentityAttributeProps } from "../../../lib/uiIdentityOverlay"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../../lib/uiIdentityOverlay"
 import { cn } from "../../../lib/utils"
 import { ProjectSectionMenu } from "./Menus"
 
 const PROJECT_GROUP_UI_ID = "sidebar.project-group"
+const PROJECT_GROUP_DESCRIPTOR = createUiIdentityDescriptor({
+  id: PROJECT_GROUP_UI_ID,
+  c3ComponentId: "c3-113",
+  c3ComponentLabel: "sidebar",
+})
 
 interface Props {
   projectGroups: SidebarProjectGroup[]
@@ -202,7 +207,7 @@ function SortableProjectGroup({
     <div
       ref={setNodeRef}
       style={style}
-      {...getUiIdentityAttributeProps(PROJECT_GROUP_UI_ID)}
+      {...getUiIdentityAttributeProps(PROJECT_GROUP_DESCRIPTOR)}
       className={cn(
         "group/section",
         isDragging && "opacity-50 shadow-lg z-50 relative"

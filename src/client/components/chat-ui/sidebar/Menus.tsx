@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { Pencil, Trash2 } from "lucide-react"
+import { createUiIdentityDescriptor } from "../../../lib/uiIdentityOverlay"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -9,6 +10,16 @@ import {
 
 const PROJECT_GROUP_MENU_UI_ID = "sidebar.project-group.menu"
 const CHAT_ROW_MENU_UI_ID = "sidebar.chat-row.menu"
+const PROJECT_GROUP_MENU_DESCRIPTOR = createUiIdentityDescriptor({
+  id: PROJECT_GROUP_MENU_UI_ID,
+  c3ComponentId: "c3-113",
+  c3ComponentLabel: "sidebar",
+})
+const CHAT_ROW_MENU_DESCRIPTOR = createUiIdentityDescriptor({
+  id: CHAT_ROW_MENU_UI_ID,
+  c3ComponentId: "c3-113",
+  c3ComponentLabel: "sidebar",
+})
 
 export function ProjectSectionMenu({
   onRemove,
@@ -22,7 +33,7 @@ export function ProjectSectionMenu({
       <ContextMenuTrigger asChild>
         {children}
       </ContextMenuTrigger>
-      <ContextMenuContent uiId={PROJECT_GROUP_MENU_UI_ID}>
+      <ContextMenuContent uiId={PROJECT_GROUP_MENU_DESCRIPTOR}>
         <ContextMenuItem
           onSelect={(event) => {
             event.stopPropagation()
@@ -52,7 +63,7 @@ export function ChatRowMenu({
       <ContextMenuTrigger asChild>
         {children}
       </ContextMenuTrigger>
-      <ContextMenuContent uiId={CHAT_ROW_MENU_UI_ID}>
+      <ContextMenuContent uiId={CHAT_ROW_MENU_DESCRIPTOR}>
         <ContextMenuItem
           onSelect={(event) => {
             event.stopPropagation()

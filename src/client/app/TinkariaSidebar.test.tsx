@@ -3,7 +3,8 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { MemoryRouter } from "react-router-dom"
 import { TooltipProvider } from "../components/ui/tooltip"
-import { TinkariaSidebar } from "./TinkariaSidebar"
+import { getSidebarUiIdentityDescriptor, TinkariaSidebar } from "./TinkariaSidebar"
+import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import type { SidebarData, UpdateSnapshot } from "../../shared/types"
 
 function createSidebarData(): SidebarData {
@@ -44,12 +45,23 @@ function renderSidebar(overrides: Partial<Parameters<typeof TinkariaSidebar>[0]>
 }
 
 describe("TinkariaSidebar", () => {
+  test("exposes a C3-owned sidebar shell descriptor", () => {
+    expect(getUiIdentityAttributeProps(getSidebarUiIdentityDescriptor())).toEqual({
+      "data-ui-id": "chat.sidebar",
+      "data-ui-c3": "c3-113",
+      "data-ui-c3-label": "sidebar",
+    })
+  })
+
   test("renders the sidebar header", () => {
     const html = renderSidebar()
     expect(html).toContain("font-logo")
     expect(html).toContain("Tinkaria")
     expect(html).toContain("tinkaria-mark-fine.svg")
     expect(html).toContain("title=\"New project\"")
+    expect(html).toContain('data-ui-id="chat.sidebar"')
+    expect(html).toContain('data-ui-c3="c3-113"')
+    expect(html).toContain('data-ui-c3-label="sidebar"')
   })
 
   test("renders the collapsed utility stub with an expand action", () => {

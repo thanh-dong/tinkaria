@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import { Button } from "../components/ui/button"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
-import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
+import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import { cn } from "../lib/utils"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProjectsSection"
@@ -37,6 +37,16 @@ interface TinkariaSidebarProps {
   onResumeSession: (projectId: string, sessionId: string, provider: AgentProvider) => void
   onRefreshSessions: (projectId: string) => void
   onShowMoreSessions: (projectId: string) => void
+}
+
+const SIDEBAR_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
+  id: "chat.sidebar",
+  c3ComponentId: "c3-113",
+  c3ComponentLabel: "sidebar",
+})
+
+export function getSidebarUiIdentityDescriptor() {
+  return SIDEBAR_UI_DESCRIPTOR
 }
 
 export function TinkariaSidebar({
@@ -257,7 +267,7 @@ export function TinkariaSidebar({
       )}
 
       <div
-        {...getUiIdentityAttributeProps("chat.sidebar")}
+        {...getUiIdentityAttributeProps(SIDEBAR_UI_DESCRIPTOR)}
         data-sidebar="open"
         className={cn(
           "fixed inset-0 z-50 bg-background dark:bg-card flex flex-col h-[100dvh] select-none",

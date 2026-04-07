@@ -1,14 +1,20 @@
 import { X } from "lucide-react"
-import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 
 interface RightSidebarProps {
   onClose: () => void
 }
 
 export function RightSidebar({ onClose }: RightSidebarProps) {
+  const rightSidebarDescriptor = createUiIdentityDescriptor({
+    id: "chat.right-sidebar",
+    c3ComponentId: "c3-115",
+    c3ComponentLabel: "right-sidebar",
+  })
+
   return (
     <div
-      {...getUiIdentityAttributeProps("chat.right-sidebar")}
+      {...getUiIdentityAttributeProps(rightSidebarDescriptor)}
       className="h-full min-h-0 border-l border-border bg-background md:min-w-[300px]"
     >
       <div className="flex h-full min-h-0 flex-col">

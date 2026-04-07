@@ -19,6 +19,11 @@ import type {
 import type { SocketStatus } from "../app/socket-interface"
 import { PageHeader } from "../app/PageHeader"
 import { getPathBasename } from "../lib/formatters"
+import {
+  createC3UiIdentityDescriptor,
+  getUiIdentityAttributeProps,
+  getUiIdentityIdMap,
+} from "../lib/uiIdentityOverlay"
 import { cn } from "../lib/utils"
 import { SessionRuntimeBadges } from "./chat-ui/SessionRuntimeBadges"
 import { NewProjectModal } from "./NewProjectModal"
@@ -51,6 +56,73 @@ interface HomepageRecentSession {
   projectId: string
   projectTitle: string
   session: DiscoveredSession
+}
+
+const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
+  page: createC3UiIdentityDescriptor({
+    id: "home.page",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  header: createC3UiIdentityDescriptor({
+    id: "home.header",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  status: createC3UiIdentityDescriptor({
+    id: "home.status",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  setup: createC3UiIdentityDescriptor({
+    id: "home.setup",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  recentSessions: createC3UiIdentityDescriptor({
+    id: "home.recent-sessions",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  stats: createC3UiIdentityDescriptor({
+    id: "home.project-stats",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  workspaceGrid: createC3UiIdentityDescriptor({
+    id: "home.workspace-grid",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  addProjectAction: createC3UiIdentityDescriptor({
+    id: "home.add-project.action",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  projectCard: createC3UiIdentityDescriptor({
+    id: "home.project-card",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  recentSessionCard: createC3UiIdentityDescriptor({
+    id: "home.recent-session-card",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  newProjectDialog: createC3UiIdentityDescriptor({
+    id: "home.add-project.dialog",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+} as const
+const LOCAL_PROJECTS_PAGE_UI_IDENTITIES = getUiIdentityIdMap(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS)
+
+export function getLocalProjectsPageUiIdentities() {
+  return LOCAL_PROJECTS_PAGE_UI_IDENTITIES
+}
+
+export function getLocalProjectsPageUiIdentityDescriptors() {
+  return LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS
 }
 
 function getSessionDisplayTitle(session: DiscoveredSession): string {
@@ -209,31 +281,33 @@ function RecentSessionCard({
 }) {
   return (
     <InfoCard>
-      <div className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="rounded-xl border border-border bg-background p-2">
-            <History className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="truncate font-medium text-foreground">{getSessionDisplayTitle(item.session)}</h3>
-              <span className="shrink-0 text-xs text-muted-foreground">{getRelativeTimeLabel(item.session.modifiedAt)}</span>
+      <div {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.recentSessionCard)}>
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl border border-border bg-background p-2">
+              <History className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">Back to {item.projectTitle}</p>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full border border-border bg-background px-2 py-0.5">
-                {item.session.provider}
-              </span>
-              <span className="rounded-full border border-border bg-background px-2 py-0.5">
-                {item.session.source === "tinkaria" ? "Tinkaria" : "CLI"}
-              </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="truncate font-medium text-foreground">{getSessionDisplayTitle(item.session)}</h3>
+                <span className="shrink-0 text-xs text-muted-foreground">{getRelativeTimeLabel(item.session.modifiedAt)}</span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">Back to {item.projectTitle}</p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border bg-background px-2 py-0.5">
+                  {item.session.provider}
+                </span>
+                <span className="rounded-full border border-border bg-background px-2 py-0.5">
+                  {item.session.source === "tinkaria" ? "Tinkaria" : "CLI"}
+                </span>
+              </div>
+              <SessionRuntimeBadges session={item.session} className="mt-2 flex flex-wrap gap-2" />
             </div>
-            <SessionRuntimeBadges session={item.session} className="mt-2 flex flex-wrap gap-2" />
           </div>
+          <Button onClick={onResume} className="w-full">
+            Resume session
+          </Button>
         </div>
-        <Button onClick={onResume} className="w-full">
-          Resume session
-        </Button>
       </div>
     </InfoCard>
   )
@@ -258,6 +332,7 @@ function ProjectCard({
     <Tooltip>
       <TooltipTrigger asChild>
         <button
+          {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectCard)}
           className={cn(
             "border border-border hover:border-primary/30 group rounded-2xl bg-card px-4 py-4 w-full text-left hover:bg-muted/50 transition-colors",
             loading && "opacity-50 cursor-not-allowed"
@@ -323,12 +398,16 @@ export function LocalDev({
   const isConnected = connectionStatus === "connected" && ready
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto">
+    <div
+      className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto"
+      {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.page)}
+    >
       {!isConnected ? (
         <>
           <PageHeader
             narrow
             icon={CodeXml}
+            uiId={LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.header}
             title={isConnecting ? `Connecting ${APP_NAME}` : `Connect ${APP_NAME}`}
             subtitle={isConnecting
               ? `${APP_NAME} is starting up and loading your local projects.`
@@ -336,7 +415,7 @@ export function LocalDev({
           />
           <div className="max-w-2xl w-full mx-auto pb-12 px-6">
             <SectionHeader>Status</SectionHeader>
-            <div className="mb-8">
+            <div className="mb-8" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.status)}>
               <InfoCard>
                 <div className="flex items-center gap-3">
                   <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
@@ -354,7 +433,7 @@ export function LocalDev({
             </div>
 
             {!isConnecting ? (
-              <div className="mb-10">
+              <div className="mb-10" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.setup)}>
                 <SectionHeader>Setup</SectionHeader>
                 <div className="space-y-4">
                   <ActionCard
@@ -388,13 +467,14 @@ export function LocalDev({
       ) : (
         <>
           <PageHeader
+            uiId={LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.header}
             title={snapshot?.machine.displayName ?? "Local Projects"}
             subtitle="Welcome back. Resume a session or jump into the right workspace."
           />
 
           <div className="w-full px-6 mb-10">
             {recentSessions.length > 0 ? (
-              <div className="mb-10">
+              <div className="mb-10" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.recentSessions)}>
                 <SectionHeader>Welcome Back</SectionHeader>
                 <div className="mb-3">
                   <h2 className="text-xl font-semibold text-foreground">Pick up where you left off</h2>
@@ -416,7 +496,7 @@ export function LocalDev({
               </div>
             ) : null}
 
-            <div className="mb-10">
+            <div className="mb-10" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.stats)}>
               <SectionHeader>Projects</SectionHeader>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard eyebrow="Projects" value={String(projectCounts.total)} detail="Workspaces available on this machine" />
@@ -431,13 +511,21 @@ export function LocalDev({
                 <h2 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider">Workspaces</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Recent work first, with enough context to choose the right place to continue.</p>
               </div>
-              <Button variant="default" size="sm" onClick={() => setNewProjectOpen(true)}>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setNewProjectOpen(true)}
+                {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.addProjectAction)}
+              >
                 <Plus className="h-4 w-4 mr-1.5" />
                 Add Project
               </Button>
             </div>
             {projects.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 3xl:grid-cols-5 gap-3">
+              <div
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 3xl:grid-cols-5 gap-3"
+                {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.workspaceGrid)}
+              >
                 {projects.map((project) => (
                   <ProjectCard
                     key={project.localPath}
@@ -471,6 +559,7 @@ export function LocalDev({
       <NewProjectModal
         open={newProjectOpen}
         onOpenChange={setNewProjectOpen}
+        rootUiId={LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.newProjectDialog}
         onConfirm={(project) => {
           void onCreateProject(project)
         }}

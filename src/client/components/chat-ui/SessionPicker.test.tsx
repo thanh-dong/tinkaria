@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
-import { SessionPickerContent, getVisibleSessions } from "./SessionPicker"
+import {
+  SessionPickerContent,
+  getSessionPickerUiIdentityDescriptors,
+  getVisibleSessions,
+} from "./SessionPicker"
+import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import type { DiscoveredSession } from "../../../shared/types"
 
 const mockSessions: DiscoveredSession[] = [
@@ -37,6 +42,21 @@ const mockSessions: DiscoveredSession[] = [
 ]
 
 describe("SessionPickerContent", () => {
+  test("backs session picker grab targets with C3-owned descriptors", () => {
+    const descriptors = getSessionPickerUiIdentityDescriptors()
+
+    expect(getUiIdentityAttributeProps(descriptors.searchInput)).toEqual({
+      "data-ui-id": "sidebar.project-group.sessions.search.input",
+      "data-ui-c3": "c3-113",
+      "data-ui-c3-label": "sidebar",
+    })
+    expect(getUiIdentityAttributeProps(descriptors.list)).toEqual({
+      "data-ui-id": "sidebar.project-group.sessions.list",
+      "data-ui-c3": "c3-113",
+      "data-ui-c3-label": "sidebar",
+    })
+  })
+
   test("renders session list with titles", () => {
     const html = renderToStaticMarkup(
       <SessionPickerContent
@@ -51,6 +71,10 @@ describe("SessionPickerContent", () => {
       />
     )
 
+    expect(html).toContain('data-ui-id="sidebar.project-group.sessions.search.input"')
+    expect(html).toContain('data-ui-id="sidebar.project-group.sessions.list"')
+    expect(html).toContain('data-ui-c3="c3-113"')
+    expect(html).toContain('data-ui-c3-label="sidebar"')
     expect(html).toContain("Fix auth bug")
     expect(html).toContain("Add unit tests for login")
   })

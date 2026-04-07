@@ -22,6 +22,8 @@ export interface UiIdentityDescriptor {
   c3ComponentLabel: string | null
 }
 
+export type UiIdentityValue = string | UiIdentityDescriptor
+
 export function createUiIdentity(base: string, kind: UiIdentityKind): string {
   return `${base}.${kind}`
 }
@@ -36,6 +38,14 @@ export function createUiIdentityDescriptor(args: {
     c3ComponentId: args.c3ComponentId ?? null,
     c3ComponentLabel: args.c3ComponentLabel ?? null,
   }
+}
+
+export function createC3UiIdentityDescriptor(args: {
+  id: string
+  c3ComponentId: string
+  c3ComponentLabel: string
+}): UiIdentityDescriptor {
+  return createUiIdentityDescriptor(args)
 }
 
 export function isUiIdentityOverlayActive(modifiers: UiIdentityModifierState): boolean {
@@ -54,12 +64,35 @@ export function formatCopiedUiIdentity(descriptor: UiIdentityDescriptor): string
   return `${descriptor.id} | c3:${descriptor.c3ComponentId}`
 }
 
-function isUiIdentityDescriptor(value: string | UiIdentityDescriptor): value is UiIdentityDescriptor {
+export function getUiIdentityId(value: UiIdentityValue): string {
+  return typeof value === "string" ? value : value.id
+}
+
+export function getUiIdentityIdMap<T extends Record<string, UiIdentityValue>>(values: T): { [K in keyof T]: string } {
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [key, getUiIdentityId(value)])
+  ) as { [K in keyof T]: string }
+}
+
+function isUiIdentityDescriptor(value: UiIdentityValue): value is UiIdentityDescriptor {
   return typeof value !== "string"
 }
 
+export function getUiIdentityDescriptorFromElement(element: Element): UiIdentityDescriptor | null {
+  const id = element.getAttribute(UI_IDENTITY_ATTRIBUTE)
+  if (!id) {
+    return null
+  }
+
+  return createUiIdentityDescriptor({
+    id,
+    c3ComponentId: element.getAttribute(UI_IDENTITY_C3_ATTRIBUTE),
+    c3ComponentLabel: element.getAttribute(UI_IDENTITY_C3_LABEL_ATTRIBUTE),
+  })
+}
+
 export function getUiIdentityAttributeProps(
-  idOrDescriptor: string | UiIdentityDescriptor,
+  idOrDescriptor: UiIdentityValue,
 ): {
   "data-ui-id": string
   "data-ui-c3"?: string

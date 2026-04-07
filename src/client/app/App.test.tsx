@@ -4,12 +4,14 @@ import { renderToStaticMarkup } from "react-dom/server"
 import * as AppModule from "./App"
 import {
   bindUiIdentityOverlayWindowEvents,
+  getAppLayoutUiIdentityDescriptor,
   getUiIdentityOverlayAnchorRect,
   getUiIdentityOverlayCopyDurationMs,
   getUiIdentityOverlayHighlightRect,
   getUiIdentityOverlayPointerHandoffDelayMs,
   shouldIgnoreUiIdentityOverlayPointerTarget,
 } from "./App"
+import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProjectsSection"
 import { TooltipProvider } from "../components/ui/tooltip"
@@ -46,12 +48,23 @@ describe("getGlobalUiIdentityIds", () => {
 
     expect(typeof getGlobalUiIdentityIds).toBe("function")
     expect((getGlobalUiIdentityIds as () => unknown)()).toEqual({
+      appLayout: "app.layout",
       sidebar: "chat.sidebar",
       rightSidebar: "chat.right-sidebar",
       chatRow: "sidebar.chat-row",
       projectGroup: "sidebar.project-group",
       chatRowMenu: "sidebar.chat-row.menu",
       projectGroupMenu: "sidebar.project-group.menu",
+    })
+  })
+})
+
+describe("getAppLayoutUiIdentityDescriptor", () => {
+  test("tags the app shell with C3 ownership metadata", () => {
+    expect(getUiIdentityAttributeProps(getAppLayoutUiIdentityDescriptor())).toEqual({
+      "data-ui-id": "app.layout",
+      "data-ui-c3": "c3-101",
+      "data-ui-c3-label": "app-shell",
     })
   })
 })

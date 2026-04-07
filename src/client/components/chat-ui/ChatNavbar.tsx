@@ -1,7 +1,7 @@
 import { GitFork, Menu, PanelLeft } from "lucide-react"
 import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
-import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createUiIdentity, createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import type { AccountInfo, CurrentRepoStatusSnapshot, DiscoveredSessionRuntime } from "../../../shared/types"
 import { getRuntimeLabels } from "./SessionRuntimeBadges"
@@ -75,6 +75,21 @@ export function ChatNavbar({
 }: Props) {
   const navbarAreaId = createUiIdentity("chat.navbar", "area")
   const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
+  const navbarDescriptor = createUiIdentityDescriptor({
+    id: "chat.navbar",
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const navbarAreaDescriptor = createUiIdentityDescriptor({
+    id: navbarAreaId,
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const forkSessionActionDescriptor = createUiIdentityDescriptor({
+    id: forkSessionActionId,
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
   const pathLabel = getPathLabel(localPath, currentRepoStatus)
   const repoLabels = getRepoLabels(currentRepoStatus)
   const primaryRuntimeLabel = getPrimaryRuntimeLabel(currentSessionRuntime)
@@ -86,14 +101,14 @@ export function ChatNavbar({
 
   return (
     <CardHeader
-      {...getUiIdentityAttributeProps("chat.navbar")}
+      {...getUiIdentityAttributeProps(navbarDescriptor)}
       className={cn(
         "absolute top-0 left-0 right-0 z-10 px-3 pt-3 border-border/0 flex items-center justify-center",
         "bg-gradient-to-b from-background/80 via-background/55 to-transparent"
       )}
     >
       <div
-        {...getUiIdentityAttributeProps(navbarAreaId)}
+        {...getUiIdentityAttributeProps(navbarAreaDescriptor)}
         className="relative flex items-center gap-2 w-full"
       >
         <div className="flex items-center gap-1 flex-shrink-0 rounded-full border border-border/80 bg-background/78 p-1 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
@@ -115,7 +130,7 @@ export function ChatNavbar({
             <PanelLeft className="size-4.5" />
           </Button>
           <Button
-            {...getUiIdentityAttributeProps(forkSessionActionId)}
+            {...getUiIdentityAttributeProps(forkSessionActionDescriptor)}
             variant="ghost"
             size="icon"
             onClick={onForkSession}

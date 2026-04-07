@@ -2,6 +2,12 @@ import { useState } from "react"
 import { Box } from "lucide-react"
 import type { AgentProvider, ProviderCatalogEntry } from "../../../shared/types"
 import {
+  createC3UiIdentityDescriptor,
+  createUiIdentity,
+  getUiIdentityAttributeProps,
+  getUiIdentityIdMap,
+} from "../../lib/uiIdentityOverlay"
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -19,7 +25,59 @@ interface Props {
   defaultProvider: AgentProvider
   defaultModel: string
   availableProviders: ProviderCatalogEntry[]
-  onFork: (context: string, provider: AgentProvider, model: string) => Promise<void>
+  onFork: (intent: string, provider: AgentProvider, model: string) => Promise<void>
+}
+
+const FORK_SESSION_UI_DESCRIPTORS = {
+  dialog: createC3UiIdentityDescriptor({
+    id: "chat.fork-session.dialog",
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  contextInput: createC3UiIdentityDescriptor({
+    id: "chat.fork-session.context.input",
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  submitAction: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.fork-session.submit", "action"),
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  cancelAction: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.fork-session.cancel", "action"),
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  providerAction: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.fork-session.provider", "action"),
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  providerPopover: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.fork-session.provider", "popover"),
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  modelAction: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.fork-session.model", "action"),
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  modelPopover: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.fork-session.model", "popover"),
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+} as const
+const FORK_SESSION_UI_IDENTITIES = getUiIdentityIdMap(FORK_SESSION_UI_DESCRIPTORS)
+
+export function getForkSessionUiIdentities() {
+  return FORK_SESSION_UI_IDENTITIES
+}
+
+export function getForkSessionUiIdentityDescriptors() {
+  return FORK_SESSION_UI_DESCRIPTORS
 }
 
 export function ForkSessionDialog({
@@ -44,6 +102,7 @@ export function ForkSessionDialog({
       <DialogContent
         size="sm"
         className="max-md:inset-0 max-md:left-0 max-md:top-0 max-md:max-w-none max-md:max-h-none max-md:h-[100dvh] max-md:rounded-none max-md:border-0 max-md:translate-x-0 max-md:translate-y-0 max-md:shadow-none"
+        {...getUiIdentityAttributeProps(FORK_SESSION_UI_DESCRIPTORS.dialog)}
       >
         {open ? (
           <ForkSessionDialogBody
@@ -70,10 +129,10 @@ function ForkSessionDialogBody({
   defaultProvider: AgentProvider
   defaultModel: string
   availableProviders: ProviderCatalogEntry[]
-  onFork: (context: string, provider: AgentProvider, model: string) => Promise<void>
+  onFork: (intent: string, provider: AgentProvider, model: string) => Promise<void>
   onClose: () => void
 }) {
-  const [context, setContext] = useState("")
+  const [intent, setIntent] = useState("")
   const [provider, setProvider] = useState<AgentProvider>(defaultProvider)
   const [model, setModel] = useState(defaultModel)
   const [pending, setPending] = useState(false)
@@ -90,11 +149,11 @@ function ForkSessionDialogBody({
   }
 
   async function handleConfirm() {
-    if (!context.trim() || pending) return
+    if (!intent.trim() || pending) return
     setPending(true)
     setError(null)
     try {
-      await onFork(context.trim(), provider, model)
+      await onFork(intent.trim(), provider, model)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -109,15 +168,19 @@ function ForkSessionDialogBody({
         <DialogTitle>Fork session</DialogTitle>
       </DialogHeader>
       <div className="px-4 pb-4 pt-3.5 space-y-3 flex flex-col flex-1 min-h-0">
+        <p className="text-sm text-muted-foreground">
+          Describe what this fork should focus on. Tinkaria will combine that with the current chat to seed the new session.
+        </p>
         <Textarea
-          placeholder="Start the new session with..."
-          value={context}
-          onChange={(e) => setContext(e.target.value)}
+          {...getUiIdentityAttributeProps(FORK_SESSION_UI_DESCRIPTORS.contextInput)}
+          placeholder="What should this fork focus on?"
+          value={intent}
+          onChange={(e) => setIntent(e.target.value)}
           autoFocus
           rows={4}
           className="resize-none text-sm flex-1 min-h-[4lh]"
           onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && context.trim() && !pending) {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && intent.trim() && !pending) {
               e.preventDefault()
               void handleConfirm()
             }
@@ -125,6 +188,8 @@ function ForkSessionDialogBody({
         />
         <div className="flex items-center gap-1">
           <InputPopover
+            triggerUiId={FORK_SESSION_UI_DESCRIPTORS.providerAction}
+            contentUiId={FORK_SESSION_UI_DESCRIPTORS.providerPopover}
             trigger={
               <>
                 <ProviderIcon className="h-3.5 w-3.5" />
@@ -151,6 +216,8 @@ function ForkSessionDialogBody({
             }
           </InputPopover>
           <InputPopover
+            triggerUiId={FORK_SESSION_UI_DESCRIPTORS.modelAction}
+            contentUiId={FORK_SESSION_UI_DESCRIPTORS.modelPopover}
             trigger={
               <>
                 <Box className="h-3.5 w-3.5" />
@@ -179,12 +246,17 @@ function ForkSessionDialogBody({
         ) : null}
       </div>
       <DialogFooter className="max-md:rounded-none max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        <DialogGhostButton onClick={onClose} disabled={pending}>
+        <DialogGhostButton
+          onClick={onClose}
+          disabled={pending}
+          {...getUiIdentityAttributeProps(FORK_SESSION_UI_DESCRIPTORS.cancelAction)}
+        >
           Cancel
         </DialogGhostButton>
         <DialogPrimaryButton
           onClick={() => void handleConfirm()}
-          disabled={!context.trim() || pending}
+          disabled={!intent.trim() || pending}
+          {...getUiIdentityAttributeProps(FORK_SESSION_UI_DESCRIPTORS.submitAction)}
         >
           {pending ? "Creating..." : "Create Session"}
         </DialogPrimaryButton>

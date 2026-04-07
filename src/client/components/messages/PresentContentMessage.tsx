@@ -1,7 +1,7 @@
 import { memo, type ReactNode } from "react"
 import { Streamdown } from "streamdown"
 import remarkGfm from "remark-gfm"
-import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { createMarkdownComponents } from "./shared"
 import { RichContentBlock } from "../rich-content/RichContentBlock"
 import { EmbedRenderer, isEmbedLanguage } from "../rich-content/EmbedRenderer"
@@ -153,8 +153,14 @@ function renderErrorContent(message: ProcessedPresentContentMessage) {
 }
 
 export const PresentContentMessage = memo(function PresentContentMessage({ message }: Props) {
+  const presentContentDescriptor = createUiIdentityDescriptor({
+    id: "message.present_content.item",
+    c3ComponentId: "c3-106",
+    c3ComponentLabel: "present-content",
+  })
+
   return (
-    <div {...getUiIdentityAttributeProps("message.present_content.item")}>
+    <div {...getUiIdentityAttributeProps(presentContentDescriptor)}>
       {message.result && isPresentContentErrorResult(message.result) ? (
         renderErrorContent(message)
       ) : (

@@ -9,8 +9,10 @@ import { createUiIdentity, getUiIdentityAttributeProps } from "../lib/uiIdentity
 import {
   ChatEmptyStateBrandMark,
   getAvailableSkillsFromMessages,
+  getChatPageUiIdentityDescriptors,
   getChatPageUiIdentities,
   getEmptyStateTypingDurationMs,
+  shouldDismissMobileKeyboardOnFirstMessage,
   shouldIgnoreMobileSidebarSwipeStart,
   shouldOpenMobileSidebarFromSwipe,
 } from "./ChatPage"
@@ -183,6 +185,26 @@ describe("shouldOpenMobileSidebarFromSwipe", () => {
   })
 })
 
+describe("shouldDismissMobileKeyboardOnFirstMessage", () => {
+  test("returns true when transitioning from 0 to >0 messages on a touch device", () => {
+    expect(shouldDismissMobileKeyboardOnFirstMessage(0, 1, true)).toBe(true)
+    expect(shouldDismissMobileKeyboardOnFirstMessage(0, 5, true)).toBe(true)
+  })
+
+  test("returns false on non-touch devices", () => {
+    expect(shouldDismissMobileKeyboardOnFirstMessage(0, 1, false)).toBe(false)
+  })
+
+  test("returns false when previous count was already >0", () => {
+    expect(shouldDismissMobileKeyboardOnFirstMessage(1, 2, true)).toBe(false)
+    expect(shouldDismissMobileKeyboardOnFirstMessage(5, 6, true)).toBe(false)
+  })
+
+  test("returns false when current count is still 0", () => {
+    expect(shouldDismissMobileKeyboardOnFirstMessage(0, 0, true)).toBe(false)
+  })
+})
+
 describe("getEmptyStateTypingDurationMs", () => {
   test("scales linearly with the configured per-character interval", () => {
     expect(getEmptyStateTypingDurationMs("")).toBe(0)
@@ -211,18 +233,33 @@ describe("getChatPageUiIdentities", () => {
 
   test("maps each shell identity through the shared ui-id helper", () => {
     const identities = getChatPageUiIdentities()
+    const descriptors = getChatPageUiIdentityDescriptors()
 
-    expect(getUiIdentityAttributeProps(identities.page)).toEqual({
+    expect(identities).toEqual({
+      page: descriptors.page.id,
+      transcript: descriptors.transcript.id,
+      composer: descriptors.composer.id,
+      navbar: descriptors.navbar.id,
+    })
+    expect(getUiIdentityAttributeProps(descriptors.page)).toEqual({
       "data-ui-id": "chat.page",
+      "data-ui-c3": "c3-110",
+      "data-ui-c3-label": "chat",
     })
-    expect(getUiIdentityAttributeProps(identities.transcript)).toEqual({
+    expect(getUiIdentityAttributeProps(descriptors.transcript)).toEqual({
       "data-ui-id": "transcript.message-list",
+      "data-ui-c3": "c3-111",
+      "data-ui-c3-label": "messages",
     })
-    expect(getUiIdentityAttributeProps(identities.composer)).toEqual({
+    expect(getUiIdentityAttributeProps(descriptors.composer)).toEqual({
       "data-ui-id": "chat.composer",
+      "data-ui-c3": "c3-112",
+      "data-ui-c3-label": "chat-input",
     })
-    expect(getUiIdentityAttributeProps(identities.navbar)).toEqual({
+    expect(getUiIdentityAttributeProps(descriptors.navbar)).toEqual({
       "data-ui-id": "chat.navbar",
+      "data-ui-c3": "c3-112",
+      "data-ui-c3-label": "chat-input",
     })
   })
 

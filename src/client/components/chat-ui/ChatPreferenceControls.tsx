@@ -12,7 +12,7 @@ import {
   type CodexReasoningEffort,
   type ProviderCatalogEntry,
 } from "../../../shared/types"
-import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createUiIdentity, createUiIdentityDescriptor, getUiIdentityAttributeProps, type UiIdentityDescriptor } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 
@@ -96,8 +96,8 @@ export function InputPopover({
   trigger: React.ReactNode
   triggerClassName?: string
   disabled?: boolean
-  triggerUiId?: string
-  contentUiId?: string
+  triggerUiId?: string | UiIdentityDescriptor
+  contentUiId?: string | UiIdentityDescriptor
   children: React.ReactNode | ((close: () => void) => React.ReactNode)
 }) {
   const [open, setOpen] = useState(false)
@@ -162,7 +162,6 @@ interface ChatPreferenceControlsProps {
   onPlanModeChange?: (planMode: boolean) => void
   includePlanMode?: boolean
   className?: string
-  skillPicker?: React.ReactNode
 }
 
 export const ChatPreferenceControls = memo(function ChatPreferenceControls({
@@ -179,7 +178,6 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
   onPlanModeChange,
   includePlanMode = true,
   className,
-  skillPicker,
 }: ChatPreferenceControlsProps) {
   const providerConfig = availableProviders.find((provider) => provider.id === selectedProvider) ?? availableProviders[0]
   const ProviderIcon = PROVIDER_ICONS[selectedProvider]
@@ -190,14 +188,74 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
   const contextWindowOptions = providerConfig.models.find((candidate) => candidate.id === model)?.contextWindowOptions ?? []
   const selectedContextWindow = claudeModelOptions?.contextWindow ?? CLAUDE_CONTEXT_WINDOW_OPTIONS[0].id
   const ContextWindowIcon = selectedContextWindow === "1m" ? SquareMenu : SquareMinus
+  const providerActionDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.provider", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const providerPopoverDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.provider", "popover"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const modelActionDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.model", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const modelPopoverDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.model", "popover"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const reasoningActionDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.reasoning", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const reasoningPopoverDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.reasoning", "popover"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const contextWindowActionDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.context-window", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const contextWindowPopoverDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.context-window", "popover"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const fastModeActionDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.fast-mode", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const fastModePopoverDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.fast-mode", "popover"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const planModeActionDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.plan-mode", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const planModePopoverDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.plan-mode", "popover"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
 
   return (
     <div className={cn("flex md:justify-center items-center gap-0.5", className)}>
       {showProviderPicker ? (
         <InputPopover
           disabled={providerLocked || !onProviderChange}
-          triggerUiId={createUiIdentity("chat.composer.provider", "action")}
-          contentUiId={createUiIdentity("chat.composer.provider", "popover")}
+          triggerUiId={providerActionDescriptor}
+          contentUiId={providerPopoverDescriptor}
           trigger={(
             <>
               <ProviderIcon className="h-3.5 w-3.5" />
@@ -224,8 +282,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
       ) : null}
 
       <InputPopover
-        triggerUiId={createUiIdentity("chat.composer.model", "action")}
-        contentUiId={createUiIdentity("chat.composer.model", "popover")}
+        triggerUiId={modelActionDescriptor}
+        contentUiId={modelPopoverDescriptor}
         trigger={(
           <>
             <ModelIcon className="h-3.5 w-3.5" />
@@ -251,8 +309,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
       </InputPopover>
 
       <InputPopover
-        triggerUiId={createUiIdentity("chat.composer.reasoning", "action")}
-        contentUiId={createUiIdentity("chat.composer.reasoning", "popover")}
+        triggerUiId={reasoningActionDescriptor}
+        contentUiId={reasoningPopoverDescriptor}
         trigger={(
           <>
             <Brain className="h-3.5 w-3.5" />
@@ -296,8 +354,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
 
       {selectedProvider === "claude" && contextWindowOptions.length > 1 ? (
         <InputPopover
-          triggerUiId={createUiIdentity("chat.composer.context-window", "action")}
-          contentUiId={createUiIdentity("chat.composer.context-window", "popover")}
+          triggerUiId={contextWindowActionDescriptor}
+          contentUiId={contextWindowPopoverDescriptor}
           trigger={(
             <>
               <ContextWindowIcon className="h-3.5 w-3.5" />
@@ -325,8 +383,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
 
       {selectedProvider === "codex" ? (
         <InputPopover
-          triggerUiId={createUiIdentity("chat.composer.fast-mode", "action")}
-          contentUiId={createUiIdentity("chat.composer.fast-mode", "popover")}
+          triggerUiId={fastModeActionDescriptor}
+          contentUiId={fastModePopoverDescriptor}
           trigger={(
             <>
               {codexModelOptions?.fastMode
@@ -364,8 +422,8 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
 
       {showPlanMode ? (
         <InputPopover
-          triggerUiId={createUiIdentity("chat.composer.plan-mode", "action")}
-          contentUiId={createUiIdentity("chat.composer.plan-mode", "popover")}
+          triggerUiId={planModeActionDescriptor}
+          contentUiId={planModePopoverDescriptor}
           trigger={(
             <>
               {planMode ? <ListTodo className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
@@ -401,7 +459,6 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
         </InputPopover>
       ) : null}
 
-      {skillPicker}
     </div>
   )
 })

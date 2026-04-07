@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import { Monitor } from "lucide-react"
+import { getUiIdentityAttributeProps, type UiIdentityDescriptor } from "../lib/uiIdentityOverlay"
 import { cn } from "../lib/utils"
 
 interface PageHeaderProps {
@@ -7,6 +8,7 @@ interface PageHeaderProps {
   title: string
   subtitle?: string
   icon?: ComponentType<{ className?: string }>
+  uiId?: string | UiIdentityDescriptor
 }
 
 export function PageHeader({
@@ -14,9 +16,13 @@ export function PageHeader({
   title,
   subtitle,
   icon: Icon = Monitor,
+  uiId,
 }: PageHeaderProps) {
   return (
-    <div className={cn("w-full", narrow ? "max-w-2xl px-6 pt-16 mx-auto" : "px-6 pt-16 mb-10")}>
+    <div
+      className={cn("w-full", narrow ? "max-w-2xl px-6 pt-16 mx-auto" : "px-6 pt-16 mb-10")}
+      {...(uiId ? getUiIdentityAttributeProps(uiId) : {})}
+    >
       <div className={cn("flex items-center gap-1 mb-2", narrow && "justify-center")}>
         <div className="p-2 pl-0 rounded-lg">
           <Icon className="h-6 w-6 text-muted-foreground" />

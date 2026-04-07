@@ -11,7 +11,11 @@ import { ProcessingMessage } from "../components/messages/ProcessingMessage"
 import { Card, CardContent } from "../components/ui/card"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../components/ui/resizable"
 import { ScrollArea } from "../components/ui/scroll-area"
-import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
+import {
+  createC3UiIdentityDescriptor,
+  getUiIdentityAttributeProps,
+  getUiIdentityIdMap,
+} from "../lib/uiIdentityOverlay"
 import { cn } from "../lib/utils"
 import {
   DEFAULT_PROJECT_RIGHT_SIDEBAR_LAYOUT,
@@ -32,12 +36,29 @@ const SCROLL_BUTTON_BOTTOM_PX = 120
 const MOBILE_SIDEBAR_SWIPE_EDGE_FRACTION = 1 / 3
 const MOBILE_SIDEBAR_SWIPE_MIN_DISTANCE_PX = 72
 const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX = 56
-const CHAT_PAGE_UI_IDENTITIES = {
-  page: "chat.page",
-  transcript: "transcript.message-list",
-  composer: "chat.composer",
-  navbar: "chat.navbar",
+const CHAT_PAGE_UI_DESCRIPTORS = {
+  page: createC3UiIdentityDescriptor({
+    id: "chat.page",
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  transcript: createC3UiIdentityDescriptor({
+    id: "transcript.message-list",
+    c3ComponentId: "c3-111",
+    c3ComponentLabel: "messages",
+  }),
+  composer: createC3UiIdentityDescriptor({
+    id: "chat.composer",
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
+  navbar: createC3UiIdentityDescriptor({
+    id: "chat.navbar",
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
 } as const
+const CHAT_PAGE_UI_IDENTITIES = getUiIdentityIdMap(CHAT_PAGE_UI_DESCRIPTORS)
 
 const MOBILE_SIDEBAR_INTERACTIVE_SELECTOR = [
   "a",
@@ -165,8 +186,20 @@ export function getEmptyStateTypingDurationMs(text: string): number {
   return text.length * EMPTY_STATE_TYPING_INTERVAL_MS
 }
 
+export function shouldDismissMobileKeyboardOnFirstMessage(
+  previousMessageCount: number,
+  currentMessageCount: number,
+  isTouchDevice: boolean
+): boolean {
+  return isTouchDevice && previousMessageCount === 0 && currentMessageCount > 0
+}
+
 export function getChatPageUiIdentities() {
   return CHAT_PAGE_UI_IDENTITIES
+}
+
+export function getChatPageUiIdentityDescriptors() {
+  return CHAT_PAGE_UI_DESCRIPTORS
 }
 
 export function ChatEmptyStateBrandMark() {
@@ -183,12 +216,12 @@ export function ChatPage() {
   const chatCardRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const mobileSidebarSwipeRef = useRef<MobileSidebarSwipeState | null>(null)
+  const previousMessageCountRef = useRef(state.messages.length)
   const projectId = state.runtime?.projectId ?? null
   const projectRightSidebarLayout = useRightSidebarStore((store) => (projectId ? store.projects[projectId] : undefined))
   const rightSidebarLayout = projectRightSidebarLayout ?? DEFAULT_PROJECT_RIGHT_SIDEBAR_LAYOUT
   const toggleRightSidebar = useRightSidebarStore((store) => store.toggleVisibility)
   const setRightSidebarSize = useRightSidebarStore((store) => store.setSize)
-  const uiIdentities = getChatPageUiIdentities()
 
   const availableSkills = useMemo(() => getAvailableSkillsFromMessages(state.messages), [state.messages])
   const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
@@ -287,6 +320,26 @@ export function ChatPage() {
     return () => window.removeEventListener("resize", handleResize)
   }, [state.updateScrollState])
 
+  useEffect(() => {
+    const previousMessageCount = previousMessageCountRef.current
+    previousMessageCountRef.current = state.messages.length
+
+    if (!shouldDismissMobileKeyboardOnFirstMessage(
+      previousMessageCount,
+      state.messages.length,
+      navigator.maxTouchPoints > 0
+    )) {
+      return
+    }
+
+    const activeElement = document.activeElement
+    if (!(activeElement instanceof HTMLElement)) {
+      return
+    }
+
+    activeElement.blur()
+  }, [state.messages.length])
+
   const clampRightSidebarSize = (size: number) => {
     if (!Number.isFinite(size)) {
       return rightSidebarLayout.size
@@ -329,7 +382,7 @@ export function ChatPage() {
           onFork={state.handleForkSession}
         />
 
-        <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(uiIdentities.transcript)}>
+        <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.transcript)}>
           <ScrollArea
             ref={state.scrollRef}
             onScroll={state.updateScrollState}
@@ -431,10 +484,10 @@ export function ChatPage() {
         </div>
       </CardContent>
 
-      <div
-        className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none"
-        {...getUiIdentityAttributeProps(uiIdentities.composer)}
-      >
+        <div
+          className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none"
+          {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.composer)}
+        >
         <div className="bg-gradient-to-t from-background via-background pointer-events-auto" ref={state.inputRef}>
           <ChatInput
             ref={chatInputRef}
@@ -465,7 +518,7 @@ export function ChatPage() {
       onPointerMove={handleMobileSidebarPointerMove}
       onPointerUp={handleMobileSidebarPointerEnd}
       onPointerCancel={handleMobileSidebarPointerEnd}
-      {...getUiIdentityAttributeProps(uiIdentities.page)}
+      {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.page)}
     >
       {shouldRenderRightSidebarLayout && projectId ? (
         <ResizablePanelGroup
