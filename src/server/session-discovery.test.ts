@@ -150,6 +150,33 @@ describe("scanClaudeSessions", () => {
     const sessions = await scanClaudeSessions("/nonexistent/path")
     expect(sessions).toEqual([])
   })
+
+  test("excludes Tinkaria quick-response workflow sessions from Claude history", async () => {
+    const claudeDir = await makeTempDir()
+    await writeFile(
+      join(claudeDir, "fork-helper.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: {
+            content: "Write the first user message for a new independent forked coding session.\n\nFork intent:\nContinue the bug fix.",
+          },
+        }),
+        JSON.stringify({ type: "assistant", message: { content: "## Objective\nContinue the bug fix." } }),
+      ].join("\n") + "\n"
+    )
+    await writeFile(
+      join(claudeDir, "real-session.jsonl"),
+      [
+        JSON.stringify({ type: "user", message: { content: "Investigate the reconnect flicker" } }),
+        JSON.stringify({ type: "assistant", message: { content: "Checking the transport." } }),
+      ].join("\n") + "\n"
+    )
+
+    const sessions = await scanClaudeSessions(claudeDir)
+
+    expect(sessions.map((session) => session.sessionId)).toEqual(["real-session"])
+  })
 })
 
 describe("scanCodexSessions", () => {
@@ -285,6 +312,37 @@ describe("scanCodexSessions", () => {
   test("returns empty array for nonexistent directory", async () => {
     const sessions = await scanCodexSessions("/nonexistent/path", "/some/path")
     expect(sessions).toEqual([])
+  })
+
+  test("excludes Tinkaria quick-response workflow sessions from Codex history", async () => {
+    const sessionsDir = await makeTempDir()
+    const dateDir = join(sessionsDir, "2026", "04", "07")
+    await mkdir(dateDir, { recursive: true })
+
+    const projectPath = "/home/user/dev/kanna"
+    await writeFile(
+      join(dateDir, "title-helper.jsonl"),
+      [
+        JSON.stringify({ type: "session_meta", payload: { id: "title-helper", cwd: projectPath, timestamp: Date.now() } }),
+        JSON.stringify({
+          type: "user",
+          message: {
+            content: "Generate a short, descriptive title (under 30 chars) for a conversation that starts with this message.\n\nhello",
+          },
+        }),
+      ].join("\n") + "\n"
+    )
+    await writeFile(
+      join(dateDir, "real-codex.jsonl"),
+      [
+        JSON.stringify({ type: "session_meta", payload: { id: "real-codex", cwd: projectPath, timestamp: Date.now() } }),
+        JSON.stringify({ type: "user", message: { content: "Trace the sidebar flicker" } }),
+      ].join("\n") + "\n"
+    )
+
+    const sessions = await scanCodexSessions(sessionsDir, projectPath)
+
+    expect(sessions.map((session) => session.sessionId)).toEqual(["real-codex"])
   })
 })
 

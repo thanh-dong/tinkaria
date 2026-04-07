@@ -16,6 +16,11 @@ import type { EventStore } from "./event-store"
 
 const TAIL_BYTES = 32 * 1024
 const TITLE_SCAN_LINES = 5
+const INTERNAL_WORKFLOW_PROMPT_PREFIXES = [
+  "write the first user message for a new independent forked coding session.",
+  "write the first user message for a new session that merges context from",
+  "generate a short, descriptive title (under 30 chars) for a conversation that starts with this message.",
+] as const
 
 interface LastExchange {
   question: string
@@ -90,6 +95,22 @@ function extractContentText(value: unknown, maxLength: number): string | null {
   }
 
   return null
+}
+
+function normalizePromptSignature(value: string | null | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase()
+}
+
+function isInternalWorkflowPrompt(value: string | null | undefined): boolean {
+  const normalized = normalizePromptSignature(value)
+  return INTERNAL_WORKFLOW_PROMPT_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+}
+
+function shouldExcludeInternalWorkflowSession(args: {
+  titleCandidate: string | null
+  lastExchange: LastExchange | null
+}): boolean {
+  return isInternalWorkflowPrompt(args.titleCandidate) || isInternalWorkflowPrompt(args.lastExchange?.question)
 }
 
 function formatUsageBucketLabel(windowMinutes: number, fallback: string): string {
@@ -375,6 +396,7 @@ export async function scanClaudeSessions(
     const titleCandidate = extractTitleCandidate(headLines)
     const lastExchange = extractLastExchange(tailContent)
     const runtime = extractClaudeRuntime(tailContent)
+    if (shouldExcludeInternalWorkflowSession({ titleCandidate, lastExchange })) continue
 
     sessions.push({
       sessionId,
@@ -451,6 +473,7 @@ export async function scanCodexSessions(
 
     const titleLines = await readHead(filePath, TITLE_SCAN_LINES + 1)
     const titleCandidate = extractTitleCandidate(titleLines.slice(1))
+    if (shouldExcludeInternalWorkflowSession({ titleCandidate, lastExchange })) continue
 
     sessions.push({
       sessionId: meta.id,
