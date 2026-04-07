@@ -10,6 +10,10 @@ interface SkillRibbonProps {
   visible: boolean
   onToggle: () => void
   onInsert: (skill: string) => void
+  showToggle?: boolean
+  showContent?: boolean
+  className?: string
+  contentClassName?: string
 }
 
 export const SkillRibbon = memo(function SkillRibbon({
@@ -18,6 +22,10 @@ export const SkillRibbon = memo(function SkillRibbon({
   visible,
   onToggle,
   onInsert,
+  showToggle = true,
+  showContent = true,
+  className,
+  contentClassName,
 }: SkillRibbonProps) {
   const usageCounts = useSkillCompositionStore((state) => state.usageCounts)
   const sorted = useMemo(
@@ -25,33 +33,38 @@ export const SkillRibbon = memo(function SkillRibbon({
     [skills, usageCounts]
   )
 
-  if (skills.length === 0) return null
+  if (skills.length === 0 || (!showToggle && !showContent)) return null
 
   return (
-    <div className="flex items-center min-h-[32px]">
-      <button
-        type="button"
-        onClick={onToggle}
-        className={cn(
-          "shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
-          "hover:bg-muted/60",
-          visible
-            ? "text-amber-600 dark:text-amber-400"
-            : "text-muted-foreground"
-        )}
-      >
-        <Sparkles className="h-3 w-3" />
-        <span>Skills</span>
-        <ChevronRight
+    <div className={cn("flex items-center min-h-[32px]", className)}>
+      {showToggle ? (
+        <button
+          type="button"
+          onClick={onToggle}
           className={cn(
-            "h-3 w-3 transition-transform duration-200",
-            visible && "rotate-90"
+            "shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
+            "hover:bg-muted/60",
+            visible
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-muted-foreground"
           )}
-        />
-      </button>
+        >
+          <Sparkles className="h-3 w-3" />
+          <span>Skills</span>
+          <ChevronRight
+            className={cn(
+              "h-3 w-3 transition-transform duration-200",
+              visible && "rotate-90"
+            )}
+          />
+        </button>
+      ) : null}
 
-      {visible ? (
-        <div className="flex-1 flex items-center gap-1 pr-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {visible && showContent ? (
+        <div className={cn(
+          "flex-1 flex items-center gap-1 pr-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          contentClassName
+        )}>
           {sorted.map((skill) => (
             <button
               key={skill}

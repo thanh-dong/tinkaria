@@ -611,7 +611,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
           </div>
         </div>
       ) : null}
-      {availableSkills.length > 0 ? (
+      {availableSkills.length > 0 && ribbonVisible ? (
         <div className={cn("px-3", isStandalone && "px-5")}>
           <div className="max-w-[840px] mx-auto">
             <SkillRibbon
@@ -620,6 +620,8 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
               visible={ribbonVisible}
               onToggle={toggleRibbon}
               onInsert={handleSkillInsert}
+              showToggle={false}
+              contentClassName="pr-0"
             />
           </div>
         </div>
@@ -697,6 +699,17 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       </div>
       <div className={cn("overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-3 flex flex-row", isStandalone && "p-5 pt-3")}>
         <div className="min-w-3"/>
+        {availableSkills.length > 0 ? (
+          <SkillRibbon
+            skills={availableSkills}
+            provider={resolvedProvider}
+            visible={ribbonVisible}
+            onToggle={toggleRibbon}
+            onInsert={handleSkillInsert}
+            showContent={false}
+            className="shrink-0"
+          />
+        ) : null}
         <ComposerPreferenceControls
           key={composerControlsKey}
           ref={composerPreferencesRef}
