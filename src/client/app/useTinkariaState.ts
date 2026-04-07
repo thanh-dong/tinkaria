@@ -627,7 +627,8 @@ export interface TinkariaState {
   handleShowMoreSessions: (projectId: string) => void
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
-  handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
+  handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
+  mergePendingChatId: string | null
   pendingMergeProjectId: string | null
   requestMerge: (projectId: string) => void
   clearMergeRequest: () => void
@@ -671,6 +672,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
   const [pendingMergeProjectId, setPendingMergeProjectId] = useState<string | null>(null)
+  const [mergePendingChatId, setMergePendingChatId] = useState<string | null>(null)
   const submitPipelineRef = useRef<SubmitPipelineState>(createSubmitPipelineState({
     queuedTextByChat: Object.fromEntries(
       Object.entries(useChatInputStore.getState().queuedDrafts).map(([chatId, draft]) => [chatId, draft.text])
@@ -1786,46 +1788,52 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     await startSessionFromPrompt(forkPromptResult.prompt, provider, model)
   }
 
-  async function handleMergeSession(chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string) {
+  async function handleMergeSession(chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) {
     if (chatIds.length < 1) {
       throw new Error("Select at least 1 session to merge")
     }
 
-    const projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
+    const projectId = pendingMergeProjectId ?? selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
     if (!projectId) {
       throw new Error("Open a project first")
     }
 
-    // Run LLM prompt generation and chat creation concurrently
-    const [mergePromptResult, createResult] = await Promise.all([
-      socket.command<{ prompt: string }>({
-        type: "chat.generateMergePrompt",
-        chatIds,
-        intent,
-        preset,
-      }),
-      socket.command<{ chatId: string }>({ type: "chat.create", projectId }),
-    ])
-
-    const providerDefaults = useChatPreferencesStore.getState().providerDefaults
-    const defaults = providerDefaults[provider]
-    const modelOptions: ModelOptions = provider === "claude"
-      ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
-      : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
-
-    await socket.command({
-      type: "chat.send",
-      chatId: createResult.chatId,
-      provider,
-      content: mergePromptResult.prompt,
-      model,
-      modelOptions,
-    })
-
-    setPendingChatId(createResult.chatId)
-    navigate(`/chat/${createResult.chatId}`)
+    // Step 1: Create chat + navigate instantly
+    const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
+    setPendingChatId(chatId)
+    setMergePendingChatId(chatId)
+    navigate(`/chat/${chatId}`)
     setSidebarOpen(false)
     setCommandError(null)
+
+    // Step 2: Background — generate prompt + send + optional cleanup
+    void (async () => {
+      try {
+        const { prompt } = await socket.command<{ prompt: string }>({
+          type: "chat.generateMergePrompt", chatIds, intent, preset,
+        })
+        const defaults = useChatPreferencesStore.getState().providerDefaults[provider]
+        const modelOptions: ModelOptions = provider === "claude"
+          ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
+          : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
+
+        await socket.command({ type: "chat.send", chatId, provider, content: prompt, model, modelOptions })
+
+        if (closeSources) {
+          for (const sourceId of chatIds) {
+            try {
+              await socket.command({ type: "chat.delete", chatId: sourceId })
+            } catch (deleteError) {
+              console.warn("[merge] failed to delete source chat:", sourceId, deleteError instanceof Error ? deleteError.message : String(deleteError))
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("[merge] background merge failed:", error instanceof Error ? error.message : String(error))
+      } finally {
+        setMergePendingChatId(null)
+      }
+    })()
   }
 
   async function handleAskUserQuestion(
@@ -1941,6 +1949,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     handleForkSession,
     handleMergeSession,
     pendingMergeProjectId,
+    mergePendingChatId,
     requestMerge: (projectId: string) => setPendingMergeProjectId(projectId),
     clearMergeRequest: () => setPendingMergeProjectId(null),
     handleAskUserQuestion,

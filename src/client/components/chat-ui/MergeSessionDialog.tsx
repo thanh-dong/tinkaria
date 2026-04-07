@@ -30,7 +30,8 @@ interface Props {
   availableProviders: ProviderCatalogEntry[]
   /** Sidebar chats for the current project (excluding active chat) */
   availableChats: SidebarChatRow[]
-  onMerge: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
+  minSessions?: number
+  onMerge: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
 }
 
 const MERGE_SESSION_UI_DESCRIPTORS = {
@@ -124,6 +125,7 @@ export function MergeSessionDialog({
   defaultModel,
   availableProviders,
   availableChats,
+  minSessions = 1,
   onMerge,
 }: Props) {
   const [openVersion, setOpenVersion] = useState(0)
@@ -149,6 +151,7 @@ export function MergeSessionDialog({
             defaultModel={defaultModel}
             availableProviders={availableProviders}
             availableChats={availableChats}
+            minSessions={minSessions}
             onMerge={onMerge}
             onClose={() => handleOpenChange(false)}
           />
@@ -163,6 +166,7 @@ function MergeSessionDialogBody({
   defaultModel,
   availableProviders,
   availableChats,
+  minSessions = 1,
   onMerge,
   onClose,
 }: {
@@ -170,7 +174,8 @@ function MergeSessionDialogBody({
   defaultModel: string
   availableProviders: ProviderCatalogEntry[]
   availableChats: SidebarChatRow[]
-  onMerge: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
+  minSessions?: number
+  onMerge: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
   onClose: () => void
 }) {
   const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(new Set())
@@ -181,6 +186,7 @@ function MergeSessionDialogBody({
   const [model, setModel] = useState(defaultModel)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [closeSources, setCloseSources] = useState(false)
 
   const providerConfig = availableProviders.find((p) => p.id === provider) ?? availableProviders[0]
   const preset = getMergePreset(presetId) ?? MERGE_PRESETS[0]
@@ -220,11 +226,11 @@ function MergeSessionDialogBody({
   }
 
   async function handleConfirm() {
-    if (selectedChatIds.size < 1 || !intent.trim() || pending) return
+    if (selectedChatIds.size < minSessions || !intent.trim() || pending) return
     setPending(true)
     setError(null)
     try {
-      await onMerge([...selectedChatIds], intent.trim(), provider, model, presetId)
+      await onMerge([...selectedChatIds], intent.trim(), provider, model, presetId, closeSources)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -233,7 +239,7 @@ function MergeSessionDialogBody({
     }
   }
 
-  const canSubmit = selectedChatIds.size >= 1 && intent.trim().length > 0 && !pending
+  const canSubmit = selectedChatIds.size >= minSessions && intent.trim().length > 0 && !pending
 
   return (
     <>
@@ -439,6 +445,16 @@ function MergeSessionDialogBody({
         {error ? (
           <div className="text-sm text-destructive">{error}</div>
         ) : null}
+
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={closeSources}
+            onChange={(e) => setCloseSources(e.target.checked)}
+            className="rounded border-border accent-primary"
+          />
+          Close source sessions after merge
+        </label>
       </div>
       <DialogFooter className="max-md:rounded-none max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <DialogGhostButton

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { ArrowDown } from "lucide-react"
+import { ArrowDown, Loader2 } from "lucide-react"
 import { useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
@@ -424,6 +424,7 @@ export function ChatPage() {
           )?.models[0]?.id ?? "sonnet"}
           availableProviders={state.availableProviders}
           availableChats={mergeAvailableChats}
+          minSessions={state.pendingMergeProjectId ? 2 : 1}
           onMerge={state.handleMergeSession}
         />
 
@@ -475,37 +476,46 @@ export function ChatPage() {
           >
             <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
               <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 opacity-70">
-                <ChatEmptyStateBrandMark />
-                <div
-                  className="text-base font-normal text-muted-foreground text-center max-w-xs flex items-center tinkaria-empty-state-text"
-                  aria-label={EMPTY_STATE_TEXT}
-                >
-                  <span className="relative inline-grid place-items-start">
-                    <span className="invisible col-start-1 row-start-1 whitespace-pre flex items-center">
-                      <span>{EMPTY_STATE_TEXT}</span>
-                      <span className="tinkaria-typewriter-cursor-slot" aria-hidden="true" />
-                    </span>
-                    <span className="col-start-1 row-start-1 whitespace-pre flex items-center">
-                      <span
-                        className="tinkaria-typewriter-text"
-                        style={{
-                          "--tinkaria-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
-                          "--tinkaria-typewriter-steps": EMPTY_STATE_TEXT.length,
-                        } as CSSProperties}
-                      >
-                        {EMPTY_STATE_TEXT}
+                {state.mergePendingChatId === state.activeChatId ? (
+                  <>
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+                    <span className="text-sm text-muted-foreground">Generating merge summary...</span>
+                  </>
+                ) : (
+                  <>
+                    <ChatEmptyStateBrandMark />
+                    <div
+                      className="text-base font-normal text-muted-foreground text-center max-w-xs flex items-center tinkaria-empty-state-text"
+                      aria-label={EMPTY_STATE_TEXT}
+                    >
+                      <span className="relative inline-grid place-items-start">
+                        <span className="invisible col-start-1 row-start-1 whitespace-pre flex items-center">
+                          <span>{EMPTY_STATE_TEXT}</span>
+                          <span className="tinkaria-typewriter-cursor-slot" aria-hidden="true" />
+                        </span>
+                        <span className="col-start-1 row-start-1 whitespace-pre flex items-center">
+                          <span
+                            className="tinkaria-typewriter-text"
+                            style={{
+                              "--tinkaria-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
+                              "--tinkaria-typewriter-steps": EMPTY_STATE_TEXT.length,
+                            } as CSSProperties}
+                          >
+                            {EMPTY_STATE_TEXT}
+                          </span>
+                          <span className="tinkaria-typewriter-cursor-slot" aria-hidden="true">
+                            <span
+                              className="tinkaria-typewriter-cursor"
+                              style={{
+                                "--tinkaria-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
+                              } as CSSProperties}
+                            />
+                          </span>
+                        </span>
                       </span>
-                      <span className="tinkaria-typewriter-cursor-slot" aria-hidden="true">
-                        <span
-                          className="tinkaria-typewriter-cursor"
-                          style={{
-                            "--tinkaria-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
-                          } as CSSProperties}
-                        />
-                      </span>
-                    </span>
-                  </span>
-                </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -544,7 +554,7 @@ export function ChatPage() {
             queuedText={state.queuedText}
             onClearQueuedText={state.clearQueuedText}
             onRestoreQueuedText={state.restoreQueuedText}
-            disabled={!state.hasSelectedProject || state.runtime?.status === "waiting_for_user"}
+            disabled={!state.hasSelectedProject || state.runtime?.status === "waiting_for_user" || state.mergePendingChatId === state.activeChatId}
             canCancel={state.canCancel}
             chatId={state.activeChatId}
             activeProvider={state.runtime?.provider ?? null}
