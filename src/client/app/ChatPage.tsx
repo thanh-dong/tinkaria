@@ -368,6 +368,8 @@ export function ChatPage() {
           localPath={state.navbarLocalPath}
           currentSessionRuntime={state.currentSessionRuntime}
           currentRepoStatus={state.currentRepoStatus}
+          chatTitle={state.runtime?.title}
+          chatStatus={state.runtime?.status}
         />
 
         <ForkSessionDialog

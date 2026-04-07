@@ -147,6 +147,61 @@ describe("ChatNavbar", () => {
 
     expect(html).not.toContain('data-testid="context-bar"')
   })
+
+  test("shows session title when sidebar is collapsed", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: true,
+      ...defaultProps,
+      chatTitle: "Adding dark mode toggle",
+      chatStatus: "idle",
+    })
+
+    expect(html).toContain("Adding dark mode toggle")
+    expect(html).toContain('data-testid="session-summary"')
+  })
+
+  test("hides session title when sidebar is expanded", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      chatTitle: "Adding dark mode toggle",
+      chatStatus: "idle",
+    })
+
+    expect(html).not.toContain('data-testid="session-summary"')
+  })
+
+  test("shows status dot for running session", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: true,
+      ...defaultProps,
+      chatTitle: "Fix authentication bug",
+      chatStatus: "running",
+    })
+
+    expect(html).toContain('data-testid="session-summary"')
+    expect(html).toContain('data-status="running"')
+  })
+
+  test("shows status dot for waiting_for_user", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: true,
+      ...defaultProps,
+      chatTitle: "Refactoring API",
+      chatStatus: "waiting_for_user",
+    })
+
+    expect(html).toContain('data-status="waiting_for_user"')
+  })
+
+  test("hides session summary when no chatTitle", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: true,
+      ...defaultProps,
+    })
+
+    expect(html).not.toContain('data-testid="session-summary"')
+  })
 })
 
 describe("getContextBarColor", () => {

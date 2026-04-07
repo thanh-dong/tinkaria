@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
-import type { CurrentRepoStatusSnapshot, DiscoveredSessionRuntime } from "../../../shared/types"
+import type { CurrentRepoStatusSnapshot, DiscoveredSessionRuntime, TinkariaStatus } from "../../../shared/types"
 import { PROVIDER_ICONS, getProviderFromModel } from "../icons/ProviderIcons"
 
 interface Props {
@@ -18,6 +18,8 @@ interface Props {
   localPath?: string
   currentSessionRuntime?: DiscoveredSessionRuntime | null
   currentRepoStatus?: CurrentRepoStatusSnapshot | null
+  chatTitle?: string
+  chatStatus?: TinkariaStatus
 }
 
 function getPathLabel(localPath: string | undefined, repoStatus: CurrentRepoStatusSnapshot | null | undefined): string | null {
@@ -142,6 +144,20 @@ function RepoDetailPopover({
   )
 }
 
+function getStatusDotClass(status: TinkariaStatus | undefined): string {
+  switch (status) {
+    case "running":
+    case "starting":
+      return "bg-emerald-500 animate-pulse"
+    case "waiting_for_user":
+      return "bg-amber-500"
+    case "failed":
+      return "bg-red-500"
+    default:
+      return "bg-muted-foreground/40"
+  }
+}
+
 export function ChatNavbar({
   sidebarCollapsed,
   onOpenSidebar,
@@ -151,6 +167,8 @@ export function ChatNavbar({
   localPath,
   currentSessionRuntime,
   currentRepoStatus,
+  chatTitle,
+  chatStatus,
 }: Props) {
   const navbarAreaId = createUiIdentity("chat.navbar", "area")
   const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
@@ -216,6 +234,20 @@ export function ChatNavbar({
             </Tooltip>
           ) : null}
         </div>
+
+        {/* Center: session title (collapsed sidebar only) */}
+        {sidebarCollapsed && chatTitle ? (
+          <div
+            className="flex min-w-0 flex-1 items-center gap-1.5 px-1"
+            data-testid="session-summary"
+            data-status={chatStatus ?? "idle"}
+          >
+            <span className={cn("size-1.5 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
+            <span className="truncate text-[11px] leading-none text-muted-foreground">
+              {chatTitle}
+            </span>
+          </div>
+        ) : null}
 
         {/* Right pill: compact repo + context bar */}
         <div className="flex min-w-0 flex-1 justify-end">
