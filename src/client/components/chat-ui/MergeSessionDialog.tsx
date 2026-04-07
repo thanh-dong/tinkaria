@@ -220,7 +220,7 @@ function MergeSessionDialogBody({
   }
 
   async function handleConfirm() {
-    if (selectedChatIds.size < 2 || !intent.trim() || pending) return
+    if (selectedChatIds.size < 1 || !intent.trim() || pending) return
     setPending(true)
     setError(null)
     try {
@@ -233,7 +233,7 @@ function MergeSessionDialogBody({
     }
   }
 
-  const canSubmit = selectedChatIds.size >= 2 && intent.trim().length > 0 && !pending
+  const canSubmit = selectedChatIds.size >= 1 && intent.trim().length > 0 && !pending
 
   return (
     <>

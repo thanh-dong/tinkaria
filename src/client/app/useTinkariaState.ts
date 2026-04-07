@@ -628,6 +628,9 @@ export interface TinkariaState {
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
+  pendingMergeProjectId: string | null
+  requestMerge: (projectId: string) => void
+  clearMergeRequest: () => void
   handleAskUserQuestion: (
     toolUseId: string,
     questions: AskUserQuestionItem[],
@@ -667,6 +670,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [commandError, setCommandError] = useState<string | null>(null)
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
+  const [pendingMergeProjectId, setPendingMergeProjectId] = useState<string | null>(null)
   const submitPipelineRef = useRef<SubmitPipelineState>(createSubmitPipelineState({
     queuedTextByChat: Object.fromEntries(
       Object.entries(useChatInputStore.getState().queuedDrafts).map(([chatId, draft]) => [chatId, draft.text])
@@ -1783,8 +1787,8 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   }
 
   async function handleMergeSession(chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string) {
-    if (chatIds.length < 2) {
-      throw new Error("Select at least 2 sessions to merge")
+    if (chatIds.length < 1) {
+      throw new Error("Select at least 1 session to merge")
     }
 
     const projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
@@ -1936,6 +1940,9 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     handleCompose,
     handleForkSession,
     handleMergeSession,
+    pendingMergeProjectId,
+    requestMerge: (projectId: string) => setPendingMergeProjectId(projectId),
+    clearMergeRequest: () => setPendingMergeProjectId(null),
     handleAskUserQuestion,
     handleExitPlanMode,
   }

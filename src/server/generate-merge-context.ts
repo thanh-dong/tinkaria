@@ -118,9 +118,9 @@ export async function generateMergePromptForChats(
   presetId?: string,
   adapter: QuickResponseAdapter = new QuickResponseAdapter(),
 ): Promise<string> {
-  if (sessions.length < 2) {
+  if (sessions.length < 1) {
     throw new Error(
-      `${LOG_PREFIX} Merge requires at least 2 sessions (got ${sessions.length})`,
+      `${LOG_PREFIX} Merge requires at least 1 session (got ${sessions.length})`,
     )
   }
   if (sessions.length > MAX_MERGE_SESSIONS) {

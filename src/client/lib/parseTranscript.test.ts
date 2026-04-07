@@ -226,6 +226,30 @@ describe("processTranscriptMessages", () => {
       },
     })
   })
+
+  test("hides context usage entries from the rendered transcript", () => {
+    const messages = processTranscriptMessages([
+      entry({
+        kind: "assistant_text",
+        text: "Before usage update",
+      }),
+      entry({
+        kind: "context_usage",
+        contextUsage: {
+          percentage: 59,
+          totalTokens: 117354,
+          maxTokens: 200000,
+        },
+      }),
+      entry({
+        kind: "assistant_text",
+        text: "After usage update",
+      }),
+    ])
+
+    expect(messages).toHaveLength(2)
+    expect(messages.map((message) => message.kind)).toEqual(["assistant_text", "assistant_text"])
+  })
 })
 
 describe("getLatestToolIds", () => {

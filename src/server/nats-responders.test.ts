@@ -299,19 +299,19 @@ describe("nats-responders", () => {
     expect(mergeCalls[0]!.preset).toBe("synthesis")
   })
 
-  test("chat.generateMergePrompt rejects fewer than 2 sessions", async () => {
+  test("chat.generateMergePrompt rejects empty chatIds", async () => {
     const { clientNc } = await setup({
       generateMergePrompt: async () => "should not reach",
     })
 
     const res = await sendCommand(clientNc, {
       type: "chat.generateMergePrompt",
-      chatIds: ["chat-1"],
+      chatIds: [],
       intent: "Merge this",
     })
 
     expect(res.ok).toBe(false)
-    expect(res.error).toContain("At least 2 sessions")
+    expect(res.error).toContain("At least 1 session")
   })
 
   test("chat.generateMergePrompt does not trigger onStateChange", async () => {

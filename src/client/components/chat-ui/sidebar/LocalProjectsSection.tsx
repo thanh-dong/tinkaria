@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo, useRef } from "react"
-import { ChevronRight, FolderOpen, Loader2, SquarePen } from "lucide-react"
+import { ChevronRight, FolderOpen, Loader2, Merge, SquarePen } from "lucide-react"
 import type { AgentProvider, DiscoveredSession } from "../../../../shared/types"
 import { SessionPicker } from "../SessionPicker"
 import {
@@ -35,6 +35,12 @@ const PROJECT_GROUP_DESCRIPTOR = createUiIdentityDescriptor({
   c3ComponentLabel: "sidebar",
 })
 
+const MERGE_SESSION_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "sidebar.project-group.merge-session",
+  c3ComponentId: "c3-113",
+  c3ComponentLabel: "sidebar",
+})
+
 interface Props {
   projectGroups: SidebarProjectGroup[]
   collapsedSections: Set<string>
@@ -55,6 +61,7 @@ interface Props {
   onResumeSession?: (projectId: string, sessionId: string, provider: AgentProvider) => void
   onRefreshSessions?: (projectId: string) => void
   onShowMoreSessions?: (projectId: string) => void
+  onMergeSession?: (projectId: string) => void
 }
 
 interface SortableProjectGroupProps {
@@ -76,6 +83,7 @@ interface SortableProjectGroupProps {
   onResumeSession?: (projectId: string, sessionId: string, provider: AgentProvider) => void
   onRefreshSessions?: (projectId: string) => void
   onShowMoreSessions?: (projectId: string) => void
+  onMergeSession?: (projectId: string) => void
 }
 
 function SortableProjectGroup({
@@ -97,6 +105,7 @@ function SortableProjectGroup({
   onResumeSession,
   onRefreshSessions,
   onShowMoreSessions,
+  onMergeSession,
 }: SortableProjectGroupProps) {
   const { groupKey, localPath, chats: pathChats } = group
 
@@ -176,6 +185,31 @@ function SortableProjectGroup({
             onOpenChange={(open) => onOpenSessionPicker(groupKey, open)}
             disabled={!isConnected}
           />
+        )}
+        {onMergeSession && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                {...getUiIdentityAttributeProps(MERGE_SESSION_DESCRIPTOR)}
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-5.5 w-5.5 !rounded opacity-100 md:opacity-0 md:group-hover/section:opacity-100",
+                  !isConnected && "opacity-50 cursor-not-allowed"
+                )}
+                disabled={!isConnected}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onMergeSession(groupKey)
+                }}
+              >
+                <Merge className="size-3.5 text-slate-500 dark:text-slate-400" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={4}>
+              {!isConnected ? `Start ${APP_NAME} to connect` : "Merge sessions"}
+            </TooltipContent>
+          </Tooltip>
         )}
         {onNewLocalChat && (
           <Tooltip>
@@ -263,6 +297,7 @@ export function LocalProjectsSection({
   onResumeSession,
   onRefreshSessions,
   onShowMoreSessions,
+  onMergeSession,
 }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -334,6 +369,7 @@ export function LocalProjectsSection({
             onResumeSession={onResumeSession}
             onRefreshSessions={onRefreshSessions}
             onShowMoreSessions={onShowMoreSessions}
+            onMergeSession={onMergeSession}
           />
         ))}
       </SortableContext>

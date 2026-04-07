@@ -370,6 +370,9 @@ function TinkariaLayout() {
           }}
           onRefreshSessions={state.handleRefreshSessions}
           onShowMoreSessions={state.handleShowMoreSessions}
+          onMergeSession={(projectId) => {
+            state.requestMerge(projectId)
+          }}
         />
         <Outlet context={state} />
       </div>

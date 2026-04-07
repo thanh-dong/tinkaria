@@ -241,8 +241,8 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       }
 
       case "chat.generateMergePrompt": {
-        if (!command.chatIds || command.chatIds.length < 2) {
-          throw new Error("At least 2 sessions are required for merge")
+        if (!command.chatIds || command.chatIds.length < 1) {
+          throw new Error("At least 1 session is required for merge")
         }
         const firstChat = store.getChat(command.chatIds[0]!)
         if (!firstChat) {

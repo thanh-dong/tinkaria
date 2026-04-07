@@ -127,6 +127,8 @@ function hydrateEntry(
         ...createBaseMessage(entry),
         kind: "context_cleared",
       }
+    case "context_usage":
+      return null
     case "interrupted":
       return {
         ...createBaseMessage(entry),

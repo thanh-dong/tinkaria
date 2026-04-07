@@ -248,12 +248,20 @@ export function ChatPage() {
   const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
   const [forkDialogOpen, setForkDialogOpen] = useState(false)
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
+  const mergeSourceProjectId = state.pendingMergeProjectId ?? projectId
   const mergeAvailableChats = useMemo(() => {
-    if (!projectId) return []
-    const group = state.sidebarData.projectGroups.find((g) => g.groupKey === projectId)
+    if (!mergeSourceProjectId) return []
+    const group = state.sidebarData.projectGroups.find((g) => g.groupKey === mergeSourceProjectId)
     if (!group) return []
     return group.chats.filter((chat) => chat.chatId !== state.activeChatId)
-  }, [projectId, state.sidebarData.projectGroups, state.activeChatId])
+  }, [mergeSourceProjectId, state.sidebarData.projectGroups, state.activeChatId])
+
+  useEffect(() => {
+    if (state.pendingMergeProjectId) {
+      setMergeDialogOpen(true)
+    }
+  }, [state.pendingMergeProjectId])
+
   const shouldRenderRightSidebarLayout = Boolean(projectId)
   const {
     isAnimating: isRightSidebarAnimating,
@@ -406,7 +414,10 @@ export function ChatPage() {
 
         <MergeSessionDialog
           open={mergeDialogOpen}
-          onOpenChange={setMergeDialogOpen}
+          onOpenChange={(open) => {
+            setMergeDialogOpen(open)
+            if (!open) state.clearMergeRequest()
+          }}
           defaultProvider={state.runtime?.provider ?? "claude"}
           defaultModel={state.availableProviders.find(
             (p) => p.id === (state.runtime?.provider ?? "claude")

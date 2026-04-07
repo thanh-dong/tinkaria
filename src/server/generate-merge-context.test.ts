@@ -213,12 +213,11 @@ describe("generateMergePromptForChats", () => {
     expect(args!.prompt).toContain("Compare & decide")
   })
 
-  test("throws for fewer than 2 sessions", async () => {
+  test("throws for empty sessions", async () => {
     const { adapter } = createMockAdapter()
-    const sessions = [{ chatId: "a", entries: [userPrompt("alone")] }]
 
     await expect(
-      generateMergePromptForChats("merge", sessions, "/tmp/test", undefined, adapter),
+      generateMergePromptForChats("merge", [], "/tmp/test", undefined, adapter),
     ).rejects.toThrow()
   })
 

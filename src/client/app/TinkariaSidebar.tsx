@@ -37,6 +37,7 @@ interface TinkariaSidebarProps {
   onResumeSession: (projectId: string, sessionId: string, provider: AgentProvider) => void
   onRefreshSessions: (projectId: string) => void
   onShowMoreSessions: (projectId: string) => void
+  onMergeSession?: (projectId: string) => void
 }
 
 const SIDEBAR_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
@@ -73,6 +74,7 @@ export function TinkariaSidebar({
   onResumeSession,
   onRefreshSessions,
   onShowMoreSessions,
+  onMergeSession,
 }: TinkariaSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -399,6 +401,7 @@ export function TinkariaSidebar({
               onResumeSession={onResumeSession}
               onRefreshSessions={onRefreshSessions}
               onShowMoreSessions={onShowMoreSessions}
+              onMergeSession={onMergeSession}
             />
           </div>
         </div>
