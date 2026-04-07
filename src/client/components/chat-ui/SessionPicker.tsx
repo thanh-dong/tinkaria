@@ -7,8 +7,20 @@ import {
   getUiIdentityAttributeProps,
   getUiIdentityIdMap,
 } from "../../lib/uiIdentityOverlay"
+import { useIsMobile } from "../../hooks/useIsMobile"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogGhostButton,
+  DialogHeader,
+  RESPONSIVE_MODAL_CONTENT_CLASS_NAME,
+  RESPONSIVE_MODAL_FOOTER_CLASS_NAME,
+  RESPONSIVE_MODAL_HEADER_CLASS_NAME,
+  DialogTitle,
+} from "../ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import type { DiscoveredSession } from "../../../shared/types"
 
@@ -20,6 +32,11 @@ const SESSION_PICKER_UI_DESCRIPTORS = {
   }),
   popover: createC3UiIdentityDescriptor({
     id: createUiIdentity("sidebar.project-group.sessions", "popover"),
+    c3ComponentId: "c3-113",
+    c3ComponentLabel: "sidebar",
+  }),
+  dialog: createC3UiIdentityDescriptor({
+    id: "sidebar.project-group.sessions.dialog",
     c3ComponentId: "c3-113",
     c3ComponentLabel: "sidebar",
   }),
@@ -42,6 +59,11 @@ export function getSessionPickerUiIdentities() {
 
 export function getSessionPickerUiIdentityDescriptors() {
   return SESSION_PICKER_UI_DESCRIPTORS
+}
+
+const SESSION_PICKER_TRIGGER_CLASS_NAME = "opacity-100 md:opacity-0 md:group-hover/section:opacity-100 transition-opacity"
+export function getSessionPickerTriggerClassName() {
+  return SESSION_PICKER_TRIGGER_CLASS_NAME
 }
 
 // --- Helpers ---
@@ -283,6 +305,7 @@ export const SessionPicker = memo(function SessionPicker({
   disabled = false,
   sidebarChatIds,
 }: SessionPickerProps) {
+  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -297,18 +320,72 @@ export const SessionPicker = memo(function SessionPicker({
     handleOpenChange(false)
   }
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
+  const trigger = (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      disabled={disabled}
+      className={SESSION_PICKER_TRIGGER_CLASS_NAME}
+      {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.triggerAction)}
+    >
+      <History className="h-3.5 w-3.5" />
+    </Button>
+  )
+
+  const content = (
+    <SessionPickerContent
+      sessions={sessions}
+      windowDays={windowDays}
+      searchQuery={searchQuery}
+      onSelectSession={handleSelectSession}
+      onRefresh={onRefresh}
+      onSearchChange={setSearchQuery}
+      onShowMore={onShowMore}
+      isRefreshing={isLoading}
+      sidebarChatIds={sidebarChatIds}
+    />
+  )
+
+  if (isMobile) {
+    return (
+      <>
         <Button
           variant="ghost"
           size="icon-sm"
           disabled={disabled}
-          className="opacity-0 group-hover/section:opacity-100 transition-opacity"
+          onClick={() => handleOpenChange(true)}
+          className={SESSION_PICKER_TRIGGER_CLASS_NAME}
           {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.triggerAction)}
         >
           <History className="h-3.5 w-3.5" />
         </Button>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+          <DialogContent
+            size="sm"
+            className={RESPONSIVE_MODAL_CONTENT_CLASS_NAME}
+            {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.dialog)}
+          >
+            <DialogHeader className={RESPONSIVE_MODAL_HEADER_CLASS_NAME}>
+              <DialogTitle>Sessions</DialogTitle>
+            </DialogHeader>
+            <div className="px-4 pb-4 pt-3.5 flex min-h-0 flex-1 flex-col overflow-hidden">
+              {content}
+            </div>
+            <DialogFooter className={RESPONSIVE_MODAL_FOOTER_CLASS_NAME}>
+              <DialogGhostButton onClick={() => handleOpenChange(false)}>
+                Close
+              </DialogGhostButton>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    )
+  }
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        {trigger}
       </PopoverTrigger>
       <PopoverContent
         side="right"
@@ -317,17 +394,7 @@ export const SessionPicker = memo(function SessionPicker({
         className="w-72 p-3"
         {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.popover)}
       >
-        <SessionPickerContent
-          sessions={sessions}
-          windowDays={windowDays}
-          searchQuery={searchQuery}
-          onSelectSession={handleSelectSession}
-          onRefresh={onRefresh}
-          onSearchChange={setSearchQuery}
-          onShowMore={onShowMore}
-          isRefreshing={isLoading}
-          sidebarChatIds={sidebarChatIds}
-        />
+        {content}
       </PopoverContent>
     </Popover>
   )

@@ -17,6 +17,8 @@ import {
   DialogGhostButton,
   DialogHeader,
   DialogPrimaryButton,
+  RESPONSIVE_MODAL_CONTENT_CLASS_NAME,
+  RESPONSIVE_MODAL_FOOTER_CLASS_NAME,
   DialogTitle,
 } from "../ui/dialog"
 import { Textarea } from "../ui/textarea"
@@ -141,7 +143,7 @@ export function MergeSessionDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         size="md"
-        className="max-md:inset-0 max-md:left-0 max-md:top-0 max-md:max-w-none max-md:max-h-none max-md:h-[100dvh] max-md:rounded-none max-md:border-0 max-md:translate-x-0 max-md:translate-y-0 max-md:shadow-none"
+        className={RESPONSIVE_MODAL_CONTENT_CLASS_NAME}
         {...getUiIdentityAttributeProps(MERGE_SESSION_UI_DESCRIPTORS.dialog)}
       >
         {open ? (
@@ -456,7 +458,7 @@ function MergeSessionDialogBody({
           Close source sessions after merge
         </label>
       </div>
-      <DialogFooter className="max-md:rounded-none max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <DialogFooter className={RESPONSIVE_MODAL_FOOTER_CLASS_NAME}>
         <DialogGhostButton
           onClick={onClose}
           disabled={pending}

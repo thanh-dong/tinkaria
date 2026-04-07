@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import {
+  SessionPicker,
   SessionPickerContent,
+  getSessionPickerTriggerClassName,
+  getSessionPickerUiIdentities,
   getSessionPickerUiIdentityDescriptors,
   getVisibleSessions,
 } from "./SessionPicker"
@@ -42,6 +45,16 @@ const mockSessions: DiscoveredSession[] = [
 ]
 
 describe("SessionPickerContent", () => {
+  test("exposes semantic ui identities for both desktop and mobile shells", () => {
+    expect(getSessionPickerUiIdentities()).toEqual({
+      triggerAction: "sidebar.project-group.sessions.action",
+      popover: "sidebar.project-group.sessions.popover",
+      dialog: "sidebar.project-group.sessions.dialog",
+      searchInput: "sidebar.project-group.sessions.search.input",
+      list: "sidebar.project-group.sessions.list",
+    })
+  })
+
   test("backs session picker grab targets with C3-owned descriptors", () => {
     const descriptors = getSessionPickerUiIdentityDescriptors()
 
@@ -52,6 +65,11 @@ describe("SessionPickerContent", () => {
     })
     expect(getUiIdentityAttributeProps(descriptors.list)).toEqual({
       "data-ui-id": "sidebar.project-group.sessions.list",
+      "data-ui-c3": "c3-113",
+      "data-ui-c3-label": "sidebar",
+    })
+    expect(getUiIdentityAttributeProps(descriptors.dialog)).toEqual({
+      "data-ui-id": "sidebar.project-group.sessions.dialog",
       "data-ui-c3": "c3-113",
       "data-ui-c3-label": "sidebar",
     })
@@ -169,6 +187,25 @@ describe("SessionPickerContent", () => {
 
     expect(html).toContain("sess-bad-title")
     expect(html).not.toContain("[object Object]")
+  })
+})
+
+describe("SessionPicker", () => {
+  test("keeps the trigger visible on mobile while remaining hover-revealed on desktop", () => {
+    const html = renderToStaticMarkup(
+      <SessionPicker
+        sessions={mockSessions}
+        isLoading={false}
+        windowDays={7}
+        onSelectSession={() => {}}
+        onRefresh={() => {}}
+        onShowMore={() => {}}
+      />
+    )
+
+    expect(getSessionPickerTriggerClassName()).toBe("opacity-100 md:opacity-0 md:group-hover/section:opacity-100 transition-opacity")
+    expect(html).toContain('data-ui-id="sidebar.project-group.sessions.action"')
+    expect(html).toContain("md:group-hover/section:opacity-100")
   })
 })
 

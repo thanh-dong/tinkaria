@@ -8,6 +8,8 @@ import {
   DialogBody,
   DialogTitle,
   DialogFooter,
+  RESPONSIVE_MODAL_CONTENT_CLASS_NAME,
+  RESPONSIVE_MODAL_FOOTER_CLASS_NAME,
 } from "./ui/dialog"
 import { Input } from "./ui/input"
 import { SegmentedControl } from "./ui/segmented-control"
@@ -42,7 +44,11 @@ export function NewProjectModal({ open, onOpenChange, onConfirm, rootUiId }: Pro
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent size="sm" {...(rootUiId ? getUiIdentityAttributeProps(rootUiId) : {})}>
+      <DialogContent
+        size="sm"
+        className={RESPONSIVE_MODAL_CONTENT_CLASS_NAME}
+        {...(rootUiId ? getUiIdentityAttributeProps(rootUiId) : {})}
+      >
         {open ? (
           <NewProjectModalBody
             key={openVersion}
@@ -136,7 +142,7 @@ function NewProjectModalBody({
           </div>
         )}
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className={RESPONSIVE_MODAL_FOOTER_CLASS_NAME}>
         <Button variant="ghost" size="sm" onClick={onClose}>
           Cancel
         </Button>

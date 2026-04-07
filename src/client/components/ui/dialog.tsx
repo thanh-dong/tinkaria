@@ -11,6 +11,9 @@ const DialogPortal = DialogPrimitive.Portal
 
 const DIALOG_BODY_INSET_CLASS_NAME = "px-4 pb-4 pt-3.5"
 const DIALOG_BODY_CLASS_NAME = `flex-1 min-h-0 overflow-y-auto ${DIALOG_BODY_INSET_CLASS_NAME}`
+const RESPONSIVE_MODAL_CONTENT_CLASS_NAME = "max-md:inset-0 max-md:left-0 max-md:top-0 max-md:max-w-none max-md:max-h-none max-md:h-[100dvh] max-md:rounded-none max-md:border-0 max-md:translate-x-0 max-md:translate-y-0 max-md:shadow-none"
+const RESPONSIVE_MODAL_HEADER_CLASS_NAME = "max-md:pt-[max(1rem,env(safe-area-inset-top))]"
+const RESPONSIVE_MODAL_FOOTER_CLASS_NAME = "max-md:rounded-none max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]"
 
 const DialogOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
@@ -163,6 +166,9 @@ export {
   DialogDescription,
   DIALOG_BODY_INSET_CLASS_NAME,
   DIALOG_BODY_CLASS_NAME,
+  RESPONSIVE_MODAL_CONTENT_CLASS_NAME,
+  RESPONSIVE_MODAL_HEADER_CLASS_NAME,
+  RESPONSIVE_MODAL_FOOTER_CLASS_NAME,
   DialogBody,
   DialogFooter,
   DialogPrimaryButton,

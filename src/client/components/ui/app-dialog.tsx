@@ -9,7 +9,16 @@ import {
   type ReactNode,
 } from "react"
 import { Button } from "./button"
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "./dialog"
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+  RESPONSIVE_MODAL_CONTENT_CLASS_NAME,
+  RESPONSIVE_MODAL_FOOTER_CLASS_NAME,
+} from "./dialog"
 import { Input } from "./input"
 
 interface ConfirmDialogOptions {
@@ -136,6 +145,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
       >
         <DialogContent
           size="sm"
+          className={RESPONSIVE_MODAL_CONTENT_CLASS_NAME}
           onKeyDown={(event) => {
             if (event.key !== "Enter" || event.shiftKey || !dialogState || dialogState.kind !== "confirm") return
             event.preventDefault()
@@ -171,7 +181,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                   />
                 ) : null}
               </DialogBody>
-              <DialogFooter>
+              <DialogFooter className={RESPONSIVE_MODAL_FOOTER_CLASS_NAME}>
                 <Button
                   variant="ghost"
                   size="sm"

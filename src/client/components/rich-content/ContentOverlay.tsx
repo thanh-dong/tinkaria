@@ -1,7 +1,14 @@
 import { useCallback, useReducer, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft, Code, FileText, GitCompareArrows, Image, Copy, Check } from "lucide-react"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogClose, DIALOG_BODY_INSET_CLASS_NAME,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogClose,
+  DIALOG_BODY_INSET_CLASS_NAME,
+  RESPONSIVE_MODAL_HEADER_CLASS_NAME,
 } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { cn } from "../../lib/utils"
@@ -76,7 +83,7 @@ export function ContentOverlay({
         {...getContentOverlayUiIdentityProps(rootUiId)}
       >
         <ContentViewerContext.Provider key={type} value={{ state: viewerState, dispatch }}>
-          <DialogHeader className={cn(isMobile && "pt-[env(safe-area-inset-top)]")}>
+          <DialogHeader className={cn(isMobile && RESPONSIVE_MODAL_HEADER_CLASS_NAME)}>
             <div className="flex items-center gap-2 pr-8">
               {isMobile ? (
                 <DialogClose asChild>
