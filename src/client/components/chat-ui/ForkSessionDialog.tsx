@@ -41,7 +41,10 @@ export function ForkSessionDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent size="sm">
+      <DialogContent
+        size="sm"
+        className="max-md:inset-0 max-md:left-0 max-md:top-0 max-md:max-w-none max-md:max-h-none max-md:h-[100dvh] max-md:rounded-none max-md:border-0 max-md:translate-x-0 max-md:translate-y-0 max-md:shadow-none"
+      >
         {open ? (
           <ForkSessionDialogBody
             key={openVersion}
@@ -105,14 +108,14 @@ function ForkSessionDialogBody({
       <DialogHeader>
         <DialogTitle>Fork session</DialogTitle>
       </DialogHeader>
-      <div className="px-4 pb-4 pt-3.5 space-y-3">
+      <div className="px-4 pb-4 pt-3.5 space-y-3 flex flex-col flex-1 min-h-0">
         <Textarea
           placeholder="Start the new session with..."
           value={context}
           onChange={(e) => setContext(e.target.value)}
           autoFocus
           rows={4}
-          className="resize-none text-sm"
+          className="resize-none text-sm flex-1 min-h-[4lh]"
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && context.trim() && !pending) {
               e.preventDefault()
@@ -175,7 +178,7 @@ function ForkSessionDialogBody({
           <div className="text-sm text-destructive">{error}</div>
         ) : null}
       </div>
-      <DialogFooter>
+      <DialogFooter className="max-md:rounded-none max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <DialogGhostButton onClick={onClose} disabled={pending}>
           Cancel
         </DialogGhostButton>
