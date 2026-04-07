@@ -13,4 +13,12 @@ describe("useIsMobile", () => {
     expect(getIsMobile()).toBe(false)
     globalThis.window = saved
   })
+
+  test("getIsMobile returns false when window exists without matchMedia", () => {
+    const saved = globalThis.window
+    // @ts-expect-error — intentionally providing a partial DOM shim
+    globalThis.window = {} as Window & typeof globalThis
+    expect(getIsMobile()).toBe(false)
+    globalThis.window = saved
+  })
 })

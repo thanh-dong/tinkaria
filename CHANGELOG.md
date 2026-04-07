@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.0-rc.3 - 2026-04-07
+
+This release candidate expands the fork-session workflow, hardens the Codex runtime transport, and tightens browser-first chat reliability across remote and mobile usage.
+
+### Added
+
+- Added fork-session intent presets plus server-side prompt seeding so implementation, investigation, cleanup, tests, docs, and alternative-approach forks start with better context.
+- Added server-side Codex skill discovery and surfaced delegation guidance to spawned sessions so local Codex kits can advertise available project skills to new work.
+- Added JetStream-backed chat event and local Codex kit coverage to validate the ordered-consumer runtime path.
+
+### Changed
+
+- Migrated the NATS transport to JetStream ordered consumers for gap-free replay and more stable remote session recovery.
+- Reworked the chat workspace around forking: the navbar now leads with the fork action, the dialog is mobile-safe, and sidebar/session surfaces expose stronger C3-backed UI identity tags.
+- Tightened runtime/session metadata handling across the navbar, transcript, and orchestration flow so forked chats and spawned agents carry cleaner context boundaries.
+
+### Fixed
+
+- Fixed session history discovery so Claude CLI history consistently reappears in the picker after publisher refreshes.
+- Fixed remote/PWA connection establishment to reach the chat socket faster on reload.
+- Fixed transcript read tracking and last-read restoration regressions that could fight manual scrolling or reopen chats at the wrong boundary.
+
+### Verification
+
+- `bun test src/client/hooks/useIsMobile.test.ts src/server/agent.test.ts src/server/chat-events-jetstream.test.ts src/server/local-codex-kit-jetstream.test.ts src/server/local-codex-kit.test.ts src/server/nats-publisher.test.ts src/server/nats-responders.test.ts src/server/nats-streams.test.ts src/server/orchestration.test.ts src/server/quick-response.test.ts src/server/session-discovery.test.ts src/server/skill-discovery.test.ts src/client/app/App.test.tsx src/client/app/ChatPage.test.ts src/client/app/TinkariaSidebar.test.tsx src/client/app/TinkariaTranscript.test.tsx src/client/app/nats-socket.test.ts src/client/app/useTinkariaState.test.ts src/client/components/LocalDev.test.tsx src/client/components/chat-ui/ChatNavbar.test.tsx src/client/components/chat-ui/ForkSessionDialog.test.tsx src/client/components/chat-ui/SessionPicker.test.tsx src/client/components/messages/TextMessage.test.tsx src/client/stores/skillCompositionStore.test.ts`
+- `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+- `bun run build`
+- `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`
+
 ## 1.0.0-rc.2 - 2026-04-06
 
 This release candidate rolls the latest chat/runtime polish into the browser-first surface and introduces the first hub-to-kit execution seam for Codex turns.

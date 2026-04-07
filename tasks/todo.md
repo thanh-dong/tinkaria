@@ -9,10 +9,10 @@ This file is a handoff, not a changelog. Keep only active work, blockers, and th
   Next: finish the shared-protocol/server/runtime audit before deleting anything that would amount to true terminal decommissioning. The current RC work only removes the remaining browser navbar actions and introduces a Codex hub-to-kit runtime seam.
   Verify: run the affected Bun tests, `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `c3x check` after the next code slice.
 
-- In progress: Prepare `1.0.0-rc.2`.
-  Status: release notes and package version now cover the post-`rc.1` delta: runtime/repo badges, last-read transcript restore, browser navbar cleanup, and the new local Codex kit runtime seam.
-  Next: cut the RC tag/publish flow.
-  Verify: targeted Bun tests, `bunx @typescript/native-preview --noEmit -p tsconfig.json`, `bun run build`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check` all passed on 2026-04-06.
+- In progress: Prepare `1.0.0-rc.3`.
+  Status: package version and changelog now cover the post-`rc.2` delta: fork-session intent seeding, JetStream ordered-consumer transport, skill discovery/delegation surfacing, remote/PWA connection hardening, session history recovery, transcript/read-state fixes, and an SSR-safe mobile breakpoint guard that unblocked transcript rich-content rendering tests.
+  Next: cut the RC tag/GitHub release once the worktree is clean.
+  Verify: targeted Bun tests, `bunx @typescript/native-preview --noEmit -p tsconfig.json`, `bun run build`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check` all passed on 2026-04-07.
 
 ## Blockers / Constraints
 
