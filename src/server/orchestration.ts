@@ -16,6 +16,7 @@ interface OrchestratorCoordinator {
     provider: AgentProvider
     content: string
     delegatedContext?: string
+    isSpawned?: boolean
     model: string
     effort?: string
     planMode: boolean
@@ -178,6 +179,7 @@ export class SessionOrchestrator {
       provider,
       content: args.instruction,
       delegatedContext,
+      isSpawned: true,
       model,
       planMode: false,
       appendUserPrompt: true,
@@ -321,7 +323,7 @@ export function createOrchestrationMcpServer(
       ),
       tool(
         "send_input",
-        "Send a follow-up message to an existing steered session.",
+        "Send a follow-up message to an existing steered session. Use this to steer a child after its first turn, request additional work, or accumulate incremental results across multiple exchanges. The child resumes with its full conversation context preserved.",
         {
           targetChatId: z.string().describe("The chatId of the target session"),
           content: z.string().describe("Message content to send"),

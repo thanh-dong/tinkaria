@@ -73,7 +73,7 @@ function createFakeStore() {
 // ---------------------------------------------------------------------------
 
 function createFakeCoordinator() {
-  const startedTurns: Array<{ chatId: string; content: string; delegatedContext?: string; provider: string }> = []
+  const startedTurns: Array<{ chatId: string; content: string; delegatedContext?: string; isSpawned?: boolean; provider: string }> = []
   const activeTurns = new Map<string, unknown>()
   const cancelledChats: string[] = []
   const disposedChats: string[] = []
@@ -83,7 +83,7 @@ function createFakeCoordinator() {
     activeTurns,
     cancelledChats,
     disposedChats,
-    async startTurnForChat(args: { chatId: string; content: string; delegatedContext?: string; provider: string }) {
+    async startTurnForChat(args: { chatId: string; content: string; delegatedContext?: string; isSpawned?: boolean; provider: string }) {
       startedTurns.push(args)
       activeTurns.set(args.chatId, { chatId: args.chatId })
     },
@@ -240,6 +240,18 @@ describe("SessionOrchestrator", () => {
       })
 
       expect(ctx.coordinator.startedTurns[0]!.provider).toBe("codex")
+    })
+
+    test("passes isSpawned flag to startTurnForChat", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "delegated work",
+      })
+
+      expect(ctx.coordinator.startedTurns).toHaveLength(1)
+      expect(ctx.coordinator.startedTurns[0]!.isSpawned).toBe(true)
     })
 
     test("rejects when max concurrency (3) reached", async () => {
