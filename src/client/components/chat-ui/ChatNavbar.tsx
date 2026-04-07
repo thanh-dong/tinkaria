@@ -235,15 +235,18 @@ export function ChatNavbar({
           ) : null}
         </div>
 
-        {/* Center: session title (collapsed sidebar only) */}
-        {sidebarCollapsed && chatTitle ? (
+        {/* Center: session title (always visible, compact on mobile when sidebar open) */}
+        {chatTitle ? (
           <div
             className="flex min-w-0 flex-1 items-center gap-1.5 px-1"
             data-testid="session-summary"
             data-status={chatStatus ?? "idle"}
           >
             <span className={cn("size-1.5 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
-            <span className="truncate text-[11px] leading-none text-muted-foreground">
+            <span className={cn(
+              "truncate text-[11px] leading-none text-muted-foreground",
+              !sidebarCollapsed && "max-md:max-w-[120px]"
+            )}>
               {chatTitle}
             </span>
           </div>

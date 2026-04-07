@@ -160,7 +160,7 @@ describe("ChatNavbar", () => {
     expect(html).toContain('data-testid="session-summary"')
   })
 
-  test("hides session title when sidebar is expanded", () => {
+  test("shows session title when sidebar is expanded", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,
       ...defaultProps,
@@ -168,7 +168,20 @@ describe("ChatNavbar", () => {
       chatStatus: "idle",
     })
 
-    expect(html).not.toContain('data-testid="session-summary"')
+    expect(html).toContain("Adding dark mode toggle")
+    expect(html).toContain('data-testid="session-summary"')
+  })
+
+  test("session title is more compact on mobile when sidebar is expanded", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      chatTitle: "Adding dark mode toggle",
+      chatStatus: "running",
+    })
+
+    expect(html).toContain('data-testid="session-summary"')
+    expect(html).toContain("max-md:max-w-[120px]")
   })
 
   test("shows status dot for running session", () => {
