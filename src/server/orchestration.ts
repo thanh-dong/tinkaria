@@ -15,6 +15,7 @@ interface OrchestratorCoordinator {
     chatId: string
     provider: AgentProvider
     content: string
+    delegatedContext?: string
     model: string
     effort?: string
     planMode: boolean
@@ -29,6 +30,7 @@ interface OrchestratorStore {
   requireChat(chatId: string): { id: string; projectId: string; provider: AgentProvider | null }
   getProject(projectId: string): { id: string; localPath: string } | null
   listChatsByProject(projectId: string): Array<{ id: string }>
+  getMessages(chatId: string): TranscriptEntry[]
 }
 
 export interface SessionOrchestratorArgs {
@@ -43,6 +45,73 @@ interface PendingWaiter {
   resolve: (value: { result: string; isError: boolean }) => void
   reject: (reason: Error) => void
   timer: ReturnType<typeof setTimeout>
+}
+
+const MAX_DELEGATED_CONTEXT_ENTRIES = 24
+const MAX_DELEGATED_CONTEXT_CHARS = 12_000
+const MAX_DELEGATED_CONTEXT_LINE_CHARS = 600
+
+function truncateLine(text: string, limit = MAX_DELEGATED_CONTEXT_LINE_CHARS) {
+  const normalized = text.replace(/\s+/g, " ").trim()
+  if (normalized.length <= limit) return normalized
+  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
+}
+
+function entryToDelegatedContextLine(entry: TranscriptEntry): string | null {
+  switch (entry.kind) {
+    case "user_prompt":
+      return `User: ${truncateLine(entry.content)}`
+    case "assistant_text":
+      return `Assistant: ${truncateLine(entry.text)}`
+    case "compact_summary":
+      return `Summary: ${truncateLine(entry.summary)}`
+    case "result":
+      return `${entry.isError ? "Result error" : "Result"}: ${truncateLine(entry.result)}`
+    default:
+      return null
+  }
+}
+
+function buildDelegatedContext(entries: TranscriptEntry[]): string | undefined {
+  const relevantEntries = entries
+    .map(entryToDelegatedContextLine)
+    .filter((line): line is string => Boolean(line))
+
+  if (relevantEntries.length === 0) return undefined
+
+  const selected = relevantEntries.slice(-MAX_DELEGATED_CONTEXT_ENTRIES)
+  const omittedCount = relevantEntries.length - selected.length
+  const headerLines = [
+    "Forked parent chat context:",
+    "Treat this as background context copied from the spawning chat before your task starts.",
+    "Do not re-answer it directly unless the new task asks you to.",
+  ]
+  if (omittedCount > 0) {
+    headerLines.push(`Older transcript lines omitted: ${omittedCount}.`)
+  }
+
+  const lines = [...headerLines, ...selected]
+  let serialized = lines.join("\n")
+
+  if (serialized.length <= MAX_DELEGATED_CONTEXT_CHARS) {
+    return serialized
+  }
+
+  const trimmedSelected: string[] = []
+  let remaining = MAX_DELEGATED_CONTEXT_CHARS - headerLines.join("\n").length - 1
+  for (let index = selected.length - 1; index >= 0; index -= 1) {
+    const line = selected[index]!
+    const cost = line.length + 1
+    if (remaining - cost < 0) break
+    trimmedSelected.unshift(line)
+    remaining -= cost
+  }
+
+  if (trimmedSelected.length === 0) {
+    return headerLines.join("\n")
+  }
+
+  return [...headerLines, ...trimmedSelected].join("\n")
 }
 
 export class SessionOrchestrator {
@@ -63,7 +132,7 @@ export class SessionOrchestrator {
 
   async spawnAgent(
     callerChatId: string,
-    args: { instruction: string; provider?: AgentProvider; model?: string },
+    args: { instruction: string; provider?: AgentProvider; model?: string; forkContext?: boolean },
   ): Promise<{ chatId: string }> {
     const callerChat = this.store.requireChat(callerChatId)
     const provider = args.provider ?? callerChat.provider ?? "claude"
@@ -99,12 +168,16 @@ export class SessionOrchestrator {
     siblings.add(newChat.id)
 
     const model = args.model ?? normalizeServerModel(provider)
+    const delegatedContext = args.forkContext
+      ? buildDelegatedContext(this.store.getMessages(callerChatId))
+      : undefined
     console.warn(`${LOG_PREFIX} spawnAgent: ${callerChatId} -> ${newChat.id} (depth=${newDepth}, provider=${provider})`)
 
     await this.coordinator.startTurnForChat({
       chatId: newChat.id,
       provider,
       content: args.instruction,
+      delegatedContext,
       model,
       planMode: false,
       appendUserPrompt: true,
@@ -233,11 +306,15 @@ export function createOrchestrationMcpServer(
         {
           instruction: z.string().describe("Task instruction for the new agent"),
           provider: z.enum(["claude", "codex"]).optional().describe("AI provider — defaults to caller's provider"),
+          fork_context: z.boolean().optional().describe(
+            "When true, seed the new agent with a bounded snapshot of the current chat transcript before its first task message.",
+          ),
         },
         async (args) => {
           const result = await orchestrator.spawnAgent(callerChatId, {
             instruction: args.instruction,
             provider: args.provider as AgentProvider | undefined,
+            forkContext: args.fork_context,
           })
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] }
         },

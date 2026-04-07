@@ -1,6 +1,8 @@
 import { wsconnect, type NatsConnection, type Subscription } from "@nats-io/nats-core"
+import { jetstream, DeliverPolicy } from "@nats-io/jetstream"
+import type { JetStreamClient, ConsumerMessages } from "@nats-io/jetstream"
 import type { ClientCommand, SubscriptionTopic, TerminalEvent, TerminalSnapshot } from "../../shared/protocol"
-import { snapshotSubject, terminalEventSubject, chatMessageSubject, commandSubject } from "../../shared/nats-subjects"
+import { snapshotSubject, terminalEventSubject, chatMessageSubject, commandSubject, CHAT_MESSAGE_EVENTS_STREAM_NAME } from "../../shared/nats-subjects"
 import { LOG_PREFIX } from "../../shared/branding"
 import { decompressPayload } from "../../shared/compression"
 import type {
@@ -18,6 +20,7 @@ interface SubscriptionEntry {
   topic: SubscriptionTopic
   natsSubscription: Subscription | null
   eventSubscription: Subscription | null
+  consumerMessages: ConsumerMessages | null
   snapshotListener: SnapshotListener<unknown>
   eventListener?: EventListener<unknown>
 }
@@ -31,6 +34,7 @@ interface NatsCommandResponse {
 export class NatsSocket implements TinkariaTransport {
   private resolvedWsUrl: string | null = null
   private nc: NatsConnection | null = null
+  private js: JetStreamClient | null = null
   private started = false
   private reconnecting = false
   private readonly subscriptions = new Map<string, SubscriptionEntry>()
@@ -74,6 +78,7 @@ export class NatsSocket implements TinkariaTransport {
       void this.nc.drain().catch(() => {})
       this.nc = null
     }
+    this.js = null
     this.emitStatus("disconnected")
   }
 
@@ -93,6 +98,7 @@ export class NatsSocket implements TinkariaTransport {
       topic,
       natsSubscription: null,
       eventSubscription: null,
+      consumerMessages: null,
       snapshotListener: listener as SnapshotListener<unknown>,
       eventListener: eventListener as EventListener<unknown> | undefined,
     }
@@ -107,6 +113,7 @@ export class NatsSocket implements TinkariaTransport {
       if (e) {
         e.natsSubscription?.unsubscribe()
         e.eventSubscription?.unsubscribe()
+        void e.consumerMessages?.close()
         this.subscriptions.delete(id)
         // Notify server to stop tracking this subscription
         if (this.nc) {
@@ -175,6 +182,7 @@ export class NatsSocket implements TinkariaTransport {
         maxPingOut: 3,
       })
 
+      this.js = jetstream(this.nc)
       this.reconnectDelayMs = 750
       this.emitStatus("connected")
 
@@ -207,8 +215,14 @@ export class NatsSocket implements TinkariaTransport {
             break
           case "reconnect":
             this.emitStatus("connected")
+            // js holds a reference to nc — no need to recreate on reconnect
             // Re-activate subscriptions after reconnect
             for (const [id, entry] of this.subscriptions.entries()) {
+              // Close stale JetStream consumers
+              if (entry.consumerMessages) {
+                void entry.consumerMessages.close()
+                entry.consumerMessages = null
+              }
               if (!entry.natsSubscription) {
                 this.activateSubscription(id, entry)
               }
@@ -235,17 +249,15 @@ export class NatsSocket implements TinkariaTransport {
     // Subscribe to NATS subject for live updates
     const subject = snapshotSubject(entry.topic)
     entry.natsSubscription = this.nc.subscribe(subject)
-    void this.consumeSubscription(id, entry.natsSubscription, entry.snapshotListener)
+    void this.consumeMessages(id, entry.natsSubscription, entry.snapshotListener)
 
-    // Event subscription (for terminals and chat messages)
+    // Event subscription
     if (entry.topic.type === "terminal" && entry.eventListener) {
       const evtSubject = terminalEventSubject(entry.topic.terminalId)
       entry.eventSubscription = this.nc.subscribe(evtSubject)
-      void this.consumeSubscription(id, entry.eventSubscription, entry.eventListener)
-    } else if (entry.topic.type === "chat" && entry.eventListener) {
-      const evtSubject = chatMessageSubject(entry.topic.chatId)
-      entry.eventSubscription = this.nc.subscribe(evtSubject)
-      void this.consumeSubscription(id, entry.eventSubscription, entry.eventListener)
+      void this.consumeMessages(id, entry.eventSubscription, entry.eventListener)
+    } else if (entry.topic.type === "chat" && entry.eventListener && this.js) {
+      void this.activateJetStreamConsumer(id, entry)
     }
 
     // Register with server + fetch initial snapshot
@@ -262,13 +274,36 @@ export class NatsSocket implements TinkariaTransport {
     })
   }
 
-  private async consumeSubscription(
+  private async activateJetStreamConsumer(id: string, entry: SubscriptionEntry): Promise<void> {
+    if (!this.js || entry.topic.type !== "chat" || !entry.eventListener) return
+
+    try {
+      const consumer = await this.js.consumers.get(CHAT_MESSAGE_EVENTS_STREAM_NAME, {
+        filter_subjects: chatMessageSubject(entry.topic.chatId),
+        deliver_policy: DeliverPolicy.New,
+      })
+      const messages = await consumer.consume()
+      entry.consumerMessages = messages
+      void this.consumeMessages(id, messages, entry.eventListener)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(LOG_PREFIX, `JetStream consumer failed for chat ${entry.topic.chatId}: ${message}`)
+      // Fallback to plain subscription
+      const evtSubject = chatMessageSubject(entry.topic.chatId)
+      if (this.nc) {
+        entry.eventSubscription = this.nc.subscribe(evtSubject)
+        void this.consumeMessages(id, entry.eventSubscription, entry.eventListener)
+      }
+    }
+  }
+
+  private async consumeMessages(
     id: string,
-    sub: Subscription,
+    source: AsyncIterable<{ data: Uint8Array }>,
     listener: (data: unknown) => void
   ): Promise<void> {
     try {
-      for await (const msg of sub) {
+      for await (const msg of source) {
         if (!this.subscriptions.has(id)) break
         try {
           const decoded = await decompressPayload(msg.data)
@@ -279,7 +314,7 @@ export class NatsSocket implements TinkariaTransport {
         }
       }
     } catch {
-      // Subscription closed
+      // Source closed
     }
   }
 
@@ -287,8 +322,10 @@ export class NatsSocket implements TinkariaTransport {
     for (const entry of this.subscriptions.values()) {
       entry.natsSubscription?.unsubscribe()
       entry.eventSubscription?.unsubscribe()
+      void entry.consumerMessages?.close()
       entry.natsSubscription = null
       entry.eventSubscription = null
+      entry.consumerMessages = null
     }
   }
 
@@ -300,6 +337,7 @@ export class NatsSocket implements TinkariaTransport {
     this.reconnecting = false
     this.unsubscribeAll()
     this.nc = null
+    this.js = null
   }
 
   private scheduleReconnect(): void {

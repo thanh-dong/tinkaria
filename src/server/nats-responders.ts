@@ -15,6 +15,8 @@ import { compressPayload } from "../shared/compression"
 import { findSessionFile, importCliTranscript } from "./session-discovery"
 import { inspectSessionRuntime } from "./session-discovery"
 import { readRepoStatus } from "./repo-status"
+import { generateForkPromptForChat } from "./generate-fork-context"
+import type { TranscriptEntry } from "../shared/types"
 
 const encoder = new TextEncoder()
 const MAX_LOCAL_FILE_PREVIEW_BYTES = 256 * 1024
@@ -36,6 +38,7 @@ export interface RegisterRespondersArgs {
   updateManager: UpdateManager | null
   publisher: NatsPublisher
   onStateChange: () => void
+  generateForkPrompt?: (forkIntent: string, entries: TranscriptEntry[], cwd: string, preset?: string) => Promise<string>
 }
 
 /** Command types that do NOT mutate state and should NOT trigger onStateChange */
@@ -48,6 +51,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "update.install",
   "system.readLocalFilePreview",
   "chat.getMessages",
+  "chat.generateForkPrompt",
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
   "snapshot.subscribe",
@@ -71,6 +75,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.send",
   "chat.cancel",
   "chat.respondTool",
+  "chat.generateForkPrompt",
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
   "terminal.create",
@@ -94,6 +99,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
     updateManager,
     publisher,
     onStateChange,
+    generateForkPrompt = generateForkPromptForChat,
   } = args
 
   const subs: Subscription[] = SERVER_COMMANDS.map((type) => nc.subscribe(commandSubject(type)))
@@ -213,6 +219,20 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       case "chat.respondTool": {
         await agent.respondTool(command)
         return undefined
+      }
+
+      case "chat.generateForkPrompt": {
+        const chat = store.getChat(command.chatId)
+        if (!chat) {
+          throw new Error("Chat not found")
+        }
+        const project = store.getProject(chat.projectId)
+        if (!project) {
+          throw new Error("Project not found")
+        }
+        return {
+          prompt: await generateForkPrompt(command.intent, store.getMessages(command.chatId), project.localPath, command.preset),
+        }
       }
 
       case "terminal.create": {

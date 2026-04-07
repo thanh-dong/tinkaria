@@ -71,6 +71,36 @@ describe("scanClaudeSessions", () => {
     expect(sessions[0].runtime?.model).toBe("claude-opus-4-6")
   })
 
+  test("extracts context_usage entries and maps to tokenUsage in runtime", async () => {
+    const claudeDir = await makeTempDir()
+    const sessionFile = join(claudeDir, "with-context-usage.jsonl")
+
+    await writeFile(sessionFile, [
+      JSON.stringify({ type: "user", message: { content: "hello" } }),
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          model: "claude-opus-4-6",
+          content: [{ type: "text", text: "done" }],
+        },
+      }),
+      JSON.stringify({
+        kind: "context_usage",
+        contextUsage: { percentage: 45, totalTokens: 50000, maxTokens: 128000 },
+        timestamp: Date.now(),
+      }),
+    ].join("\n") + "\n")
+
+    const sessions = await scanClaudeSessions(claudeDir)
+
+    expect(sessions[0].runtime?.model).toBe("claude-opus-4-6")
+    expect(sessions[0].runtime?.tokenUsage).toEqual({
+      totalTokens: 50000,
+      contextWindow: 128000,
+      estimatedContextPercent: 45,
+    })
+  })
+
   test("skips directories with same UUID names", async () => {
     const claudeDir = await makeTempDir()
     const sessionId = "abc12345-6789-0def-ghij-klmnopqrstuv"
@@ -192,6 +222,33 @@ describe("scanCodexSessions", () => {
     expect(sessions).toHaveLength(1)
     expect(sessions[0].sessionId).toBe("sess-long")
     expect(sessions[0].runtime?.tokenUsage?.estimatedContextPercent).toBe(20)
+  })
+
+  test("normalizes ISO session_meta timestamps so sessions stay sortable and visible", async () => {
+    const sessionsDir = await makeTempDir()
+    const dateDir = join(sessionsDir, "2026", "04", "06")
+    await mkdir(dateDir, { recursive: true })
+
+    const projectPath = "/home/user/dev/kanna"
+    const isoTimestamp = "2026-04-06T06:20:46.420Z"
+    const sessionFile = join(dateDir, "session-iso-timestamp.jsonl")
+
+    await writeFile(sessionFile, [
+      JSON.stringify({
+        type: "session_meta",
+        payload: {
+          id: "sess-iso",
+          cwd: projectPath,
+          timestamp: isoTimestamp,
+        },
+      }),
+      JSON.stringify({ type: "user", message: { content: "Recover the session history bug" } }),
+    ].join("\n") + "\n")
+
+    const sessions = await scanCodexSessions(sessionsDir, projectPath)
+
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0].modifiedAt).toBe(Date.parse(isoTimestamp))
   })
 
   test("returns empty array for nonexistent directory", async () => {

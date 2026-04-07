@@ -4,6 +4,7 @@ import { connect, type NatsConnection } from "@nats-io/transport-node"
 import type { TranscriptEntry } from "../shared/types"
 import type { HarnessTurn } from "./harness-types"
 import { LocalCodexKitDaemon, ProjectKitRegistry, RemoteCodexRuntime } from "./local-codex-kit"
+import { ensureKitTurnEventsStream } from "./nats-streams"
 
 function timestamped<T extends Omit<TranscriptEntry, "_id" | "createdAt">>(entry: T): TranscriptEntry {
   return {
@@ -36,8 +37,9 @@ afterEach(async () => {
 })
 
 async function setup() {
-  server = await NatsServer.start()
+  server = await NatsServer.start({ jetstream: true })
   hubNc = await connect({ servers: server.url })
+  await ensureKitTurnEventsStream(hubNc)
   registry = new ProjectKitRegistry(hubNc)
   return { hubNc, registry }
 }

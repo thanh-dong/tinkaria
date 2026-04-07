@@ -50,7 +50,8 @@ export function getWebContextPrompt(
     "Plan mode renders a visual approval UI with approve/reject controls.",
     "Cross-session agent work is explicit orchestration between separate chats in the same project, not hidden shared memory.",
     "Use spawn_agent to start a separate chat for delegated work, send_input to message an existing delegated chat, wait_agent to receive only that chat's final result, and close_agent to dispose it when done.",
-    "Do not assume delegated chats share live intermediate reasoning, transcript state, or mutable in-memory context with your current chat; communicate needed context explicitly.",
+    "Set `fork_context` on spawn_agent when the delegated chat should start with a bounded snapshot of the current chat transcript before its first task message.",
+    "Do not assume delegated chats share live intermediate reasoning, transcript state, or mutable in-memory context after spawn; if `fork_context` is false, communicate needed context explicitly.",
     "Delegated chats may already be busy, and orchestration is bounded by depth and concurrency limits.",
   ]
 
@@ -134,6 +135,11 @@ function stringFromUnknown(value: unknown) {
   } catch {
     return String(value)
   }
+}
+
+function buildTurnPrompt(content: string, delegatedContext?: string): string {
+  if (!delegatedContext) return content
+  return `${delegatedContext}\n\nDelegated task:\n${content}`
 }
 
 function discardedToolResult(
@@ -381,6 +387,14 @@ async function startClaudeTurn(args: {
         return null
       }
     },
+    getContextUsage: async () => {
+      try {
+        const usage = await q.getContextUsage()
+        return { percentage: usage.percentage, totalTokens: usage.totalTokens, maxTokens: usage.maxTokens }
+      } catch {
+        return null
+      }
+    },
     interrupt: async () => {
       await q.interrupt()
     },
@@ -458,6 +472,7 @@ export class AgentCoordinator {
     chatId: string
     provider: AgentProvider
     content: string
+    delegatedContext?: string
     model: string
     effort?: string
     serviceTier?: "fast"
@@ -512,7 +527,7 @@ export class AgentCoordinator {
     let turn: HarnessTurn
     if (args.provider === "claude") {
       turn = await startClaudeTurn({
-        content: args.content,
+        content: buildTurnPrompt(args.content, args.delegatedContext),
         localPath: project.localPath,
         model: args.model,
         effort: args.effort,
@@ -533,7 +548,7 @@ export class AgentCoordinator {
       })
       turn = await this.codexRuntime.startTurn({
         chatId: args.chatId,
-        content: args.content,
+        content: buildTurnPrompt(args.content, args.delegatedContext),
         model: args.model,
         effort: args.effort as any,
         serviceTier: args.serviceTier,
@@ -565,6 +580,23 @@ export class AgentCoordinator {
         .then(async (accountInfo) => {
           if (!accountInfo) return
           await this.appendAndPublish(args.chatId, timestamped({ kind: "account_info", accountInfo }))
+          this.onStateChange()
+        })
+        .catch(() => undefined)
+    }
+
+    if (turn.getContextUsage) {
+      void turn.getContextUsage()
+        .then(async (usage) => {
+          if (!usage) return
+          await this.appendAndPublish(args.chatId, timestamped({
+            kind: "context_usage",
+            contextUsage: {
+              percentage: usage.percentage,
+              totalTokens: usage.totalTokens,
+              maxTokens: usage.maxTokens,
+            },
+          }))
           this.onStateChange()
         })
         .catch(() => undefined)

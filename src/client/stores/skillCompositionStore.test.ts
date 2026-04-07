@@ -1,60 +1,15 @@
 import { describe, test, expect, afterEach } from "bun:test"
-import { useSkillCompositionStore, parseSkillsFromContent, formatContentWithSkills, sortSkillsByFrequency } from "./skillCompositionStore"
+import {
+  useSkillCompositionStore,
+  parseSkillsFromContent,
+  sortSkillsByFrequency,
+  getSkillPrefix,
+  formatSkillCommand,
+  computeSkillInsertion,
+} from "./skillCompositionStore"
 
 afterEach(() => {
-  useSkillCompositionStore.setState({ selections: {}, usageCounts: {} })
-})
-
-describe("skillCompositionStore", () => {
-  test("initially has no selections", () => {
-    const state = useSkillCompositionStore.getState()
-    expect(state.getSelectedSkills("chat-1")).toEqual([])
-  })
-
-  test("toggleSkill adds a skill", () => {
-    const store = useSkillCompositionStore.getState()
-    store.toggleSkill("chat-1", "c3")
-    expect(useSkillCompositionStore.getState().getSelectedSkills("chat-1")).toEqual(["c3"])
-  })
-
-  test("toggleSkill removes a skill when already selected", () => {
-    const store = useSkillCompositionStore.getState()
-    store.toggleSkill("chat-1", "c3")
-    store.toggleSkill("chat-1", "c3")
-    expect(useSkillCompositionStore.getState().getSelectedSkills("chat-1")).toEqual([])
-  })
-
-  test("toggleSkill handles multiple skills", () => {
-    const store = useSkillCompositionStore.getState()
-    store.toggleSkill("chat-1", "c3")
-    store.toggleSkill("chat-1", "frontend-design")
-    store.toggleSkill("chat-1", "commit")
-    expect(useSkillCompositionStore.getState().getSelectedSkills("chat-1")).toEqual([
-      "c3",
-      "frontend-design",
-      "commit",
-    ])
-  })
-
-  test("clearSkills removes all skills for a chat", () => {
-    const store = useSkillCompositionStore.getState()
-    store.toggleSkill("chat-1", "c3")
-    store.toggleSkill("chat-1", "frontend-design")
-    store.clearSkills("chat-1")
-    expect(useSkillCompositionStore.getState().getSelectedSkills("chat-1")).toEqual([])
-  })
-
-  test("selections are isolated per chat", () => {
-    const store = useSkillCompositionStore.getState()
-    store.toggleSkill("chat-1", "c3")
-    store.toggleSkill("chat-2", "commit")
-    expect(useSkillCompositionStore.getState().getSelectedSkills("chat-1")).toEqual(["c3"])
-    expect(useSkillCompositionStore.getState().getSelectedSkills("chat-2")).toEqual(["commit"])
-  })
-
-  test("getSelectedSkills returns empty for unknown chat", () => {
-    expect(useSkillCompositionStore.getState().getSelectedSkills("nonexistent")).toEqual([])
-  })
+  useSkillCompositionStore.setState({ usageCounts: {}, ribbonVisible: true })
 })
 
 describe("parseSkillsFromContent", () => {
@@ -130,26 +85,72 @@ describe("sortSkillsByFrequency", () => {
   })
 })
 
-describe("formatContentWithSkills", () => {
-  test("returns content unchanged when no skills", () => {
-    expect(formatContentWithSkills("hello", [])).toBe("hello")
+describe("getSkillPrefix", () => {
+  test("returns / for claude", () => {
+    expect(getSkillPrefix("claude")).toBe("/")
   })
 
-  test("prepends single skill", () => {
-    expect(formatContentWithSkills("build it", ["c3"])).toBe("[Skills: /c3]\n\nbuild it")
+  test("returns $ for codex", () => {
+    expect(getSkillPrefix("codex")).toBe("$")
+  })
+})
+
+describe("formatSkillCommand", () => {
+  test("formats claude skill with slash prefix", () => {
+    expect(formatSkillCommand("c3", "claude")).toBe("/c3")
   })
 
-  test("prepends multiple skills", () => {
-    expect(formatContentWithSkills("build it", ["c3", "frontend-design"])).toBe(
-      "[Skills: /c3, /frontend-design]\n\nbuild it"
-    )
+  test("formats codex skill with dollar prefix", () => {
+    expect(formatSkillCommand("commit", "codex")).toBe("$commit")
+  })
+})
+
+describe("computeSkillInsertion", () => {
+  test("inserts at the beginning of empty text", () => {
+    const result = computeSkillInsertion("", 0, 0, "/c3")
+    expect(result).toEqual({ value: "/c3 ", cursorPosition: 4 })
   })
 
-  test("roundtrips through parse", () => {
-    const original = "build the thing"
-    const skills = ["c3", "frontend-design", "commit"]
-    const formatted = formatContentWithSkills(original, skills)
-    const parsed = parseSkillsFromContent(formatted)
-    expect(parsed).toEqual({ skills, content: original })
+  test("inserts at cursor position in middle of text", () => {
+    const result = computeSkillInsertion("hello world", 6, 6, "/c3")
+    expect(result).toEqual({ value: "hello /c3 world", cursorPosition: 10 })
+  })
+
+  test("adds leading space when no space before cursor", () => {
+    const result = computeSkillInsertion("build", 5, 5, "/c3")
+    expect(result).toEqual({ value: "build /c3 ", cursorPosition: 10 })
+  })
+
+  test("no extra space when already preceded by space", () => {
+    const result = computeSkillInsertion("build ", 6, 6, "/c3")
+    expect(result).toEqual({ value: "build /c3 ", cursorPosition: 10 })
+  })
+
+  test("no extra space when preceded by newline", () => {
+    const result = computeSkillInsertion("line1\n", 6, 6, "/c3")
+    expect(result).toEqual({ value: "line1\n/c3 ", cursorPosition: 10 })
+  })
+
+  test("replaces selected text", () => {
+    const result = computeSkillInsertion("hello world", 6, 11, "/c3")
+    expect(result).toEqual({ value: "hello /c3 ", cursorPosition: 10 })
+  })
+
+  test("works with codex dollar prefix", () => {
+    const result = computeSkillInsertion("", 0, 0, "$commit")
+    expect(result).toEqual({ value: "$commit ", cursorPosition: 8 })
+  })
+})
+
+describe("ribbonVisible", () => {
+  test("defaults to true", () => {
+    expect(useSkillCompositionStore.getState().ribbonVisible).toBe(true)
+  })
+
+  test("toggleRibbon flips visibility", () => {
+    useSkillCompositionStore.getState().toggleRibbon()
+    expect(useSkillCompositionStore.getState().ribbonVisible).toBe(false)
+    useSkillCompositionStore.getState().toggleRibbon()
+    expect(useSkillCompositionStore.getState().ribbonVisible).toBe(true)
   })
 })

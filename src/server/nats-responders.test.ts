@@ -222,6 +222,54 @@ describe("nats-responders", () => {
     expect(changed).toBe(false)
   })
 
+  test("chat.generateForkPrompt returns a derived prompt from transcript context", async () => {
+    const generateCalls: Array<{ intent: string; entries: unknown[]; cwd: string; preset?: string }> = []
+    const { clientNc } = await setup({
+      store: {
+        ...createMockStore(),
+        getMessages: () => [
+          { kind: "user_prompt", content: "Investigate auth race", _id: "1", createdAt: 1 },
+          { kind: "assistant_text", text: "Likely around session restore", _id: "2", createdAt: 2 },
+        ],
+      } as never,
+      generateForkPrompt: async (intent, entries, cwd, preset) => {
+        generateCalls.push({ intent, entries, cwd, preset })
+        return "## Objective\nFix the auth race"
+      },
+    })
+
+    const res = await sendCommand(clientNc, {
+      type: "chat.generateForkPrompt",
+      chatId: "chat-1",
+      intent: "Focus on the regression test",
+      preset: "tests",
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual({ prompt: "## Objective\nFix the auth race" })
+    expect(generateCalls).toEqual([
+      {
+        intent: "Focus on the regression test",
+        entries: [
+          { kind: "user_prompt", content: "Investigate auth race", _id: "1", createdAt: 1 },
+          { kind: "assistant_text", text: "Likely around session restore", _id: "2", createdAt: 2 },
+        ],
+        cwd: "/tmp/test-project",
+        preset: "tests",
+      },
+    ])
+  })
+
+  test("chat.generateForkPrompt does not trigger onStateChange", async () => {
+    let changed = false
+    const { clientNc } = await setup({
+      onStateChange: () => { changed = true },
+      generateForkPrompt: async () => "fork seed",
+    })
+    await sendCommand(clientNc, { type: "chat.generateForkPrompt", chatId: "chat-1", intent: "Fork this work" })
+    expect(changed).toBe(false)
+  })
+
   test("chat.getRepoStatus returns repo status for the active project", async () => {
     tempDir = await mkdtemp(path.join(tmpdir(), "kanna-repo-status-"))
     const { clientNc } = await setup({

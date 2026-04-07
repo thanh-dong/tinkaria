@@ -3,7 +3,12 @@ import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect, type NatsConnection } from "@nats-io/transport-node"
 import { jetstreamManager } from "@nats-io/jetstream"
 import { Kvm } from "@nats-io/kv"
-import { ensureTerminalEventsStream, TERMINAL_EVENTS_STREAM } from "./nats-streams"
+import {
+  ensureTerminalEventsStream,
+  TERMINAL_EVENTS_STREAM,
+  ensureKitTurnEventsStream,
+  KIT_TURN_EVENTS_STREAM,
+} from "./nats-streams"
 import { KV_BUCKET, snapshotKvKey } from "../shared/nats-subjects"
 
 let server: NatsServer | null = null
@@ -104,5 +109,34 @@ describe("KV snapshot bucket", () => {
     expect(snapshotKvKey({ type: "local-projects" })).toBe("local-projects")
     expect(snapshotKvKey({ type: "chat", chatId: "abc" })).toBe("chat.abc")
     expect(snapshotKvKey({ type: "terminal", terminalId: "t1" })).toBe("terminal.t1")
+  })
+})
+
+describe("ensureKitTurnEventsStream", () => {
+  test("creates stream with correct config", async () => {
+    server = await NatsServer.start({ jetstream: true })
+    nc = await connect({ servers: server.url })
+    await ensureKitTurnEventsStream(nc)
+
+    const jsm = await jetstreamManager(nc)
+    const info = await jsm.streams.info(KIT_TURN_EVENTS_STREAM)
+
+    expect(info.config.name).toBe("KANNA_KIT_TURN_EVENTS")
+    expect(info.config.subjects).toEqual(["runtime.kit.evt.turn.>"])
+    expect(info.config.retention).toBe("limits")
+    expect(info.config.storage).toBe("memory")
+    expect(info.config.max_msgs).toBe(20_000)
+  })
+
+  test("updates existing stream without error", async () => {
+    server = await NatsServer.start({ jetstream: true })
+    nc = await connect({ servers: server.url })
+    await ensureKitTurnEventsStream(nc)
+    // Second call should update, not throw
+    await ensureKitTurnEventsStream(nc)
+
+    const jsm = await jetstreamManager(nc)
+    const info = await jsm.streams.info(KIT_TURN_EVENTS_STREAM)
+    expect(info.config.name).toBe("KANNA_KIT_TURN_EVENTS")
   })
 })

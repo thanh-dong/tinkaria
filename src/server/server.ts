@@ -11,7 +11,7 @@ import { NatsBridge } from "./nats-bridge"
 import { generateAuthToken } from "./nats-auth"
 import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
-import { ensureTerminalEventsStream, ensureChatMessageStream } from "./nats-streams"
+import { ensureTerminalEventsStream, ensureChatMessageStream, ensureKitTurnEventsStream } from "./nats-streams"
 import type { TranscriptEntry } from "../shared/types"
 import { SessionOrchestrator } from "./orchestration"
 import { SessionIndex } from "./session-index"
@@ -65,6 +65,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   const natsBridge = await NatsBridge.create({ token: authToken })
   await ensureTerminalEventsStream(natsBridge.nc)
   await ensureChatMessageStream(natsBridge.nc)
+  await ensureKitTurnEventsStream(natsBridge.nc)
 
   // Codex kit: registry + runtime created now, daemon started in background after HTTP is up
   const projectKitRegistry = new ProjectKitRegistry(natsBridge.nc)

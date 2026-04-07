@@ -14,6 +14,7 @@ export interface HarnessTurn {
   provider: AgentProvider
   stream: AsyncIterable<HarnessEvent>
   getAccountInfo?: () => Promise<AccountInfo | null>
+  getContextUsage?: () => Promise<{ percentage: number; totalTokens: number; maxTokens: number } | null>
   interrupt: () => Promise<void>
   close: () => void
 }

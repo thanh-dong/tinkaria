@@ -2,42 +2,17 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
 interface SkillCompositionState {
-  selections: Record<string, string[]>
   usageCounts: Record<string, number>
-  toggleSkill: (chatId: string, skill: string) => void
-  clearSkills: (chatId: string) => void
-  getSelectedSkills: (chatId: string) => string[]
+  ribbonVisible: boolean
   recordUsage: (skills: string[]) => void
+  toggleRibbon: () => void
 }
 
 export const useSkillCompositionStore = create<SkillCompositionState>()(
   persist(
-    (set, get) => ({
-      selections: {},
+    (set) => ({
       usageCounts: {},
-
-      toggleSkill: (chatId, skill) =>
-        set((state) => {
-          const current = state.selections[chatId] ?? []
-          const next = current.includes(skill)
-            ? current.filter((s) => s !== skill)
-            : [...current, skill]
-
-          if (next.length === 0) {
-            const { [chatId]: _, ...rest } = state.selections
-            return { selections: rest }
-          }
-
-          return { selections: { ...state.selections, [chatId]: next } }
-        }),
-
-      clearSkills: (chatId) =>
-        set((state) => {
-          const { [chatId]: _, ...rest } = state.selections
-          return { selections: rest }
-        }),
-
-      getSelectedSkills: (chatId) => get().selections[chatId] ?? [],
+      ribbonVisible: true,
 
       recordUsage: (skills) => {
         if (skills.length === 0) return
@@ -49,6 +24,8 @@ export const useSkillCompositionStore = create<SkillCompositionState>()(
           return { usageCounts: next }
         })
       },
+
+      toggleRibbon: () => set((state) => ({ ribbonVisible: !state.ribbonVisible })),
     }),
     { name: "skill-composition" }
   )
@@ -66,12 +43,31 @@ export function parseSkillsFromContent(content: string): { skills: string[] | nu
   return { skills, content: remaining }
 }
 
-export function formatContentWithSkills(content: string, skills: string[]): string {
-  if (skills.length === 0) return content
-  const prefix = `[Skills: ${skills.map((s) => `/${s}`).join(", ")}]`
-  return `${prefix}\n\n${content}`
-}
-
 export function sortSkillsByFrequency(skills: string[], usageCounts: Record<string, number>): string[] {
   return [...skills].sort((a, b) => (usageCounts[b] ?? 0) - (usageCounts[a] ?? 0))
+}
+
+export function getSkillPrefix(provider: "claude" | "codex"): string {
+  return provider === "codex" ? "$" : "/"
+}
+
+export function formatSkillCommand(skill: string, provider: "claude" | "codex"): string {
+  return `${getSkillPrefix(provider)}${skill}`
+}
+
+export function computeSkillInsertion(
+  currentValue: string,
+  selectionStart: number,
+  selectionEnd: number,
+  command: string
+): { value: string; cursorPosition: number } {
+  const before = currentValue.substring(0, selectionStart)
+  const after = currentValue.substring(selectionEnd)
+  const needsLeadingSpace = before.length > 0 && !before.endsWith(" ") && !before.endsWith("\n")
+  const needsTrailingSpace = after.length === 0 || (!after.startsWith(" ") && !after.startsWith("\n"))
+  const prefix = needsLeadingSpace ? " " : ""
+  const suffix = needsTrailingSpace ? " " : ""
+  const value = before + prefix + command + suffix + after
+  const cursorPosition = selectionStart + prefix.length + command.length + suffix.length
+  return { value, cursorPosition }
 }

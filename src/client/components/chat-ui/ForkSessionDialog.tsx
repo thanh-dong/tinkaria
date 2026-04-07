@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { Box } from "lucide-react"
+import { Box, Sparkles } from "lucide-react"
+import { DEFAULT_FORK_PRESET_ID, FORK_PRESETS, getForkPreset } from "../../../shared/fork-presets"
 import type { AgentProvider, ProviderCatalogEntry } from "../../../shared/types"
 import {
   createC3UiIdentityDescriptor,
@@ -25,7 +26,7 @@ interface Props {
   defaultProvider: AgentProvider
   defaultModel: string
   availableProviders: ProviderCatalogEntry[]
-  onFork: (intent: string, provider: AgentProvider, model: string) => Promise<void>
+  onFork: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
 }
 
 const FORK_SESSION_UI_DESCRIPTORS = {
@@ -66,6 +67,16 @@ const FORK_SESSION_UI_DESCRIPTORS = {
   }),
   modelPopover: createC3UiIdentityDescriptor({
     id: createUiIdentity("chat.fork-session.model", "popover"),
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  presetAction: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.fork-session.preset", "action"),
+    c3ComponentId: "c3-110",
+    c3ComponentLabel: "chat",
+  }),
+  presetPopover: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.fork-session.preset", "popover"),
     c3ComponentId: "c3-110",
     c3ComponentLabel: "chat",
   }),
@@ -129,15 +140,17 @@ function ForkSessionDialogBody({
   defaultProvider: AgentProvider
   defaultModel: string
   availableProviders: ProviderCatalogEntry[]
-  onFork: (intent: string, provider: AgentProvider, model: string) => Promise<void>
+  onFork: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   onClose: () => void
 }) {
-  const [intent, setIntent] = useState("")
+  const [presetId, setPresetId] = useState(DEFAULT_FORK_PRESET_ID)
+  const [intent, setIntent] = useState(() => getForkPreset(DEFAULT_FORK_PRESET_ID)?.defaultIntent ?? "")
   const [provider, setProvider] = useState<AgentProvider>(defaultProvider)
   const [model, setModel] = useState(defaultModel)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const providerConfig = availableProviders.find((p) => p.id === provider) ?? availableProviders[0]
+  const preset = getForkPreset(presetId) ?? FORK_PRESETS[0]
   const ProviderIcon = PROVIDER_ICONS[provider]
 
   function handleProviderChange(nextProvider: AgentProvider) {
@@ -148,12 +161,17 @@ function ForkSessionDialogBody({
     }
   }
 
+  function handlePresetChange(nextPresetId: string) {
+    setPresetId(nextPresetId)
+    setIntent(getForkPreset(nextPresetId)?.defaultIntent ?? "")
+  }
+
   async function handleConfirm() {
     if (!intent.trim() || pending) return
     setPending(true)
     setError(null)
     try {
-      await onFork(intent.trim(), provider, model)
+      await onFork(intent.trim(), provider, model, presetId)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -171,6 +189,32 @@ function ForkSessionDialogBody({
         <p className="text-sm text-muted-foreground">
           Describe what this fork should focus on. Tinkaria will combine that with the current chat to seed the new session.
         </p>
+        <InputPopover
+          triggerUiId={FORK_SESSION_UI_DESCRIPTORS.presetAction}
+          contentUiId={FORK_SESSION_UI_DESCRIPTORS.presetPopover}
+          trigger={
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>{preset?.label ?? "Preset"}</span>
+            </>
+          }
+        >
+          {(close) =>
+            FORK_PRESETS.map((candidate) => (
+              <PopoverMenuItem
+                key={candidate.id}
+                onClick={() => {
+                  handlePresetChange(candidate.id)
+                  close()
+                }}
+                selected={candidate.id === presetId}
+                icon={<Sparkles className="h-4 w-4 text-muted-foreground" />}
+                label={candidate.label}
+                description={candidate.description}
+              />
+            ))
+          }
+        </InputPopover>
         <Textarea
           {...getUiIdentityAttributeProps(FORK_SESSION_UI_DESCRIPTORS.contextInput)}
           placeholder="What should this fork focus on?"

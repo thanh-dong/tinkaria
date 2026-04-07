@@ -30,11 +30,13 @@ interface FakeChat {
 function createFakeStore() {
   const chats = new Map<string, FakeChat>()
   const project = { id: "project-1", localPath: "/tmp/project" }
+  const messagesByChatId = new Map<string, TranscriptEntry[]>()
   let chatCounter = 0
 
   return {
     chats,
     project,
+    messagesByChatId,
     async createChat(projectId: string) {
       const id = `chat-${++chatCounter}`
       const chat: FakeChat = {
@@ -46,12 +48,16 @@ function createFakeStore() {
         sessionToken: null,
       }
       chats.set(id, chat)
+      messagesByChatId.set(id, [])
       return chat
     },
     requireChat(chatId: string) {
       const chat = chats.get(chatId)
       if (!chat) throw new Error(`Chat not found: ${chatId}`)
       return chat
+    },
+    getMessages(chatId: string) {
+      return [...(messagesByChatId.get(chatId) ?? [])]
     },
     getProject() {
       return project
@@ -67,7 +73,7 @@ function createFakeStore() {
 // ---------------------------------------------------------------------------
 
 function createFakeCoordinator() {
-  const startedTurns: Array<{ chatId: string; content: string; provider: string }> = []
+  const startedTurns: Array<{ chatId: string; content: string; delegatedContext?: string; provider: string }> = []
   const activeTurns = new Map<string, unknown>()
   const cancelledChats: string[] = []
   const disposedChats: string[] = []
@@ -77,7 +83,7 @@ function createFakeCoordinator() {
     activeTurns,
     cancelledChats,
     disposedChats,
-    async startTurnForChat(args: { chatId: string; content: string; provider: string }) {
+    async startTurnForChat(args: { chatId: string; content: string; delegatedContext?: string; provider: string }) {
       startedTurns.push(args)
       activeTurns.set(args.chatId, { chatId: args.chatId })
     },
@@ -189,6 +195,28 @@ describe("SessionOrchestrator", () => {
 
       expect(ctx.coordinator.startedTurns).toHaveLength(1)
       expect(ctx.coordinator.startedTurns[0]!.content).toBe("Write unit tests")
+    })
+
+    test("fork_context seeds delegated context without rewriting the child instruction", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      ctx.store.messagesByChatId.set(caller.id, [
+        timestamped({ kind: "user_prompt", content: "Investigate the auth race condition" }),
+        timestamped({ kind: "assistant_text", text: "The race likely happens between session restore and token refresh." }),
+        timestamped({ kind: "result", subtype: "success", isError: false, durationMs: 1, result: "Auth logs collected." }),
+      ])
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Write the regression test",
+        forkContext: true,
+      })
+
+      expect(ctx.coordinator.startedTurns).toHaveLength(1)
+      expect(ctx.coordinator.startedTurns[0]!.content).toBe("Write the regression test")
+      expect(ctx.coordinator.startedTurns[0]!.delegatedContext).toContain("Forked parent chat context:")
+      expect(ctx.coordinator.startedTurns[0]!.delegatedContext).toContain("User: Investigate the auth race condition")
+      expect(ctx.coordinator.startedTurns[0]!.delegatedContext).toContain("Assistant: The race likely happens between session restore and token refresh.")
+      expect(ctx.coordinator.startedTurns[0]!.delegatedContext).toContain("Result: Auth logs collected.")
     })
 
     test("uses caller's provider by default", async () => {

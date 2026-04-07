@@ -1,4 +1,6 @@
 import { connect, type Msg, type NatsConnection, type Subscription } from "@nats-io/transport-node"
+import { jetstream, DeliverPolicy } from "@nats-io/jetstream"
+import type { JetStreamClient } from "@nats-io/jetstream"
 import { LOG_PREFIX } from "../shared/branding"
 import {
   codexKitHeartbeatSubject,
@@ -10,6 +12,7 @@ import {
   codexKitTurnInterruptSubject,
   codexKitTurnStartSubject,
 } from "../shared/nats-subjects"
+import { KIT_TURN_EVENTS_STREAM } from "./nats-streams"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
 import {
   CodexAppServerManager,
@@ -19,6 +22,7 @@ import {
 import type { CodexRuntime, StartCodexRuntimeSessionArgs } from "./codex-runtime"
 
 const encoder = new TextEncoder()
+const decoder = new TextDecoder()
 
 function encode(data: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(data))
@@ -204,6 +208,7 @@ export class LocalCodexKitDaemon {
   readonly kitId: string
 
   private readonly manager: CodexAppServerManager
+  private readonly js: JetStreamClient
   private readonly registration: CodexKitRegistration
   private readonly activeTurns = new Map<string, ActiveKitTurn>()
   private readonly subscriptions: Subscription[] = []
@@ -215,6 +220,7 @@ export class LocalCodexKitDaemon {
     args: LocalCodexKitDaemonArgs
   ) {
     this.kitId = args.kitId ?? "kit-local-codex"
+    this.js = jetstream(nc)
     this.manager = args.codexManager ?? new CodexAppServerManager()
     this.registration = {
       kitId: this.kitId,
@@ -348,21 +354,27 @@ export class LocalCodexKitDaemon {
     void this.streamTurn(payload.chatId, turn)
   }
 
-  private publishStreamEvent(chatId: string, envelope: KitStreamEnvelope) {
-    this.nc.publish(codexKitTurnEventsSubject(chatId), encode(envelope))
+  private async publishStreamEvent(chatId: string, envelope: KitStreamEnvelope): Promise<void> {
+    try {
+      await this.js.publish(codexKitTurnEventsSubject(chatId), encode(envelope))
+    } catch (error) {
+      console.warn(LOG_PREFIX, `JetStream publish failed for kit turn event: ${errorMessage(error)}`)
+    }
   }
 
   private async streamTurn(chatId: string, turn: HarnessTurn) {
     try {
       for await (const event of turn.stream) {
-        this.publishStreamEvent(chatId, {
+        // Fire-and-forget for throughput — lost harness events are tolerable
+        void this.publishStreamEvent(chatId, {
           type: "harness_event",
           event,
         })
       }
-      this.publishStreamEvent(chatId, { type: "stream_end" })
+      // Await sentinels — consumer hangs forever if these are lost
+      await this.publishStreamEvent(chatId, { type: "stream_end" })
     } catch (error) {
-      this.publishStreamEvent(chatId, {
+      await this.publishStreamEvent(chatId, {
         type: "stream_error",
         error: errorMessage(error),
       })
@@ -396,9 +408,11 @@ export interface RemoteCodexRuntimeArgs {
 export class RemoteCodexRuntime implements CodexRuntime {
   private readonly chatAssignments = new Map<string, string>()
   private readonly requestTimeoutMs: number
+  private readonly js: JetStreamClient
 
   constructor(private readonly args: RemoteCodexRuntimeArgs) {
     this.requestTimeoutMs = args.requestTimeoutMs ?? 30_000
+    this.js = jetstream(args.nc)
   }
 
   private async request<T>(subject: string, payload: unknown): Promise<T> {
@@ -431,12 +445,17 @@ export class RemoteCodexRuntime implements CodexRuntime {
     }
 
     const queue = new AsyncQueue<KitStreamEnvelope>()
-    const sub = this.args.nc.subscribe(codexKitTurnEventsSubject(args.chatId))
+
+    const consumer = await this.js.consumers.get(KIT_TURN_EVENTS_STREAM, {
+      filter_subjects: codexKitTurnEventsSubject(args.chatId),
+      deliver_policy: DeliverPolicy.New,
+    })
+    const messages = await consumer.consume()
 
     void (async () => {
       try {
-        for await (const msg of sub) {
-          const envelope = msg.json<KitStreamEnvelope>()
+        for await (const msg of messages) {
+          const envelope = JSON.parse(decoder.decode(msg.data)) as KitStreamEnvelope
           if (envelope.type === "tool_request") {
             const result = await args.onToolRequest(envelope.request)
             await this.request(codexKitToolRespondSubject(kitId), {
@@ -458,7 +477,7 @@ export class RemoteCodexRuntime implements CodexRuntime {
           error: errorMessage(error),
         })
       } finally {
-        sub.unsubscribe()
+        await messages.close()
         queue.finish()
       }
     })()
@@ -480,7 +499,7 @@ export class RemoteCodexRuntime implements CodexRuntime {
         await this.request(codexKitTurnInterruptSubject(kitId), { chatId: args.chatId })
       },
       close: () => {
-        sub.unsubscribe()
+        void messages.close()
         queue.finish()
       },
     }

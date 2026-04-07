@@ -368,7 +368,6 @@ export function ChatPage() {
           localPath={state.navbarLocalPath}
           currentSessionRuntime={state.currentSessionRuntime}
           currentRepoStatus={state.currentRepoStatus}
-          accountInfo={state.currentAccountInfo}
         />
 
         <ForkSessionDialog

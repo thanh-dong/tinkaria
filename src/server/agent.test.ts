@@ -56,6 +56,7 @@ describe("getWebContextPrompt", () => {
     for (const provider of ["claude", "codex"] as const) {
       const prompt = getWebContextPrompt(provider)
       expect(prompt).toContain("spawn_agent")
+      expect(prompt).toContain("fork_context")
       expect(prompt).toContain("send_input")
       expect(prompt).toContain("wait_agent")
       expect(prompt).toContain("separate chats")
@@ -246,6 +247,71 @@ describe("AgentCoordinator codex integration", () => {
     })
 
     expect(startedSessions).toEqual([{ chatId: "chat-1", projectId: "project-1" }])
+  })
+
+  test("injects delegated context into the provider turn without rewriting the visible user prompt", async () => {
+    let runtimeTurnContent = ""
+    const runtime: CodexRuntime = {
+      async startSession() {},
+      async startTurn(args): Promise<HarnessTurn> {
+        runtimeTurnContent = args.content
+
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession() {},
+    }
+
+    const store = createFakeStore()
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexRuntime: runtime,
+    })
+
+    await coordinator.startTurnForChat({
+      chatId: "chat-1",
+      provider: "codex",
+      content: "Write the patch",
+      delegatedContext: "Forked parent chat context:\nUser: Repro and logs\nAssistant: Root cause analysis",
+      model: "gpt-5.4",
+      planMode: false,
+      appendUserPrompt: true,
+    })
+
+    await waitFor(() => store.messages.some((entry) => entry.kind === "result"))
+    expect(store.messages[0]).toMatchObject({ kind: "user_prompt", content: "Write the patch" })
+    expect(runtimeTurnContent).toContain("Forked parent chat context:")
+    expect(runtimeTurnContent).toContain("Delegated task:\nWrite the patch")
   })
 
   test("does not overwrite a manual rename when background title generation finishes later", async () => {
@@ -839,6 +905,70 @@ describe("AgentCoordinator codex integration", () => {
     }
     expect(discardedResult.content).toEqual({ discarded: true })
     expect(startTurnCalls).toEqual(["plan this"])
+  })
+
+  test("getContextUsage is called and a context_usage transcript entry is appended", async () => {
+    const contextUsageData = { percentage: 42, totalTokens: 55000, maxTokens: 128000 }
+
+    const runtime: CodexRuntime = {
+      async startSession() {},
+      async startTurn(): Promise<HarnessTurn> {
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          getContextUsage: async () => contextUsageData,
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession() {},
+    }
+
+    const store = createFakeStore()
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexRuntime: runtime,
+    })
+
+    await coordinator.send({
+      type: "chat.send",
+      chatId: "chat-1",
+      provider: "codex",
+      content: "hello",
+      model: "gpt-5.4",
+    })
+
+    await waitFor(() => store.messages.some((e) => e.kind === "context_usage"))
+    const contextEntry = store.messages.find((e) => e.kind === "context_usage")
+    expect(contextEntry).toBeDefined()
+    if (contextEntry?.kind !== "context_usage") throw new Error("unexpected kind")
+    expect(contextEntry.contextUsage).toEqual(contextUsageData)
   })
 
   test("result entries from the stream are suppressed after cancel", async () => {

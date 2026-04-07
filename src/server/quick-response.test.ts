@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { generateTitleForChat } from "./generate-title"
+import { generateForkPromptForChat } from "./generate-fork-context"
 import { QuickResponseAdapter } from "./quick-response"
 
 describe("QuickResponseAdapter", () => {
@@ -111,5 +112,57 @@ describe("generateTitleForChat", () => {
     )
 
     expect(title).toBeNull()
+  })
+})
+
+describe("generateForkPromptForChat", () => {
+  test("returns a sanitized generated fork prompt", async () => {
+    const prompt = await generateForkPromptForChat(
+      "Focus on the auth race fix",
+      [],
+      "/tmp/project",
+      undefined,
+      new QuickResponseAdapter({
+        runClaudeStructured: async () => ({
+          prompt: "  ## Objective\nFix the auth race.\n\n## Constraints\nKeep the existing API.  ",
+        }),
+      }),
+    )
+
+    expect(prompt).toBe("## Objective\nFix the auth race.\n\n## Constraints\nKeep the existing API.")
+  })
+
+  test("falls back to the normalized fork intent when structured output is invalid", async () => {
+    const prompt = await generateForkPromptForChat(
+      "   Continue the mobile keyboard fix   ",
+      [],
+      "/tmp/project",
+      undefined,
+      new QuickResponseAdapter({
+        runClaudeStructured: async () => ({ nope: true }),
+        runCodexStructured: async () => ({ prompt: "   " }),
+      }),
+    )
+
+    expect(prompt).toBe("Continue the mobile keyboard fix")
+  })
+
+  test("includes preset guidance in the generation prompt", async () => {
+    let capturedPrompt = ""
+    await generateForkPromptForChat(
+      "Focus on an alternative design",
+      [],
+      "/tmp/project",
+      "alternative_approach",
+      new QuickResponseAdapter({
+        runClaudeStructured: async (args) => {
+          capturedPrompt = args.prompt
+          return { prompt: "## Objective\nExplore the alternative." }
+        },
+      }),
+    )
+
+    expect(capturedPrompt).toContain("Selected fork preset: Alternative approach.")
+    expect(capturedPrompt).toContain("exploring a different solution path")
   })
 })

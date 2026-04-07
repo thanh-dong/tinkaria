@@ -80,8 +80,10 @@ export function ChatRow({
         data-chat-id={normalizeChatId(chat.chatId)}
         {...getUiIdentityAttributeProps(CHAT_ROW_DESCRIPTOR)}
         className={cn(
-          "group flex items-center gap-2 pl-2.5 pr-0.5 py-0.5 rounded-lg cursor-pointer border-border/0 hover:border-border hover:bg-muted/20 active:scale-[0.985] border transition-all",
-          activeChatId === normalizeChatId(chat.chatId) ? "bg-muted hover:bg-muted border-border" : "border-border/0 dark:hover:border-slate-400/10 "
+          "group flex items-center gap-2 pl-2.5 pr-0.5 py-0.5 rounded-lg cursor-pointer border hover:bg-muted/20 active:scale-[0.985] transition-all",
+          activeChatId === normalizeChatId(chat.chatId)
+            ? "bg-primary/[0.07] hover:bg-primary/[0.1] border-primary/20 dark:bg-primary/[0.12] dark:hover:bg-primary/[0.16] dark:border-primary/15"
+            : "border-border/0 hover:border-border dark:hover:border-slate-400/10"
         )}
         onClick={() => {
           if (!isEditing) onSelectChat(chat.chatId)
@@ -118,7 +120,10 @@ export function ChatRow({
           />
         ) : (
           <span
-            className="text-sm truncate flex-1 translate-y-[-0.5px]"
+            className={cn(
+              "text-sm truncate flex-1 translate-y-[-0.5px]",
+              activeChatId === normalizeChatId(chat.chatId) && "font-medium",
+            )}
             onDoubleClick={(event) => {
               event.stopPropagation()
               startEditing()
@@ -141,8 +146,7 @@ export function ChatRow({
             <span
               className={cn(
                 "flex h-7 w-4 items-center justify-center text-muted-foreground/55 transition-colors",
-                activeChatId === normalizeChatId(chat.chatId) && "text-muted-foreground/80",
-                "group-hover:text-muted-foreground/80"
+                activeChatId === normalizeChatId(chat.chatId) ? "text-foreground/60" : "group-hover:text-muted-foreground/80",
               )}
               title={providerLabel}
               aria-label={providerLabel}

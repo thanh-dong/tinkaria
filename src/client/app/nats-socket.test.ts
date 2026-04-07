@@ -128,3 +128,10 @@ describe("NatsSocket reconnect", () => {
     socket.dispose()
   })
 })
+
+describe("NatsSocket JetStream integration", () => {
+  test("CHAT_MESSAGE_EVENTS_STREAM_NAME is the correct stream name", async () => {
+    const { CHAT_MESSAGE_EVENTS_STREAM_NAME } = await import("../../shared/nats-subjects")
+    expect(CHAT_MESSAGE_EVENTS_STREAM_NAME).toBe("KANNA_CHAT_MESSAGE_EVENTS")
+  })
+})

@@ -70,8 +70,14 @@ export const ALL_TERMINAL_EVENTS = `${PREFIX}.evt.terminal.>`
 /** Wildcard: all chat message events */
 export const ALL_CHAT_MESSAGE_EVENTS = `${PREFIX}.evt.chat.>`
 
+/** Wildcard: all kit turn events */
+export const ALL_KIT_TURN_EVENTS = `${PREFIX}.kit.evt.turn.>`
+
 /** Wildcard: all commands */
 export const ALL_COMMANDS = `${PREFIX}.cmd.>`
+
+/** JetStream stream name for chat message events */
+export const CHAT_MESSAGE_EVENTS_STREAM_NAME = "KANNA_CHAT_MESSAGE_EVENTS"
 
 /** KV bucket name for snapshot caching */
 export const KV_BUCKET = "runtime_snapshots"

@@ -609,7 +609,7 @@ export interface TinkariaState {
   handleRefreshSessions: (projectId: string) => void
   handleShowMoreSessions: (projectId: string) => void
   handleCompose: () => void
-  handleForkSession: (context: string, provider: AgentProvider, model: string) => Promise<void>
+  handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleAskUserQuestion: (
     toolUseId: string,
     questions: AskUserQuestionItem[],
@@ -1754,11 +1754,21 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     navigate("/")
   }
 
-  async function handleForkSession(context: string, provider: AgentProvider, model: string) {
+  async function handleForkSession(intent: string, provider: AgentProvider, model: string, preset?: string) {
     const projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
     if (!projectId) {
       throw new Error("Open a project first")
     }
+    if (!activeChatId) {
+      throw new Error("Open a chat first")
+    }
+
+    const forkPromptResult = await socket.command<{ prompt: string }>({
+      type: "chat.generateForkPrompt",
+      chatId: activeChatId,
+      intent,
+      preset,
+    })
 
     const result = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
 
@@ -1772,7 +1782,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       type: "chat.send",
       chatId: result.chatId,
       provider,
-      content: context,
+      content: forkPromptResult.prompt,
       model,
       modelOptions,
     })

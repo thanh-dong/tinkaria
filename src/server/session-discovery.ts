@@ -34,6 +34,15 @@ function normalizeNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined
 }
 
+function normalizeTimestamp(value: unknown): number | undefined {
+  const numberValue = normalizeNumber(value)
+  if (numberValue !== undefined) return numberValue
+  if (typeof value !== "string") return undefined
+
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
 function parseJsonLine(line: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(line)
@@ -51,19 +60,41 @@ function formatUsageBucketLabel(windowMinutes: number, fallback: string): string
 
 function extractClaudeRuntime(tailContent: string): DiscoveredSession["runtime"] | undefined {
   const lines = tailContent.split("\n").filter(Boolean)
+  let model: string | undefined
+  let tokenUsage: DiscoveredSessionTokenUsage | undefined
 
   for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const parsed = parseJsonLine(lines[index])
-    if (!parsed || normalizeString(parsed.type) !== "assistant") continue
+    if (model && tokenUsage) break
 
-    const message = isRecord(parsed.message) ? parsed.message : null
-    const model = normalizeString(message?.model)
-    if (model) {
-      return { model }
+    const parsed = parseJsonLine(lines[index])
+    if (!parsed) continue
+
+    if (!model && normalizeString(parsed.type) === "assistant") {
+      const message = isRecord(parsed.message) ? parsed.message : null
+      model = normalizeString(message?.model)
+      continue
+    }
+
+    if (!tokenUsage && normalizeString(parsed.kind) === "context_usage") {
+      const contextUsage = isRecord(parsed.contextUsage) ? parsed.contextUsage : null
+      const percentage = normalizeNumber(contextUsage?.percentage)
+      const totalTokens = normalizeNumber(contextUsage?.totalTokens)
+      const maxTokens = normalizeNumber(contextUsage?.maxTokens)
+      if (totalTokens !== undefined) {
+        tokenUsage = {
+          totalTokens,
+          ...(maxTokens !== undefined ? { contextWindow: maxTokens } : {}),
+          ...(percentage !== undefined ? { estimatedContextPercent: percentage } : {}),
+        }
+      }
     }
   }
 
-  return undefined
+  if (!model && !tokenUsage) return undefined
+  return {
+    ...(model ? { model } : {}),
+    ...(tokenUsage ? { tokenUsage } : {}),
+  }
 }
 
 function extractCodexRuntime(tailContent: string): DiscoveredSession["runtime"] | undefined {
@@ -348,8 +379,16 @@ export async function scanCodexSessions(
     let meta: { id: string; cwd: string; timestamp?: number }
     try {
       const parsed = JSON.parse(headLines[0])
-      if (parsed.type !== "session_meta" || !parsed.payload?.id || !parsed.payload?.cwd) continue
-      meta = parsed.payload
+      if (!isRecord(parsed) || normalizeString(parsed.type) !== "session_meta") continue
+      const payload = isRecord(parsed.payload) ? parsed.payload : null
+      const sessionId = normalizeString(payload?.id)
+      const cwd = normalizeString(payload?.cwd)
+      if (!sessionId || !cwd) continue
+      meta = {
+        id: sessionId,
+        cwd,
+        timestamp: normalizeTimestamp(payload?.timestamp),
+      }
     } catch {
       continue
     }

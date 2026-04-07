@@ -463,6 +463,15 @@ export interface InterruptedEntry extends TranscriptEntryBase {
   kind: "interrupted"
 }
 
+export interface ContextUsageEntry extends TranscriptEntryBase {
+  kind: "context_usage"
+  contextUsage: {
+    percentage: number
+    totalTokens: number
+    maxTokens: number
+  }
+}
+
 export type TranscriptEntry =
   | UserPromptEntry
   | SystemInitEntry
@@ -476,6 +485,7 @@ export type TranscriptEntry =
   | CompactSummaryEntry
   | ContextClearedEntry
   | InterruptedEntry
+  | ContextUsageEntry
 
 export interface HydratedToolCallBase<TKind extends string, TInput, TResult> {
   id: string
