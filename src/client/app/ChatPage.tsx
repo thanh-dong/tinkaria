@@ -23,6 +23,7 @@ import {
   RIGHT_SIDEBAR_MIN_SIZE_PERCENT,
   useRightSidebarStore,
 } from "../stores/rightSidebarStore"
+import { useSkillCompositionStore } from "../stores/skillCompositionStore"
 import { useRightSidebarToggleAnimation } from "./useRightSidebarToggleAnimation"
 import type { TinkariaState } from "./useTinkariaState"
 import { TinkariaTranscript } from "./TinkariaTranscript"
@@ -32,7 +33,8 @@ import type { HydratedTranscriptMessage } from "../../shared/types"
 const EMPTY_STATE_TEXT = "What are we building?"
 const EMPTY_STATE_TYPING_INTERVAL_MS = 19
 const CHAT_NAVBAR_OFFSET_PX = 72
-const SCROLL_BUTTON_BOTTOM_PX = 120
+const SCROLL_BUTTON_BASE_BOTTOM_PX = 120
+const SCROLL_BUTTON_SKILLS_RIBBON_OFFSET_PX = 52
 const MOBILE_SIDEBAR_SWIPE_EDGE_FRACTION = 1 / 3
 const MOBILE_SIDEBAR_SWIPE_MIN_DISTANCE_PX = 72
 const MOBILE_SIDEBAR_SWIPE_MAX_VERTICAL_DRIFT_PX = 56
@@ -122,6 +124,15 @@ export function getAvailableSkillsFromMessages(messages: HydratedTranscriptMessa
     return getSkillsFromDebugRaw(message.debugRaw) ?? message.slashCommands
   }
   return []
+}
+
+export function getScrollButtonBottomPx(args: {
+  hasAvailableSkills: boolean
+  skillsRibbonVisible: boolean
+}): number {
+  return args.hasAvailableSkills && args.skillsRibbonVisible
+    ? SCROLL_BUTTON_BASE_BOTTOM_PX + SCROLL_BUTTON_SKILLS_RIBBON_OFFSET_PX
+    : SCROLL_BUTTON_BASE_BOTTOM_PX
 }
 
 export function shouldIgnoreMobileSidebarSwipeStart(target: EventTarget | null): boolean {
@@ -222,8 +233,13 @@ export function ChatPage() {
   const rightSidebarLayout = projectRightSidebarLayout ?? DEFAULT_PROJECT_RIGHT_SIDEBAR_LAYOUT
   const toggleRightSidebar = useRightSidebarStore((store) => store.toggleVisibility)
   const setRightSidebarSize = useRightSidebarStore((store) => store.setSize)
+  const skillsRibbonVisible = useSkillCompositionStore((store) => store.ribbonVisible)
 
   const availableSkills = useMemo(() => getAvailableSkillsFromMessages(state.messages), [state.messages])
+  const scrollButtonBottomPx = getScrollButtonBottomPx({
+    hasAvailableSkills: availableSkills.length > 0,
+    skillsRibbonVisible,
+  })
   const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
   const [forkDialogOpen, setForkDialogOpen] = useState(false)
   const shouldRenderRightSidebarLayout = Boolean(projectId)
@@ -468,9 +484,9 @@ export function ChatPage() {
         ) : null}
 
         <div
-          style={{ bottom: SCROLL_BUTTON_BOTTOM_PX }}
+          style={{ bottom: scrollButtonBottomPx }}
           className={cn(
-            "absolute left-1/2 -translate-x-1/2 z-10 transition-all",
+            "absolute left-1/2 -translate-x-1/2 z-30 transition-all",
             state.showScrollButton
               ? "scale-100 duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
               : "scale-60 duration-300 ease-out pointer-events-none blur-sm opacity-0"

@@ -12,6 +12,7 @@ import {
   getChatPageUiIdentityDescriptors,
   getChatPageUiIdentities,
   getEmptyStateTypingDurationMs,
+  getScrollButtonBottomPx,
   shouldDismissMobileKeyboardOnFirstMessage,
   shouldIgnoreMobileSidebarSwipeStart,
   shouldOpenMobileSidebarFromSwipe,
@@ -92,6 +93,29 @@ describe("getAvailableSkillsFromMessages", () => {
     ]
 
     expect(getAvailableSkillsFromMessages(messages)).toEqual([])
+  })
+})
+
+describe("getScrollButtonBottomPx", () => {
+  test("keeps the base offset when no skills are available", () => {
+    expect(getScrollButtonBottomPx({
+      hasAvailableSkills: false,
+      skillsRibbonVisible: true,
+    })).toBe(120)
+  })
+
+  test("keeps the base offset when the skills ribbon is collapsed", () => {
+    expect(getScrollButtonBottomPx({
+      hasAvailableSkills: true,
+      skillsRibbonVisible: false,
+    })).toBe(120)
+  })
+
+  test("lifts the scroll button above the expanded skills ribbon", () => {
+    expect(getScrollButtonBottomPx({
+      hasAvailableSkills: true,
+      skillsRibbonVisible: true,
+    })).toBe(172)
   })
 })
 
