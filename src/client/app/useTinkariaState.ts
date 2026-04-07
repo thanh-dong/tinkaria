@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
+import { useScrollFollow } from "./useScrollFollow"
 import { useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import {
@@ -469,6 +470,22 @@ export function normalizeLocalFilePreviewErrorMessage(error: unknown): string {
   return message
 }
 
+export function normalizeCommandErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const normalized = message.trim()
+  const lower = normalized.toLowerCase()
+
+  if (lower === "not connected") {
+    return `Can't reach your local ${APP_NAME} server yet. Wait a moment, or start ${APP_NAME} in a terminal on this machine and try again.`
+  }
+
+  if (lower.includes("connection closed") || lower.includes("socket closed")) {
+    return `The connection to your local ${APP_NAME} server dropped. ${APP_NAME} will keep trying to reconnect.`
+  }
+
+  return normalized
+}
+
 export function shouldFlushQueuedText(args: {
   activeChatId: string | null
   queuedChatId: string | null
@@ -555,6 +572,7 @@ export interface TinkariaState {
   sidebarOpen: boolean
   sidebarCollapsed: boolean
   scrollRef: RefObject<HTMLDivElement | null>
+  sentinelRef: RefObject<HTMLDivElement | null>
   inputRef: RefObject<HTMLDivElement | null>
   messages: HydratedTranscriptMessage[]
   latestToolIds: ReturnType<typeof getLatestToolIds>
@@ -580,7 +598,6 @@ export interface TinkariaState {
   expandSidebar: () => void
   closeLocalFilePreview: () => void
   handleInitialReadAnchorScrolled: () => void
-  updateScrollState: () => void
   scrollToBottom: () => void
   handleCreateChat: (projectId: string) => Promise<void>
   handleOpenLocalProject: (localPath: string) => Promise<void>
@@ -646,7 +663,6 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [inputHeight, setInputHeight] = useState(148)
-  const [isAtBottom, setIsAtBottom] = useState(true)
   const [commandError, setCommandError] = useState<string | null>(null)
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
@@ -679,10 +695,20 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const clearChatReadState = useChatReadStateStore((store) => store.clearChat)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLDivElement>(null)
   const initialScrollCompletedRef = useRef(false)
-  const initialScrollFrameRef = useRef<number | null>(null)
+  const {
+    isFollowing,
+    modeRef: scrollModeRef,
+    scrollToBottom: scrollFollowToBottom,
+    handleInitialScrollDone,
+    handleChatChanged: scrollFollowChatChanged,
+  } = useScrollFollow(scrollRef, sentinelRef)
   const activeQueuedText = getQueuedText(submitPipeline, activeChatId)
+  const setNormalizedCommandError = useCallback((error: unknown) => {
+    setCommandError(normalizeCommandErrorMessage(error))
+  }, [])
 
   function updateSubmitPipeline(updater: (current: SubmitPipelineState) => SubmitPipelineState): SubmitPipelineState {
     const next = updater(submitPipelineRef.current)
@@ -747,9 +773,9 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   useEffect(() => {
     if (connectionStatus !== "connected") return
     void socket.command<UpdateSnapshot>({ type: "update.check", force: true }).catch((error) => {
-      setCommandError(error instanceof Error ? error.message : String(error))
+      setNormalizedCommandError(error)
     })
-  }, [connectionStatus, socket])
+  }, [connectionStatus, setNormalizedCommandError, socket])
 
   useEffect(() => {
     const phase = getUiUpdateRestartPhase()
@@ -770,7 +796,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       if (!updateSnapshot?.lastCheckedAt) return
       if (Date.now() - updateSnapshot.lastCheckedAt <= 60 * 60 * 1000) return
       void socket.command<UpdateSnapshot>({ type: "update.check" }).catch((error) => {
-        setCommandError(error instanceof Error ? error.message : String(error))
+        setNormalizedCommandError(error)
       })
     }
 
@@ -778,7 +804,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     return () => {
       window.removeEventListener("focus", handleWindowFocus)
     }
-  }, [socket, updateSnapshot?.lastCheckedAt])
+  }, [setNormalizedCommandError, socket, updateSnapshot?.lastCheckedAt])
 
   useEffect(() => {
     function maybeRefreshAfterResume(trigger: "focus" | "online" | "pageshow" | "visibilitychange") {
@@ -843,10 +869,10 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
     for (const projectId of getResumeRefreshSessionProjectIds(activeSessionsSubs.current.keys())) {
       void socket.command({ type: "sessions.refresh", projectId }).catch((error) => {
-        setCommandError(error instanceof Error ? error.message : String(error))
+        setNormalizedCommandError(error)
       })
     }
-  }, [resumeRefreshNonce, socket])
+  }, [resumeRefreshNonce, setNormalizedCommandError, socket])
 
   useEffect(() => {
     if (!activeChatId) {
@@ -1058,14 +1084,6 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     }
   }, [chatSnapshot, pendingChatId])
 
-  useEffect(() => {
-    return () => {
-      if (initialScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(initialScrollFrameRef.current)
-      }
-    }
-  }, [])
-
   useLayoutEffect(() => { messagesRef.current = messages }, [messages])
 
   useLayoutEffect(() => {
@@ -1123,33 +1141,20 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
   useEffect(() => {
     initialScrollCompletedRef.current = false
-    if (initialScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(initialScrollFrameRef.current)
-      initialScrollFrameRef.current = null
-    }
+    scrollFollowChatChanged()
     setInitialChatReadAnchor({ kind: "wait" })
-  }, [activeChatId])
-
-  useEffect(() => () => {
-    if (initialScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(initialScrollFrameRef.current)
-    }
-  }, [])
+  }, [activeChatId, scrollFollowChatChanged])
 
   useEffect(() => {
     if (initialScrollCompletedRef.current) return
 
     setInitialChatReadAnchor((current) => {
-      const lockedAnchor = getLockedInitialChatReadAnchor(current, nextInitialChatReadAnchor, initialScrollCompletedRef.current)
-      if (lockedAnchor.kind !== "wait" && current.kind === "wait") {
-        setIsAtBottom(lockedAnchor.kind === "tail")
-      }
-      return lockedAnchor
+      return getLockedInitialChatReadAnchor(current, nextInitialChatReadAnchor, initialScrollCompletedRef.current)
     })
   }, [nextInitialChatReadAnchor])
 
   const transcriptPaddingBottom = FIXED_TRANSCRIPT_PADDING_BOTTOM
-  const showScrollButton = !isAtBottom && messages.length > 0
+  const showScrollButton = !isFollowing && messages.length > 0
   const fallbackLocalProjectPath = localProjects?.projects[0]?.localPath ?? null
   const selectedProject = resolveProjectSelection(projectSelection)
   const selectedProjectId = selectedProject.projectId
@@ -1167,37 +1172,29 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const initialReadAnchorMessageId = initialChatReadAnchor.kind === "block" ? initialChatReadAnchor.messageId : null
   const initialReadAnchorBlockIndex = initialChatReadAnchor.kind === "block" ? initialChatReadAnchor.blockIndex : null
 
+  // External system sync: content ↔ scroll position
   useLayoutEffect(() => {
-    if (initialScrollCompletedRef.current) return
-
     const element = scrollRef.current
     if (!element) return
-    if (initialChatReadAnchor.kind !== "tail") return
 
-    element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
-    if (initialScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(initialScrollFrameRef.current)
-    }
-    initialScrollFrameRef.current = window.requestAnimationFrame(() => {
-      const currentElement = scrollRef.current
-      if (!currentElement) return
-      currentElement.scrollTo({ top: currentElement.scrollHeight, behavior: "auto" })
-      initialScrollFrameRef.current = null
-    })
-    initialScrollCompletedRef.current = true
-  }, [activeChatId, initialChatReadAnchor, inputHeight, messages.length])
-
-  useEffect(() => {
-    if (!initialScrollCompletedRef.current || !isAtBottom) return
-
-    const frameId = window.requestAnimationFrame(() => {
-      const element = scrollRef.current
-      if (!element || !isAtBottom) return
+    // Phase 1: Initial scroll to tail (once per chat)
+    if (!initialScrollCompletedRef.current && initialChatReadAnchor.kind === "tail") {
       element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
-    })
+      // Second pass for virtualizer measurement settling
+      const frameId = window.requestAnimationFrame(() => {
+        const el = scrollRef.current
+        if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" })
+      })
+      initialScrollCompletedRef.current = true
+      handleInitialScrollDone("tail")
+      return () => window.cancelAnimationFrame(frameId)
+    }
 
-    return () => window.cancelAnimationFrame(frameId)
-  }, [activeChatId, inputHeight, isAtBottom, messages.length, runtime?.status])
+    // Phase 2: Auto-follow — reads mode ref, NOT state
+    if (initialScrollCompletedRef.current && scrollModeRef.current === "following") {
+      element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
+    }
+  }, [activeChatId, initialChatReadAnchor, inputHeight, messages.length, runtime?.status, handleInitialScrollDone, scrollModeRef])
 
   useEffect(() => {
     const provider = activeChatSnapshot?.runtime.provider
@@ -1290,43 +1287,29 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   useEffect(() => {
     if (!activeChatId) return
     const lastMessageAt = activeSidebarChat?.lastMessageAt
-    if (!initialScrollCompletedRef.current || !isAtBottom || lastMessageAt === undefined) return
+    if (!initialScrollCompletedRef.current || scrollModeRef.current !== "following" || lastMessageAt === undefined) return
     markChatRead(activeChatId, {
       messageId: latestReadableMessage?.id,
       blockIndex: latestReadableMessage ? Math.max(0, getReadableBlockCount(latestReadableMessage) - 1) : undefined,
       lastMessageAt,
     })
-  }, [activeChatId, activeSidebarChat?.lastMessageAt, isAtBottom, latestReadableMessage, markChatRead])
-
-  function updateScrollState() {
-    const element = scrollRef.current
-    if (!element) return
-    const distance = element.scrollHeight - element.scrollTop - element.clientHeight
-    const nextIsAtBottom = shouldAutoFollowTranscript(distance)
-    setIsAtBottom((current) => current === nextIsAtBottom ? current : nextIsAtBottom)
-  }
-
-  function enableAutoFollow(behavior: ScrollBehavior) {
-    const element = scrollRef.current
-    setIsAtBottom(true)
-    if (!element) return
-    element.scrollTo({ top: element.scrollHeight, behavior })
-  }
+  }, [activeChatId, activeSidebarChat?.lastMessageAt, isFollowing, latestReadableMessage, markChatRead])
 
   function scrollToBottom() {
-    enableAutoFollow("smooth")
+    scrollFollowToBottom("smooth")
   }
 
-  function handleInitialReadAnchorScrolled() {
+  const handleInitialReadAnchorScrolled = useCallback(() => {
     initialScrollCompletedRef.current = true
-  }
+    handleInitialScrollDone("block")
+  }, [handleInitialScrollDone])
 
   function keepComposerSubmitAnchored() {
     const element = scrollRef.current
     if (!element) return
     const distance = element.scrollHeight - element.scrollTop - element.clientHeight
     if (!shouldStickToBottomOnComposerSubmit(distance)) return
-    enableAutoFollow("auto")
+    scrollFollowToBottom("auto")
   }
 
   function maybeFlushQueuedSubmit(chatId: string, isProcessing: boolean) {
@@ -1474,7 +1457,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         throw new Error("Open a project first")
       }
 
-      enableAutoFollow("auto")
+      scrollFollowToBottom("auto")
 
       const result = await socket.command<{ chatId?: string }>({
         type: "chat.send",
@@ -1847,6 +1830,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     sidebarOpen,
     sidebarCollapsed,
     scrollRef,
+    sentinelRef,
     inputRef,
     messages,
     latestToolIds,
@@ -1877,7 +1861,6 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     expandSidebar: () => setSidebarCollapsed(false),
     closeLocalFilePreview: () => setLocalFilePreview(null),
     handleInitialReadAnchorScrolled,
-    updateScrollState,
     scrollToBottom,
     handleCreateChat,
     handleOpenLocalProject,

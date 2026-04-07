@@ -94,6 +94,10 @@ describe("getAvailableSkillsFromMessages", () => {
 
     expect(getAvailableSkillsFromMessages(messages)).toEqual([])
   })
+
+  test("returns an empty list when no messages exist (snapshot fallback precondition)", () => {
+    expect(getAvailableSkillsFromMessages([])).toEqual([])
+  })
 })
 
 describe("getScrollButtonBottomPx", () => {

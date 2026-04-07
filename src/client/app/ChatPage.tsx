@@ -235,7 +235,11 @@ export function ChatPage() {
   const setRightSidebarSize = useRightSidebarStore((store) => store.setSize)
   const skillsRibbonVisible = useSkillCompositionStore((store) => store.ribbonVisible)
 
-  const availableSkills = useMemo(() => getAvailableSkillsFromMessages(state.messages), [state.messages])
+  const availableSkills = useMemo(() => {
+    const fromMessages = getAvailableSkillsFromMessages(state.messages)
+    if (fromMessages.length > 0) return fromMessages
+    return state.chatSnapshot?.availableSkills ?? []
+  }, [state.messages, state.chatSnapshot?.availableSkills])
   const scrollButtonBottomPx = getScrollButtonBottomPx({
     hasAvailableSkills: availableSkills.length > 0,
     skillsRibbonVisible,
@@ -327,14 +331,6 @@ export function ChatPage() {
     return () => window.removeEventListener("keydown", handleGlobalKeydown)
   }, [projectId, state, toggleRightSidebar])
 
-  useEffect(() => {
-    function handleResize() {
-      state.updateScrollState()
-    }
-
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [state.updateScrollState])
 
   useEffect(() => {
     const previousMessageCount = previousMessageCountRef.current
@@ -402,7 +398,6 @@ export function ChatPage() {
         <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.transcript)}>
           <ScrollArea
             ref={state.scrollRef}
-            onScroll={state.updateScrollState}
             className="h-full px-4 scroll-pt-[72px]"
           >
             {state.messages.length === 0 ? <div style={{ height: state.transcriptPaddingBottom }} aria-hidden="true" /> : null}
@@ -430,6 +425,7 @@ export function ChatPage() {
                     </div>
                   ) : null}
                 </div>
+                <div ref={state.sentinelRef} className="h-px" aria-hidden="true" />
                 <div style={{ height: 250 }} aria-hidden="true" />
               </>
             ) : null}

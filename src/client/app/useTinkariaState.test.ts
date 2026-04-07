@@ -19,6 +19,7 @@ import {
   isReadableTranscriptMessage,
   isChatRead,
   normalizeLocalFilePreviewErrorMessage,
+  normalizeCommandErrorMessage,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
   hasRenderableTranscriptHistory,
@@ -230,6 +231,24 @@ describe("normalizeLocalFilePreviewErrorMessage", () => {
   })
 })
 
+describe("normalizeCommandErrorMessage", () => {
+  test("rewrites transport not-connected errors into a user-facing setup hint", () => {
+    expect(normalizeCommandErrorMessage(new Error("Not connected"))).toBe(
+      "Can't reach your local Tinkaria server yet. Wait a moment, or start Tinkaria in a terminal on this machine and try again."
+    )
+  })
+
+  test("rewrites dropped connection errors into a reconnect hint", () => {
+    expect(normalizeCommandErrorMessage(new Error("Connection closed"))).toBe(
+      "The connection to your local Tinkaria server dropped. Tinkaria will keep trying to reconnect."
+    )
+  })
+
+  test("passes through unrelated command errors", () => {
+    expect(normalizeCommandErrorMessage(new Error("Permission denied"))).toBe("Permission denied")
+  })
+})
+
 describe("resolveComposeIntent", () => {
   test("prefers the selected project when available", () => {
     expect(
@@ -287,6 +306,7 @@ describe("getActiveChatSnapshot", () => {
       },
       messageCount: 0,
       availableProviders: [],
+      availableSkills: [],
     }
 
     expect(getActiveChatSnapshot(snapshot, "chat-1")).toEqual(snapshot)
@@ -306,6 +326,7 @@ describe("getActiveChatSnapshot", () => {
       },
       messageCount: 0,
       availableProviders: [],
+      availableSkills: [],
     }
 
     expect(getActiveChatSnapshot(snapshot, "chat-new")).toBeNull()
