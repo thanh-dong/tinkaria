@@ -31,6 +31,31 @@ interface NatsCommandResponse {
   error?: string
 }
 
+interface ReconnectableSubscriptionEntry {
+  natsSubscription: Subscription | null
+  eventSubscription: Subscription | null
+  consumerMessages: ConsumerMessages | null
+}
+
+export function resetSubscriptionEntryForReconnect(entry: ReconnectableSubscriptionEntry): void {
+  entry.natsSubscription?.unsubscribe()
+  entry.eventSubscription?.unsubscribe()
+  void entry.consumerMessages?.close()
+  entry.natsSubscription = null
+  entry.eventSubscription = null
+  entry.consumerMessages = null
+}
+
+export function reactivateSubscriptionsAfterReconnect(
+  entries: Map<string, ReconnectableSubscriptionEntry>,
+  activate: (id: string, entry: ReconnectableSubscriptionEntry) => void
+): void {
+  for (const [id, entry] of entries.entries()) {
+    resetSubscriptionEntryForReconnect(entry)
+    activate(id, entry)
+  }
+}
+
 export class NatsSocket implements TinkariaTransport {
   private resolvedWsUrl: string | null = null
   private nc: NatsConnection | null = null
@@ -215,18 +240,12 @@ export class NatsSocket implements TinkariaTransport {
             break
           case "reconnect":
             this.emitStatus("connected")
-            // js holds a reference to nc — no need to recreate on reconnect
-            // Re-activate subscriptions after reconnect
-            for (const [id, entry] of this.subscriptions.entries()) {
-              // Close stale JetStream consumers
-              if (entry.consumerMessages) {
-                void entry.consumerMessages.close()
-                entry.consumerMessages = null
-              }
-              if (!entry.natsSubscription) {
-                this.activateSubscription(id, entry)
-              }
-            }
+            // js holds a reference to nc — no need to recreate on reconnect.
+            // Always rebuild snapshot/event subscriptions so the server sends a fresh
+            // snapshot even when the transport dropped while the chat state changed.
+            reactivateSubscriptionsAfterReconnect(this.subscriptions, (id, entry) => {
+              this.activateSubscription(id, entry as SubscriptionEntry)
+            })
             break
           case "reconnecting":
             this.emitStatus("connecting")

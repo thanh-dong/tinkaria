@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test"
+import { reactivateSubscriptionsAfterReconnect, resetSubscriptionEntryForReconnect } from "./nats-socket"
 
 // NatsSocket uses `window.setTimeout` — provide the global before importing
 const timers: Array<{ cb: () => void; delay: number }> = []
@@ -133,5 +134,62 @@ describe("NatsSocket JetStream integration", () => {
   test("CHAT_MESSAGE_EVENTS_STREAM_NAME is the correct stream name", async () => {
     const { CHAT_MESSAGE_EVENTS_STREAM_NAME } = await import("../../shared/nats-subjects")
     expect(CHAT_MESSAGE_EVENTS_STREAM_NAME).toBe("KANNA_CHAT_MESSAGE_EVENTS")
+  })
+})
+
+describe("resetSubscriptionEntryForReconnect", () => {
+  test("closes stale subscription handles and clears the entry", () => {
+    const unsubscribeSnapshot = mock(() => {})
+    const unsubscribeEvents = mock(() => {})
+    const closeConsumer = mock(async () => {})
+    const entry = {
+      natsSubscription: { unsubscribe: unsubscribeSnapshot } as never,
+      eventSubscription: { unsubscribe: unsubscribeEvents } as never,
+      consumerMessages: { close: closeConsumer } as never,
+    }
+
+    resetSubscriptionEntryForReconnect(entry)
+
+    expect(unsubscribeSnapshot).toHaveBeenCalledTimes(1)
+    expect(unsubscribeEvents).toHaveBeenCalledTimes(1)
+    expect(closeConsumer).toHaveBeenCalledTimes(1)
+    expect(entry.natsSubscription).toBeNull()
+    expect(entry.eventSubscription).toBeNull()
+    expect(entry.consumerMessages).toBeNull()
+  })
+})
+
+describe("reactivateSubscriptionsAfterReconnect", () => {
+  test("re-subscribes every active topic after reconnect, even when stale handles exist", () => {
+    const staleSnapshotUnsubscribe = mock(() => {})
+    const staleEventsUnsubscribe = mock(() => {})
+    const staleConsumerClose = mock(async () => {})
+    const idleEntry = {
+      natsSubscription: null,
+      eventSubscription: null,
+      consumerMessages: null,
+    }
+    const busyEntry = {
+      natsSubscription: { unsubscribe: staleSnapshotUnsubscribe } as never,
+      eventSubscription: { unsubscribe: staleEventsUnsubscribe } as never,
+      consumerMessages: { close: staleConsumerClose } as never,
+    }
+    const entries = new Map<string, typeof busyEntry | typeof idleEntry>([
+      ["chat-1", busyEntry],
+      ["chat-2", idleEntry],
+    ])
+    const activatedIds: string[] = []
+
+    reactivateSubscriptionsAfterReconnect(entries, (id) => {
+      activatedIds.push(id)
+    })
+
+    expect(staleSnapshotUnsubscribe).toHaveBeenCalledTimes(1)
+    expect(staleEventsUnsubscribe).toHaveBeenCalledTimes(1)
+    expect(staleConsumerClose).toHaveBeenCalledTimes(1)
+    expect(activatedIds).toEqual(["chat-1", "chat-2"])
+    expect(busyEntry.natsSubscription).toBeNull()
+    expect(busyEntry.eventSubscription).toBeNull()
+    expect(busyEntry.consumerMessages).toBeNull()
   })
 })
