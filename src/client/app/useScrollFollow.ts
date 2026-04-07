@@ -58,6 +58,12 @@ export function createScrollFollowStore(
 
     handleInitialScrollDone(anchor) {
       transition({ type: "initial-scroll-done", anchor })
+      // Force re-observe so the observer delivers current intersection state.
+      // Without this, a "block" anchor that lands with the sentinel already
+      // visible stays "detached" forever — the observer already fired during
+      // "anchoring" (which ignores intersection events) and won't fire again.
+      observer.unobserve(sentinelEl)
+      observer.observe(sentinelEl)
     },
 
     handleScrollToBottom() {

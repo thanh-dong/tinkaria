@@ -6,13 +6,22 @@ type IntersectionCallback = (entries: IntersectionObserverEntry[]) => void
 let observerCallback: IntersectionCallback | null = null
 let observedElements: unknown[] = []
 let disconnected = false
+let pendingIntersecting: boolean | null = null
 
 class MockIntersectionObserver {
   constructor(callback: IntersectionCallback, _options?: IntersectionObserverInit) {
     observerCallback = callback
     disconnected = false
   }
-  observe(target: Element) { observedElements.push(target) }
+  observe(target: Element) {
+    observedElements.push(target)
+    // When re-observing, deliver pending intersection state (simulates browser behavior)
+    if (pendingIntersecting !== null && observerCallback) {
+      const state = pendingIntersecting
+      pendingIntersecting = null
+      queueMicrotask(() => observerCallback?.([{ isIntersecting: state } as IntersectionObserverEntry]))
+    }
+  }
   unobserve(_target: Element) { /* noop */ }
   disconnect() { disconnected = true }
 }
@@ -26,6 +35,7 @@ function resetMocks() {
   observerCallback = null
   observedElements = []
   disconnected = false
+  pendingIntersecting = null
 }
 
 // Mock elements — createScrollFollowStore only needs them as identity tokens
@@ -147,5 +157,24 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     const { store } = await setup()
     store.destroy()
     expect(disconnected).toBe(true)
+  })
+
+  test("reconciles to following when sentinel is already visible after block anchor scroll", async () => {
+    const { store } = await setup()
+    // Sentinel is visible during anchoring (ignored by state machine)
+    fireIntersection(true)
+    expect(store.getMode()).toBe("anchoring")
+
+    // Set up pending intersection for re-observe
+    pendingIntersecting = true
+
+    // Block anchor completes → detached, but sentinel is already visible
+    store.handleInitialScrollDone("block")
+
+    // After microtask (re-observe fires), should reconcile to following
+    await new Promise((resolve) => queueMicrotask(resolve))
+    expect(store.getMode()).toBe("following")
+    expect(store.getSnapshot()).toBe(true)
+    store.destroy()
   })
 })
