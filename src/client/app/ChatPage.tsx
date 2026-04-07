@@ -98,6 +98,13 @@ export interface MobileSidebarSwipeState {
   target: EventTarget | null
 }
 
+interface ComposerLiftArgs {
+  layoutViewportHeight: number | null
+  visualViewportHeight: number | null
+  visualViewportOffsetTop: number | null
+  isTouchDevice: boolean
+}
+
 function getSkillsFromDebugRaw(debugRaw?: string): string[] | null {
   if (!debugRaw) return null
   try {
@@ -134,6 +141,20 @@ export function getScrollButtonBottomPx(args: {
   return args.hasAvailableSkills && args.skillsRibbonVisible
     ? SCROLL_BUTTON_BASE_BOTTOM_PX + SCROLL_BUTTON_SKILLS_RIBBON_OFFSET_PX
     : SCROLL_BUTTON_BASE_BOTTOM_PX
+}
+
+export function getComposerLiftPx(args: ComposerLiftArgs): number {
+  if (!args.isTouchDevice) return 0
+  if (
+    args.layoutViewportHeight === null
+    || args.visualViewportHeight === null
+    || args.visualViewportOffsetTop === null
+  ) {
+    return 0
+  }
+
+  const obscuredBottom = args.layoutViewportHeight - (args.visualViewportHeight + args.visualViewportOffsetTop)
+  return obscuredBottom > 0 ? Math.round(obscuredBottom) : 0
 }
 
 export function shouldIgnoreMobileSidebarSwipeStart(target: EventTarget | null): boolean {
@@ -248,6 +269,7 @@ export function ChatPage() {
   const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
   const [forkDialogOpen, setForkDialogOpen] = useState(false)
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
+  const [composerLiftPx, setComposerLiftPx] = useState(0)
   const mergeSourceProjectId = state.pendingMergeProjectId ?? projectId
   const mergeAvailableChats = useMemo(() => {
     if (!mergeSourceProjectId) return []
@@ -347,6 +369,39 @@ export function ChatPage() {
     return () => window.removeEventListener("keydown", handleGlobalKeydown)
   }, [projectId, state, toggleRightSidebar])
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setComposerLiftPx(0)
+      return
+    }
+
+    const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0
+    const visualViewport = window.visualViewport
+    if (!isTouchDevice || !visualViewport) {
+      setComposerLiftPx(0)
+      return
+    }
+
+    const syncComposerLift = () => {
+      setComposerLiftPx(getComposerLiftPx({
+        layoutViewportHeight: window.innerHeight,
+        visualViewportHeight: visualViewport.height,
+        visualViewportOffsetTop: visualViewport.offsetTop,
+        isTouchDevice,
+      }))
+    }
+
+    syncComposerLift()
+    visualViewport.addEventListener("resize", syncComposerLift)
+    visualViewport.addEventListener("scroll", syncComposerLift)
+    window.addEventListener("resize", syncComposerLift)
+    return () => {
+      visualViewport.removeEventListener("resize", syncComposerLift)
+      visualViewport.removeEventListener("scroll", syncComposerLift)
+      window.removeEventListener("resize", syncComposerLift)
+    }
+  }, [])
+
 
   useEffect(() => {
     const previousMessageCount = previousMessageCountRef.current
@@ -367,6 +422,9 @@ export function ChatPage() {
 
     activeElement.blur()
   }, [state.messages.length])
+
+  const effectiveTranscriptPaddingBottom = state.transcriptPaddingBottom + composerLiftPx
+  const effectiveScrollButtonBottomPx = scrollButtonBottomPx + composerLiftPx
 
   const clampRightSidebarSize = (size: number) => {
     if (!Number.isFinite(size)) {
@@ -433,7 +491,7 @@ export function ChatPage() {
             ref={state.scrollRef}
             className="h-full px-4 scroll-pt-[72px]"
           >
-            {state.messages.length === 0 ? <div style={{ height: state.transcriptPaddingBottom }} aria-hidden="true" /> : null}
+            {state.messages.length === 0 ? <div style={{ height: effectiveTranscriptPaddingBottom }} aria-hidden="true" /> : null}
             {state.messages.length > 0 ? (
               <>
                 <div className="animate-fade-in space-y-5 pt-[72px] max-w-[800px] mx-auto">
@@ -471,7 +529,7 @@ export function ChatPage() {
             className="pointer-events-none absolute inset-x-4 animate-fade-in"
             style={{
               top: CHAT_NAVBAR_OFFSET_PX,
-              bottom: state.transcriptPaddingBottom,
+              bottom: effectiveTranscriptPaddingBottom,
             }}
           >
             <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
@@ -522,7 +580,7 @@ export function ChatPage() {
         ) : null}
 
         <div
-          style={{ bottom: scrollButtonBottomPx }}
+          style={{ bottom: effectiveScrollButtonBottomPx }}
           className={cn(
             "absolute left-1/2 -translate-x-1/2 z-30 transition-all",
             state.showScrollButton
@@ -540,6 +598,7 @@ export function ChatPage() {
       </CardContent>
 
         <div
+          style={{ bottom: composerLiftPx }}
           className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none"
           {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.composer)}
         >

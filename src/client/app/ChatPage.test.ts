@@ -11,6 +11,7 @@ import {
   getAvailableSkillsFromMessages,
   getChatPageUiIdentityDescriptors,
   getChatPageUiIdentities,
+  getComposerLiftPx,
   getEmptyStateTypingDurationMs,
   getScrollButtonBottomPx,
   shouldDismissMobileKeyboardOnFirstMessage,
@@ -120,6 +121,44 @@ describe("getScrollButtonBottomPx", () => {
       hasAvailableSkills: true,
       skillsRibbonVisible: true,
     })).toBe(172)
+  })
+})
+
+describe("getComposerLiftPx", () => {
+  test("returns zero on non-touch devices even when the visual viewport shrinks", () => {
+    expect(getComposerLiftPx({
+      layoutViewportHeight: 844,
+      visualViewportHeight: 544,
+      visualViewportOffsetTop: 0,
+      isTouchDevice: false,
+    })).toBe(0)
+  })
+
+  test("returns the obscured bottom inset when the mobile keyboard shrinks the visual viewport", () => {
+    expect(getComposerLiftPx({
+      layoutViewportHeight: 844,
+      visualViewportHeight: 544,
+      visualViewportOffsetTop: 0,
+      isTouchDevice: true,
+    })).toBe(300)
+  })
+
+  test("accounts for a shifted visual viewport when the browser also moves the viewport origin", () => {
+    expect(getComposerLiftPx({
+      layoutViewportHeight: 844,
+      visualViewportHeight: 508,
+      visualViewportOffsetTop: 24,
+      isTouchDevice: true,
+    })).toBe(312)
+  })
+
+  test("returns zero when the viewport data is unavailable", () => {
+    expect(getComposerLiftPx({
+      layoutViewportHeight: 844,
+      visualViewportHeight: null,
+      visualViewportOffsetTop: 0,
+      isTouchDevice: true,
+    })).toBe(0)
   })
 })
 
