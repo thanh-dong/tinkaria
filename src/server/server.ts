@@ -128,6 +128,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     getDiscoveredProjects: () => discoveredProjects,
     machineDisplayName,
     updateManager,
+    skillCache,
   })
 
   broadcast = () => publisher.broadcastSnapshots()
@@ -224,6 +225,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   // Start Codex kit daemon in background — not on the critical path for HTTP
   let localCodexKit: LocalCodexKitDaemon | null = null
   void LocalCodexKitDaemon.start({
+    nc: natsBridge.nc,
     natsUrl: natsBridge.natsUrl,
     authToken,
   }).then((daemon) => {

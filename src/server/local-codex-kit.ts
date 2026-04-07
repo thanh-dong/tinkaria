@@ -198,6 +198,7 @@ export class ProjectKitRegistry {
 
 export interface LocalCodexKitDaemonArgs {
   natsUrl: string
+  nc?: NatsConnection
   authToken?: string
   displayName?: string
   settingsIdentity?: string
@@ -213,13 +214,16 @@ export class LocalCodexKitDaemon {
   private readonly registration: CodexKitRegistration
   private readonly activeTurns = new Map<string, ActiveKitTurn>()
   private readonly subscriptions: Subscription[] = []
+  private readonly ownsConnection: boolean
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private disposed = false
 
   private constructor(
     private readonly nc: NatsConnection,
-    args: LocalCodexKitDaemonArgs
+    args: LocalCodexKitDaemonArgs,
+    ownsConnection: boolean
   ) {
+    this.ownsConnection = ownsConnection
     this.kitId = args.kitId ?? "kit-local-codex"
     this.js = jetstream(nc)
     this.manager = args.codexManager ?? new CodexAppServerManager()
@@ -233,11 +237,11 @@ export class LocalCodexKitDaemon {
   }
 
   static async start(args: LocalCodexKitDaemonArgs): Promise<LocalCodexKitDaemon> {
-    const nc = await connect({
+    const nc = args.nc ?? await connect({
       servers: args.natsUrl,
       token: args.authToken,
     })
-    const daemon = new LocalCodexKitDaemon(nc, args)
+    const daemon = new LocalCodexKitDaemon(nc, args, !args.nc)
     await daemon.initialize()
     return daemon
   }
@@ -397,7 +401,9 @@ export class LocalCodexKitDaemon {
       sub.unsubscribe()
     }
     this.manager.stopAll()
-    await this.nc.drain()
+    if (this.ownsConnection) {
+      await this.nc.drain()
+    }
   }
 }
 

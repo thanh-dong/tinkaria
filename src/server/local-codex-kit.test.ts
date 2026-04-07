@@ -45,6 +45,80 @@ async function setup() {
 }
 
 describe("local codex kit", () => {
+  test("supports a shared hub connection without opening a second client connection", async () => {
+    const ctx = await setup()
+    const sessionStarts: Array<{ chatId: string; cwd: string; model: string; sessionToken: string | null }> = []
+
+    daemon = await LocalCodexKitDaemon.start({
+      nc: ctx.hubNc,
+      natsUrl: server!.url,
+      kitId: "kit-a",
+      codexManager: {
+        async startSession(args: { chatId: string; cwd: string; model: string; sessionToken: string | null }) {
+          sessionStarts.push(args)
+        },
+        async startTurn(): Promise<HarnessTurn> {
+          async function* stream() {
+            yield {
+              type: "transcript" as const,
+              entry: timestamped({
+                kind: "result",
+                subtype: "success",
+                isError: false,
+                durationMs: 0,
+                result: "shared",
+              }),
+            }
+          }
+
+          return {
+            provider: "codex",
+            stream: stream(),
+            interrupt: async () => {},
+            close: () => {},
+          }
+        },
+        stopSession() {},
+        stopAll() {},
+      } as never,
+    })
+
+    const runtime = new RemoteCodexRuntime({
+      nc: ctx.hubNc,
+      registry: ctx.registry,
+    })
+
+    await runtime.startSession({
+      chatId: "chat-shared",
+      projectId: "project-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await runtime.startTurn({
+      chatId: "chat-shared",
+      content: "hello",
+      model: "gpt-5.4",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+
+    const events = []
+    for await (const event of turn.stream) {
+      events.push(event)
+    }
+
+    expect(sessionStarts).toEqual([{
+      chatId: "chat-shared",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    }])
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ type: "transcript" })
+  })
+
   test("binds a project to the first connected kit and reuses that assignment", async () => {
     const ctx = await setup()
 
