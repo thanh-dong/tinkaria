@@ -6,6 +6,37 @@ import type { ProcessedToolCall } from "./types"
 import { Button } from "../ui/button"
 import { createMarkdownComponents } from "./shared"
 import { cn } from "../../lib/utils"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+
+const PLAN_AREA_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.plan.area",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const PLAN_APPROVE_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.plan.approve.action",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const PLAN_APPROVE_CLEAR_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.plan.approve-clear.action",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const PLAN_SUGGEST_EDITS_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.plan.suggest-edits.action",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const PLAN_ADJUST_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.plan.adjust.action",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
 
 interface Props {
   message: Extract<ProcessedToolCall, { toolKind: "exit_plan_mode" }>
@@ -39,7 +70,7 @@ export const ExitPlanModeMessage = memo(function ExitPlanModeMessage({ message, 
   const isDiscarded = result?.discarded === true
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" {...getUiIdentityAttributeProps(PLAN_AREA_DESCRIPTOR)}>
       <div className="relative rounded-2xl border border-border overflow-hidden group/plan">
         {input?.plan && (
           <Button
@@ -110,6 +141,7 @@ export const ExitPlanModeMessage = memo(function ExitPlanModeMessage({ message, 
                 size="sm"
                 onClick={() => onConfirm(message.toolId, true, true)}
                 className="rounded-full bg-primary text-background pr-4 md:order-last"
+                {...getUiIdentityAttributeProps(PLAN_APPROVE_CLEAR_DESCRIPTOR)}
               >
                 <CheckCheck className="h-4 w-4 mr-1.5" />
                 Approve & Clear
@@ -120,6 +152,7 @@ export const ExitPlanModeMessage = memo(function ExitPlanModeMessage({ message, 
                   variant="outline"
                   onClick={() => setShowEditInput(true)}
                   className="rounded-full border-border flex-1 md:flex-initial md:order-first"
+                  {...getUiIdentityAttributeProps(PLAN_SUGGEST_EDITS_DESCRIPTOR)}
                 >
                   <Pencil className="h-4 w-4 mr-1.5" />
                   Suggest Edits
@@ -129,6 +162,7 @@ export const ExitPlanModeMessage = memo(function ExitPlanModeMessage({ message, 
                   variant="outline"
                   onClick={() => onConfirm(message.toolId, true)}
                   className="rounded-full border-border flex-1 md:flex-initial"
+                  {...getUiIdentityAttributeProps(PLAN_APPROVE_DESCRIPTOR)}
                 >
                   <Check className="h-4 w-4 mr-1.5" />
                   Approve
@@ -174,6 +208,7 @@ export const ExitPlanModeMessage = memo(function ExitPlanModeMessage({ message, 
                   disabled={!editMessage.trim()}
                   onClick={() => onConfirm(message.toolId, false, undefined, editMessage.trim())}
                   className="rounded-full bg-primary text-background disabled:opacity-50 disabled:pointer-events-none"
+                  {...getUiIdentityAttributeProps(PLAN_ADJUST_DESCRIPTOR)}
                 >
                   <Send className="h-4 w-4 mr-1.5" />
                   Adjust Plan

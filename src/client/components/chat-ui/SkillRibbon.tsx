@@ -2,7 +2,26 @@ import { memo, useMemo } from "react"
 import { Sparkles, ChevronRight } from "lucide-react"
 import type { AgentProvider } from "../../../shared/types"
 import { cn } from "../../lib/utils"
+import { createUiIdentity, createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { sortSkillsByFrequency, formatSkillCommand, useSkillCompositionStore } from "../../stores/skillCompositionStore"
+
+const SKILL_RIBBON_UI_DESCRIPTORS = {
+  ribbon: createUiIdentityDescriptor({
+    id: "chat.composer.skills.ribbon",
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
+  toggle: createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.skills.toggle", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
+  skillButton: createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.skills.insert", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
+}
 
 interface SkillRibbonProps {
   skills: string[]
@@ -36,7 +55,7 @@ export const SkillRibbon = memo(function SkillRibbon({
   if (skills.length === 0 || (!showToggle && !showContent)) return null
 
   return (
-    <div className={cn("flex items-center min-h-[32px]", className)}>
+    <div className={cn("flex items-center min-h-[32px]", className)} {...getUiIdentityAttributeProps(SKILL_RIBBON_UI_DESCRIPTORS.ribbon)}>
       {showToggle ? (
         <button
           type="button"
@@ -48,6 +67,7 @@ export const SkillRibbon = memo(function SkillRibbon({
               ? "text-amber-600 dark:text-amber-400"
               : "text-muted-foreground"
           )}
+          {...getUiIdentityAttributeProps(SKILL_RIBBON_UI_DESCRIPTORS.toggle)}
         >
           <Sparkles className="h-3 w-3" />
           <span>Skills</span>
@@ -70,6 +90,7 @@ export const SkillRibbon = memo(function SkillRibbon({
               key={skill}
               type="button"
               onClick={() => onInsert(skill)}
+              {...getUiIdentityAttributeProps(SKILL_RIBBON_UI_DESCRIPTORS.skillButton)}
               className={cn(
                 "shrink-0 px-2 py-0.5 text-xs font-mono rounded-md transition-colors",
                 "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground",

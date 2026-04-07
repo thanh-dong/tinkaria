@@ -100,6 +100,11 @@ function SortableProjectGroup({
 }: SortableProjectGroupProps) {
   const { groupKey, localPath, chats: pathChats } = group
 
+  const sidebarChatIds = useMemo(
+    () => new Set(pathChats.map((chat) => chat.chatId)),
+    [pathChats]
+  )
+
   const isExpanded = expandedGroups.has(groupKey)
   const displayChats = isExpanded ? pathChats : pathChats.slice(0, chatsPerProject)
   const hasMore = pathChats.length > chatsPerProject
@@ -158,6 +163,7 @@ function SortableProjectGroup({
             sessions={sessions ?? []}
             isLoading={false}
             windowDays={sessionsWindowDays ?? 7}
+            sidebarChatIds={sidebarChatIds}
             onSelectSession={(session) => {
               if (session.chatId) {
                 onNavigateToChat?.(session.chatId)

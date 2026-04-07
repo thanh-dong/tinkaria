@@ -1,0 +1,232 @@
+{
+  "$schema": "https://c3.io/schemas/component-identity-mapping.json",
+  "version": "1.0",
+  "description": "Stable semantic UI identifiers for all C3 components, required by rule-ui-identity-composition",
+  "lastUpdated": "2026-04-07",
+  "components": {
+    "c3-101": {
+      "component_id": "c3-101",
+      "ui_id": "app",
+      "title": "app-shell",
+      "container": "c3-1",
+      "description": "React SPA shell and routing"
+    },
+    "c3-102": {
+      "component_id": "c3-102",
+      "ui_id": "stores",
+      "title": "stores",
+      "container": "c3-1",
+      "description": "Zustand state management"
+    },
+    "c3-103": {
+      "component_id": "c3-103",
+      "ui_id": "theme",
+      "title": "theme",
+      "container": "c3-1",
+      "description": "Theme provider and switcher"
+    },
+    "c3-104": {
+      "component_id": "c3-104",
+      "ui_id": "ui-primitives",
+      "title": "ui-primitives",
+      "container": "c3-1",
+      "description": "Radix-based UI components"
+    },
+    "c3-106": {
+      "component_id": "c3-106",
+      "ui_id": "present-content",
+      "title": "present-content",
+      "container": "c3-1",
+      "description": "Rich artifact cards"
+    },
+    "c3-107": {
+      "component_id": "c3-107",
+      "ui_id": "rich-content",
+      "title": "rich-content",
+      "container": "c3-1",
+      "description": "Content viewer and overlays"
+    },
+    "c3-108": {
+      "component_id": "c3-108",
+      "ui_id": "identity-overlay",
+      "title": "ui-identity",
+      "container": "c3-1",
+      "description": "Alt+Shift identity overlay controller"
+    },
+    "c3-110": {
+      "component_id": "c3-110",
+      "ui_id": "chat-workspace",
+      "title": "chat",
+      "container": "c3-1",
+      "description": "Chat workspace page"
+    },
+    "c3-111": {
+      "component_id": "c3-111",
+      "ui_id": "transcript",
+      "title": "messages",
+      "container": "c3-1",
+      "description": "Transcript message surfaces"
+    },
+    "c3-112": {
+      "component_id": "c3-112",
+      "ui_id": "chat-input-bar",
+      "title": "chat-input",
+      "container": "c3-1",
+      "description": "Chat input and composer"
+    },
+    "c3-113": {
+      "component_id": "c3-113",
+      "ui_id": "sidebar",
+      "title": "sidebar",
+      "container": "c3-1",
+      "description": "Left navigation sidebar"
+    },
+    "c3-115": {
+      "component_id": "c3-115",
+      "ui_id": "right-sidebar",
+      "title": "right-sidebar",
+      "container": "c3-1",
+      "description": "Right file/diff panel"
+    },
+    "c3-117": {
+      "component_id": "c3-117",
+      "ui_id": "projects-home",
+      "title": "projects",
+      "container": "c3-1",
+      "description": "Projects homepage"
+    },
+    "c3-201": {
+      "component_id": "c3-201",
+      "ui_id": "event-store",
+      "title": "event-store",
+      "container": "c3-2",
+      "description": "JSONL event log"
+    },
+    "c3-203": {
+      "component_id": "c3-203",
+      "ui_id": "cli",
+      "title": "cli",
+      "container": "c3-2",
+      "description": "CLI entry and supervisor"
+    },
+    "c3-204": {
+      "component_id": "c3-204",
+      "ui_id": "shared-types",
+      "title": "shared-types",
+      "container": "c3-2",
+      "description": "Shared schema and types"
+    },
+    "c3-205": {
+      "component_id": "c3-205",
+      "ui_id": "nats-transport",
+      "title": "nats-transport",
+      "container": "c3-2",
+      "description": "NATS broker and streams"
+    },
+    "c3-206": {
+      "component_id": "c3-206",
+      "ui_id": "orchestration",
+      "title": "orchestration",
+      "container": "c3-2",
+      "description": "Cross-session agent delegation"
+    },
+    "c3-207": {
+      "component_id": "c3-207",
+      "ui_id": "prompt-context",
+      "title": "prompt-context",
+      "container": "c3-2",
+      "description": "Web context instructions"
+    },
+    "c3-208": {
+      "component_id": "c3-208",
+      "ui_id": "kit-runtime",
+      "title": "kit-runtime",
+      "container": "c3-2",
+      "description": "Codex kit execution bridge"
+    },
+    "c3-210": {
+      "component_id": "c3-210",
+      "ui_id": "agent-coordinator",
+      "title": "agent",
+      "container": "c3-2",
+      "description": "Agent turn coordinator"
+    },
+    "c3-211": {
+      "component_id": "c3-211",
+      "ui_id": "providers",
+      "title": "providers",
+      "container": "c3-2",
+      "description": "Provider/model catalog"
+    },
+    "c3-213": {
+      "component_id": "c3-213",
+      "ui_id": "discovery",
+      "title": "discovery",
+      "container": "c3-2",
+      "description": "Local project discovery"
+    },
+    "c3-214": {
+      "component_id": "c3-214",
+      "ui_id": "read-models",
+      "title": "read-models",
+      "container": "c3-2",
+      "description": "CQRS read-side projections"
+    },
+    "c3-215": {
+      "component_id": "c3-215",
+      "ui_id": "share",
+      "title": "share",
+      "container": "c3-2",
+      "description": "Cloudflared tunnel sharing"
+    },
+    "c3-216": {
+      "component_id": "c3-216",
+      "ui_id": "codex",
+      "title": "codex",
+      "container": "c3-2",
+      "description": "Codex CLI wrapper"
+    },
+    "c3-217": {
+      "component_id": "c3-217",
+      "ui_id": "session-discovery",
+      "title": "session-discovery",
+      "container": "c3-2",
+      "description": "Provider session history merge"
+    },
+    "c3-218": {
+      "component_id": "c3-218",
+      "ui_id": "session-index",
+      "title": "session-index",
+      "container": "c3-2",
+      "description": "Session summaries index"
+    },
+    "c3-219": {
+      "component_id": "c3-219",
+      "ui_id": "task-ledger",
+      "title": "task-ledger",
+      "container": "c3-2",
+      "description": "Cross-session task tracking"
+    },
+    "c3-220": {
+      "component_id": "c3-220",
+      "ui_id": "transcript-search",
+      "title": "transcript-search",
+      "container": "c3-2",
+      "description": "BM25 transcript search"
+    },
+    "c3-222": {
+      "component_id": "c3-222",
+      "ui_id": "project-agent",
+      "title": "project-agent",
+      "container": "c3-2",
+      "description": "Project query router"
+    },
+    "c3-223": {
+      "component_id": "c3-223",
+      "ui_id": "skill-discovery",
+      "title": "skill-discovery",
+      "container": "c3-2",
+      "description": "Skill manifest loader"
+    }
+  }
+}

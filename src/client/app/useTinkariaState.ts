@@ -627,6 +627,7 @@ export interface TinkariaState {
   handleShowMoreSessions: (projectId: string) => void
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
+  handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleAskUserQuestion: (
     toolUseId: string,
     questions: AskUserQuestionItem[],
@@ -1737,21 +1738,11 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     navigate("/")
   }
 
-  async function handleForkSession(intent: string, provider: AgentProvider, model: string, preset?: string) {
+  async function startSessionFromPrompt(prompt: string, provider: AgentProvider, model: string) {
     const projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
     if (!projectId) {
       throw new Error("Open a project first")
     }
-    if (!activeChatId) {
-      throw new Error("Open a chat first")
-    }
-
-    const forkPromptResult = await socket.command<{ prompt: string }>({
-      type: "chat.generateForkPrompt",
-      chatId: activeChatId,
-      intent,
-      preset,
-    })
 
     const result = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
 
@@ -1765,13 +1756,70 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       type: "chat.send",
       chatId: result.chatId,
       provider,
-      content: forkPromptResult.prompt,
+      content: prompt,
       model,
       modelOptions,
     })
 
     setPendingChatId(result.chatId)
     navigate(`/chat/${result.chatId}`)
+    setSidebarOpen(false)
+    setCommandError(null)
+  }
+
+  async function handleForkSession(intent: string, provider: AgentProvider, model: string, preset?: string) {
+    if (!activeChatId) {
+      throw new Error("Open a chat first")
+    }
+
+    const forkPromptResult = await socket.command<{ prompt: string }>({
+      type: "chat.generateForkPrompt",
+      chatId: activeChatId,
+      intent,
+      preset,
+    })
+
+    await startSessionFromPrompt(forkPromptResult.prompt, provider, model)
+  }
+
+  async function handleMergeSession(chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string) {
+    if (chatIds.length < 2) {
+      throw new Error("Select at least 2 sessions to merge")
+    }
+
+    const projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
+    if (!projectId) {
+      throw new Error("Open a project first")
+    }
+
+    // Run LLM prompt generation and chat creation concurrently
+    const [mergePromptResult, createResult] = await Promise.all([
+      socket.command<{ prompt: string }>({
+        type: "chat.generateMergePrompt",
+        chatIds,
+        intent,
+        preset,
+      }),
+      socket.command<{ chatId: string }>({ type: "chat.create", projectId }),
+    ])
+
+    const providerDefaults = useChatPreferencesStore.getState().providerDefaults
+    const defaults = providerDefaults[provider]
+    const modelOptions: ModelOptions = provider === "claude"
+      ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
+      : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
+
+    await socket.command({
+      type: "chat.send",
+      chatId: createResult.chatId,
+      provider,
+      content: mergePromptResult.prompt,
+      model,
+      modelOptions,
+    })
+
+    setPendingChatId(createResult.chatId)
+    navigate(`/chat/${createResult.chatId}`)
     setSidebarOpen(false)
     setCommandError(null)
   }
@@ -1887,6 +1935,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     handleShowMoreSessions,
     handleCompose,
     handleForkSession,
+    handleMergeSession,
     handleAskUserQuestion,
     handleExitPlanMode,
   }

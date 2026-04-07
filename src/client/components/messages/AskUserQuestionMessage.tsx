@@ -4,6 +4,37 @@ import type { ProcessedToolCall, AskUserQuestionItem, AskUserQuestionOption } fr
 import type { AskUserQuestionAnswerMap } from "../../../shared/types"
 import { Button } from "../ui/button"
 import { cn } from "../../lib/utils"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+
+const ASK_USER_AREA_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.ask-user.area",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const ASK_USER_OPTION_ACTION_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.ask-user.option.action",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const ASK_USER_CUSTOM_INPUT_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.ask-user.custom-input.item",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const ASK_USER_SUBMIT_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.ask-user.submit.action",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const ASK_USER_NEXT_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.ask-user.next.action",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
 
 interface Props {
   message: Extract<ProcessedToolCall, { toolKind: "ask_user_question" }>
@@ -118,6 +149,7 @@ function OptionRow({
       <button
         onClick={onClick}
         className={cn(baseClasses, borderClass, "transition-all cursor-pointer")}
+        {...getUiIdentityAttributeProps(ASK_USER_OPTION_ACTION_DESCRIPTOR)}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -264,7 +296,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
     const displayAnswers = savedAnswers || submittedAnswers || {}
 
     return (
-      <div className="w-full">
+      <div className="w-full" {...getUiIdentityAttributeProps(ASK_USER_AREA_DESCRIPTOR)}>
         <div className="rounded-2xl border border-border overflow-hidden">
           <div className="font-medium text-sm p-3 px-4 pr-5 bg-muted  border-b border-border flex flex-row items-center justify-between">
             <p>Question{questions.length !== 1 ? "s" : ""}</p>
@@ -316,7 +348,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
   const customInput = customInputs[getQuestionKey(currentQuestion)] || ""
 
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-3" {...getUiIdentityAttributeProps(ASK_USER_AREA_DESCRIPTOR)}>
       <QuestionCard
         question={currentQuestion.question}
         currentIndex={currentIndex}
@@ -343,6 +375,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
               onKeyDown={handleCustomInputEnter}
               placeholder="Other..."
               className="flex-1 px-3 !py-1 pl-4 min-h-[55px] min-w-0 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
+              {...getUiIdentityAttributeProps(ASK_USER_CUSTOM_INPUT_DESCRIPTOR)}
             />
             <Checkbox
               selected={!!customInput}
@@ -355,7 +388,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
 
       <div className="flex justify-end gap-2 mx-2">
         {!isLastQuestion && currentHasAnswer && (currentQuestion.multiSelect || !!customInput) && (
-          <Button size="sm" onClick={handleNext}>
+          <Button size="sm" onClick={handleNext} {...getUiIdentityAttributeProps(ASK_USER_NEXT_DESCRIPTOR)}>
             Next
           </Button>
         )}
@@ -365,6 +398,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
             onClick={handleSubmit}
             disabled={!allQuestionsAnswered}
             className={cn(!allQuestionsAnswered && "opacity-50 cursor-not-allowed", "rounded-full")}
+            {...getUiIdentityAttributeProps(ASK_USER_SUBMIT_DESCRIPTOR)}
           >
             Submit
           </Button>

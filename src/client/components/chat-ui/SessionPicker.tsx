@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react"
 import { Flower, History, RefreshCw, Search, Terminal } from "lucide-react"
+import { formatRelativeTime } from "../../lib/formatters"
 import {
   createC3UiIdentityDescriptor,
   createUiIdentity,
@@ -10,7 +11,6 @@ import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import type { DiscoveredSession } from "../../../shared/types"
-import { SessionRuntimeBadges } from "./SessionRuntimeBadges"
 
 const SESSION_PICKER_UI_DESCRIPTORS = {
   triggerAction: createC3UiIdentityDescriptor({
@@ -46,17 +46,6 @@ export function getSessionPickerUiIdentityDescriptors() {
 
 // --- Helpers ---
 
-function relativeTime(timestamp: number): string {
-  const delta = Date.now() - timestamp
-  const minutes = Math.floor(delta / 60_000)
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
 function sessionDisplayTitle(session: DiscoveredSession): string {
   if (session.title) return session.title
   if (session.lastExchange?.question) return session.lastExchange.question
@@ -82,6 +71,7 @@ interface SessionPickerContentProps {
   onSearchChange: (query: string) => void
   onShowMore: () => void
   isRefreshing: boolean
+  sidebarChatIds?: Set<string>
 }
 
 interface VisibleSessionsOptions {
@@ -89,6 +79,7 @@ interface VisibleSessionsOptions {
   searchQuery: string
   windowDays: number
   now?: number
+  sidebarChatIds?: Set<string>
 }
 
 export function getVisibleSessions({
@@ -96,23 +87,29 @@ export function getVisibleSessions({
   searchQuery,
   windowDays,
   now = Date.now(),
+  sidebarChatIds,
 }: VisibleSessionsOptions): {
   sessions: DiscoveredSession[]
   hasMore: boolean
 } {
+  // Exclude sessions already visible on the sidebar
+  const eligible = sidebarChatIds
+    ? sessions.filter((session) => !(session.chatId && sidebarChatIds.has(session.chatId)))
+    : sessions
+
   const cutoff = now - windowDays * 24 * 60 * 60 * 1000
-  const recentSessions = sessions.filter((session) => session.modifiedAt >= cutoff)
+  const recentSessions = eligible.filter((session) => session.modifiedAt >= cutoff)
 
   if (!searchQuery) {
     return {
       sessions: recentSessions.slice(0, 25),
-      hasMore: sessions.some((session) => session.modifiedAt < cutoff),
+      hasMore: eligible.some((session) => session.modifiedAt < cutoff),
     }
   }
 
   const lower = searchQuery.toLowerCase()
   return {
-    sessions: sessions.filter((session) => {
+    sessions: eligible.filter((session) => {
       const title = sessionDisplayTitle(session).toLowerCase()
       const question = (session.lastExchange?.question ?? "").toLowerCase()
       return title.includes(lower) || question.includes(lower)
@@ -130,13 +127,14 @@ export const SessionPickerContent = memo(function SessionPickerContent({
   onSearchChange,
   onShowMore,
   isRefreshing,
+  sidebarChatIds,
 }: SessionPickerContentProps) {
   const [activeIndex, setActiveIndex] = useState(-1)
   const listRef = useRef<HTMLDivElement>(null)
 
   const visible = useMemo(
-    () => getVisibleSessions({ sessions, searchQuery, windowDays }),
-    [sessions, searchQuery, windowDays]
+    () => getVisibleSessions({ sessions, searchQuery, windowDays, sidebarChatIds }),
+    [sessions, searchQuery, windowDays, sidebarChatIds]
   )
   const filtered = visible.sessions
 
@@ -229,9 +227,8 @@ export const SessionPickerContent = memo(function SessionPickerContent({
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    {relativeTime(session.modifiedAt)}
+                    {formatRelativeTime(session.modifiedAt)}
                   </span>
-                  <SessionRuntimeBadges session={session} />
                 </div>
               </button>
             ))}
@@ -263,6 +260,7 @@ interface SessionPickerProps {
   onShowMore: () => void
   onOpenChange?: (open: boolean) => void
   disabled?: boolean
+  sidebarChatIds?: Set<string>
 }
 
 export const SessionPicker = memo(function SessionPicker({
@@ -274,6 +272,7 @@ export const SessionPicker = memo(function SessionPicker({
   onShowMore,
   onOpenChange,
   disabled = false,
+  sidebarChatIds,
 }: SessionPickerProps) {
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -318,6 +317,7 @@ export const SessionPicker = memo(function SessionPicker({
           onSearchChange={setSearchQuery}
           onShowMore={onShowMore}
           isRefreshing={isLoading}
+          sidebarChatIds={sidebarChatIds}
         />
       </PopoverContent>
     </Popover>

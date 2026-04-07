@@ -5,6 +5,7 @@ import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
 import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
 import { ForkSessionDialog } from "../components/chat-ui/ForkSessionDialog"
+import { MergeSessionDialog } from "../components/chat-ui/MergeSessionDialog"
 import { RightSidebar } from "../components/chat-ui/RightSidebar"
 import { LocalFilePreviewDialog } from "../components/messages/LocalFilePreviewDialog"
 import { ProcessingMessage } from "../components/messages/ProcessingMessage"
@@ -246,6 +247,13 @@ export function ChatPage() {
   })
   const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
   const [forkDialogOpen, setForkDialogOpen] = useState(false)
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
+  const mergeAvailableChats = useMemo(() => {
+    if (!projectId) return []
+    const group = state.sidebarData.projectGroups.find((g) => g.groupKey === projectId)
+    if (!group) return []
+    return group.chats.filter((chat) => chat.chatId !== state.activeChatId)
+  }, [projectId, state.sidebarData.projectGroups, state.activeChatId])
   const shouldRenderRightSidebarLayout = Boolean(projectId)
   const {
     isAnimating: isRightSidebarAnimating,
@@ -377,6 +385,7 @@ export function ChatPage() {
           onCollapseSidebar={state.collapseSidebar}
           onExpandSidebar={state.expandSidebar}
           onForkSession={() => setForkDialogOpen(true)}
+          onMergeSession={() => setMergeDialogOpen(true)}
           localPath={state.navbarLocalPath}
           currentSessionRuntime={state.currentSessionRuntime}
           currentRepoStatus={state.currentRepoStatus}
@@ -393,6 +402,18 @@ export function ChatPage() {
           )?.models[0]?.id ?? "sonnet"}
           availableProviders={state.availableProviders}
           onFork={state.handleForkSession}
+        />
+
+        <MergeSessionDialog
+          open={mergeDialogOpen}
+          onOpenChange={setMergeDialogOpen}
+          defaultProvider={state.runtime?.provider ?? "claude"}
+          defaultModel={state.availableProviders.find(
+            (p) => p.id === (state.runtime?.provider ?? "claude")
+          )?.models[0]?.id ?? "sonnet"}
+          availableProviders={state.availableProviders}
+          availableChats={mergeAvailableChats}
+          onMerge={state.handleMergeSession}
         />
 
         <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.transcript)}>

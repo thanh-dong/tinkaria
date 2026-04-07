@@ -20,8 +20,10 @@ describe("ContentOverlay", () => {
 
   test("tags the fullscreen rich-content viewer root so the overlay can grab it", () => {
     expect(CONTENT_OVERLAY_ROOT_UI_ID).toBe("rich-content.viewer.area")
-    expect(getContentOverlayUiIdentityProps()).toEqual({
+    expect(getContentOverlayUiIdentityProps()).toMatchObject({
       "data-ui-id": "rich-content.viewer.area",
+      "data-ui-c3": "c3-107",
+      "data-ui-c3-label": "rich-content",
     })
     expect(getContentOverlayUiIdentityProps("content-preview.dialog")).toEqual({
       "data-ui-id": "content-preview.dialog",

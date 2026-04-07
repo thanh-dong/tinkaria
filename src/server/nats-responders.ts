@@ -16,6 +16,7 @@ import { findSessionFile, importCliTranscript } from "./session-discovery"
 import { inspectSessionRuntime } from "./session-discovery"
 import { readRepoStatus } from "./repo-status"
 import { generateForkPromptForChat } from "./generate-fork-context"
+import { generateMergePromptForChats as defaultGenerateMergePrompt } from "./generate-merge-context"
 import type { TranscriptEntry } from "../shared/types"
 
 const encoder = new TextEncoder()
@@ -39,6 +40,7 @@ export interface RegisterRespondersArgs {
   publisher: NatsPublisher
   onStateChange: () => void
   generateForkPrompt?: (forkIntent: string, entries: TranscriptEntry[], cwd: string, preset?: string) => Promise<string>
+  generateMergePrompt?: (mergeIntent: string, sessions: { chatId: string; entries: TranscriptEntry[] }[], cwd: string, preset?: string) => Promise<string>
 }
 
 /** Command types that do NOT mutate state and should NOT trigger onStateChange */
@@ -52,6 +54,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "system.readLocalFilePreview",
   "chat.getMessages",
   "chat.generateForkPrompt",
+  "chat.generateMergePrompt",
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
   "snapshot.subscribe",
@@ -76,6 +79,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.cancel",
   "chat.respondTool",
   "chat.generateForkPrompt",
+  "chat.generateMergePrompt",
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
   "terminal.create",
@@ -100,6 +104,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
     publisher,
     onStateChange,
     generateForkPrompt = generateForkPromptForChat,
+    generateMergePrompt = defaultGenerateMergePrompt,
   } = args
 
   const subs: Subscription[] = SERVER_COMMANDS.map((type) => nc.subscribe(commandSubject(type)))
@@ -235,6 +240,30 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         }
       }
 
+      case "chat.generateMergePrompt": {
+        if (!command.chatIds || command.chatIds.length < 2) {
+          throw new Error("At least 2 sessions are required for merge")
+        }
+        const firstChat = store.getChat(command.chatIds[0]!)
+        if (!firstChat) {
+          throw new Error(`Chat not found: ${command.chatIds[0]}`)
+        }
+        const mergeProject = store.getProject(firstChat.projectId)
+        if (!mergeProject) {
+          throw new Error("Project not found")
+        }
+        const sessions = command.chatIds.map((chatId) => {
+          const chat = store.getChat(chatId)
+          if (!chat) {
+            throw new Error(`Chat not found: ${chatId}`)
+          }
+          return { chatId, entries: store.getMessages(chatId) }
+        })
+        return {
+          prompt: await generateMergePrompt(command.intent, sessions, mergeProject.localPath, command.preset),
+        }
+      }
+
       case "terminal.create": {
         const project = store.getProject(command.projectId)
         if (!project) {
@@ -304,7 +333,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (command.topic.type === "local-projects") {
           await refreshDiscovery()
         }
-        return publisher.getSnapshot(command.topic)
+        return await publisher.getSnapshot(command.topic)
       }
 
       case "snapshot.unsubscribe": {

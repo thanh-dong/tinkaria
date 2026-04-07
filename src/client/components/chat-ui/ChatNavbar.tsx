@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { GitFork, Menu, PanelLeft } from "lucide-react"
+import { GitFork, Menu, Merge, PanelLeft } from "lucide-react"
 import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
@@ -15,6 +15,7 @@ interface Props {
   onCollapseSidebar: () => void
   onExpandSidebar: () => void
   onForkSession: () => void
+  onMergeSession: () => void
   localPath?: string
   currentSessionRuntime?: DiscoveredSessionRuntime | null
   currentRepoStatus?: CurrentRepoStatusSnapshot | null
@@ -164,6 +165,7 @@ export function ChatNavbar({
   onCollapseSidebar,
   onExpandSidebar,
   onForkSession,
+  onMergeSession,
   localPath,
   currentSessionRuntime,
   currentRepoStatus,
@@ -172,6 +174,7 @@ export function ChatNavbar({
 }: Props) {
   const navbarAreaId = createUiIdentity("chat.navbar", "area")
   const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
+  const mergeSessionActionId = createUiIdentity("chat.navbar.merge-session", "action")
   const pathLabel = getPathLabel(localPath, currentRepoStatus)
   const compactRepoLabel = getCompactRepoLabel(pathLabel, currentRepoStatus)
   const contextPercent = currentSessionRuntime?.tokenUsage?.estimatedContextPercent
@@ -220,6 +223,15 @@ export function ChatNavbar({
             title="Fork session"
           >
             <GitFork className="size-4.5" />
+          </Button>
+          <Button
+            {...getUiIdentityAttributeProps(mergeSessionActionId)}
+            variant="ghost"
+            size="icon"
+            onClick={onMergeSession}
+            title="Merge sessions"
+          >
+            <Merge className="size-4.5" />
           </Button>
           {ProviderIcon && modelName ? (
             <Tooltip>

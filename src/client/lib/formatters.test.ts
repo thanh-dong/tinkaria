@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { formatBashCommandTitle, formatSidebarAgeLabel } from "./formatters"
+import { formatBashCommandTitle, formatRelativeTime, formatSidebarAgeLabel } from "./formatters"
 
 describe("formatBashCommandTitle", () => {
   test("unwraps codex zsh -lc commands", () => {
@@ -28,6 +28,30 @@ describe("formatBashCommandTitle", () => {
 
   test("leaves plain commands alone", () => {
     expect(formatBashCommandTitle("bun test --help")).toBe("bun test --help")
+  })
+})
+
+describe("formatRelativeTime", () => {
+  const now = Date.UTC(2026, 2, 17, 12, 0, 0)
+
+  test("returns 'just now' for sub-minute deltas", () => {
+    expect(formatRelativeTime(now, now)).toBe("just now")
+    expect(formatRelativeTime(now - 59_000, now)).toBe("just now")
+  })
+
+  test("shows minutes with 'ago' suffix", () => {
+    expect(formatRelativeTime(now - 60_000, now)).toBe("1m ago")
+    expect(formatRelativeTime(now - 30 * 60_000, now)).toBe("30m ago")
+  })
+
+  test("shows hours with 'ago' suffix", () => {
+    expect(formatRelativeTime(now - 60 * 60_000, now)).toBe("1h ago")
+    expect(formatRelativeTime(now - 16 * 60 * 60_000, now)).toBe("16h ago")
+  })
+
+  test("shows days with 'ago' suffix", () => {
+    expect(formatRelativeTime(now - 24 * 60 * 60_000, now)).toBe("1d ago")
+    expect(formatRelativeTime(now - 6 * 24 * 60 * 60_000, now)).toBe("6d ago")
   })
 })
 

@@ -62,6 +62,7 @@ export type ClientCommand =
   | { type: "chat.cancel"; chatId: string }
   | { type: "chat.respondTool"; chatId: string; toolUseId: string; result: unknown }
   | { type: "chat.generateForkPrompt"; chatId: string; intent: string; preset?: string }
+  | { type: "chat.generateMergePrompt"; chatIds: string[]; intent: string; preset?: string }
   | { type: "chat.getSessionRuntime"; chatId: string }
   | { type: "chat.getRepoStatus"; chatId: string }
   | { type: "terminal.create"; projectId: string; terminalId: string; cols: number; rows: number; scrollback: number }

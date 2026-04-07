@@ -193,4 +193,25 @@ describe("LocalDev homepage", () => {
     expect(html).not.toContain("Projects picked up from usage")
     expect(html).not.toContain("Workspaces available on this machine")
   })
+
+  test("renders a clearer disconnected setup state with next steps", () => {
+    const html = renderToStaticMarkup(
+      <TooltipProvider>
+        <LocalDev
+          connectionStatus="disconnected"
+          ready={false}
+          snapshot={null}
+          startingLocalPath={null}
+          commandError="Can't reach your local Tinkaria server yet. Wait a moment, or start Tinkaria in a terminal on this machine and try again."
+          onOpenProject={async () => {}}
+          onCreateProject={async () => {}}
+        />
+      </TooltipProvider>
+    )
+
+    expect(html).toContain("Local Tinkaria server not reachable")
+    expect(html).toContain("Get Connected")
+    expect(html).toContain("Start Tinkaria locally")
+    expect(html).toContain("Already running?")
+  })
 })

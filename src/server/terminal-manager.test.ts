@@ -64,6 +64,7 @@ async function createSession(terminalId: string) {
 
   manager.write(terminalId, "printf '__KANNA_READY__\\n'\r")
   await waitFor(() => output.includes("__KANNA_READY__"), SHELL_START_TIMEOUT_MS)
+  await waitForTerminalToSettle(() => output)
 
   return {
     manager,
@@ -73,6 +74,22 @@ async function createSession(terminalId: string) {
 
 async function waitForOutputToContain(getOutput: () => string, value: string, timeoutMs = COMMAND_TIMEOUT_MS) {
   await waitFor(() => getOutput().includes(value), timeoutMs)
+}
+
+async function waitForTerminalToSettle(getOutput: () => string, idleMs = 75, timeoutMs = COMMAND_TIMEOUT_MS) {
+  let lastOutput = getOutput()
+  let unchangedSince = Date.now()
+
+  await waitFor(() => {
+    const currentOutput = getOutput()
+    if (currentOutput !== lastOutput) {
+      lastOutput = currentOutput
+      unchangedSince = Date.now()
+      return false
+    }
+
+    return Date.now() - unchangedSince >= idleMs
+  }, timeoutMs)
 }
 
 describeIfSupported("TerminalManager", () => {
@@ -117,9 +134,13 @@ describeIfSupported("TerminalManager", () => {
 
   test("ctrl+d preserves eof behavior", async () => {
     const terminalId = "terminal-ctrl-d"
-    const { manager } = await createSession(terminalId)
+    const { manager, getOutput } = await createSession(terminalId)
 
     try {
+      manager.write(terminalId, "printf '__KANNA_CTRL_D_READY__\\n'\r")
+      await waitFor(() => getOutput().includes("__KANNA_CTRL_D_READY__"), COMMAND_TIMEOUT_MS)
+      await waitForTerminalToSettle(getOutput, 200)
+
       manager.write(terminalId, "\x04")
 
       await waitFor(() => manager.getSnapshot(terminalId)?.status === "exited", COMMAND_TIMEOUT_MS)

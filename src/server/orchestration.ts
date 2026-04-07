@@ -3,6 +3,7 @@ import { z } from "zod/v4"
 import type { AgentProvider, TranscriptEntry } from "../shared/types"
 import { LOG_PREFIX } from "../shared/branding"
 import { normalizeServerModel } from "./provider-catalog"
+import { toTranscriptLine } from "./transcript-utils"
 
 interface OriginRecord {
   originChatId: string
@@ -52,25 +53,8 @@ const MAX_DELEGATED_CONTEXT_ENTRIES = 24
 const MAX_DELEGATED_CONTEXT_CHARS = 12_000
 const MAX_DELEGATED_CONTEXT_LINE_CHARS = 600
 
-function truncateLine(text: string, limit = MAX_DELEGATED_CONTEXT_LINE_CHARS) {
-  const normalized = text.replace(/\s+/g, " ").trim()
-  if (normalized.length <= limit) return normalized
-  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
-}
-
 function entryToDelegatedContextLine(entry: TranscriptEntry): string | null {
-  switch (entry.kind) {
-    case "user_prompt":
-      return `User: ${truncateLine(entry.content)}`
-    case "assistant_text":
-      return `Assistant: ${truncateLine(entry.text)}`
-    case "compact_summary":
-      return `Summary: ${truncateLine(entry.summary)}`
-    case "result":
-      return `${entry.isError ? "Result error" : "Result"}: ${truncateLine(entry.result)}`
-    default:
-      return null
-  }
+  return toTranscriptLine(entry, MAX_DELEGATED_CONTEXT_LINE_CHARS)
 }
 
 function buildDelegatedContext(entries: TranscriptEntry[]): string | undefined {

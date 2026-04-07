@@ -79,7 +79,7 @@ describe("SessionPickerContent", () => {
     expect(html).toContain("Add unit tests for login")
   })
 
-  test("renders runtime session details when available", () => {
+  test("does not render runtime badges (simplified view)", () => {
     const html = renderToStaticMarkup(
       <SessionPickerContent
         sessions={mockSessions}
@@ -93,11 +93,9 @@ describe("SessionPickerContent", () => {
       />
     )
 
-    expect(html).toContain("gpt-5.4")
-    expect(html).toContain("~16% ctx")
-    expect(html).toContain("4.3K used")
-    expect(html).toContain("5h 13%")
-    expect(html).toContain("7d 7%")
+    expect(html).not.toContain("gpt-5.4")
+    expect(html).not.toContain("~16% ctx")
+    expect(html).not.toContain("4.3K used")
   })
 
   test("renders empty state when no sessions", () => {
@@ -184,5 +182,78 @@ describe("getVisibleSessions", () => {
     })
     expect(searchView.sessions.map((session) => session.sessionId)).toEqual(["sess-old"])
     expect(searchView.hasMore).toBe(false)
+  })
+
+  test("excludes sessions whose chatId is already in the sidebar", () => {
+    const now = Date.now()
+    const sidebarSession: DiscoveredSession = {
+      sessionId: "sess-sidebar",
+      provider: "claude",
+      source: "tinkaria",
+      title: "Already in sidebar",
+      lastExchange: { question: "Something", answer: "Done" },
+      modifiedAt: now - 60_000,
+      chatId: "chat-visible",
+    }
+    const orphanSession: DiscoveredSession = {
+      sessionId: "sess-orphan",
+      provider: "claude",
+      source: "cli",
+      title: "CLI session not in sidebar",
+      lastExchange: { question: "Fix the bug", answer: "Fixed" },
+      modifiedAt: now - 120_000,
+      chatId: null,
+    }
+
+    const result = getVisibleSessions({
+      sessions: [sidebarSession, orphanSession],
+      searchQuery: "",
+      windowDays: 7,
+      now,
+      sidebarChatIds: new Set(["chat-visible"]),
+    })
+    expect(result.sessions.map((s) => s.sessionId)).toEqual(["sess-orphan"])
+  })
+
+  test("excludes sidebar chats but keeps all other sessions regardless of title quality", () => {
+    const now = Date.now()
+    const sessions: DiscoveredSession[] = [
+      {
+        sessionId: "in-sidebar",
+        provider: "claude",
+        source: "tinkaria",
+        title: "Sidebar chat",
+        lastExchange: { question: "Q", answer: "A" },
+        modifiedAt: now - 60_000,
+        chatId: "chat-1",
+      },
+      {
+        sessionId: "date-titled",
+        provider: "claude",
+        source: "cli",
+        title: "Apr 7, 3:42 PM",
+        lastExchange: null,
+        modifiedAt: now - 120_000,
+        chatId: null,
+      },
+      {
+        sessionId: "good-one",
+        provider: "codex",
+        source: "cli",
+        title: "Deploy pipeline fix",
+        lastExchange: { question: "Fix deploy", answer: "Done" },
+        modifiedAt: now - 180_000,
+        chatId: null,
+      },
+    ]
+
+    const result = getVisibleSessions({
+      sessions,
+      searchQuery: "",
+      windowDays: 7,
+      now,
+      sidebarChatIds: new Set(["chat-1"]),
+    })
+    expect(result.sessions.map((s) => s.sessionId)).toEqual(["date-titled", "good-one"])
   })
 })

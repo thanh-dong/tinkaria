@@ -1,60 +1,18 @@
 import type { TranscriptEntry } from "../shared/types"
 import { getForkPreset } from "../shared/fork-presets"
 import { QuickResponseAdapter } from "./quick-response"
-
-const FORK_PROMPT_SCHEMA = {
-  type: "object",
-  properties: {
-    prompt: { type: "string" },
-  },
-  required: ["prompt"],
-  additionalProperties: false,
-} as const
+import { PROMPT_SCHEMA, normalizeGeneratedPrompt, normalizeIntent, toTranscriptLine } from "./transcript-utils"
 
 const MAX_FORK_TRANSCRIPT_LINES = 32
 const MAX_FORK_TRANSCRIPT_CHARS = 14_000
 const MAX_FORK_LINE_CHARS = 700
 const MAX_FORK_PROMPT_CHARS = 4_000
 
-function truncateLine(text: string, limit = MAX_FORK_LINE_CHARS) {
-  const normalized = text.replace(/\s+/g, " ").trim()
-  if (normalized.length <= limit) return normalized
-  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
-}
-
-function normalizeForkIntent(intent: string): string {
-  return intent.replace(/\s+/g, " ").trim().slice(0, 1_000)
-}
-
-function normalizeGeneratedForkPrompt(value: unknown): string | null {
-  if (typeof value !== "string") return null
-  const normalized = value
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, MAX_FORK_PROMPT_CHARS)
-    .trim()
-  return normalized || null
-}
-
-function toForkTranscriptLine(entry: TranscriptEntry): string | null {
-  switch (entry.kind) {
-    case "user_prompt":
-      return `User: ${truncateLine(entry.content)}`
-    case "assistant_text":
-      return `Assistant: ${truncateLine(entry.text)}`
-    case "compact_summary":
-      return `Summary: ${truncateLine(entry.summary)}`
-    case "result":
-      return `${entry.isError ? "Result error" : "Result"}: ${truncateLine(entry.result)}`
-    default:
-      return null
-  }
-}
-
+/** Build a bounded transcript excerpt from a list of transcript entries.
+ * Exported for reuse by merge-context generation. */
 export function buildForkTranscriptExcerpt(entries: TranscriptEntry[]): string {
   const lines = entries
-    .map(toForkTranscriptLine)
+    .map((e) => toTranscriptLine(e, MAX_FORK_LINE_CHARS))
     .filter((line): line is string => Boolean(line))
 
   if (lines.length === 0) return "No prior transcript context was available."
@@ -90,7 +48,7 @@ export async function generateForkPromptForChat(
   adapter = new QuickResponseAdapter(),
 ): Promise<string> {
   const preset = getForkPreset(presetId)
-  const normalizedIntent = normalizeForkIntent(forkIntent) || preset?.defaultIntent || ""
+  const normalizedIntent = normalizeIntent(forkIntent) || preset?.defaultIntent || ""
   const transcriptExcerpt = buildForkTranscriptExcerpt(entries)
 
   const result = await adapter.generateStructured<string>({
@@ -112,10 +70,10 @@ export async function generateForkPromptForChat(
       "",
       transcriptExcerpt,
     ].join("\n"),
-    schema: FORK_PROMPT_SCHEMA,
+    schema: PROMPT_SCHEMA,
     parse: (value) => {
       const output = value && typeof value === "object" ? value as { prompt?: unknown } : {}
-      return normalizeGeneratedForkPrompt(output.prompt)
+      return normalizeGeneratedPrompt(output.prompt, MAX_FORK_PROMPT_CHARS)
     },
   })
 

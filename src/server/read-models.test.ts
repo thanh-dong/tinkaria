@@ -61,6 +61,58 @@ describe("read models", () => {
     ])
   })
 
+  test("includes available skills in chat snapshot when provided", () => {
+    const state = createEmptyState()
+    state.projectsById.set("project-1", {
+      id: "project-1",
+      localPath: "/tmp/project",
+      title: "Project",
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.chatsById.set("chat-1", {
+      id: "chat-1",
+      projectId: "project-1",
+      title: "Chat",
+      createdAt: 1,
+      updatedAt: 1,
+      provider: "claude",
+      planMode: false,
+      sessionToken: null,
+      lastTurnOutcome: null,
+    })
+
+    const chat = deriveChatSnapshot(state, new Map(), "chat-1", 0, ["skill-a", "skill-b"])
+    expect(chat?.availableSkills).toEqual(["skill-a", "skill-b"])
+  })
+
+  test("defaults availableSkills to empty array when not provided", () => {
+    const state = createEmptyState()
+    state.projectsById.set("project-1", {
+      id: "project-1",
+      localPath: "/tmp/project",
+      title: "Project",
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.chatsById.set("chat-1", {
+      id: "chat-1",
+      projectId: "project-1",
+      title: "Chat",
+      createdAt: 1,
+      updatedAt: 1,
+      provider: "claude",
+      planMode: false,
+      sessionToken: null,
+      lastTurnOutcome: null,
+    })
+
+    const chat = deriveChatSnapshot(state, new Map(), "chat-1", 0)
+    expect(chat?.availableSkills).toEqual([])
+  })
+
   test("prefers saved project metadata over discovered entries for the same path", () => {
     const state = createEmptyState()
     state.projectsById.set("project-1", {

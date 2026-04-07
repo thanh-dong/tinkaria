@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react"
+import { formatRelativeTime } from "../lib/formatters"
 import {
   Check,
   CodeXml,
@@ -116,17 +117,6 @@ function getSessionDisplayTitle(session: DiscoveredSession): string {
   return session.sessionId
 }
 
-function getRelativeTimeLabel(timestamp: number, now = Date.now()): string {
-  const delta = now - timestamp
-  const minutes = Math.floor(delta / 60_000)
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
 export function getHomepageRecentSessions(
   snapshot: LocalProjectsSnapshot | null,
   sessionsForProject?: (projectId: string) => DiscoveredSession[],
@@ -233,6 +223,46 @@ function ActionCard({
   )
 }
 
+function ConnectionStatusCard({
+  isConnecting,
+  commandError,
+}: {
+  isConnecting: boolean
+  commandError: string | null
+}) {
+  return (
+    <InfoCard>
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "rounded-xl border p-2",
+            isConnecting
+              ? "border-border bg-background"
+              : "border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-300"
+          )}>
+            <Loader2 className={cn("h-4 w-4", isConnecting && "animate-spin text-muted-foreground")} />
+          </div>
+          <div className="min-w-0">
+            <div className="font-medium text-foreground">
+              {isConnecting ? `Connecting to your local ${APP_NAME} server` : `Local ${APP_NAME} server not reachable`}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isConnecting
+                ? `Loading workspaces and recent sessions from this machine.`
+                : `This browser tab can't reach the local ${APP_NAME} server yet. Start it on this machine and the page will reconnect automatically.`}
+            </p>
+          </div>
+        </div>
+        {commandError ? (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+            {commandError}
+          </div>
+        ) : null}
+      </div>
+    </InfoCard>
+  )
+}
+
 function RecentSessionRow({
   item,
   onResume,
@@ -253,7 +283,7 @@ function RecentSessionRow({
         <div className="flex items-center gap-2 mt-0.5">
           <span className="text-xs text-muted-foreground truncate">{item.projectTitle}</span>
           <span className="text-xs text-muted-foreground/50">·</span>
-          <span className="text-xs text-muted-foreground shrink-0">{getRelativeTimeLabel(item.session.modifiedAt)}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{formatRelativeTime(item.session.modifiedAt)}</span>
         </div>
         <SessionRuntimeBadges session={item.session} className="mt-1.5 flex flex-wrap gap-1.5" />
       </div>
@@ -342,7 +372,7 @@ export function LocalDev({
     () => getHomepageRecentSessions(snapshot, sessionsForProject),
     [snapshot, sessionsForProject]
   )
-  const isConnecting = connectionStatus === "connecting" || !ready
+  const isConnecting = connectionStatus === "connecting" || (connectionStatus === "connected" && !ready)
   const isConnected = connectionStatus === "connected" && ready
 
   return (
@@ -364,38 +394,30 @@ export function LocalDev({
           <div className="max-w-2xl w-full mx-auto pb-12 px-6">
             <SectionHeader>Status</SectionHeader>
             <div className="mb-8" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.status)}>
-              <InfoCard>
-                <div className="flex items-center gap-3">
-                  <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
-                  <span className="text-sm text-muted-foreground">
-                    {isConnecting ? (
-                      `Connecting to your local ${APP_NAME} server...`
-                    ) : (
-                      <>
-                        Not connected. Run <code className="bg-background border border-border rounded-md mx-0.5 p-1 font-mono text-xs text-foreground">{getCliInvocation()}</code> from any terminal on this machine.
-                      </>
-                    )}
-                  </span>
-                </div>
-              </InfoCard>
+              <ConnectionStatusCard isConnecting={isConnecting} commandError={commandError} />
             </div>
 
             {!isConnecting ? (
               <div className="mb-10" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.setup)}>
-                <SectionHeader>Setup</SectionHeader>
+                <SectionHeader>Get Connected</SectionHeader>
                 <div className="space-y-4">
                   <ActionCard
                     icon={Sparkles}
-                    title={`Start ${APP_NAME}`}
-                    description="This page will reconnect automatically once the local server is running."
+                    title={`Start ${APP_NAME} locally`}
+                    description="Open a terminal on this machine and run the local server. This page reconnects automatically as soon as it comes online."
                     action={<CodeBlock>{getCliInvocation()}</CodeBlock>}
                   />
                   <ActionCard
                     icon={FolderOpen}
-                    title="Useful variants"
-                    description="Use the current directory directly, or keep the server headless."
+                    title="Already running?"
+                    description="If you expected this page to be connected already, double-check that the server is running on this same machine and keep this tab open for a few seconds."
                     action={(
                       <div className="space-y-3 text-sm text-muted-foreground">
+                        <ul className="list-disc pl-5 space-y-1">
+                          <li>Wait a moment after startup: project and session snapshots arrive after the socket connects.</li>
+                          <li>Run the command in a terminal on this machine, not on a different host.</li>
+                          <li>If you want to start in the current directory or skip opening a browser tab, use the variants below.</li>
+                        </ul>
                         <div className="space-y-1">
                           <div className="font-medium text-foreground">Start in the current directory</div>
                           <CodeBlock>{getCliInvocation("").trim()}</CodeBlock>

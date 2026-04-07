@@ -5,6 +5,19 @@ import { MetaRow, MetaLabel } from "./shared"
 import { AnimatedShinyText } from "../ui/animated-shiny-text"
 import type { ProcessedToolCall } from "./types"
 import type { HydratedTranscriptMessage } from "../../../shared/types"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+
+const TOOL_GROUP_AREA_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.tool-group.area",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
+
+const TOOL_GROUP_EXPAND_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.tool-group.expand.action",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
 
 interface ToolCategory {
   key: string
@@ -75,11 +88,13 @@ export const CollapsedToolGroup = memo(function CollapsedToolGroup({ messages, i
   const showLoadingState = anyInProgress && isLoading
 
   return (
+    <div {...getUiIdentityAttributeProps(TOOL_GROUP_AREA_DESCRIPTOR)}>
     <MetaRow className="w-full">
       <div className="flex flex-col w-full">
         <button
           onClick={() => setExpanded(!expanded)}
           className={`group cursor-pointer grid grid-cols-[auto_1fr] items-center gap-1 text-sm ${!expanded && !showLoadingState ? "hover:opacity-60 transition-opacity" : ""}`}
+          {...getUiIdentityAttributeProps(TOOL_GROUP_EXPAND_DESCRIPTOR)}
         >
           <div className="grid grid-cols-[auto_1fr] items-center gap-1.5">
             <div className="w-5 h-5 relative flex items-center justify-center">
@@ -119,5 +134,6 @@ export const CollapsedToolGroup = memo(function CollapsedToolGroup({ messages, i
         )}
       </div>
     </MetaRow>
+    </div>
   )
 })

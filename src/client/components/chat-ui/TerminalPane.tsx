@@ -5,6 +5,13 @@ import { Terminal, type ITheme } from "@xterm/xterm"
 import type { TerminalSnapshot } from "../../../shared/protocol"
 import type { TinkariaTransport, SocketStatus } from "../../app/socket-interface"
 import { useTheme } from "../../hooks/useTheme"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+
+const TERMINAL_PANE_UI_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "terminal.pane.area",
+  c3ComponentId: "c3-110",
+  c3ComponentLabel: "chat",
+})
 
 interface Props {
   projectId: string
@@ -436,7 +443,7 @@ export function TerminalPane({
   }, [connectionStatus, projectId, scrollback, socket, terminalId])
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-4">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-4" {...getUiIdentityAttributeProps(TERMINAL_PANE_UI_DESCRIPTOR)}>
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden px-3 py-1">
         <div ref={containerRef} className="tinkaria-terminal min-h-0 min-w-0 flex-1 overflow-hidden w-full" />
       </div>

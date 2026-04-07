@@ -100,6 +100,7 @@ export function deriveChatSnapshot(
   activeStatuses: Map<string, TinkariaStatus>,
   chatId: string,
   messageCount: number,
+  availableSkills?: string[],
 ): ChatSnapshot | null {
   const chat = state.chatsById.get(chatId)
   if (!chat || chat.deletedAt) return null
@@ -121,6 +122,7 @@ export function deriveChatSnapshot(
     runtime,
     messageCount,
     availableProviders: [...SERVER_PROVIDERS],
+    availableSkills: availableSkills ?? [],
   }
 }
 

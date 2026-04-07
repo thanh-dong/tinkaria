@@ -217,7 +217,7 @@ describe("CodexAppServerManager", () => {
             }),
           })
         )
-        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("only that chat's final result")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("its final turn result is what wait_agent returns")
         expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
           "Do not assume delegated chats share live intermediate reasoning"
         )

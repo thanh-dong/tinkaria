@@ -140,8 +140,8 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
     publisher: {
       addSubscription: () => {},
       removeSubscription: () => {},
-      getSnapshot: () => null,
-      broadcastSnapshots: () => {},
+      getSnapshot: async () => null,
+      broadcastSnapshots: async () => {},
       publishChatMessage: () => {},
       refreshSessions: async () => {},
       dispose: () => {},
@@ -258,6 +258,78 @@ describe("nats-responders", () => {
         preset: "tests",
       },
     ])
+  })
+
+  test("chat.generateMergePrompt returns a synthesized prompt from multiple sessions", async () => {
+    const mergeCalls: Array<{ intent: string; sessions: Array<{ chatId: string; entries: unknown[] }>; cwd: string; preset?: string }> = []
+    const multiChatStore = {
+      ...createMockStore(),
+      getChat: (id: string) => {
+        if (id === "chat-1" || id === "chat-2") return { id, projectId: "proj-1", provider: "claude", sessionToken: `session-${id}` }
+        return null
+      },
+      getMessages: (chatId: string) => {
+        if (chatId === "chat-1") return [{ kind: "user_prompt", content: "Session 1 work", _id: "1", createdAt: 1 }]
+        if (chatId === "chat-2") return [{ kind: "assistant_text", text: "Session 2 output", _id: "2", createdAt: 2 }]
+        return []
+      },
+    }
+
+    const { clientNc } = await setup({
+      store: multiChatStore as never,
+      generateMergePrompt: async (intent, sessions, cwd, preset) => {
+        mergeCalls.push({ intent, sessions, cwd, preset })
+        return "## Merged\nCombined context from sessions"
+      },
+    })
+
+    const res = await sendCommand(clientNc, {
+      type: "chat.generateMergePrompt",
+      chatIds: ["chat-1", "chat-2"],
+      intent: "Synthesize findings",
+      preset: "synthesis",
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual({ prompt: "## Merged\nCombined context from sessions" })
+    expect(mergeCalls).toHaveLength(1)
+    expect(mergeCalls[0]!.intent).toBe("Synthesize findings")
+    expect(mergeCalls[0]!.sessions).toHaveLength(2)
+    expect(mergeCalls[0]!.cwd).toBe("/tmp/test-project")
+    expect(mergeCalls[0]!.preset).toBe("synthesis")
+  })
+
+  test("chat.generateMergePrompt rejects fewer than 2 sessions", async () => {
+    const { clientNc } = await setup({
+      generateMergePrompt: async () => "should not reach",
+    })
+
+    const res = await sendCommand(clientNc, {
+      type: "chat.generateMergePrompt",
+      chatIds: ["chat-1"],
+      intent: "Merge this",
+    })
+
+    expect(res.ok).toBe(false)
+    expect(res.error).toContain("At least 2 sessions")
+  })
+
+  test("chat.generateMergePrompt does not trigger onStateChange", async () => {
+    let changed = false
+    const multiChatStore = {
+      ...createMockStore(),
+      getChat: (id: string) => {
+        if (id === "chat-1" || id === "chat-2") return { id, projectId: "proj-1", provider: "claude", sessionToken: `session-${id}` }
+        return null
+      },
+    }
+    const { clientNc } = await setup({
+      store: multiChatStore as never,
+      onStateChange: () => { changed = true },
+      generateMergePrompt: async () => "merge seed",
+    })
+    await sendCommand(clientNc, { type: "chat.generateMergePrompt", chatIds: ["chat-1", "chat-2"], intent: "Merge these" })
+    expect(changed).toBe(false)
   })
 
   test("chat.generateForkPrompt does not trigger onStateChange", async () => {
@@ -599,8 +671,8 @@ describe("nats-responders", () => {
     const mockPublisher = {
       addSubscription: (id: string) => { addCalled = true; addedId = id },
       removeSubscription: () => {},
-      getSnapshot: () => ({ mock: "snapshot" }),
-      broadcastSnapshots: () => {},
+      getSnapshot: async () => ({ mock: "snapshot" }),
+      broadcastSnapshots: async () => {},
       publishChatMessage: () => {},
       refreshSessions: async () => {},
       dispose: () => {},
@@ -622,8 +694,8 @@ describe("nats-responders", () => {
     const mockPublisher = {
       addSubscription: () => {},
       removeSubscription: (id: string) => { removedId = id },
-      getSnapshot: () => null,
-      broadcastSnapshots: () => {},
+      getSnapshot: async () => null,
+      broadcastSnapshots: async () => {},
       publishChatMessage: () => {},
       refreshSessions: async () => {},
       dispose: () => {},

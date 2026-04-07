@@ -6,6 +6,13 @@ import { stripWorkspacePath } from "../../lib/pathUtils"
 import { AnimatedShinyText } from "../ui/animated-shiny-text"
 import { formatBashCommandTitle, toTitleCase } from "../../lib/formatters"
 import { FileContentView } from "./FileContentView"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+
+const TOOL_CALL_ITEM_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.tool-call.item",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
 
 interface Props {
   message: ProcessedToolCall
@@ -93,6 +100,7 @@ export const ToolCallMessage = memo(function ToolCallMessage({ message, isLoadin
   }, [message])
 
   return (
+    <div {...getUiIdentityAttributeProps(TOOL_CALL_ITEM_DESCRIPTOR)}>
     <MetaRow className="w-full">
       <ExpandableRow
         expandedContent={
@@ -168,5 +176,6 @@ export const ToolCallMessage = memo(function ToolCallMessage({ message, isLoadin
 
       </ExpandableRow>
     </MetaRow>
+    </div>
   )
 })

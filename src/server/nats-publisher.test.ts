@@ -328,7 +328,9 @@ describe("createNatsPublisher", () => {
     const publisher = await createNatsPublisher(mockArgs({ store }))
     await publisher.refreshSessions(project.id, projectPath)
 
-    const snapshot = publisher.getSnapshot({ type: "sessions", projectId: project.id }) as { sessions: Array<{ sessionId: string, source: string }> }
+    const snapshot = await publisher.getSnapshot({ type: "sessions", projectId: project.id }) as {
+      sessions: Array<{ sessionId: string, source: string }>
+    }
 
     expect(snapshot.sessions).toHaveLength(1)
     expect(snapshot.sessions[0]).toMatchObject({

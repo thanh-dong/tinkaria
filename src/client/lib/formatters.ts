@@ -37,6 +37,17 @@ export function formatModelLabel(modelId: string): string {
   return toTitleCase(shortModelName).replace(/^Claude\s+/i, "")
 }
 
+export function formatRelativeTime(timestamp: number, now = Date.now()): string {
+  const delta = now - timestamp
+  const minutes = Math.floor(delta / 60_000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 export function formatSidebarAgeLabel(lastMessageAt: number | undefined, nowMs: number): string | null {
   if (lastMessageAt === undefined) return null
 

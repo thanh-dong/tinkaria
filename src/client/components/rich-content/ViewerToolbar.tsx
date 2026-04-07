@@ -1,7 +1,14 @@
 import { memo } from "react"
 import { Hash, Minus, Plus, List } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import type { ViewerState, ViewerAction } from "./ContentViewerContext"
+
+const VIEWER_TOOLBAR_UI_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "rich-content.toolbar.area",
+  c3ComponentId: "c3-107",
+  c3ComponentLabel: "rich-content",
+})
 
 interface ViewerToolbarProps {
   state: ViewerState
@@ -51,7 +58,7 @@ export const ViewerToolbar = memo(function ViewerToolbar({ state, dispatch }: Vi
 })
 
 function ToolbarRow({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-1.5">{children}</div>
+  return <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-1.5" {...getUiIdentityAttributeProps(VIEWER_TOOLBAR_UI_DESCRIPTOR)}>{children}</div>
 }
 
 function SegmentGroup({ children }: { children: React.ReactNode }) {

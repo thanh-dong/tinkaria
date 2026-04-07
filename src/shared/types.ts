@@ -639,6 +639,7 @@ export interface ChatSnapshot {
   runtime: ChatRuntime
   messageCount: number
   availableProviders: ProviderCatalogEntry[]
+  availableSkills: string[]
 }
 
 export interface CurrentSessionSnapshot {

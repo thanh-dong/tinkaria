@@ -2,6 +2,13 @@ import { memo } from "react"
 import { Check, Circle, ListChecks, Loader2 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import type { ProcessedToolCall } from "./types"
+import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+
+const TODO_AREA_DESCRIPTOR = createUiIdentityDescriptor({
+  id: "message.todo.area",
+  c3ComponentId: "c3-111",
+  c3ComponentLabel: "messages",
+})
 
 const STATUS_CONFIG = {
   completed:   { Icon: Check,   iconClass: "text-emerald-500",             textClass: "text-muted-foreground" },
@@ -19,7 +26,7 @@ export const TodoWriteMessage = memo(function TodoWriteMessage({ message }: Prop
   if (!todos.length) return null
 
   return (
-    <div className="w-full">
+    <div className="w-full" {...getUiIdentityAttributeProps(TODO_AREA_DESCRIPTOR)}>
       <div className="rounded-2xl border border-border overflow-hidden">
         <h3 className="font-medium text-foreground text-sm p-3 px-4 bg-card border-b border-border flex items-center gap-2">
           <ListChecks className="h-4 w-4 text-muted-foreground" />

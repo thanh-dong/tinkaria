@@ -15,6 +15,7 @@ import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSessionsSnapshot
 import { discoverSessions } from "./session-discovery"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
+import type { SkillCache } from "./skill-discovery"
 
 const encoder = new TextEncoder()
 
@@ -41,6 +42,7 @@ export interface CreateNatsPublisherArgs {
   getDiscoveredProjects: () => DiscoveredProject[]
   machineDisplayName: string
   updateManager: UpdateManager | null
+  skillCache?: SkillCache
 }
 
 export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
@@ -52,6 +54,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     getDiscoveredProjects,
     machineDisplayName,
     updateManager,
+    skillCache,
   } = args
 
   const js = jetstream(nc)
@@ -105,7 +108,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     })
   }
 
-  function computeSnapshot(topic: SubscriptionTopic): unknown {
+  async function computeSnapshot(topic: SubscriptionTopic): Promise<unknown> {
     switch (topic.type) {
       case "sidebar":
         return deriveSidebarData(store.state, agent.getActiveStatuses())
@@ -113,13 +116,18 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         return deriveLocalProjectsSnapshot(store.state, getDiscoveredProjects(), machineDisplayName)
       case "update":
         return updateManager?.getSnapshot() ?? DEFAULT_UPDATE_SNAPSHOT
-      case "chat":
+      case "chat": {
+        const chat = store.state.chatsById.get(topic.chatId)
+        const project = chat ? store.state.projectsById.get(chat.projectId) : undefined
+        const skills = project && skillCache ? await skillCache.get(project.localPath) : []
         return deriveChatSnapshot(
           store.state,
           agent.getActiveStatuses(),
           topic.chatId,
           store.getMessageCount(topic.chatId),
+          skills,
         )
+      }
       case "terminal":
         return terminals.getSnapshot(topic.terminalId)
       case "sessions":
@@ -183,19 +191,19 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     }
   }
 
-  function getSnapshot(topic: SubscriptionTopic): unknown {
-    const data = computeSnapshot(topic)
+  async function getSnapshot(topic: SubscriptionTopic): Promise<unknown> {
+    const data = await computeSnapshot(topic)
     publishSnapshot(topic, data)
     return data
   }
 
-  function broadcastSnapshots(): void {
+  async function broadcastSnapshots(): Promise<void> {
     const published = new Set<string>()
     for (const [, topic] of activeSubscriptions) {
       const key = snapshotKvKey(topic)
       if (published.has(key)) continue
       published.add(key)
-      publishSnapshot(topic, computeSnapshot(topic))
+      publishSnapshot(topic, await computeSnapshot(topic))
     }
   }
 

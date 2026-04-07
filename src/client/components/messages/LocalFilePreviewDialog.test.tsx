@@ -65,8 +65,10 @@ describe("LocalFilePreviewContent", () => {
 describe("LocalFilePreviewDialog", () => {
   test("tags the visible fullscreen preview dialog root", () => {
     expect(LOCAL_FILE_PREVIEW_DIALOG_UI_ID).toBe("content-preview.dialog")
-    expect(getLocalFilePreviewDialogUiIdentityProps()).toEqual({
+    expect(getLocalFilePreviewDialogUiIdentityProps()).toMatchObject({
       "data-ui-id": "content-preview.dialog",
+      "data-ui-c3": "c3-111",
+      "data-ui-c3-label": "transcript-surfaces",
     })
   })
 
@@ -77,8 +79,11 @@ describe("LocalFilePreviewDialog", () => {
   })
 
   test("reuses the rich content overlay identity contract for local file previews", () => {
-    expect(getLocalFilePreviewDialogUiIdentityProps()).toEqual(
-      getContentOverlayUiIdentityProps(LOCAL_FILE_PREVIEW_DIALOG_UI_ID)
-    )
+    expect(getLocalFilePreviewDialogUiIdentityProps()).toMatchObject(getContentOverlayUiIdentityProps(LOCAL_FILE_PREVIEW_DIALOG_UI_ID))
+    expect(getLocalFilePreviewDialogUiIdentityProps()).toMatchObject({
+      "data-ui-id": LOCAL_FILE_PREVIEW_DIALOG_UI_ID,
+      "data-ui-c3": "c3-111",
+      "data-ui-c3-label": "transcript-surfaces",
+    })
   })
 })

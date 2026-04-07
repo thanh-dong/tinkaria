@@ -314,6 +314,7 @@ describe("getChatPageUiIdentities", () => {
         onCollapseSidebar: () => {},
         onExpandSidebar: () => {},
         onForkSession: () => {},
+        onMergeSession: () => {},
       })
     )
 
@@ -335,6 +336,7 @@ describe("getChatPageUiIdentities", () => {
         onCollapseSidebar: () => {},
         onExpandSidebar: () => {},
         onForkSession: () => {},
+        onMergeSession: () => {},
         localPath: "/tmp/project",
       })
     )

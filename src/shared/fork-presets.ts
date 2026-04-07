@@ -1,10 +1,6 @@
-export interface ForkPresetDefinition {
-  id: string
-  label: string
-  description: string
-  defaultIntent: string
-  generatorHint: string
-}
+import { type PresetDefinition, getPreset } from "./preset-types"
+
+export type ForkPresetDefinition = PresetDefinition
 
 export const FORK_PRESETS: readonly ForkPresetDefinition[] = [
   {
@@ -54,6 +50,5 @@ export const FORK_PRESETS: readonly ForkPresetDefinition[] = [
 export const DEFAULT_FORK_PRESET_ID = FORK_PRESETS[0]!.id
 
 export function getForkPreset(id?: string | null): ForkPresetDefinition | null {
-  if (!id) return null
-  return FORK_PRESETS.find((preset) => preset.id === id) ?? null
+  return getPreset(FORK_PRESETS, id)
 }
