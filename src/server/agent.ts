@@ -12,6 +12,7 @@ import { EventStore } from "./event-store"
 import { CodexAppServerManager } from "./codex-app-server"
 import { InProcessCodexRuntime, type CodexRuntime } from "./codex-runtime"
 import { generateTitleForChat } from "./generate-title"
+import type { SkillCache } from "./skill-discovery"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
 import {
   codexServiceTierFromModelOptions,
@@ -49,9 +50,13 @@ export function getWebContextPrompt(
     "The user has a sidebar with chat history and project management — multiple concurrent chats are supported.",
     "Plan mode renders a visual approval UI with approve/reject controls.",
     "Cross-session agent work is explicit orchestration between separate chats in the same project, not hidden shared memory.",
-    "Use spawn_agent to start a separate chat for delegated work, send_input to message an existing delegated chat, wait_agent to receive only that chat's final result, and close_agent to dispose it when done.",
-    "Set `fork_context` on spawn_agent when the delegated chat should start with a bounded snapshot of the current chat transcript before its first task message.",
-    "Do not assume delegated chats share live intermediate reasoning, transcript state, or mutable in-memory context after spawn; if `fork_context` is false, communicate needed context explicitly.",
+    "spawn_agent creates a child session — its final turn result is what wait_agent returns. Instruct children to end with a structured report.",
+    "send_input sends follow-up messages to a child to steer, accumulate incremental results, or request a summary. The child resumes with full context.",
+    "wait_agent blocks until the child completes its current turn. Call it after each send_input for iterative exchanges.",
+    "close_agent disposes the child session — always close when done.",
+    "You can run multiple children concurrently: spawn all, then wait each.",
+    "Set `fork_context` on spawn_agent when the child session should start with a bounded snapshot of the current chat transcript.",
+    "Do not assume delegated chats share live intermediate reasoning or mutable context — communicate needed context explicitly.",
     "Delegated chats may already be busy, and orchestration is bounded by depth and concurrency limits.",
   ]
 
@@ -115,6 +120,7 @@ interface AgentCoordinatorArgs {
   codexRuntime?: CodexRuntime
   generateTitle?: (messageContent: string, cwd: string) => Promise<string | null>
   orchestrator?: SessionOrchestrator
+  skillCache?: SkillCache
 }
 
 function timestamped<T extends Omit<TranscriptEntry, "_id" | "createdAt">>(
@@ -137,9 +143,23 @@ function stringFromUnknown(value: unknown) {
   }
 }
 
-function buildTurnPrompt(content: string, delegatedContext?: string): string {
-  if (!delegatedContext) return content
-  return `${delegatedContext}\n\nDelegated task:\n${content}`
+const DELEGATION_PREAMBLE = [
+  "You were spawned by a parent session to handle a delegated task.",
+  "Your final output will be read by the parent via wait_agent — end with a clear, structured report.",
+  "The parent does not see your intermediate tool calls or reasoning.",
+  "If the parent sends follow-up instructions via send_input, respond to each and report again.",
+].join("\n")
+
+function buildTurnPrompt(content: string, opts?: { delegatedContext?: string; isSpawned?: boolean; chatId?: string }): string {
+  if (!opts?.isSpawned && !opts?.delegatedContext) return content
+  const parts: string[] = []
+  if (opts.isSpawned) {
+    const idLine = opts.chatId ? `\nYour session ID is ${opts.chatId}.` : ""
+    parts.push(DELEGATION_PREAMBLE + idLine)
+  }
+  if (opts.delegatedContext) parts.push(opts.delegatedContext)
+  parts.push(`Delegated task:\n${content}`)
+  return parts.join("\n\n")
 }
 
 function discardedToolResult(
@@ -410,6 +430,7 @@ export class AgentCoordinator {
   private readonly onMessageAppended: ((chatId: string, entry: TranscriptEntry) => void) | undefined
   private readonly codexRuntime: CodexRuntime
   private readonly generateTitle: (messageContent: string, cwd: string) => Promise<string | null>
+  private readonly skillCache: SkillCache | undefined
   orchestrator: SessionOrchestrator | undefined
   readonly activeTurns = new Map<string, ActiveTurn>()
 
@@ -420,6 +441,7 @@ export class AgentCoordinator {
     this.codexRuntime = args.codexRuntime ?? new InProcessCodexRuntime(args.codexManager ?? new CodexAppServerManager())
     this.generateTitle = args.generateTitle ?? generateTitleForChat
     this.orchestrator = args.orchestrator
+    this.skillCache = args.skillCache
   }
 
   private async appendAndPublish(chatId: string, entry: TranscriptEntry): Promise<void> {
@@ -473,6 +495,7 @@ export class AgentCoordinator {
     provider: AgentProvider
     content: string
     delegatedContext?: string
+    isSpawned?: boolean
     model: string
     effort?: string
     serviceTier?: "fast"
@@ -527,7 +550,7 @@ export class AgentCoordinator {
     let turn: HarnessTurn
     if (args.provider === "claude") {
       turn = await startClaudeTurn({
-        content: buildTurnPrompt(args.content, args.delegatedContext),
+        content: buildTurnPrompt(args.content, { delegatedContext: args.delegatedContext, isSpawned: args.isSpawned, chatId: args.chatId }),
         localPath: project.localPath,
         model: args.model,
         effort: args.effort,
@@ -546,13 +569,15 @@ export class AgentCoordinator {
         serviceTier: args.serviceTier,
         sessionToken: chat.sessionToken,
       })
+      const skills = await this.skillCache?.get(project.localPath)
       turn = await this.codexRuntime.startTurn({
         chatId: args.chatId,
-        content: buildTurnPrompt(args.content, args.delegatedContext),
+        content: buildTurnPrompt(args.content, { delegatedContext: args.delegatedContext, isSpawned: args.isSpawned, chatId: args.chatId }),
         model: args.model,
         effort: args.effort as any,
         serviceTier: args.serviceTier,
         planMode: args.planMode,
+        skills,
         onToolRequest,
       })
     }

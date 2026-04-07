@@ -20,6 +20,7 @@ import { TranscriptSearchIndex } from "./transcript-search"
 import { ProjectAgent } from "./project-agent"
 import { createProjectAgentRouter } from "./project-agent-routes"
 import { LocalCodexKitDaemon, ProjectKitRegistry, RemoteCodexRuntime } from "./local-codex-kit"
+import { SkillCache } from "./skill-discovery"
 
 export interface StartTinkariaServerOptions {
   port?: number
@@ -80,10 +81,12 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   let broadcast = () => {}
   let publishMessage: (chatId: string, entry: TranscriptEntry) => void = () => {}
 
+  const skillCache = new SkillCache()
   const agent = new AgentCoordinator({
     store,
     onStateChange: () => broadcast(),
     codexRuntime,
+    skillCache,
     onMessageAppended: (chatId, entry) => {
       publishMessage(chatId, entry)
       sessionIndex.onMessageAppended(chatId, entry, store.state)

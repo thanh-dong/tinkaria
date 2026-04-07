@@ -98,6 +98,7 @@ interface StartKitTurnRequest {
   effort?: StartCodexTurnArgs["effort"]
   serviceTier?: StartCodexTurnArgs["serviceTier"]
   planMode: boolean
+  skills?: string[]
 }
 
 interface ToolResponseRequest {
@@ -331,6 +332,7 @@ export class LocalCodexKitDaemon {
       effort: payload.effort,
       serviceTier: payload.serviceTier,
       planMode: payload.planMode,
+      skills: payload.skills,
       onToolRequest: async (request) => {
         const active = this.activeTurns.get(payload.chatId)
         if (!active) {
@@ -490,6 +492,7 @@ export class RemoteCodexRuntime implements CodexRuntime {
       effort: args.effort,
       serviceTier: args.serviceTier,
       planMode: args.planMode,
+      skills: args.skills,
     } satisfies StartKitTurnRequest)
 
     return {

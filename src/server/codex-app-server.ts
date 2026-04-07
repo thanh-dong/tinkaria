@@ -131,6 +131,7 @@ export interface StartCodexTurnArgs {
   advertiseDynamicTools?: boolean
   content: string
   planMode: boolean
+  skills?: string[]
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   onApprovalRequest?: PendingTurn["onApprovalRequest"]
 }
@@ -154,14 +155,14 @@ function timestamped<T extends Omit<TranscriptEntry, "_id" | "createdAt">>(
   } as TranscriptEntry
 }
 
-function codexSystemInitEntry(model: string): TranscriptEntry {
+function codexSystemInitEntry(model: string, skills?: string[]): TranscriptEntry {
   return timestamped({
     kind: "system_init",
     provider: "codex",
     model,
     tools: ["Bash", "Write", "Edit", "WebSearch", "TodoWrite", "AskUserQuestion", "ExitPlanMode"],
     agents: ["spawnAgent", "sendInput", "resumeAgent", "wait", "closeAgent"],
-    slashCommands: [],
+    slashCommands: skills ?? [],
     mcpServers: [],
   })
 }
@@ -776,7 +777,7 @@ export class CodexAppServerManager {
     if (context.sessionToken) {
       queue.push({ type: "session_token", sessionToken: context.sessionToken })
     }
-    queue.push({ type: "transcript", entry: codexSystemInitEntry(args.model) })
+    queue.push({ type: "transcript", entry: codexSystemInitEntry(args.model, args.skills) })
 
     const pendingTurn: PendingTurn = {
       turnId: null,

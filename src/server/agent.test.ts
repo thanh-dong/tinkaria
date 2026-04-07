@@ -59,12 +59,24 @@ describe("getWebContextPrompt", () => {
       expect(prompt).toContain("fork_context")
       expect(prompt).toContain("send_input")
       expect(prompt).toContain("wait_agent")
-      expect(prompt).toContain("separate chats")
-      expect(prompt).toContain("same project")
+      expect(prompt).toContain("close_agent")
       expect(prompt).toContain("not hidden shared memory")
-      expect(prompt).toContain("final result")
-      expect(prompt).toContain("only that chat's final result")
-      expect(prompt).toContain("Do not assume delegated chats share live intermediate reasoning")
+      expect(prompt).toContain("Do not assume delegated chats share")
+    }
+  })
+
+  test("orchestration block describes workflow semantics and accumulation pattern", () => {
+    for (const provider of ["claude", "codex"] as const) {
+      const prompt = getWebContextPrompt(provider)
+      // Workflow: spawn creates child, wait returns its result
+      expect(prompt).toContain("child session")
+      // Accumulation: send_input for follow-ups and iterative refinement
+      expect(prompt).toContain("send_input")
+      expect(prompt).toMatch(/follow-up|steer|accumulate/i)
+      // Report instruction: child should end with a structured report
+      expect(prompt).toMatch(/report/i)
+      // Concurrency: multiple children
+      expect(prompt).toMatch(/multiple.*concurrent|concurrently/i)
     }
   })
 
@@ -312,6 +324,142 @@ describe("AgentCoordinator codex integration", () => {
     expect(store.messages[0]).toMatchObject({ kind: "user_prompt", content: "Write the patch" })
     expect(runtimeTurnContent).toContain("Forked parent chat context:")
     expect(runtimeTurnContent).toContain("Delegated task:\nWrite the patch")
+  })
+
+  test("isSpawned injects delegation preamble into provider turn content", async () => {
+    let runtimeTurnContent = ""
+    const runtime: CodexRuntime = {
+      async startSession() {},
+      async startTurn(args): Promise<HarnessTurn> {
+        runtimeTurnContent = args.content
+
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession() {},
+    }
+
+    const store = createFakeStore()
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexRuntime: runtime,
+    })
+
+    await coordinator.startTurnForChat({
+      chatId: "chat-1",
+      provider: "codex",
+      content: "Fix the auth bug",
+      isSpawned: true,
+      model: "gpt-5.4",
+      planMode: false,
+      appendUserPrompt: true,
+    })
+
+    await waitFor(() => store.messages.some((entry) => entry.kind === "result"))
+    // The user-visible prompt stays clean
+    expect(store.messages[0]).toMatchObject({ kind: "user_prompt", content: "Fix the auth bug" })
+    // But the provider turn content includes delegation preamble with session identity
+    expect(runtimeTurnContent).toMatch(/spawned.*parent/i)
+    expect(runtimeTurnContent).toMatch(/report/i)
+    expect(runtimeTurnContent).toContain("chat-1")
+    expect(runtimeTurnContent).toContain("Fix the auth bug")
+  })
+
+  test("isSpawned preamble combines with delegatedContext when both are present", async () => {
+    let runtimeTurnContent = ""
+    const runtime: CodexRuntime = {
+      async startSession() {},
+      async startTurn(args): Promise<HarnessTurn> {
+        runtimeTurnContent = args.content
+
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession() {},
+    }
+
+    const store = createFakeStore()
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexRuntime: runtime,
+    })
+
+    await coordinator.startTurnForChat({
+      chatId: "chat-1",
+      provider: "codex",
+      content: "Write the patch",
+      delegatedContext: "Forked parent chat context:\nUser: Auth logs\nAssistant: Root cause found",
+      isSpawned: true,
+      model: "gpt-5.4",
+      planMode: false,
+      appendUserPrompt: true,
+    })
+
+    await waitFor(() => store.messages.some((entry) => entry.kind === "result"))
+    // Both preamble and context should be present
+    expect(runtimeTurnContent).toMatch(/spawned.*parent/i)
+    expect(runtimeTurnContent).toContain("Forked parent chat context:")
+    expect(runtimeTurnContent).toContain("Write the patch")
   })
 
   test("does not overwrite a manual rename when background title generation finishes later", async () => {
@@ -1047,6 +1195,150 @@ describe("AgentCoordinator codex integration", () => {
     // The error result from the stream should NOT appear in the transcript
     const resultEntries = store.messages.filter((e) => e.kind === "result")
     expect(resultEntries).toHaveLength(0)
+  })
+})
+
+describe("AgentCoordinator skill discovery", () => {
+  test("passes resolved skills to codex startTurn", async () => {
+    const receivedSkills: Array<string[] | undefined> = []
+    const runtime: CodexRuntime = {
+      async startSession() {},
+      async startTurn(args): Promise<HarnessTurn> {
+        receivedSkills.push(args.skills)
+
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: args.skills ?? [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession() {},
+    }
+
+    const fakeSkillCache = {
+      async get(_projectPath: string) {
+        return ["c3", "commit", "review-pr"]
+      },
+      invalidate() {},
+    }
+
+    const store = createFakeStore()
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexRuntime: runtime,
+      skillCache: fakeSkillCache as never,
+    })
+
+    await coordinator.startTurnForChat({
+      chatId: "chat-1",
+      provider: "codex",
+      content: "hello",
+      model: "gpt-5.4",
+      planMode: false,
+      appendUserPrompt: true,
+    })
+
+    await waitFor(() => store.messages.some((e) => e.kind === "result"))
+    expect(receivedSkills).toHaveLength(1)
+    expect(receivedSkills[0]).toEqual(["c3", "commit", "review-pr"])
+  })
+
+  test("codex system_init includes discovered skills in slashCommands", async () => {
+    const runtime: CodexRuntime = {
+      async startSession() {},
+      async startTurn(args): Promise<HarnessTurn> {
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: args.skills ?? [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession() {},
+    }
+
+    const fakeSkillCache = {
+      async get() {
+        return ["frontend-design"]
+      },
+      invalidate() {},
+    }
+
+    const store = createFakeStore()
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexRuntime: runtime,
+      skillCache: fakeSkillCache as never,
+    })
+
+    await coordinator.startTurnForChat({
+      chatId: "chat-1",
+      provider: "codex",
+      content: "build the UI",
+      model: "gpt-5.4",
+      planMode: false,
+      appendUserPrompt: true,
+    })
+
+    await waitFor(() => store.messages.some((e) => e.kind === "result"))
+    const initEntry = store.messages.find((e) => e.kind === "system_init")
+    expect(initEntry).toBeDefined()
+    if (initEntry?.kind === "system_init") {
+      expect(initEntry.slashCommands).toEqual(["frontend-design"])
+    }
   })
 })
 
