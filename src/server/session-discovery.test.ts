@@ -50,6 +50,37 @@ describe("scanClaudeSessions", () => {
     expect(sessions[0].runtime?.model).toBeUndefined()
   })
 
+  test("extracts readable titles and exchanges from structured message content", async () => {
+    const claudeDir = await makeTempDir()
+    const sessionFile = join(claudeDir, "structured-content.jsonl")
+
+    await writeFile(sessionFile, [
+      JSON.stringify({
+        type: "user",
+        message: {
+          content: [
+            { type: "text", text: "Fix the flickering sidebar picker" },
+            { type: "tool_result", content: { ignored: true } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [{ type: "text", text: "Patched." }],
+        },
+      }),
+    ].join("\n") + "\n")
+
+    const sessions = await scanClaudeSessions(claudeDir)
+
+    expect(sessions[0].title).toBe("Fix the flickering sidebar picker")
+    expect(sessions[0].lastExchange).toEqual({
+      question: "Fix the flickering sidebar picker",
+      answer: "Patched.",
+    })
+  })
+
   test("extracts the last Claude model when assistant usage metadata is present", async () => {
     const claudeDir = await makeTempDir()
     const sessionFile = join(claudeDir, "with-model.jsonl")

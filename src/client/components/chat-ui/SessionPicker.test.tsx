@@ -141,6 +141,35 @@ describe("SessionPickerContent", () => {
 
     expect(html).toContain("Recover the archived release session")
   })
+
+  test("falls back to the session id when malformed titles slip through runtime data", () => {
+    const html = renderToStaticMarkup(
+      <SessionPickerContent
+        sessions={[{
+          sessionId: "sess-bad-title",
+          provider: "claude",
+          source: "cli",
+          title: { text: "Bad title object" } as unknown as string,
+          lastExchange: {
+            question: { text: "Bad question object" } as unknown as string,
+            answer: "",
+          },
+          modifiedAt: Date.now() - 3600_000,
+          chatId: null,
+        }]}
+        windowDays={7}
+        searchQuery=""
+        onSelectSession={() => {}}
+        onRefresh={() => {}}
+        onSearchChange={() => {}}
+        onShowMore={() => {}}
+        isRefreshing={false}
+      />
+    )
+
+    expect(html).toContain("sess-bad-title")
+    expect(html).not.toContain("[object Object]")
+  })
 })
 
 describe("getVisibleSessions", () => {

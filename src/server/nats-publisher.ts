@@ -88,6 +88,17 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     publishSnapshot(topic, snapshot)
   }
 
+  async function getOrRefreshSessionsSnapshot(projectId: string): Promise<SessionsSnapshot | null> {
+    const cached = sessionsCache.get(projectId)
+    if (cached) return cached
+
+    const project = store.state.projectsById.get(projectId)
+    if (!project) return null
+
+    await refreshSessions(projectId, project.localPath)
+    return sessionsCache.get(projectId) ?? null
+  }
+
   function publishSnapshot(topic: SubscriptionTopic, data: unknown): void {
     const kvKey = snapshotKvKey(topic)
     const json = JSON.stringify(data)
@@ -131,7 +142,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
       case "terminal":
         return terminals.getSnapshot(topic.terminalId)
       case "sessions":
-        return deriveSessionsSnapshot(sessionsCache.get(topic.projectId) ?? null)
+        return deriveSessionsSnapshot(await getOrRefreshSessionsSnapshot(topic.projectId))
       default: {
         const _exhaustive: never = topic
         throw new Error(`Unknown topic type: ${(_exhaustive as SubscriptionTopic).type}`)
@@ -144,13 +155,9 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
 
     if (topic.type === "sessions" && !sessionsPollTimers.has(topic.projectId)) {
       const projectId = topic.projectId
-      // Look up project path from store
       const project = store.state.projectsById.get(projectId)
       if (project) {
         const projectPath = project.localPath
-        refreshSessions(projectId, projectPath).catch((err) =>
-          console.warn(LOG_PREFIX, "sessions scan failed:", err instanceof Error ? err.message : String(err))
-        )
         const timer = setInterval(() => {
           refreshSessions(projectId, projectPath).catch((err) =>
             console.warn(LOG_PREFIX, "sessions scan failed:", err instanceof Error ? err.message : String(err))

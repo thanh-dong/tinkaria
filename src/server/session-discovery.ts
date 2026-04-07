@@ -22,6 +22,16 @@ interface LastExchange {
   answer: string
 }
 
+function joinSnippetParts(parts: Array<string | null>, maxLength: number): string | null {
+  const combined = parts
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join(" ")
+    .trim()
+
+  if (!combined) return null
+  return combined.slice(0, maxLength)
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -50,6 +60,36 @@ function parseJsonLine(line: string): Record<string, unknown> | null {
   } catch {
     return null
   }
+}
+
+function extractContentText(value: unknown, maxLength: number): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed ? trimmed.slice(0, maxLength) : null
+  }
+
+  if (Array.isArray(value)) {
+    return joinSnippetParts(value.map((entry) => extractContentText(entry, maxLength)), maxLength)
+  }
+
+  if (!isRecord(value)) return null
+
+  if (typeof value.text === "string") {
+    const trimmed = value.text.trim()
+    if (trimmed) return trimmed.slice(0, maxLength)
+  }
+
+  if ("content" in value) {
+    const contentText = extractContentText(value.content, maxLength)
+    if (contentText) return contentText
+  }
+
+  if ("message" in value) {
+    const messageText = extractContentText(value.message, maxLength)
+    if (messageText) return messageText
+  }
+
+  return null
 }
 
 function formatUsageBucketLabel(windowMinutes: number, fallback: string): string {
@@ -176,10 +216,12 @@ function extractLastExchange(tailContent: string): LastExchange | null {
   for (const line of lines) {
     try {
       const parsed = JSON.parse(line)
-      if (parsed.type === "user" && parsed.message?.content) {
-        lastUser = String(parsed.message.content).slice(0, 200)
-      } else if (parsed.type === "assistant" && parsed.message?.content) {
-        lastAssistant = String(parsed.message.content).slice(0, 200)
+      const content = extractContentText(parsed.message?.content, 200)
+      if (!content) continue
+      if (parsed.type === "user") {
+        lastUser = content
+      } else if (parsed.type === "assistant") {
+        lastAssistant = content
       }
     } catch {
       // skip malformed lines
@@ -196,8 +238,11 @@ function extractTitleCandidate(headLines: string[]): string | null {
   for (const line of headLines.slice(0, TITLE_SCAN_LINES)) {
     try {
       const parsed = JSON.parse(line)
-      if (parsed.type === "user" && parsed.message?.content) {
-        return String(parsed.message.content).slice(0, 80)
+      const content = parsed.type === "user"
+        ? extractContentText(parsed.message?.content, 80)
+        : null
+      if (content) {
+        return content
       }
     } catch {
       // skip malformed lines
@@ -218,19 +263,20 @@ export function parseCliTranscript(
 
     try {
       const parsed = JSON.parse(line)
-      if (parsed.type === "user" && parsed.message?.content) {
+      const content = extractContentText(parsed.message?.content, 20_000)
+      if (parsed.type === "user" && content) {
         const entry: UserPromptEntry = {
           _id: randomUUID(),
           kind: "user_prompt",
-          content: String(parsed.message.content),
+          content,
           createdAt: parsed.timestamp ?? Date.now(),
         }
         entries.push(entry)
-      } else if (parsed.type === "assistant" && parsed.message?.content) {
+      } else if (parsed.type === "assistant" && content) {
         const entry: AssistantTextEntry = {
           _id: randomUUID(),
           kind: "assistant_text",
-          text: String(parsed.message.content),
+          text: content,
           createdAt: parsed.timestamp ?? Date.now(),
         }
         entries.push(entry)

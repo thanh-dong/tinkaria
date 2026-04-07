@@ -3,7 +3,7 @@ import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect, type NatsConnection, type Subscription } from "@nats-io/transport-node"
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises"
 import { join } from "node:path"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { createNatsPublisher, type CreateNatsPublisherArgs } from "./nats-publisher"
 import { snapshotSubject, snapshotKvKey, KV_BUCKET } from "../shared/nats-subjects"
 import { createEmptyState } from "./events"
@@ -305,17 +305,15 @@ describe("createNatsPublisher", () => {
     server = await NatsServer.start({ jetstream: true })
     nc = await connect({ servers: server.url })
 
-    const homeDir = await makeTempDir("tinkaria-home-")
-    process.env.HOME = homeDir
-
     const storeDir = await makeTempDir("tinkaria-store-")
     const store = new EventStore(storeDir)
     await store.initialize()
 
-    const projectPath = "/home/user/dev/kanna"
+    const projectPath = `/home/user/dev/kanna-refresh-${Date.now()}`
     const project = await store.openProject(projectPath, "kanna")
 
-    const claudeDir = encodeClaudeProjectDir(projectPath, homeDir)
+    const claudeDir = encodeClaudeProjectDir(projectPath, homedir())
+    tempDirs.push(claudeDir)
     await mkdir(claudeDir, { recursive: true })
     await writeFile(
       join(claudeDir, "cli-session.jsonl"),
@@ -337,6 +335,35 @@ describe("createNatsPublisher", () => {
       sessionId: "cli-session",
       source: "cli",
     })
+
+    publisher.dispose()
+  })
+
+  test("getSnapshot hydrates sessions before the first subscribe response", async () => {
+    server = await NatsServer.start({ jetstream: true })
+    nc = await connect({ servers: server.url })
+
+    const storeDir = await makeTempDir("tinkaria-store-")
+    const store = new EventStore(storeDir)
+    await store.initialize()
+
+    const projectPath = `/home/user/dev/kanna-initial-${Date.now()}`
+    const project = await store.openProject(projectPath, "kanna")
+
+    const claudeDir = encodeClaudeProjectDir(projectPath, homedir())
+    tempDirs.push(claudeDir)
+    await mkdir(claudeDir, { recursive: true })
+    await writeFile(
+      join(claudeDir, "initial-session.jsonl"),
+      JSON.stringify({ type: "user", message: { content: "Initial session snapshot" } }) + "\n"
+    )
+
+    const publisher = await createNatsPublisher(mockArgs({ store }))
+    const snapshot = await publisher.getSnapshot({ type: "sessions", projectId: project.id }) as {
+      sessions: Array<{ sessionId: string }>
+    }
+
+    expect(snapshot.sessions.map((session) => session.sessionId)).toEqual(["initial-session"])
 
     publisher.dispose()
   })

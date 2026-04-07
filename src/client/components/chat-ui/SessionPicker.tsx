@@ -47,8 +47,17 @@ export function getSessionPickerUiIdentityDescriptors() {
 // --- Helpers ---
 
 function sessionDisplayTitle(session: DiscoveredSession): string {
-  if (session.title) return session.title
-  if (session.lastExchange?.question) return session.lastExchange.question
+  const title = typeof (session.title as unknown) === "string"
+    ? session.title.trim()
+    : ""
+  if (title) return title
+
+  const questionValue = session.lastExchange?.question
+  if (typeof questionValue === "string") {
+    const question = questionValue.trim()
+    if (question) return question
+  }
+
   return session.sessionId
 }
 

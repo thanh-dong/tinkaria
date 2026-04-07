@@ -103,6 +103,19 @@ describe("markdownComponents", () => {
     expect(html).not.toContain("sh__token--")
   })
 
+  test("renders inline code without aggressive per-character wrapping", () => {
+    const html = renderToStaticMarkup(
+      <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {"Use `$c3` here."}
+      </Markdown>
+    )
+
+    expect(html).toContain("$c3")
+    expect(html).toContain("break-normal")
+    expect(html).toContain("[overflow-wrap:anywhere]")
+    expect(html).not.toContain("break-all")
+  })
+
   test("renders local file links without browser target handling", () => {
     const html = renderToStaticMarkup(
       <Markdown
