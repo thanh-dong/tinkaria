@@ -12,7 +12,7 @@ describe("ChatInput", () => {
     })
   })
 
-  test("keeps the skill chips above the composer while moving the Skills toggle into the bottom bar", () => {
+  test("keeps the skill chips above the composer while placing the Skills toggle beside model selection", () => {
     useSkillCompositionStore.setState({
       usageCounts: {},
       ribbonVisible: true,
@@ -31,12 +31,14 @@ describe("ChatInput", () => {
 
     const skillChipIndex = html.indexOf("/c3")
     const placeholderIndex = html.indexOf("Build something...")
+    const modelIndex = html.indexOf("Opus")
     const skillsToggleIndex = html.indexOf(">Skills<")
 
     expect(skillChipIndex).toBeGreaterThan(-1)
     expect(placeholderIndex).toBeGreaterThan(-1)
+    expect(modelIndex).toBeGreaterThan(placeholderIndex)
     expect(skillsToggleIndex).toBeGreaterThan(-1)
     expect(skillChipIndex).toBeLessThan(placeholderIndex)
-    expect(skillsToggleIndex).toBeGreaterThan(placeholderIndex)
+    expect(skillsToggleIndex).toBeGreaterThan(modelIndex)
   })
 })

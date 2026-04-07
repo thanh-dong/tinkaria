@@ -1,5 +1,5 @@
 import { memo, useState } from "react"
-import { Box, Brain, Gauge, ListTodo, LockOpen, SquareMenu, SquareMinus } from "lucide-react"
+import { Box, Brain, ChevronRight, Gauge, ListTodo, LockOpen, Sparkles, SquareMenu, SquareMinus } from "lucide-react"
 import {
   CLAUDE_CONTEXT_WINDOW_OPTIONS,
   CLAUDE_REASONING_OPTIONS,
@@ -128,6 +128,9 @@ interface ChatPreferenceControlsProps {
   planMode?: boolean
   onPlanModeChange?: (planMode: boolean) => void
   includePlanMode?: boolean
+  showSkillsToggle?: boolean
+  skillsVisible?: boolean
+  onSkillsToggle?: () => void
   className?: string
 }
 
@@ -144,6 +147,9 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
   planMode = false,
   onPlanModeChange,
   includePlanMode = true,
+  showSkillsToggle = false,
+  skillsVisible = false,
+  onSkillsToggle,
   className,
 }: ChatPreferenceControlsProps) {
   const providerConfig = availableProviders.find((provider) => provider.id === selectedProvider) ?? availableProviders[0]
@@ -215,6 +221,11 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
     c3ComponentId: "c3-112",
     c3ComponentLabel: "chat-input",
   })
+  const skillsToggleDescriptor = createUiIdentityDescriptor({
+    id: createUiIdentity("chat.composer.skills.toggle", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
 
   return (
     <div className={cn("flex md:justify-center items-center gap-0.5", className)}>
@@ -274,6 +285,23 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
           )
         })}
       </InputPopover>
+
+      {showSkillsToggle ? (
+        <button
+          type="button"
+          onClick={onSkillsToggle}
+          className={cn(
+            "shrink-0 flex items-center gap-1 px-2 py-1 text-sm rounded-md transition-colors",
+            "text-muted-foreground hover:bg-muted/50 [&>span]:whitespace-nowrap",
+            skillsVisible && "text-amber-600 dark:text-amber-400"
+          )}
+          {...getUiIdentityAttributeProps(skillsToggleDescriptor)}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Skills</span>
+          <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", skillsVisible && "rotate-90")} />
+        </button>
+      ) : null}
 
       <InputPopover
         triggerUiId={reasoningActionDescriptor}

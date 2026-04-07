@@ -208,6 +208,9 @@ interface ComposerPreferencesProps {
   composerState: ComposerState
   providerDefaults: ReturnType<typeof useChatPreferencesStore.getState>["providerDefaults"]
   availableProviders: ProviderCatalogEntry[]
+  availableSkills: string[]
+  ribbonVisible: boolean
+  toggleRibbon: () => void
   setComposerModel: (model: string) => void
   setComposerModelOptions: (modelOptions: Partial<ClaudeModelOptions> | Partial<CodexModelOptions>) => void
   setComposerPlanMode: (planMode: boolean) => void
@@ -219,6 +222,9 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
   composerState,
   providerDefaults,
   availableProviders,
+  availableSkills,
+  ribbonVisible,
+  toggleRibbon,
   setComposerModel,
   setComposerModelOptions,
   setComposerPlanMode,
@@ -340,6 +346,9 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
       planMode={resolved.providerPrefs.planMode}
       onPlanModeChange={handlePlanModeChange}
       includePlanMode={showPlanMode}
+      showSkillsToggle={availableSkills.length > 0}
+      skillsVisible={ribbonVisible}
+      onSkillsToggle={toggleRibbon}
       className="max-w-[840px] mx-auto"
     />
   )
@@ -699,17 +708,6 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       </div>
       <div className={cn("overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-3 flex flex-row", isStandalone && "p-5 pt-3")}>
         <div className="min-w-3"/>
-        {availableSkills.length > 0 ? (
-          <SkillRibbon
-            skills={availableSkills}
-            provider={resolvedProvider}
-            visible={ribbonVisible}
-            onToggle={toggleRibbon}
-            onInsert={handleSkillInsert}
-            showContent={false}
-            className="shrink-0"
-          />
-        ) : null}
         <ComposerPreferenceControls
           key={composerControlsKey}
           ref={composerPreferencesRef}
@@ -717,6 +715,9 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
           composerState={composerState}
           providerDefaults={providerDefaults}
           availableProviders={availableProviders}
+          availableSkills={availableSkills}
+          ribbonVisible={ribbonVisible}
+          toggleRibbon={toggleRibbon}
           setComposerModel={setComposerModel}
           setComposerModelOptions={setComposerModelOptions}
           setComposerPlanMode={setComposerPlanMode}

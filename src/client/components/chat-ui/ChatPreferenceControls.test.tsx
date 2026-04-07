@@ -47,4 +47,28 @@ describe("ChatPreferenceControls", () => {
     expect(html).toContain("1M")
     expect(html).toContain("Plan Mode")
   })
+
+  test("renders the skills toggle directly after the model control when requested", () => {
+    const html = renderToStaticMarkup(
+      <ChatPreferenceControls
+        availableProviders={PROVIDERS}
+        selectedProvider="codex"
+        model="gpt-5.3-codex"
+        modelOptions={{ reasoningEffort: "xhigh", fastMode: true }}
+        onProviderChange={() => {}}
+        onModelChange={() => {}}
+        onModelOptionChange={() => {}}
+        showSkillsToggle
+        onSkillsToggle={() => {}}
+      />
+    )
+
+    const modelIndex = html.indexOf("GPT-5.3 Codex")
+    const skillsIndex = html.indexOf(">Skills<")
+    const reasoningIndex = html.indexOf(">XHigh<")
+
+    expect(modelIndex).toBeGreaterThan(-1)
+    expect(skillsIndex).toBeGreaterThan(modelIndex)
+    expect(reasoningIndex).toBeGreaterThan(skillsIndex)
+  })
 })
