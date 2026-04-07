@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.0-rc.7 - 2026-04-07
+
+This release candidate rolls up the verified branch work into an explicit RC cut focused on session hygiene, faster merge flows, and mobile-safe dialog/composer behavior.
+
+### Added
+
+- Added server-side filtering for Tinkaria-owned quick-response helper sessions so fork, merge, and title-generation runs stay out of resumable session history.
+- Added shared responsive dialog tokens and regression coverage so mobile modal surfaces consistently expand fullscreen with safe-area-aware chrome.
+
+### Changed
+
+- Changed merge-session UX to navigate into the merge chat immediately, keep prompt/send work in the background, and optionally close source sessions after merge.
+- Changed session-picker mobile behavior to follow the same full-screen dialog contract as fork and merge surfaces while desktop keeps popover behavior.
+
+### Fixed
+
+- Fixed the mobile chat composer so `visualViewport` shrink and offset changes lift the composer, transcript spacing, and scroll affordance above the software keyboard.
+- Fixed responsive modal drift across fork, merge, session picker, new-project, app dialog, and rich-content overlay surfaces by routing them through the shared dialog contract.
+
+### Verification
+
+- `bun test src/client/app/ChatPage.test.ts src/server/session-discovery.test.ts src/client/components/chat-ui/SessionPicker.test.tsx src/client/components/ui/dialog.test.tsx`
+- `bun test`
+- `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+- `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`
+
 ## 1.0.0-rc.3 - 2026-04-07
 
 This release candidate expands the fork-session workflow, hardens the Codex runtime transport, and tightens browser-first chat reliability across remote and mobile usage.
