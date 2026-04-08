@@ -794,6 +794,8 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     scrollToBottom: scrollFollowToBottom,
     handleInitialScrollDone,
     handleChatChanged: scrollFollowChatChanged,
+    beginProgrammaticScroll,
+    endProgrammaticScroll,
   } = useScrollFollow(scrollRef, sentinelRef)
   const activeQueuedText = getQueuedText(submitPipeline, activeChatId)
   const setNormalizedCommandError = useCallback((error: unknown) => {
@@ -1283,9 +1285,12 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
     // Phase 2: Auto-follow — reads mode ref, NOT state
     if (initialScrollCompletedRef.current && scrollModeRef.current === "following") {
+      beginProgrammaticScroll()
       element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
+      const frameId = window.requestAnimationFrame(() => endProgrammaticScroll())
+      return () => window.cancelAnimationFrame(frameId)
     }
-  }, [activeChatId, initialChatReadAnchor, inputHeight, messages.length, runtime?.status, handleInitialScrollDone, scrollModeRef])
+  }, [activeChatId, beginProgrammaticScroll, endProgrammaticScroll, initialChatReadAnchor, inputHeight, messages.length, runtime?.status, handleInitialScrollDone, scrollModeRef])
 
   const syncReadBoundaryFromHooks = useCallback(() => {
     const element = scrollRef.current

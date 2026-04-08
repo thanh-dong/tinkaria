@@ -139,26 +139,39 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     store.destroy()
   })
 
-  test("notifies subscriber only when isFollowing flips", async () => {
+  test("notifies subscriber on every mode transition", async () => {
     const { store } = await setup()
     const onChange = mock(() => {})
     store.subscribe(onChange)
 
-    // anchoring → following (false → true) → notify
+    // anchoring → following → notify
     store.handleInitialScrollDone("tail")
     expect(onChange).toHaveBeenCalledTimes(1)
 
-    // following → detached (true → false) → notify
+    // following → detached → notify
     fireIntersection(false)
     expect(onChange).toHaveBeenCalledTimes(2)
 
-    // detached + sentinel still not intersecting → no flip → no notify
+    // detached + sentinel still not intersecting → same mode → no notify
     fireIntersection(false)
     expect(onChange).toHaveBeenCalledTimes(2)
 
-    // detached → following (false → true) → notify
+    // detached → following → notify
     store.handleScrollToBottom()
     expect(onChange).toHaveBeenCalledTimes(3)
+
+    store.destroy()
+  })
+
+  test("notifies subscriber when mode changes even if isFollowing stays the same", async () => {
+    const { store } = await setup()
+    const onChange = mock(() => {})
+    store.subscribe(onChange)
+
+    // anchoring → detached (block anchor) — both are !following, but mode changes
+    store.handleInitialScrollDone("block")
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(store.getMode()).toBe("detached")
 
     store.destroy()
   })

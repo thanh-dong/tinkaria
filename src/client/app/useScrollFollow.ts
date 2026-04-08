@@ -34,9 +34,8 @@ export function createScrollFollowStore(
   function transition(event: Parameters<typeof nextScrollMode>[1]) {
     const prev = mode
     mode = nextScrollMode(prev, event)
-    const nowFollowing = shouldAutoFollow(mode)
-    if (nowFollowing !== isFollowing) {
-      isFollowing = nowFollowing
+    isFollowing = shouldAutoFollow(mode)
+    if (mode !== prev) {
       listener?.()
     }
   }
@@ -113,6 +112,8 @@ export function useScrollFollow(
   scrollToBottom: (behavior?: ScrollBehavior) => void
   handleInitialScrollDone: (anchor: "tail" | "block") => void
   handleChatChanged: () => void
+  beginProgrammaticScroll: () => void
+  endProgrammaticScroll: () => void
 } {
   const storeRef = useRef<ScrollFollowStore | null>(null)
   const modeRef = useRef<ScrollMode>("anchoring")
@@ -189,11 +190,23 @@ export function useScrollFollow(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRef, sentinelRef])
 
+  const beginProgrammaticScroll = useCallback(() => {
+    getStore()?.beginProgrammaticScroll()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollRef, sentinelRef])
+
+  const endProgrammaticScroll = useCallback(() => {
+    getStore()?.endProgrammaticScroll()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollRef, sentinelRef])
+
   return {
     isFollowing,
     modeRef,
     scrollToBottom,
     handleInitialScrollDone,
     handleChatChanged,
+    beginProgrammaticScroll,
+    endProgrammaticScroll,
   }
 }
