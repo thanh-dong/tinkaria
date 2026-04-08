@@ -44,8 +44,6 @@ import {
 } from "./useAppState.machine"
 import { isProcessingStatus } from "./derived"
 
-// --- Module-private helpers for UI update restart flow ---
-
 const UI_UPDATE_RESTART_STORAGE_KEY = "tinkaria:ui-update-restart"
 
 function getUiUpdateRestartPhase() {
@@ -60,7 +58,6 @@ function clearUiUpdateRestartPhase() {
   window.sessionStorage.removeItem(UI_UPDATE_RESTART_STORAGE_KEY)
 }
 
-// Re-export so useAppState.ts can still reach them for its connectionStatus effect
 export { getUiUpdateRestartPhase, setUiUpdateRestartPhase, clearUiUpdateRestartPhase, UI_UPDATE_RESTART_STORAGE_KEY }
 
 export interface ChatCommandsArgs {

@@ -78,7 +78,7 @@ export function useScrollSync(args: {
     markChatRead,
   } = args
 
-  // --- Refs and scroll-follow ---
+
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const initialScrollCompletedRef = useRef(false)
@@ -92,7 +92,7 @@ export function useScrollSync(args: {
     endProgrammaticScroll,
   } = useScrollFollow(scrollRef, sentinelRef)
 
-  // --- Anchor computation ---
+
   const nextInitialChatReadAnchor = getInitialChatReadAnchor({
     activeChatId,
     sidebarReady,
@@ -105,13 +105,13 @@ export function useScrollSync(args: {
   })
   const initialChatReadAnchor = useLockedAnchor(activeChatId, nextInitialChatReadAnchor, initialScrollCompletedRef)
 
-  // --- Chat-changed layout effect ---
+
   useLayoutEffect(() => {
     initialScrollCompletedRef.current = false
     scrollFollowChatChanged()
   }, [activeChatId, scrollFollowChatChanged])
 
-  // --- Tail-settle: keep scrolling to bottom while virtualizer measures and settles ---
+
   useEffect(() => {
     if (initialScrollCompletedRef.current) return
     if (initialChatReadAnchor.kind !== "tail") return
@@ -154,13 +154,13 @@ export function useScrollSync(args: {
     }
   }, [activeChatId, beginProgrammaticScroll, endProgrammaticScroll, handleInitialScrollDone, initialChatReadAnchor.kind, messages.length])
 
-  // --- Derived scroll values ---
+
   const transcriptPaddingBottom = FIXED_TRANSCRIPT_PADDING_BOTTOM
   const showScrollButton = shouldShowScrollButton(scrollModeRef.current, messages.length)
   const initialReadAnchorMessageId = initialChatReadAnchor.kind === "block" ? initialChatReadAnchor.messageId : null
   const initialReadAnchorBlockIndex = initialChatReadAnchor.kind === "block" ? initialChatReadAnchor.blockIndex : null
 
-  // --- Tail-follow layout effect ---
+
   useLayoutEffect(() => {
     const element = scrollRef.current
     if (!element) return
@@ -179,7 +179,7 @@ export function useScrollSync(args: {
     }
   }, [activeChatId, beginProgrammaticScroll, endProgrammaticScroll, initialChatReadAnchor, inputHeight, messages.length, runtime?.status, handleInitialScrollDone, scrollModeRef])
 
-  // --- Read boundary sync ---
+
   const syncReadBoundaryFromHooks = useCallback(() => {
     const element = scrollRef.current
     if (!element || !activeChatId) return
@@ -239,7 +239,7 @@ export function useScrollSync(args: {
     }
   }, [activeChatId, scrollModeRef, syncReadBoundaryFromHooks])
 
-  // --- Mark-read-while-following effect ---
+
   useEffect(() => {
     if (!activeChatId) return
     if (!initialScrollCompletedRef.current || scrollModeRef.current !== "following" || lastMessageAt === undefined) return
@@ -260,7 +260,7 @@ export function useScrollSync(args: {
     })
   }, [activeChatId, lastMessageAt, isFollowing, lastReadBlockIndex, lastReadMessageId, latestReadableMessage, markChatRead, messages])
 
-  // --- Scroll action functions ---
+
   function scrollToBottom() {
     scrollFollowToBottom("smooth")
   }

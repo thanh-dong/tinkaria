@@ -43,56 +43,6 @@ import { useScrollSync } from "./useScrollSync"
 import { useTranscriptLifecycle } from "./useTranscriptLifecycle"
 import { useChatCommands, getUiUpdateRestartPhase, setUiUpdateRestartPhase, clearUiUpdateRestartPhase } from "./useChatCommands"
 
-// Re-export all moved helpers so existing consumers continue to work
-export {
-  appendQueuedText,
-  compareReadBoundary,
-  computeTailOffset,
-  getActiveChatSnapshot,
-  getHookReadProgressBoundary,
-  getInitialChatReadAnchor,
-  getLastReadableMessage,
-  getLockedInitialChatReadAnchor,
-  getNewestRemainingChatId,
-  getNextReadableBoundary,
-  getReadableBlockCount,
-  getReadTimestampToPersistAfterReply,
-  getResumeRefreshSessionProjectIds,
-  getSidebarChatLabels,
-  getSidebarChatRow,
-  getUiUpdateRestartReconnectAction,
-  getViewportRatioThresholdPx,
-  hasRenderableTranscriptHistory,
-  isChatRead,
-  isReadableTranscriptMessage,
-  normalizeCommandErrorMessage,
-  normalizeLocalFilePreviewErrorMessage,
-  prependQueuedText,
-  resolveComposeIntent,
-  resolveLockedAnchor,
-  shouldBackfillTranscriptWindow,
-  shouldFlushQueuedText,
-  shouldQueueChatSubmit,
-  shouldRefreshStaleSessionOnResume,
-  shouldStickToBottomOnComposerSubmit,
-  summarizeTranscriptWindow,
-  TRANSCRIPT_TAIL_SIZE,
-  PWA_RESUME_STALE_AFTER_MS,
-} from "./appState.helpers"
-
-export type {
-  BoundaryComparison,
-  InitialChatReadAnchor,
-  LockedAnchorState,
-  PendingSessionBootstrap,
-  ProjectRequest,
-  ReadBlockBoundary,
-  ReadHookProgressBoundary,
-  ReadHookProgressState,
-  StartChatIntent,
-  TranscriptWindowDiagnostics,
-} from "./appState.helpers"
-
 function useAppSocket(): AppTransport {
   const socketRef = useRef<AppTransport | null>(null)
   if (!socketRef.current) {
@@ -119,7 +69,6 @@ function logAppState(message: string, details?: unknown) {
   console.info(`[useAppState] ${message}`, details)
 }
 
-// Chat cache module re-exports (extracted to ./chatCache.ts)
 export { type CachedChatState, MAX_CACHED_CHATS } from "./chatCache"
 
 export interface AppState {

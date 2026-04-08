@@ -5,8 +5,6 @@ import remarkParse from "remark-parse"
 import { unified } from "unified"
 import type { SocketStatus } from "./socket-interface"
 
-// --- Types ---
-
 export interface ReadBlockBoundary {
   messageId: string
   blockIndex: number
@@ -56,15 +54,11 @@ export type StartChatIntent =
   | { kind: "local_path"; localPath: string }
   | { kind: "project_request"; project: ProjectRequest }
 
-// --- Constants ---
-
 export const COMPOSER_STICK_DISTANCE_RATIO = 0.12
 export const READ_HOOK_READING_START_RATIO = 0.5
 export const READ_HOOK_READ_START_RATIO = 0.75
 export const TRANSCRIPT_TAIL_SIZE = 200
 export const PWA_RESUME_STALE_AFTER_MS = 15_000
-
-// --- Pure helper functions ---
 
 export function getNewestRemainingChatId(projectGroups: SidebarData["projectGroups"], activeChatId: string): string | null {
   const projectGroup = projectGroups.find((group) => group.chats.some((chat) => chat.chatId === activeChatId))
