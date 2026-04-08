@@ -16,7 +16,8 @@ import { ensureTerminalEventsStream, ensureChatMessageStream, ensureKitTurnEvent
 import { RunnerManager } from "./runner-manager"
 import { RunnerProxy } from "./runner-proxy"
 import { TranscriptConsumer } from "./transcript-consumer"
-import type { TranscriptEntry } from "../shared/types"
+import type { AgentProvider, TranscriptEntry, TinkariaStatus } from "../shared/types"
+import type { ClientCommand } from "../shared/protocol"
 import { SessionOrchestrator } from "./orchestration"
 import { SessionIndex } from "./session-index"
 import { TaskLedger } from "./task-ledger"
@@ -36,6 +37,21 @@ export interface StartTinkariaServerOptions {
     fetchLatestVersion: (packageName: string) => Promise<string>
     installVersion: (packageName: string, version: string) => UpdateInstallAttemptResult
   }
+}
+
+/** Duck-typed coordinator — satisfied by both AgentCoordinator (in-process) and RunnerProxy (split mode). */
+interface SessionCoordinator {
+  send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }>
+  cancel(chatId: string): Promise<void>
+  respondTool(command: Extract<ClientCommand, { type: "chat.respondTool" }>): Promise<void>
+  disposeChat(chatId: string): Promise<void>
+  getActiveStatuses(): Map<string, TinkariaStatus>
+  activeTurns: { has(key: string): boolean }
+  startTurnForChat(args: {
+    chatId: string; provider: AgentProvider; content: string
+    delegatedContext?: string; isSpawned?: boolean; model: string; effort?: string
+    serviceTier?: "fast"; planMode: boolean; appendUserPrompt: boolean
+  }): Promise<void>
 }
 
 export async function startTinkariaServer(options: StartTinkariaServerOptions = {}) {
@@ -75,9 +91,11 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     natsWsPort: daemonInfo.wsPort,
     token: authToken,
   })
-  await ensureTerminalEventsStream(natsConnector.nc)
-  await ensureChatMessageStream(natsConnector.nc)
-  await ensureKitTurnEventsStream(natsConnector.nc)
+  await Promise.all([
+    ensureTerminalEventsStream(natsConnector.nc),
+    ensureChatMessageStream(natsConnector.nc),
+    ensureKitTurnEventsStream(natsConnector.nc),
+  ])
 
   const splitMode = process.env.TINKARIA_SPLIT === "true"
 
@@ -113,24 +131,13 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   }
 
   // Coordinator: RunnerProxy (split mode) or AgentCoordinator (in-process)
-  let coordinator: {
-    send(command: Extract<import("../shared/protocol").ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }>
-    cancel(chatId: string): Promise<void>
-    respondTool(command: Extract<import("../shared/protocol").ClientCommand, { type: "chat.respondTool" }>): Promise<void>
-    disposeChat(chatId: string): Promise<void>
-    getActiveStatuses(): Map<string, import("../shared/types").TinkariaStatus>
-    activeTurns: { has(key: string): boolean }
-    startTurnForChat(args: {
-      chatId: string; provider: import("../shared/types").AgentProvider; content: string
-      delegatedContext?: string; isSpawned?: boolean; model: string; effort?: string
-      serviceTier?: "fast"; planMode: boolean; appendUserPrompt: boolean
-    }): Promise<void>
-  }
+  let coordinator: SessionCoordinator
 
   let runnerManager: RunnerManager | null = null
   let transcriptConsumer: TranscriptConsumer | null = null
 
   const skillCache = new SkillCache()
+  const projectKitRegistry = new ProjectKitRegistry(natsConnector.nc)
 
   if (splitMode) {
     // ── Split mode: separate runner process ──
@@ -162,10 +169,9 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     console.warn(LOG_PREFIX, "Split mode enabled — runner process handles turn execution")
   } else {
     // ── In-process mode: AgentCoordinator (default) ──
-    const projectKitRegistry_inner = new ProjectKitRegistry(natsConnector.nc)
     const codexRuntime = new RemoteCodexRuntime({
       nc: natsConnector.nc,
-      registry: projectKitRegistry_inner,
+      registry: projectKitRegistry,
     })
 
     const agent = new AgentCoordinator({
@@ -176,8 +182,6 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
       onMessageAppended,
     })
     coordinator = agent
-    // orchestrator is set below
-    void Promise.resolve().then(() => { agent.orchestrator = orchestrator })
   }
 
   const orchestrator = new SessionOrchestrator({
@@ -185,8 +189,10 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     coordinator,
   })
 
-  // Codex kit: registry + runtime created now, daemon started in background after HTTP is up
-  const projectKitRegistry = new ProjectKitRegistry(natsConnector.nc)
+  // Wire orchestrator into coordinator (breaks circular init dependency)
+  if (!splitMode && "orchestrator" in coordinator) {
+    (coordinator as AgentCoordinator).orchestrator = orchestrator
+  }
 
   const publisher = await createNatsPublisher({
     nc: natsConnector.nc,

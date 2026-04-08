@@ -1,7 +1,6 @@
 import type { NatsConnection, Msg, Subscription } from "@nats-io/transport-node"
 import { stat } from "node:fs/promises"
 import type { ClientCommand } from "../shared/protocol"
-import type { AgentCoordinator } from "./agent"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
 import { openExternal } from "./external-open"
@@ -19,6 +18,14 @@ import { generateForkPromptForChat } from "./generate-fork-context"
 import { generateMergePromptForChats as defaultGenerateMergePrompt } from "./generate-merge-context"
 import type { TranscriptEntry } from "../shared/types"
 
+/** Duck-typed coordinator — accepts AgentCoordinator or RunnerProxy */
+interface Coordinator {
+  send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }>
+  cancel(chatId: string): Promise<void>
+  respondTool(command: Extract<ClientCommand, { type: "chat.respondTool" }>): Promise<void>
+  disposeChat(chatId: string): Promise<void>
+}
+
 const encoder = new TextEncoder()
 const MAX_LOCAL_FILE_PREVIEW_BYTES = 256 * 1024
 
@@ -29,7 +36,7 @@ function encode(data: unknown): Uint8Array {
 export interface RegisterRespondersArgs {
   nc: NatsConnection
   store: EventStore
-  agent: AgentCoordinator
+  agent: Coordinator
   terminals: TerminalManager
   refreshDiscovery: () => Promise<DiscoveredProject[]>
   /** @deprecated Unused by responders -- kept for interface compatibility with tests */
