@@ -35,9 +35,35 @@ function getBackendPort() {
 
 const backendTargetHost = getBackendTargetHost()
 const backendPort = getBackendPort()
+const reactRefreshPreambleCode = react.preambleCode
+
+function ensureReactRefreshPreamble() {
+  let base = "/"
+
+  return {
+    name: "tinkaria:ensure-react-refresh-preamble",
+    apply: "serve" as const,
+    configResolved(config: { base: string }) {
+      base = config.base
+    },
+    transformIndexHtml(html: string) {
+      if (html.includes("window.$RefreshReg$")) {
+        return html
+      }
+
+      return [
+        {
+          tag: "script",
+          attrs: { type: "module" },
+          children: reactRefreshPreambleCode.replace("__BASE__", base),
+        },
+      ]
+    },
+  }
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [ensureReactRefreshPreamble(), react()],
   server: {
     host: "0.0.0.0",
     port: DEV_CLIENT_PORT,

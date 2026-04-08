@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
-import { EmbedRenderer, isEmbedLanguage } from "./EmbedRenderer"
+import { EmbedRenderer, getEmbedWheelZoomIntent, isEmbedLanguage } from "./EmbedRenderer"
 import { ContentViewerContext, type ContentViewerContextValue } from "./ContentViewerContext"
 
 describe("isEmbedLanguage", () => {
@@ -98,17 +98,19 @@ describe("EmbedRenderer", () => {
       <EmbedRenderer format="iframe" source="https://example.com/embed/widget" />
     )
 
+    expect(html).toContain("Zoom in")
+    expect(html).toContain("100%")
     expect(html).toContain('data-remote-embed="true"')
     expect(html).toContain('src="https://example.com/embed/widget"')
   })
 
-  test("normalizes diashort share links into embed links", () => {
+  test("normalizes diashort links to the zoomable document view", () => {
     const html = renderToStaticMarkup(
       <EmbedRenderer format="diashort" source="https://diashort.apps.quickable.co/d/abc123" />
     )
 
     expect(html).toContain('data-remote-embed="true"')
-    expect(html).toContain('data-remote-embed-url="https://diashort.apps.quickable.co/e/abc123"')
+    expect(html).toContain('data-remote-embed-url="https://diashort.apps.quickable.co/d/abc123"')
   })
 
   test("shows source fallback for invalid remote embed URLs", () => {
@@ -122,7 +124,7 @@ describe("EmbedRenderer", () => {
 })
 
 describe("EmbedRenderer with ContentViewerContext", () => {
-  test("svg hides inline controls when viewer context is present", () => {
+  test("svg keeps inline controls when viewer context is present", () => {
     const ctx: ContentViewerContextValue = {
       state: { type: "embed", renderMode: "render", zoom: 1 },
       dispatch: () => {},
@@ -132,7 +134,8 @@ describe("EmbedRenderer with ContentViewerContext", () => {
         <EmbedRenderer format="svg" source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'} />
       </ContentViewerContext.Provider>
     )
-    expect(html).not.toContain('aria-label="SVG display mode"')
+    expect(html).toContain('aria-label="SVG display mode"')
+    expect(html).toContain("Zoom in")
     expect(html).toContain("data-svg-render")
   })
 
@@ -168,6 +171,7 @@ describe("EmbedRenderer with ContentViewerContext", () => {
       <EmbedRenderer format="svg" source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'} />
     )
     expect(html).toContain('aria-label="SVG display mode"')
+    expect(html).toContain("Zoom out")
     expect(html).toContain("data-svg-render")
   })
 
@@ -183,5 +187,14 @@ describe("EmbedRenderer with ContentViewerContext", () => {
     )
     expect(html).not.toContain('data-remote-embed="true"')
     expect(html).toContain("https://example.com/embed/widget")
+  })
+})
+
+describe("getEmbedWheelZoomIntent", () => {
+  test("uses ctrl/cmd wheel to map to embed zoom direction", () => {
+    expect(getEmbedWheelZoomIntent({ ctrlKey: true, metaKey: false, deltaY: -10 })).toBe("in")
+    expect(getEmbedWheelZoomIntent({ ctrlKey: false, metaKey: true, deltaY: 10 })).toBe("out")
+    expect(getEmbedWheelZoomIntent({ ctrlKey: false, metaKey: false, deltaY: -10 })).toBeNull()
+    expect(getEmbedWheelZoomIntent({ ctrlKey: true, metaKey: false, deltaY: 0 })).toBeNull()
   })
 })

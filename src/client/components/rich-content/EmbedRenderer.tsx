@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { useContentViewer } from "./ContentViewerContext"
+import { clampEmbedZoom, useContentViewer } from "./ContentViewerContext"
 
 const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort"])
 
@@ -11,6 +11,8 @@ interface EmbedRendererProps {
   format: string
   source: string
 }
+
+type EmbedWheelZoomIntent = "in" | "out" | null
 
 export const EmbedRenderer = memo(function EmbedRenderer({
   format,
@@ -157,6 +159,17 @@ function parseSvgMarkup(source: string): SvgParseResult {
   return { ok: true, markup: trimmed.slice(rootStart, rootEnd) }
 }
 
+export function getEmbedWheelZoomIntent(event: {
+  ctrlKey: boolean
+  metaKey: boolean
+  deltaY: number
+}): EmbedWheelZoomIntent {
+  if (!event.ctrlKey && !event.metaKey) return null
+  if (event.deltaY < 0) return "in"
+  if (event.deltaY > 0) return "out"
+  return null
+}
+
 function normalizeRemoteEmbedSource(format: string, source: string): string | null {
   try {
     const url = new URL(source)
@@ -165,11 +178,11 @@ function normalizeRemoteEmbedSource(format: string, source: string): string | nu
     if (format === "diashort" || url.hostname === "diashort.apps.quickable.co") {
       const match = url.pathname.match(/^\/(?:d|e)\/([^/?#]+)/)
       if (!match) return null
-      const embedUrl = new URL(`/e/${match[1]}`, url.origin)
+      const documentUrl = new URL(`/d/${match[1]}`, url.origin)
       for (const [key, value] of url.searchParams.entries()) {
-        embedUrl.searchParams.set(key, value)
+        documentUrl.searchParams.set(key, value)
       }
-      return embedUrl.toString()
+      return documentUrl.toString()
     }
 
     return url.toString()
@@ -181,41 +194,60 @@ function normalizeRemoteEmbedSource(format: string, source: string): string | nu
 function RemoteEmbed({ format, source }: { format: string; source: string }) {
   const viewer = useContentViewer()
   const [localMode, setLocalMode] = useState<"render" | "source">("render")
+  const [localZoom, setLocalZoom] = useState(1)
 
   const embedState = viewer !== null && viewer.state.type === "embed" ? viewer.state : null
+  const viewerDispatch = viewer !== null && viewer.state.type === "embed" ? viewer.dispatch : null
   const mode = embedState ? embedState.renderMode : localMode
-  const zoom = embedState ? embedState.zoom : 1
+  const zoom = embedState ? embedState.zoom : localZoom
   const embedUrl = normalizeRemoteEmbedSource(format, source)
+
+  const setZoom = (nextZoom: number) => {
+    if (viewerDispatch) {
+      viewerDispatch({ type: "SET_ZOOM", payload: nextZoom })
+      return
+    }
+    setLocalZoom(clampEmbedZoom(nextZoom))
+  }
+
+  const adjustZoom = (direction: EmbedWheelZoomIntent) => {
+    if (direction === "in") {
+      if (viewerDispatch) {
+        viewerDispatch({ type: "ZOOM_IN" })
+      } else {
+        setLocalZoom((current) => clampEmbedZoom(current + 0.25))
+      }
+      return
+    }
+    if (direction === "out") {
+      if (viewerDispatch) {
+        viewerDispatch({ type: "ZOOM_OUT" })
+      } else {
+        setLocalZoom((current) => clampEmbedZoom(current - 0.25))
+      }
+    }
+  }
 
   return (
     <div className="space-y-3 p-3">
-      {!embedState ? (
-        <div aria-label="Embed display mode" className="flex items-center gap-1 rounded-md bg-muted/50 p-1 text-xs">
-          <button
-            type="button"
-            aria-pressed={localMode === "render"}
-            onClick={() => setLocalMode("render")}
-            className={`rounded px-2 py-1 transition-colors ${
-              localMode === "render" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-            }`}
-          >
-            Render
-          </button>
-          <button
-            type="button"
-            aria-pressed={localMode === "source"}
-            onClick={() => setLocalMode("source")}
-            className={`rounded px-2 py-1 transition-colors ${
-              localMode === "source" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-            }`}
-          >
-            Source
-          </button>
-        </div>
-      ) : null}
+      <InlineEmbedControls
+        mode={mode}
+        zoom={zoom}
+        onSetRenderMode={viewerDispatch ? (nextMode) => viewerDispatch({ type: "SET_RENDER_MODE", payload: nextMode }) : setLocalMode}
+        onZoomOut={() => adjustZoom("out")}
+        onZoomReset={() => setZoom(1)}
+        onZoomIn={() => adjustZoom("in")}
+      />
 
       {mode === "render" && embedUrl ? (
         <div
+          onWheel={(event) => {
+            const direction = getEmbedWheelZoomIntent(event)
+            if (!direction) return
+            event.preventDefault()
+            adjustZoom(direction)
+          }}
+          data-embed-zoomable="true"
           style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
           className="overflow-hidden rounded-md border border-border/60 bg-background"
         >
@@ -299,45 +331,67 @@ function readSvgTag(
 function SvgEmbed({ source }: { source: string }) {
   const viewer = useContentViewer()
   const [localMode, setLocalMode] = useState<"render" | "source">("render")
+  const [localZoom, setLocalZoom] = useState(1)
 
   const embedState = viewer !== null && viewer.state.type === "embed" ? viewer.state : null
+  const viewerDispatch = viewer !== null && viewer.state.type === "embed" ? viewer.dispatch : null
   const mode = embedState ? embedState.renderMode : localMode
-  const zoom = embedState ? embedState.zoom : 1
+  const zoom = embedState ? embedState.zoom : localZoom
 
   const parsed = parseSvgMarkup(source)
   const svgDataUrl = parsed.ok
     ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(parsed.markup)}`
     : null
 
+  const setZoom = (nextZoom: number) => {
+    if (viewerDispatch) {
+      viewerDispatch({ type: "SET_ZOOM", payload: nextZoom })
+      return
+    }
+    setLocalZoom(clampEmbedZoom(nextZoom))
+  }
+
+  const adjustZoom = (direction: EmbedWheelZoomIntent) => {
+    if (direction === "in") {
+      if (viewerDispatch) {
+        viewerDispatch({ type: "ZOOM_IN" })
+      } else {
+        setLocalZoom((current) => clampEmbedZoom(current + 0.25))
+      }
+      return
+    }
+    if (direction === "out") {
+      if (viewerDispatch) {
+        viewerDispatch({ type: "ZOOM_OUT" })
+      } else {
+        setLocalZoom((current) => clampEmbedZoom(current - 0.25))
+      }
+    }
+  }
+
   return (
     <div className="space-y-3 p-3">
-      {!embedState ? (
-        <div aria-label="SVG display mode" className="flex items-center gap-1 rounded-md bg-muted/50 p-1 text-xs">
-          <button
-            type="button"
-            aria-pressed={localMode === "render"}
-            onClick={() => setLocalMode("render")}
-            className={`rounded px-2 py-1 transition-colors ${
-              localMode === "render" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-            }`}
-          >
-            Render
-          </button>
-          <button
-            type="button"
-            aria-pressed={localMode === "source"}
-            onClick={() => setLocalMode("source")}
-            className={`rounded px-2 py-1 transition-colors ${
-              localMode === "source" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-            }`}
-          >
-            Source
-          </button>
-        </div>
-      ) : null}
+      <InlineEmbedControls
+        ariaLabel="SVG display mode"
+        mode={mode}
+        zoom={zoom}
+        onSetRenderMode={viewerDispatch ? (nextMode) => viewerDispatch({ type: "SET_RENDER_MODE", payload: nextMode }) : setLocalMode}
+        onZoomOut={() => adjustZoom("out")}
+        onZoomReset={() => setZoom(1)}
+        onZoomIn={() => adjustZoom("in")}
+      />
 
       {mode === "render" && parsed.ok ? (
-        <div style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}>
+        <div
+          onWheel={(event) => {
+            const direction = getEmbedWheelZoomIntent(event)
+            if (!direction) return
+            event.preventDefault()
+            adjustZoom(direction)
+          }}
+          data-embed-zoomable="true"
+          style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
+        >
           <img
             data-svg-render="true"
             alt=""
@@ -358,6 +412,62 @@ function SvgEmbed({ source }: { source: string }) {
           </pre>
         </div>
       )}
+    </div>
+  )
+}
+
+function InlineEmbedControls({
+  ariaLabel = "Embed display mode",
+  mode,
+  zoom,
+  onSetRenderMode,
+  onZoomOut,
+  onZoomReset,
+  onZoomIn,
+}: {
+  ariaLabel?: string
+  mode: "render" | "source"
+  zoom: number
+  onSetRenderMode: (mode: "render" | "source") => void
+  onZoomOut: () => void
+  onZoomReset: () => void
+  onZoomIn: () => void
+}) {
+  return (
+    <div aria-label={ariaLabel} className="flex flex-wrap items-center gap-2 rounded-md bg-muted/50 p-1 text-xs">
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-pressed={mode === "render"}
+          onClick={() => onSetRenderMode("render")}
+          className={`rounded px-2 py-1 transition-colors ${
+            mode === "render" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+          }`}
+        >
+          Render
+        </button>
+        <button
+          type="button"
+          aria-pressed={mode === "source"}
+          onClick={() => onSetRenderMode("source")}
+          className={`rounded px-2 py-1 transition-colors ${
+            mode === "source" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+          }`}
+        >
+          Source
+        </button>
+      </div>
+      <div className="ml-auto flex items-center gap-1">
+        <button type="button" aria-label="Zoom out" onClick={onZoomOut} className="rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground">
+          -
+        </button>
+        <button type="button" aria-label="Reset zoom" onClick={onZoomReset} className="min-w-[3rem] rounded px-2 py-1 tabular-nums text-muted-foreground transition-colors hover:bg-background hover:text-foreground">
+          {Math.round(zoom * 100)}%
+        </button>
+        <button type="button" aria-label="Zoom in" onClick={onZoomIn} className="rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground">
+          +
+        </button>
+      </div>
     </div>
   )
 }

@@ -110,7 +110,7 @@ describe("PresentContentMessage", () => {
     )
 
     expect(html).toContain('data-remote-embed="true"')
-    expect(html).toContain("diashort.apps.quickable.co/e/abc123")
+    expect(html).toContain("diashort.apps.quickable.co/d/abc123")
   })
 
   test("renders code success content in a RichContentBlock", () => {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { viewerReducer, createInitialState, type ViewerAction } from "./ContentViewerContext"
+import { clampEmbedZoom, viewerReducer, createInitialState, type ViewerAction } from "./ContentViewerContext"
 
 describe("ContentViewerContext reducer", () => {
   describe("code viewer", () => {
@@ -65,6 +65,24 @@ describe("ContentViewerContext reducer", () => {
       const next = viewerReducer(state, { type: "ZOOM_RESET" })
       expect(next).toEqual({ type: "embed", renderMode: "render", zoom: 1 })
     })
+    test("SET_ZOOM clamps arbitrary zoom values", () => {
+      const state = createInitialState("embed")
+      expect(viewerReducer(state, { type: "SET_ZOOM", payload: 3.5 })).toEqual({
+        type: "embed",
+        renderMode: "render",
+        zoom: 3.5,
+      })
+      expect(viewerReducer(state, { type: "SET_ZOOM", payload: 99 })).toEqual({
+        type: "embed",
+        renderMode: "render",
+        zoom: 5,
+      })
+      expect(viewerReducer(state, { type: "SET_ZOOM", payload: 0.1 })).toEqual({
+        type: "embed",
+        renderMode: "render",
+        zoom: 0.25,
+      })
+    })
   })
   describe("markdown viewer", () => {
     test("creates initial state with tocOpen false and empty headings", () => {
@@ -91,5 +109,14 @@ describe("ContentViewerContext reducer", () => {
     // @ts-expect-error — testing unknown action
     const next = viewerReducer(state, { type: "UNKNOWN_ACTION" })
     expect(next).toBe(state)
+  })
+})
+
+describe("clampEmbedZoom", () => {
+  test("clamps zoom and falls back for non-finite values", () => {
+    expect(clampEmbedZoom(0.1)).toBe(0.25)
+    expect(clampEmbedZoom(2)).toBe(2)
+    expect(clampEmbedZoom(99)).toBe(5)
+    expect(clampEmbedZoom(Number.NaN)).toBe(1)
   })
 })

@@ -4,10 +4,22 @@ This file is a handoff, not a changelog. Keep only active work, blockers, and th
 
 ## Active
 
+- Next architecture slice: make delegated sessions survive Tinkaria server/UI restarts.
+  Status: researched on 2026-04-08. Current `SessionOrchestrator` ownership is in-memory, `LocalCodexKitDaemon` is started in-process and disposed on shutdown, Claude turns are fully in-process, and Codex kit turn replay is not reclaimable because the server uses an ephemeral `DeliverPolicy.New` consumer over a 5-minute memory-backed JetStream stream. Session discovery can recover provider transcript history by `sessionToken`, but that is post-restart recovery, not live ownership transfer.
+  Next: cut an ADR for detached kit ownership plus reclaimable turn state. Start with Codex only: launch the local kit as an independently supervised subprocess, persist chat-to-kit lease/turn metadata in the store, mirror streamed turn entries into the chat transcript as the source of truth, and add reconnect/reattach tests before deciding whether Claude needs a matching external runner.
+
+- In progress: Hook-based read/follow fix for the chat down-arrow.
+  Status: proven live repro shows transcript growth can move the viewport off bottom after the user already reached it. New work should use percentage-based hook proximity, keep the transcript pinned through streaming growth, and retire the stale exact-bottom-only assumptions where the hook model covers them.
+  Next: land the scroll-follow and read-boundary changes in `src/client/app/useScrollFollow.ts` and `src/client/app/useTinkariaState.ts`, then verify with focused Bun tests, native TS, C3, and browser smoke.
+
 - In progress: Remove embedded terminal and settings surfaces.
   Status: browser-facing slice verified. ADR `adr-20260406-remove-terminal-and-settings` exists. Scope stays limited to browser product surfaces for embedded terminal access, terminal buttons/shortcuts/layout, and settings navigation/routes.
   Next: finish the shared-protocol/server/runtime audit before deleting anything that would amount to true terminal decommissioning. The current RC work only removes the remaining browser navbar actions and introduces a Codex hub-to-kit runtime seam.
   Verify: run the affected Bun tests, `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `c3x check` after the next code slice.
+
+- Next research-to-build slice: upstream Kanna feature matching after the imported `v0.16.0`-era baseline.
+  Status: researched on 2026-04-08 against `jakemor/kanna` tags `v0.17.0` through `v0.24.0` with local baseline evidence (`a777ce8` imported on 2026-03-31, no shared git ancestry). Upstream tunnel/share is already present; strongest missing candidates are attachments/pasted images, transcript TOC, and repo diff/branch actions. Branch-switcher/PR workflows should be weighed against the current browser-first removal of right-sidebar/settings/terminal product surfaces.
+  Next: choose one adoption track and cut an ADR-backed implementation slice instead of mixing low-friction UX work with the heavier repo-operations surface.
 
 ## Blockers / Constraints
 
@@ -16,6 +28,8 @@ This file is a handoff, not a changelog. Keep only active work, blockers, and th
 
 ## Verified Baseline
 
+- Fork and merge session creation now share a compact-first bootstrap: both create the destination chat immediately, split the user instruction into compaction vs next-step intent, compact selected source contexts in parallel, and show destination-chat bootstrap indicators while the dedicated session is being seeded. Verified on 2026-04-08 with targeted Bun tests (`src/server/generate-merge-context.test.ts`, `src/server/quick-response.test.ts`, `src/server/nats-responders.test.ts`, `src/client/components/chat-ui/ForkSessionDialog.test.tsx`, `src/client/components/chat-ui/MergeSessionDialog.test.tsx`), `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`.
+- Chat scroll-follow now re-enters `following` when the user manually reaches the exact bottom even if `IntersectionObserver` misses that final transition, so the down-arrow affordance disappears reliably at bottom. Verified on 2026-04-07 with targeted Bun tests (`src/client/app/useScrollFollow.test.ts`, `src/client/app/scrollMachine.test.ts`), `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`.
 - Chat view composer now tracks mobile `visualViewport` shrink/offset and lifts itself, transcript bottom spacing, and the scroll-to-bottom affordance above the software keyboard instead of staying pinned under it after focus restore. Verified on 2026-04-07 with targeted Bun tests (`src/client/app/ChatPage.test.ts`), `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`.
 - Chat composer skill chips still render above the textarea, but `chat.composer.skills.toggle.action` now sits beside the model selector in the bottom preference bar instead of as a far-left standalone control. Verified on 2026-04-07 with targeted Bun tests (`src/client/components/chat-ui/ChatInput.test.tsx`, `src/client/components/chat-ui/ChatPreferenceControls.test.tsx`), `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check` (existing `ref-component-identity-mapping` warnings only).
 - User-level agent update flow for the running Tinkaria app now has a single canonical entrypoint: Claude exposes `/pump-tinker`, Codex has a `pump-tinker` skill, and both are pinned to `~/dev/bot/tinkaria-update` plus mandatory `systemctl --user status tinkaria` / `journalctl --user -u tinkaria` verification. Verified on 2026-04-07 by creating the user-level command/skill files, wiring the global Claude/Codex memory to those names, and confirming the exact updater path appears in all four surfaces.
@@ -40,6 +54,8 @@ This file is a handoff, not a changelog. Keep only active work, blockers, and th
 - Internal branding/transport cleanup is done for active codepaths: Tinkaria naming is primary, transport namespace is generic, and the stale `~/.kanna*` migration path is gone.
 - Session resume and active-chat navbar surfaces now expose runtime metadata already present in provider session logs.
 - Diashort links now prefer rich embed presentation, including direct embed rendering through `present_content` and assistant-text auto-upgrade for bare links.
+- Transcript embed surfaces now expose inline render/source plus zoom controls, clamp zoom consistently across local and overlay viewer state, interpret ctrl/cmd+wheel as zoom, and route Diashort embeds to the `/d/...` document view so mouse/mobile-friendly zoom is available inside the embedded viewer. Verified on 2026-04-08 with targeted Bun tests (`src/client/components/rich-content/ContentViewerContext.test.ts`, `src/client/components/rich-content/EmbedRenderer.test.tsx`), `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`.
+- Dev verification via `agent-browser` no longer stalls on a blank `#root`: Vite dev HTML now force-injects the React refresh preamble when the plugin path skips it, avoiding the `$RefreshReg$ is not defined` crash in transformed React modules. Verified on 2026-04-08 with direct `bun x vite --host 127.0.0.1 --port 5474 --strictPort`, `curl http://127.0.0.1:5474` showing the preamble script, `agent-browser` rendering a non-empty root on that port, `bunx @typescript/native-preview --noEmit -p tsconfig.json`, and `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`.
 - The obsolete tauri companion path has been removed; product direction is browser/PWA-first.
 
 ## Cleanup Rule

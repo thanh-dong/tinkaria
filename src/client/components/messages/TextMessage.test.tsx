@@ -31,7 +31,7 @@ describe("TextMessage", () => {
     expect(html).toContain("https://diashort.apps.quickable.co/d/abc123")
     expect(html).toContain("Embedded Diagram")
     expect(html).toContain('data-remote-embed="true"')
-    expect(html).toContain("diashort.apps.quickable.co/e/abc123")
+    expect(html).toContain("diashort.apps.quickable.co/d/abc123")
   })
 
   test("deduplicates repeated diashort links into one embed card", () => {
