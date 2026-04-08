@@ -11,6 +11,7 @@ import {
   getNextReadableBoundary,
   getReadableBlockCount,
   getInitialChatReadAnchor,
+  getHookReadProgressBoundary,
   getLockedInitialChatReadAnchor,
   getLastReadableMessage,
   getNewestRemainingChatId,
@@ -25,7 +26,6 @@ import {
   hasRenderableTranscriptHistory,
   summarizeTranscriptWindow,
   shouldBackfillTranscriptWindow,
-  shouldAutoFollowTranscript,
   shouldRefreshStaleSessionOnResume,
   shouldStickToBottomOnComposerSubmit,
   PWA_RESUME_STALE_AFTER_MS,
@@ -135,25 +135,81 @@ describe("getNewestRemainingChatId", () => {
   })
 })
 
-describe("shouldAutoFollowTranscript", () => {
-  test("returns true when the transcript is at the bottom", () => {
-    expect(shouldAutoFollowTranscript(0)).toBe(true)
-  })
-
-  test("returns true when the transcript is near the bottom", () => {
-    expect(shouldAutoFollowTranscript(23)).toBe(true)
-  })
-
-  test("returns false when the transcript is not near the bottom", () => {
-    expect(shouldAutoFollowTranscript(24)).toBe(false)
-  })
-})
-
 describe("shouldStickToBottomOnComposerSubmit", () => {
   test("keeps bottom follow for composer submits that happen near the tail", () => {
     expect(shouldStickToBottomOnComposerSubmit(0)).toBe(true)
     expect(shouldStickToBottomOnComposerSubmit(96)).toBe(true)
     expect(shouldStickToBottomOnComposerSubmit(97)).toBe(false)
+  })
+
+  test("scales the composer submit threshold with viewport height when provided", () => {
+    expect(shouldStickToBottomOnComposerSubmit(119, 1000)).toBe(true)
+    expect(shouldStickToBottomOnComposerSubmit(120, 1000)).toBe(false)
+  })
+})
+
+describe("getHookReadProgressBoundary", () => {
+  function createBoundaryNode(messageId: string, blockIndex: number, top: number) {
+    return {
+      dataset: {
+        readAnchorMessageId: messageId,
+        readAnchorBlockIndex: String(blockIndex),
+      },
+      getBoundingClientRect: () => ({
+        top,
+        bottom: top + 20,
+      }),
+    }
+  }
+
+  function createBoundaryContainer(
+    tops: Array<{ messageId: string; blockIndex: number; top: number }>,
+    height = 800,
+  ) {
+    const nodes = tops.map((item) => createBoundaryNode(item.messageId, item.blockIndex, item.top))
+    return {
+      querySelectorAll: () => nodes,
+      getBoundingClientRect: () => ({
+        top: 0,
+        bottom: height,
+        height,
+      }),
+    } as unknown as HTMLElement
+  }
+
+  test("returns the deepest hook in the lower-half reading lane", () => {
+    const container = createBoundaryContainer([
+      { messageId: "m1", blockIndex: 0, top: 200 },
+      { messageId: "m1", blockIndex: 1, top: 460 },
+      { messageId: "m2", blockIndex: 0, top: 520 },
+    ])
+
+    expect(getHookReadProgressBoundary(container)).toEqual({
+      messageId: "m2",
+      blockIndex: 0,
+      state: "reading",
+    })
+  })
+
+  test("marks hooks near the composer in the committed read lane", () => {
+    const container = createBoundaryContainer([
+      { messageId: "m1", blockIndex: 0, top: 610 },
+    ])
+
+    expect(getHookReadProgressBoundary(container)).toEqual({
+      messageId: "m1",
+      blockIndex: 0,
+      state: "read",
+    })
+  })
+
+  test("returns null when no hook has entered the lower-half reading lane", () => {
+    const container = createBoundaryContainer([
+      { messageId: "m1", blockIndex: 0, top: 120 },
+      { messageId: "m1", blockIndex: 1, top: 260 },
+    ])
+
+    expect(getHookReadProgressBoundary(container)).toBeNull()
   })
 })
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { useScrollFollow } from "./useScrollFollow"
+import { shouldShowScrollButton } from "./scrollMachine"
 import { useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import {
@@ -68,6 +69,13 @@ export function getSidebarChatRow(
   return null
 }
 
+export function getSidebarChatLabels(
+  projectGroups: SidebarData["projectGroups"],
+  chatIds: string[],
+): string[] {
+  return chatIds.map((chatId) => getSidebarChatRow(projectGroups, chatId)?.title?.trim() || chatId)
+}
+
 export function isChatRead(lastSeenMessageAt?: number, lastMessageAt?: number): boolean {
   if (lastMessageAt === undefined) return true
   return (lastSeenMessageAt ?? Number.NEGATIVE_INFINITY) >= lastMessageAt
@@ -82,6 +90,19 @@ export function getReadTimestampToPersistAfterReply(lastSeenMessageAt?: number, 
 export interface ReadBlockBoundary {
   messageId: string
   blockIndex: number
+}
+
+export interface PendingSessionBootstrap {
+  chatId: string
+  kind: "fork" | "merge"
+  phase: "compacting" | "starting"
+  sourceLabels: string[]
+}
+
+export type ReadHookProgressState = "reading" | "read"
+
+export interface ReadHookProgressBoundary extends ReadBlockBoundary {
+  state: ReadHookProgressState
 }
 
 export function isReadableTranscriptMessage(message: HydratedTranscriptMessage): boolean {
@@ -129,16 +150,24 @@ export function getReadableBlockCount(message: HydratedTranscriptMessage): numbe
   }
 }
 
-export function getVisibleReadBlockBoundary(container: HTMLElement): ReadBlockBoundary | null {
+const COMPOSER_STICK_DISTANCE_RATIO = 0.12
+const READ_HOOK_READING_START_RATIO = 0.5
+const READ_HOOK_READ_START_RATIO = 0.75
+
+function getViewportRatioThresholdPx(viewportHeight: number, ratio: number, minimumPx: number): number {
+  return Math.max(minimumPx, viewportHeight * ratio)
+}
+
+export function getHookReadProgressBoundary(container: HTMLElement): ReadHookProgressBoundary | null {
   const blockNodes = Array.from(container.querySelectorAll<HTMLElement>("[data-read-anchor-message-id][data-read-anchor-block-index]"))
   if (blockNodes.length === 0) return null
 
   const viewportRect = container.getBoundingClientRect()
-  const viewportTop = viewportRect.top + 8
+  const viewportHeight = Math.max(0, viewportRect.height)
   const viewportBottom = viewportRect.bottom - 8
-
-  let firstBelowTop: { top: number; boundary: ReadBlockBoundary } | null = null
-  let closestAbove: { distance: number; boundary: ReadBlockBoundary } | null = null
+  const readingThresholdTop = viewportRect.top + viewportHeight * READ_HOOK_READING_START_RATIO
+  const readThresholdTop = viewportRect.top + viewportHeight * READ_HOOK_READ_START_RATIO
+  let candidate: ReadHookProgressBoundary | null = null
 
   for (const node of blockNodes) {
     const messageId = node.dataset.readAnchorMessageId
@@ -147,24 +176,15 @@ export function getVisibleReadBlockBoundary(container: HTMLElement): ReadBlockBo
     if (!messageId || !Number.isFinite(blockIndex)) continue
 
     const rect = node.getBoundingClientRect()
-    if (rect.bottom > viewportTop && rect.top < viewportBottom) {
-      return { messageId, blockIndex }
-    }
-
-    if (rect.top <= viewportTop) {
-      const distance = viewportTop - rect.top
-      if (!closestAbove || distance < closestAbove.distance) {
-        closestAbove = { distance, boundary: { messageId, blockIndex } }
-      }
-      continue
-    }
-
-    if (!firstBelowTop || rect.top < firstBelowTop.top) {
-      firstBelowTop = { top: rect.top, boundary: { messageId, blockIndex } }
+    if (rect.top < readingThresholdTop || rect.top > viewportBottom) continue
+    candidate = {
+      messageId,
+      blockIndex,
+      state: rect.top >= readThresholdTop ? "read" : "reading",
     }
   }
 
-  return closestAbove?.boundary ?? firstBelowTop?.boundary ?? null
+  return candidate
 }
 
 export function getNextReadableBoundary(args: {
@@ -267,12 +287,8 @@ function logTinkariaState(message: string, details?: unknown) {
   console.info(`[useTinkariaState] ${message}`, details)
 }
 
-export function shouldAutoFollowTranscript(distanceFromBottom: number) {
-  return distanceFromBottom < 24
-}
-
-export function shouldStickToBottomOnComposerSubmit(distanceFromBottom: number) {
-  return distanceFromBottom < 97
+export function shouldStickToBottomOnComposerSubmit(distanceFromBottom: number, viewportHeight = 0) {
+  return distanceFromBottom < getViewportRatioThresholdPx(viewportHeight, COMPOSER_STICK_DISTANCE_RATIO, 97)
 }
 
 export function getUiUpdateRestartReconnectAction(
@@ -628,7 +644,7 @@ export interface TinkariaState {
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
-  mergePendingChatId: string | null
+  pendingSessionBootstrap: PendingSessionBootstrap | null
   pendingMergeProjectId: string | null
   requestMerge: (projectId: string) => void
   clearMergeRequest: () => void
@@ -672,7 +688,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
   const [pendingMergeProjectId, setPendingMergeProjectId] = useState<string | null>(null)
-  const [mergePendingChatId, setMergePendingChatId] = useState<string | null>(null)
+  const [pendingSessionBootstrap, setPendingSessionBootstrap] = useState<PendingSessionBootstrap | null>(null)
   const submitPipelineRef = useRef<SubmitPipelineState>(createSubmitPipelineState({
     queuedTextByChat: Object.fromEntries(
       Object.entries(useChatInputStore.getState().queuedDrafts).map(([chatId, draft]) => [chatId, draft.text])
@@ -1161,7 +1177,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   }, [nextInitialChatReadAnchor])
 
   const transcriptPaddingBottom = FIXED_TRANSCRIPT_PADDING_BOTTOM
-  const showScrollButton = !isFollowing && messages.length > 0
+  const showScrollButton = shouldShowScrollButton(scrollModeRef.current, messages.length)
   const fallbackLocalProjectPath = localProjects?.projects[0]?.localPath ?? null
   const selectedProject = resolveProjectSelection(projectSelection)
   const selectedProjectId = selectedProject.projectId
@@ -1202,6 +1218,60 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
     }
   }, [activeChatId, initialChatReadAnchor, inputHeight, messages.length, runtime?.status, handleInitialScrollDone, scrollModeRef])
+
+  const syncReadBoundaryFromHooks = useCallback(() => {
+    const element = scrollRef.current
+    if (!element || !activeChatId) return
+    const progress = getHookReadProgressBoundary(element)
+    if (!progress || progress.state !== "read") return
+    markChatRead(activeChatId, {
+      messageId: progress.messageId,
+      blockIndex: progress.blockIndex,
+    })
+  }, [activeChatId, markChatRead])
+
+  useEffect(() => {
+    const element = scrollRef.current
+    if (!element || !activeChatId) return
+
+    let frameId: number | null = null
+    const scrollElement = element
+    const resizeTarget = scrollElement.firstElementChild instanceof HTMLElement ? scrollElement.firstElementChild : scrollElement
+
+    function scheduleHookSync() {
+      if (frameId !== null) return
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null
+        syncReadBoundaryFromHooks()
+      })
+    }
+
+    function keepFollowPinnedOnResize() {
+      if (!initialScrollCompletedRef.current || scrollModeRef.current !== "following") return
+      scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: "auto" })
+    }
+
+    function handleScroll() {
+      scheduleHookSync()
+    }
+
+    scheduleHookSync()
+    scrollElement.addEventListener("scroll", handleScroll, { passive: true })
+
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => {
+          keepFollowPinnedOnResize()
+          scheduleHookSync()
+        })
+    resizeObserver?.observe(resizeTarget)
+
+    return () => {
+      if (frameId !== null) window.cancelAnimationFrame(frameId)
+      scrollElement.removeEventListener("scroll", handleScroll)
+      resizeObserver?.disconnect()
+    }
+  }, [activeChatId, scrollModeRef, syncReadBoundaryFromHooks])
 
   useEffect(() => {
     const provider = activeChatSnapshot?.runtime.provider
@@ -1315,7 +1385,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     const element = scrollRef.current
     if (!element) return
     const distance = element.scrollHeight - element.scrollTop - element.clientHeight
-    if (!shouldStickToBottomOnComposerSubmit(distance)) return
+    if (!shouldStickToBottomOnComposerSubmit(distance, element.clientHeight)) return
     scrollFollowToBottom("auto")
   }
 
@@ -1744,48 +1814,50 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     navigate("/")
   }
 
-  async function startSessionFromPrompt(prompt: string, provider: AgentProvider, model: string) {
-    const projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
-    if (!projectId) {
-      throw new Error("Open a project first")
-    }
-
-    const result = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
-
-    const providerDefaults = useChatPreferencesStore.getState().providerDefaults
-    const defaults = providerDefaults[provider]
-    const modelOptions: ModelOptions = provider === "claude"
-      ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
-      : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
-
-    await socket.command({
-      type: "chat.send",
-      chatId: result.chatId,
-      provider,
-      content: prompt,
-      model,
-      modelOptions,
-    })
-
-    setPendingChatId(result.chatId)
-    navigate(`/chat/${result.chatId}`)
-    setSidebarOpen(false)
-    setCommandError(null)
-  }
-
   async function handleForkSession(intent: string, provider: AgentProvider, model: string, preset?: string) {
     if (!activeChatId) {
       throw new Error("Open a chat first")
     }
+    const projectId = chatSnapshot?.runtime?.projectId ?? selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
+    if (!projectId) {
+      throw new Error("Open a project first")
+    }
 
-    const forkPromptResult = await socket.command<{ prompt: string }>({
-      type: "chat.generateForkPrompt",
-      chatId: activeChatId,
-      intent,
-      preset,
+    const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
+    setPendingChatId(chatId)
+    setPendingSessionBootstrap({
+      chatId,
+      kind: "fork",
+      phase: "compacting",
+      sourceLabels: [getSidebarChatRow(sidebarData.projectGroups, activeChatId)?.title?.trim() || activeChatId],
     })
+    navigate(`/chat/${chatId}`)
+    setSidebarOpen(false)
+    setCommandError(null)
 
-    await startSessionFromPrompt(forkPromptResult.prompt, provider, model)
+    void (async () => {
+      try {
+        const { prompt } = await socket.command<{ prompt: string }>({
+          type: "chat.generateForkPrompt",
+          chatId: activeChatId,
+          intent,
+          preset,
+        })
+        setPendingSessionBootstrap((current) => current?.chatId === chatId
+          ? { ...current, phase: "starting" }
+          : current)
+        const defaults = useChatPreferencesStore.getState().providerDefaults[provider]
+        const modelOptions: ModelOptions = provider === "claude"
+          ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
+          : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
+
+        await socket.command({ type: "chat.send", chatId, provider, content: prompt, model, modelOptions })
+      } catch (error) {
+        console.warn("[fork] background fork failed:", error instanceof Error ? error.message : String(error))
+      } finally {
+        setPendingSessionBootstrap((current) => current?.chatId === chatId ? null : current)
+      }
+    })()
   }
 
   async function handleMergeSession(chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) {
@@ -1801,7 +1873,12 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     // Step 1: Create chat + navigate instantly
     const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
     setPendingChatId(chatId)
-    setMergePendingChatId(chatId)
+    setPendingSessionBootstrap({
+      chatId,
+      kind: "merge",
+      phase: "compacting",
+      sourceLabels: getSidebarChatLabels(sidebarData.projectGroups, chatIds),
+    })
     navigate(`/chat/${chatId}`)
     setSidebarOpen(false)
     setCommandError(null)
@@ -1812,6 +1889,9 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         const { prompt } = await socket.command<{ prompt: string }>({
           type: "chat.generateMergePrompt", chatIds, intent, preset,
         })
+        setPendingSessionBootstrap((current) => current?.chatId === chatId
+          ? { ...current, phase: "starting" }
+          : current)
         const defaults = useChatPreferencesStore.getState().providerDefaults[provider]
         const modelOptions: ModelOptions = provider === "claude"
           ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
@@ -1831,7 +1911,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       } catch (error) {
         console.warn("[merge] background merge failed:", error instanceof Error ? error.message : String(error))
       } finally {
-        setMergePendingChatId(null)
+        setPendingSessionBootstrap((current) => current?.chatId === chatId ? null : current)
       }
     })()
   }
@@ -1949,7 +2029,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     handleForkSession,
     handleMergeSession,
     pendingMergeProjectId,
-    mergePendingChatId,
+    pendingSessionBootstrap,
     requestMerge: (projectId: string) => setPendingMergeProjectId(projectId),
     clearMergeRequest: () => setPendingMergeProjectId(null),
     handleAskUserQuestion,

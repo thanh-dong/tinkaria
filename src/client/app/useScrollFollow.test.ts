@@ -7,6 +7,7 @@ let observerCallback: IntersectionCallback | null = null
 let observedElements: unknown[] = []
 let disconnected = false
 let pendingIntersecting: boolean | null = null
+let scrollListener: (() => void) | null = null
 
 class MockIntersectionObserver {
   constructor(callback: IntersectionCallback, _options?: IntersectionObserverInit) {
@@ -36,14 +37,28 @@ function resetMocks() {
   observedElements = []
   disconnected = false
   pendingIntersecting = null
+  scrollListener = null
 }
 
-// Mock elements — createScrollFollowStore only needs them as identity tokens
-// and passes them to IntersectionObserver. No real DOM needed.
 function mockElements() {
-  const scrollEl = {} as HTMLElement
+  const scrollEl = {
+    scrollHeight: 1000,
+    scrollTop: 0,
+    clientHeight: 400,
+    addEventListener: (_event: string, listener: () => void) => {
+      scrollListener = listener
+    },
+    removeEventListener: (_event: string, listener: () => void) => {
+      if (scrollListener === listener) scrollListener = null
+    },
+  } as unknown as HTMLElement
   const sentinelEl = {} as HTMLElement
   return { scrollEl, sentinelEl }
+}
+
+function fireScroll() {
+  if (!scrollListener) throw new Error("No scroll listener registered")
+  scrollListener()
 }
 
 const savedIO = globalThis.IntersectionObserver
@@ -157,6 +172,20 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     const { store } = await setup()
     store.destroy()
     expect(disconnected).toBe(true)
+  })
+
+  test("re-engages following when the user manually reaches exact bottom without a fresh intersection callback", async () => {
+    const { store, scrollEl } = await setup()
+    store.handleInitialScrollDone("tail")
+    fireIntersection(false)
+    expect(store.getMode()).toBe("detached")
+
+    scrollEl.scrollTop = 600
+    fireScroll()
+
+    expect(store.getMode()).toBe("following")
+    expect(store.getSnapshot()).toBe(true)
+    store.destroy()
   })
 
   test("reconciles to following when sentinel is already visible after block anchor scroll", async () => {
