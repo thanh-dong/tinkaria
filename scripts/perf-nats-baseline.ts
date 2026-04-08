@@ -369,6 +369,80 @@ async function benchBroadcastSimulation(iterations: number): Promise<BenchResult
   return { name: `broadcastSnapshots sim (${subscriptionCount} subs, all deduped)`, unit: "ms", stats: stats(latencies) }
 }
 
+async function benchBroadcastStorm(nc: NatsConnection, js: JetStreamClient, iterations: number): Promise<BenchResult[]> {
+  // Simulate the REAL application bottleneck:
+  // N events arrive → each triggers broadcastSnapshots (10 subs × serialize × dedup)
+  const results: BenchResult[] = []
+  const eventCount = 50
+  const subscriptionCount = 10
+
+  // Build mock snapshot data for each subscription
+  const snapshots = Array.from({ length: subscriptionCount }, (_, i) => ({
+    key: `topic-${i}`,
+    data: { id: i, status: "running", title: `Chat ${i}`, messageCount: 100 + i, extra: "x".repeat(200) },
+  }))
+  const dedupCache = new Map<string, string>()
+  for (const s of snapshots) {
+    dedupCache.set(s.key, JSON.stringify(s.data))
+  }
+
+  // Variant 1: Per-event broadcast (current behavior)
+  {
+    const latencies: number[] = []
+    for (let i = 0; i < iterations; i++) {
+      let broadcastCount = 0
+      const start = performance.now()
+      for (let e = 0; e < eventCount; e++) {
+        // Simulate onStateChange() → broadcastSnapshots()
+        const published = new Set<string>()
+        for (const s of snapshots) {
+          if (published.has(s.key)) continue
+          published.add(s.key)
+          const json = JSON.stringify(s.data)
+          if (dedupCache.get(s.key) !== json) {
+            // Would publish — but dedup catches unchanged snapshots
+          }
+        }
+        broadcastCount++
+      }
+      latencies.push(performance.now() - start)
+    }
+    results.push({
+      name: `broadcastStorm: per-event (${eventCount} events × ${subscriptionCount} subs)`,
+      unit: "ms",
+      stats: stats(latencies),
+    })
+  }
+
+  // Variant 2: Debounced broadcast (coalesced into 1 call)
+  {
+    const latencies: number[] = []
+    for (let i = 0; i < iterations; i++) {
+      let broadcastCount = 0
+      const start = performance.now()
+      // All events arrive, but only ONE broadcast happens
+      const published = new Set<string>()
+      for (const s of snapshots) {
+        if (published.has(s.key)) continue
+        published.add(s.key)
+        const json = JSON.stringify(s.data)
+        if (dedupCache.get(s.key) !== json) {
+          // Would publish
+        }
+      }
+      broadcastCount++
+      latencies.push(performance.now() - start)
+    }
+    results.push({
+      name: `broadcastStorm: debounced (${eventCount} events → 1 broadcast)`,
+      unit: "ms",
+      stats: stats(latencies),
+    })
+  }
+
+  return results
+}
+
 async function benchHighFrequencyPipeline(nc: NatsConnection, js: JetStreamClient, iterations: number): Promise<BenchResult> {
   // Simulate the streaming path: rapid events published → consumed → trigger broadcast
   const latencies: number[] = []
@@ -466,9 +540,12 @@ async function run() {
   results.push(...await benchCompression(ITER))
 
   // 4. Application-level benchmarks
-  console.error("  [8/8] Application patterns...")
+  console.error("  [8/9] Application patterns...")
   results.push(await benchSnapshotDedup(ITER * 2))
   results.push(await benchBroadcastSimulation(ITER * 2))
+
+  console.error("  [9/9] Broadcast storm + burst pipeline...")
+  results.push(...await benchBroadcastStorm(nc, js, ITER))
   results.push(await benchHighFrequencyPipeline(nc, js, 20))
 
   // Cleanup
