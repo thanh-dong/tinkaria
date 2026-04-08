@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { Loader2, Menu, PanelLeft, Plus, X } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
@@ -7,7 +7,7 @@ import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import { cn } from "../lib/utils"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
-import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProjectsSection"
+const LocalProjectsSection = lazy(() => import("../components/chat-ui/sidebar/LocalProjectsSection").then(m => ({ default: m.LocalProjectsSection })))
 import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
 import type { SocketStatus } from "./socket-interface"
 import { useProjectGroupOrderStore } from "../stores/projectGroupOrderStore"
@@ -374,35 +374,37 @@ export function TinkariaSidebar({
               <p className="text-sm text-slate-400 p-2 mt-6 text-center">No conversations yet</p>
             ) : null}
 
-            <LocalProjectsSection
-              projectGroups={orderedProjectGroups}
-              onReorderGroups={handleReorderGroups}
-              collapsedSections={collapsedSections}
-              expandedGroups={expandedGroups}
-              onToggleSection={toggleSection}
-              onToggleExpandedGroup={toggleExpandedGroup}
-              renderChatRow={renderChatRow}
-              chatsPerProject={chatsPerProject}
-              onNewLocalChat={(localPath) => {
-                const projectId = projectIdByPath.get(localPath)
-                if (projectId) {
-                  onCreateChat(projectId)
-                }
-              }}
-              onRemoveProject={onRemoveProject}
-              isConnected={connectionStatus === "connected"}
-              sessionsForProject={sessionsForProject}
-              sessionsWindowDaysForProject={sessionsWindowDaysForProject}
-              onOpenSessionPicker={onOpenSessionPicker}
-              onNavigateToChat={(chatId) => {
-                navigate(`/chat/${chatId}`)
-                onClose()
-              }}
-              onResumeSession={onResumeSession}
-              onRefreshSessions={onRefreshSessions}
-              onShowMoreSessions={onShowMoreSessions}
-              onMergeSession={onMergeSession}
-            />
+            <Suspense fallback={null}>
+              <LocalProjectsSection
+                projectGroups={orderedProjectGroups}
+                onReorderGroups={handleReorderGroups}
+                collapsedSections={collapsedSections}
+                expandedGroups={expandedGroups}
+                onToggleSection={toggleSection}
+                onToggleExpandedGroup={toggleExpandedGroup}
+                renderChatRow={renderChatRow}
+                chatsPerProject={chatsPerProject}
+                onNewLocalChat={(localPath) => {
+                  const projectId = projectIdByPath.get(localPath)
+                  if (projectId) {
+                    onCreateChat(projectId)
+                  }
+                }}
+                onRemoveProject={onRemoveProject}
+                isConnected={connectionStatus === "connected"}
+                sessionsForProject={sessionsForProject}
+                sessionsWindowDaysForProject={sessionsWindowDaysForProject}
+                onOpenSessionPicker={onOpenSessionPicker}
+                onNavigateToChat={(chatId) => {
+                  navigate(`/chat/${chatId}`)
+                  onClose()
+                }}
+                onResumeSession={onResumeSession}
+                onRefreshSessions={onRefreshSessions}
+                onShowMoreSessions={onShowMoreSessions}
+                onMergeSession={onMergeSession}
+              />
+            </Suspense>
           </div>
         </div>
 
