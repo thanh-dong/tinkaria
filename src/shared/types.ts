@@ -671,3 +671,24 @@ export interface PendingToolSnapshot {
   toolUseId: string
   toolKind: "ask_user_question" | "exit_plan_mode"
 }
+
+export type OrchestrationChildStatus =
+  | "spawning"
+  | "running"
+  | "waiting"
+  | "completed"
+  | "failed"
+  | "closed"
+
+export interface OrchestrationChildNode {
+  chatId: string
+  status: OrchestrationChildStatus
+  spawnedAt: number
+  lastStatusAt: number
+  instruction: string
+  children: OrchestrationChildNode[]
+}
+
+export interface OrchestrationHierarchySnapshot {
+  children: OrchestrationChildNode[]
+}
