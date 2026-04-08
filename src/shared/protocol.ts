@@ -10,6 +10,7 @@ export type SubscriptionTopic =
   | { type: "chat"; chatId: string }
   | { type: "terminal"; terminalId: string }
   | { type: "sessions"; projectId: string }
+  | { type: "orchestration"; chatId: string }
 
 export interface TerminalSnapshot {
   terminalId: string

@@ -7,11 +7,15 @@ import { getMachineDisplayName } from "./machine-name"
 import { TerminalManager } from "./terminal-manager"
 import { UpdateManager } from "./update-manager"
 import type { UpdateInstallAttemptResult } from "./cli-runtime"
-import { NatsBridge } from "./nats-bridge"
+import { NatsDaemonManager } from "./nats-daemon-manager"
+import { NatsConnector } from "./nats-connector"
 import { generateAuthToken } from "./nats-auth"
 import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
-import { ensureTerminalEventsStream, ensureChatMessageStream, ensureKitTurnEventsStream } from "./nats-streams"
+import { ensureTerminalEventsStream, ensureChatMessageStream, ensureKitTurnEventsStream, ensureRunnerEventsStream } from "./nats-streams"
+import { RunnerManager } from "./runner-manager"
+import { RunnerProxy } from "./runner-proxy"
+import { TranscriptConsumer } from "./transcript-consumer"
 import type { TranscriptEntry } from "../shared/types"
 import { SessionOrchestrator } from "./orchestration"
 import { SessionIndex } from "./session-index"
@@ -63,45 +67,19 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     : null
 
   const authToken = generateAuthToken()
-  const natsBridge = await NatsBridge.create({ token: authToken })
-  await ensureTerminalEventsStream(natsBridge.nc)
-  await ensureChatMessageStream(natsBridge.nc)
-  await ensureKitTurnEventsStream(natsBridge.nc)
-
-  // Codex kit: registry + runtime created now, daemon started in background after HTTP is up
-  const projectKitRegistry = new ProjectKitRegistry(natsBridge.nc)
-  const codexRuntime = new RemoteCodexRuntime({
-    nc: natsBridge.nc,
-    registry: projectKitRegistry,
+  const daemonManager = new NatsDaemonManager()
+  const daemonInfo = await daemonManager.ensureDaemon({ token: authToken, host: hostname })
+  const natsConnector = await NatsConnector.connect({
+    natsUrl: daemonInfo.url,
+    natsWsUrl: daemonInfo.wsUrl,
+    natsWsPort: daemonInfo.wsPort,
+    token: authToken,
   })
+  await ensureTerminalEventsStream(natsConnector.nc)
+  await ensureChatMessageStream(natsConnector.nc)
+  await ensureKitTurnEventsStream(natsConnector.nc)
 
-  // Use indirection to break the circular dependency:
-  // agent -> onStateChange -> publisher.broadcastSnapshots
-  // publisher -> agent.getActiveStatuses
-  let broadcast = () => {}
-  let publishMessage: (chatId: string, entry: TranscriptEntry) => void = () => {}
-
-  const skillCache = new SkillCache()
-  const agent = new AgentCoordinator({
-    store,
-    onStateChange: () => broadcast(),
-    codexRuntime,
-    skillCache,
-    onMessageAppended: (chatId, entry) => {
-      publishMessage(chatId, entry)
-      sessionIndex.onMessageAppended(chatId, entry, store.state)
-      transcriptSearch.addEntry(chatId, entry)
-      if (entry.kind === "result") {
-        orchestrator.onMessageAppended(chatId, entry)
-      }
-    },
-  })
-
-  const orchestrator = new SessionOrchestrator({
-    store,
-    coordinator: agent,
-  })
-  agent.orchestrator = orchestrator
+  const splitMode = process.env.TINKARIA_SPLIT === "true"
 
   // Project agent: cross-session awareness and coordination
   const sessionIndex = new SessionIndex()
@@ -119,25 +97,117 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     taskLedger.detectAbandoned()
   }, 60_000)
 
-  const publisher = await createNatsPublisher({
-    nc: natsBridge.nc,
+  // Use indirection to break the circular dependency:
+  // coordinator -> onStateChange -> publisher.broadcastSnapshots
+  // publisher -> coordinator.getActiveStatuses
+  let broadcast = () => {}
+  let publishMessage: (chatId: string, entry: TranscriptEntry) => void = () => {}
+
+  const onMessageAppended = (chatId: string, entry: TranscriptEntry) => {
+    publishMessage(chatId, entry)
+    sessionIndex.onMessageAppended(chatId, entry, store.state)
+    transcriptSearch.addEntry(chatId, entry)
+    if (entry.kind === "result") {
+      orchestrator.onMessageAppended(chatId, entry)
+    }
+  }
+
+  // Coordinator: RunnerProxy (split mode) or AgentCoordinator (in-process)
+  let coordinator: {
+    send(command: Extract<import("../shared/protocol").ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }>
+    cancel(chatId: string): Promise<void>
+    respondTool(command: Extract<import("../shared/protocol").ClientCommand, { type: "chat.respondTool" }>): Promise<void>
+    disposeChat(chatId: string): Promise<void>
+    getActiveStatuses(): Map<string, import("../shared/types").TinkariaStatus>
+    activeTurns: { has(key: string): boolean }
+    startTurnForChat(args: {
+      chatId: string; provider: import("../shared/types").AgentProvider; content: string
+      delegatedContext?: string; isSpawned?: boolean; model: string; effort?: string
+      serviceTier?: "fast"; planMode: boolean; appendUserPrompt: boolean
+    }): Promise<void>
+  }
+
+  let runnerManager: RunnerManager | null = null
+  let transcriptConsumer: TranscriptConsumer | null = null
+
+  const skillCache = new SkillCache()
+
+  if (splitMode) {
+    // ── Split mode: separate runner process ──
+    await ensureRunnerEventsStream(natsConnector.nc)
+
+    runnerManager = new RunnerManager({
+      nc: natsConnector.nc,
+      natsUrl: daemonInfo.url,
+      authToken,
+    })
+    const runnerId = await runnerManager.ensureRunner()
+
+    transcriptConsumer = new TranscriptConsumer({
+      nc: natsConnector.nc,
+      store,
+      onStateChange: () => broadcast(),
+      onMessageAppended,
+    })
+    void transcriptConsumer.start()
+
+    const proxy = new RunnerProxy({
+      nc: natsConnector.nc,
+      store,
+      runnerId,
+      getActiveStatuses: () => transcriptConsumer!.getActiveStatuses(),
+    })
+    coordinator = proxy
+
+    console.warn(LOG_PREFIX, "Split mode enabled — runner process handles turn execution")
+  } else {
+    // ── In-process mode: AgentCoordinator (default) ──
+    const projectKitRegistry_inner = new ProjectKitRegistry(natsConnector.nc)
+    const codexRuntime = new RemoteCodexRuntime({
+      nc: natsConnector.nc,
+      registry: projectKitRegistry_inner,
+    })
+
+    const agent = new AgentCoordinator({
+      store,
+      onStateChange: () => broadcast(),
+      codexRuntime,
+      skillCache,
+      onMessageAppended,
+    })
+    coordinator = agent
+    // orchestrator is set below
+    void Promise.resolve().then(() => { agent.orchestrator = orchestrator })
+  }
+
+  const orchestrator = new SessionOrchestrator({
     store,
-    agent,
+    coordinator,
+  })
+
+  // Codex kit: registry + runtime created now, daemon started in background after HTTP is up
+  const projectKitRegistry = new ProjectKitRegistry(natsConnector.nc)
+
+  const publisher = await createNatsPublisher({
+    nc: natsConnector.nc,
+    store,
+    agent: coordinator,
     terminals,
     refreshDiscovery,
     getDiscoveredProjects: () => discoveredProjects,
     machineDisplayName,
     updateManager,
     skillCache,
+    orchestrator,
   })
 
   broadcast = () => publisher.broadcastSnapshots()
   publishMessage = (chatId, entry) => publisher.publishChatMessage(chatId, entry)
 
   const responders = registerCommandResponders({
-    nc: natsBridge.nc,
+    nc: natsConnector.nc,
     store,
-    agent,
+    agent: coordinator,
     terminals,
     refreshDiscovery,
     updateManager,
@@ -161,7 +231,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
           const url = new URL(req.url)
 
           if (url.pathname === "/nats-ws") {
-            const upgraded = srv.upgrade(req, { data: { wsPort: natsBridge.natsWsPort, upstream: null } })
+            const upgraded = srv.upgrade(req, { data: { wsPort: natsConnector.natsWsPort, upstream: null } })
             if (upgraded) return undefined
             return new Response("WebSocket upgrade failed", { status: 426 })
           }
@@ -170,7 +240,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
             return Response.json({
               ok: true,
               port: actualPort,
-              natsWsPort: natsBridge.natsWsPort,
+              natsWsPort: natsConnector.natsWsPort,
             })
           }
 
@@ -225,8 +295,8 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   // Start Codex kit daemon in background — not on the critical path for HTTP
   let localCodexKit: LocalCodexKitDaemon | null = null
   void LocalCodexKitDaemon.start({
-    nc: natsBridge.nc,
-    natsUrl: natsBridge.natsUrl,
+    nc: natsConnector.nc,
+    natsUrl: natsConnector.natsUrl,
     authToken,
   }).then((daemon) => {
     localCodexKit = daemon
@@ -237,16 +307,22 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
 
   const shutdown = async () => {
     clearInterval(abandonInterval)
-    for (const chatId of [...agent.activeTurns.keys()]) {
-      await agent.cancel(chatId)
+    // Cancel active turns (in-process mode only — split mode turns live in runner)
+    if (!splitMode) {
+      for (const [chatId] of coordinator.getActiveStatuses()) {
+        await coordinator.cancel(chatId)
+      }
     }
     orchestrator.destroy()
     responders.dispose()
     publisher.dispose()
     terminals.closeAll()
     projectKitRegistry.dispose()
+    transcriptConsumer?.stop()
     await localCodexKit?.dispose()
-    await natsBridge.dispose()
+    await runnerManager?.dispose()
+    await natsConnector.dispose()
+    await daemonManager.dispose()
     await store.compact()
     server.stop(true)
   }

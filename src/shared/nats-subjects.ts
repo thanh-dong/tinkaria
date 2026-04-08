@@ -9,6 +9,7 @@ export function snapshotKvKey(topic: SubscriptionTopic): string {
     case "chat": return `chat.${topic.chatId}`
     case "terminal": return `terminal.${topic.terminalId}`
     case "sessions": return `sessions.${topic.projectId}`
+    case "orchestration": return `orchestration.${topic.chatId}`
     default: return topic.type
   }
 }

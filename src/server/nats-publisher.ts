@@ -8,7 +8,7 @@ import { snapshotSubject, snapshotKvKey, terminalEventSubject, chatMessageSubjec
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
 import type { ChatMessageEvent, SessionsSnapshot, TranscriptEntry } from "../shared/types"
-import type { AgentCoordinator } from "./agent"
+import type { TinkariaStatus } from "../shared/types"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
 import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSessionsSnapshot, deriveSidebarData } from "./read-models"
@@ -16,6 +16,7 @@ import { discoverSessions } from "./session-discovery"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
 import type { SkillCache } from "./skill-discovery"
+import type { SessionOrchestrator } from "./orchestration"
 
 const encoder = new TextEncoder()
 
@@ -36,13 +37,14 @@ const DEFAULT_UPDATE_SNAPSHOT = {
 export interface CreateNatsPublisherArgs {
   nc: NatsConnection
   store: EventStore
-  agent: AgentCoordinator
+  agent: { getActiveStatuses(): Map<string, TinkariaStatus> }
   terminals: TerminalManager
   refreshDiscovery: () => Promise<DiscoveredProject[]>
   getDiscoveredProjects: () => DiscoveredProject[]
   machineDisplayName: string
   updateManager: UpdateManager | null
   skillCache?: SkillCache
+  orchestrator?: SessionOrchestrator
 }
 
 export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
@@ -55,6 +57,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     machineDisplayName,
     updateManager,
     skillCache,
+    orchestrator,
   } = args
 
   const js = jetstream(nc)
@@ -143,6 +146,8 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         return terminals.getSnapshot(topic.terminalId)
       case "sessions":
         return deriveSessionsSnapshot(await getOrRefreshSessionsSnapshot(topic.projectId))
+      case "orchestration":
+        return orchestrator?.getHierarchy(topic.chatId) ?? { children: [] }
       default: {
         const _exhaustive: never = topic
         throw new Error(`Unknown topic type: ${(_exhaustive as SubscriptionTopic).type}`)
@@ -212,6 +217,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
       published.add(key)
       publishSnapshot(topic, await computeSnapshot(topic))
     }
+    orchestrator?.pruneTombstones()
   }
 
   function publishChatMessage(chatId: string, entry: TranscriptEntry): void {
