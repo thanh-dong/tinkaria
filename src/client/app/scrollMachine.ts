@@ -13,6 +13,10 @@ export function nextScrollMode(current: ScrollMode, event: ScrollEvent): ScrollM
     if (event.type === "initial-scroll-done") {
       return event.anchor === "tail" ? "following" : "detached"
     }
+    // User scrolled away from bottom before initial scroll completed — break out of anchoring
+    if (event.type === "intersection-change" && !event.isProgrammatic && !event.isIntersecting) {
+      return "detached"
+    }
     return "anchoring"
   }
 

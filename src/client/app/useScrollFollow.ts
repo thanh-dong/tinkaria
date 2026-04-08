@@ -1,4 +1,4 @@
-import { useCallback, useRef, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { nextScrollMode, shouldAutoFollow, type ScrollMode } from "./scrollMachine"
 import type { RefObject } from "react"
 
@@ -74,10 +74,6 @@ export function createScrollFollowStore(
 
     handleInitialScrollDone(anchor) {
       transition({ type: "initial-scroll-done", anchor })
-      // Force re-observe so the observer delivers current intersection state.
-      // Without this, a "block" anchor that lands with the sentinel already
-      // visible stays "detached" forever — the observer already fired during
-      // "anchoring" (which ignores intersection events) and won't fire again.
       observer.unobserve(sentinelEl)
       observer.observe(sentinelEl)
     },
@@ -116,10 +112,8 @@ export function useScrollFollow(
   const storeRef = useRef<ScrollFollowStore | null>(null)
   const modeRef = useRef<ScrollMode>("anchoring")
   const rafRef = useRef<number | null>(null)
+  const [scrollMode, setScrollMode] = useState<ScrollMode>("anchoring")
 
-  // Refs are identity-stable across renders, so these callbacks only
-  // recreate when the ref objects themselves change (effectively never).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   function getStore(): ScrollFollowStore | null {
     const scrollEl = scrollRef.current
     const sentinelEl = sentinelRef.current
@@ -130,28 +124,29 @@ export function useScrollFollow(
     return storeRef.current
   }
 
-  const subscribe = useCallback((onChange: () => void) => {
+  // Subscribe to mode changes via effect — avoids useSyncExternalStore timing issues
+  useEffect(() => {
     const store = getStore()
-    if (!store) return () => {}
-    const unsubscribe = store.subscribe(onChange)
+    if (!store) return
+    const unsubscribe = store.subscribe(() => {
+      const mode = store.getSnapshot()
+      modeRef.current = mode
+      setScrollMode(mode)
+    })
+    // Sync initial mode
+    modeRef.current = store.getSnapshot()
+    setScrollMode(store.getSnapshot())
+
     return () => {
       unsubscribe()
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       storeRef.current?.destroy()
       storeRef.current = null
     }
+  // Re-subscribe when refs change (effectively on mount/unmount)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollRef, sentinelRef])
+  }, [scrollRef.current, sentinelRef.current])
 
-  const getSnapshot = useCallback((): ScrollMode => {
-    const store = getStore()
-    if (!store) return "anchoring"
-    modeRef.current = store.getSnapshot()
-    return modeRef.current
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollRef, sentinelRef])
-
-  const scrollMode = useSyncExternalStore(subscribe, getSnapshot, (): ScrollMode => "anchoring")
   const isFollowing = shouldAutoFollow(scrollMode)
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {

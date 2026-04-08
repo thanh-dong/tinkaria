@@ -18,10 +18,26 @@ describe("nextScrollMode", () => {
       expect(nextScrollMode(current, { type: "initial-scroll-done", anchor: "block" })).toBe("detached")
     })
 
-    test("ignores intersection changes during anchoring", () => {
+    test("ignores programmatic intersection changes during anchoring", () => {
       expect(nextScrollMode(current, {
         type: "intersection-change",
         isIntersecting: false,
+        isProgrammatic: true,
+      })).toBe("anchoring")
+    })
+
+    test("breaks out to detached on user scroll during anchoring", () => {
+      expect(nextScrollMode(current, {
+        type: "intersection-change",
+        isIntersecting: false,
+        isProgrammatic: false,
+      })).toBe("detached")
+    })
+
+    test("stays anchoring when sentinel is visible from user context during anchoring", () => {
+      expect(nextScrollMode(current, {
+        type: "intersection-change",
+        isIntersecting: true,
         isProgrammatic: false,
       })).toBe("anchoring")
     })

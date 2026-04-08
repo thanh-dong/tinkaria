@@ -1270,16 +1270,16 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     const element = scrollRef.current
     if (!element) return
 
-    // Phase 1: Initial scroll to tail (once per chat)
-    if (!initialScrollCompletedRef.current && initialChatReadAnchor.kind === "tail") {
+    // Phase 1: Initial scroll to tail (once per chat, only after messages exist)
+    if (!initialScrollCompletedRef.current && initialChatReadAnchor.kind === "tail" && messages.length > 0) {
       element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
-      // Second pass for virtualizer measurement settling
+      // Defer completion to next frame so virtualizer measurement settles first
       const frameId = window.requestAnimationFrame(() => {
         const el = scrollRef.current
         if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" })
+        initialScrollCompletedRef.current = true
+        handleInitialScrollDone("tail")
       })
-      initialScrollCompletedRef.current = true
-      handleInitialScrollDone("tail")
       return () => window.cancelAnimationFrame(frameId)
     }
 

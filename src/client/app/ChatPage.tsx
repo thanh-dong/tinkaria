@@ -520,10 +520,10 @@ export function ChatPage() {
                     </div>
                   ) : null}
                 </div>
-                <div ref={state.sentinelRef} className="h-px" aria-hidden="true" />
                 <div style={{ height: 250 }} aria-hidden="true" />
               </>
             ) : null}
+            <div ref={state.sentinelRef} className="h-px" aria-hidden="true" />
           </ScrollArea>
         </div>
 
