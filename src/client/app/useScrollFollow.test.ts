@@ -82,24 +82,21 @@ describe("useScrollFollow — createScrollFollowStore", () => {
 
   test("initial mode is anchoring", async () => {
     const { store } = await setup()
-    expect(store.getSnapshot()).toBe(false) // not following
-    expect(store.getMode()).toBe("anchoring" satisfies ScrollMode)
+    expect(store.getSnapshot()).toBe("anchoring" satisfies ScrollMode)
     store.destroy()
   })
 
   test("transitions to following after initial tail scroll", async () => {
     const { store } = await setup()
     store.handleInitialScrollDone("tail")
-    expect(store.getMode()).toBe("following" satisfies ScrollMode)
-    expect(store.getSnapshot()).toBe(true)
+    expect(store.getSnapshot()).toBe("following" satisfies ScrollMode)
     store.destroy()
   })
 
   test("transitions to detached after initial block scroll", async () => {
     const { store } = await setup()
     store.handleInitialScrollDone("block")
-    expect(store.getMode()).toBe("detached" satisfies ScrollMode)
-    expect(store.getSnapshot()).toBe(false)
+    expect(store.getSnapshot()).toBe("detached" satisfies ScrollMode)
     store.destroy()
   })
 
@@ -107,7 +104,7 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     const { store } = await setup()
     store.handleInitialScrollDone("tail") // → following
     fireIntersection(false) // sentinel exits
-    expect(store.getMode()).toBe("detached" satisfies ScrollMode)
+    expect(store.getSnapshot()).toBe("detached" satisfies ScrollMode)
     store.destroy()
   })
 
@@ -116,7 +113,7 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     store.handleInitialScrollDone("tail") // → following
     store.beginProgrammaticScroll()
     fireIntersection(false) // sentinel exits during programmatic scroll
-    expect(store.getMode()).toBe("following" satisfies ScrollMode)
+    expect(store.getSnapshot()).toBe("following" satisfies ScrollMode)
     store.endProgrammaticScroll()
     store.destroy()
   })
@@ -125,9 +122,9 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     const { store } = await setup()
     store.handleInitialScrollDone("tail")
     fireIntersection(false) // → detached
-    expect(store.getMode()).toBe("detached")
+    expect(store.getSnapshot()).toBe("detached")
     store.handleScrollToBottom()
-    expect(store.getMode()).toBe("following" satisfies ScrollMode)
+    expect(store.getSnapshot()).toBe("following" satisfies ScrollMode)
     store.destroy()
   })
 
@@ -135,7 +132,7 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     const { store } = await setup()
     store.handleInitialScrollDone("tail") // → following
     store.handleChatChanged()
-    expect(store.getMode()).toBe("anchoring" satisfies ScrollMode)
+    expect(store.getSnapshot()).toBe("anchoring" satisfies ScrollMode)
     store.destroy()
   })
 
@@ -171,7 +168,7 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     // anchoring → detached (block anchor) — both are !following, but mode changes
     store.handleInitialScrollDone("block")
     expect(onChange).toHaveBeenCalledTimes(1)
-    expect(store.getMode()).toBe("detached")
+    expect(store.getSnapshot()).toBe("detached")
 
     store.destroy()
   })
@@ -191,13 +188,12 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     const { store, scrollEl } = await setup()
     store.handleInitialScrollDone("tail")
     fireIntersection(false)
-    expect(store.getMode()).toBe("detached")
+    expect(store.getSnapshot()).toBe("detached")
 
     scrollEl.scrollTop = 600
     fireScroll()
 
-    expect(store.getMode()).toBe("following")
-    expect(store.getSnapshot()).toBe(true)
+    expect(store.getSnapshot()).toBe("following")
     store.destroy()
   })
 
@@ -205,7 +201,7 @@ describe("useScrollFollow — createScrollFollowStore", () => {
     const { store } = await setup()
     // Sentinel is visible during anchoring (ignored by state machine)
     fireIntersection(true)
-    expect(store.getMode()).toBe("anchoring")
+    expect(store.getSnapshot()).toBe("anchoring")
 
     // Set up pending intersection for re-observe
     pendingIntersecting = true
@@ -215,8 +211,7 @@ describe("useScrollFollow — createScrollFollowStore", () => {
 
     // After microtask (re-observe fires), should reconcile to following
     await new Promise((resolve) => queueMicrotask(resolve))
-    expect(store.getMode()).toBe("following")
-    expect(store.getSnapshot()).toBe(true)
+    expect(store.getSnapshot()).toBe("following")
     store.destroy()
   })
 })

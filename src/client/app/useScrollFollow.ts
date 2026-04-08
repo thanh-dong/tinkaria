@@ -3,8 +3,7 @@ import { nextScrollMode, shouldAutoFollow, type ScrollMode } from "./scrollMachi
 import type { RefObject } from "react"
 
 export interface ScrollFollowStore {
-  getSnapshot: () => boolean
-  getMode: () => ScrollMode
+  getSnapshot: () => ScrollMode
   subscribe: (onChange: () => void) => () => void
   handleInitialScrollDone: (anchor: "tail" | "block") => void
   handleScrollToBottom: () => void
@@ -66,8 +65,7 @@ export function createScrollFollowStore(
   scrollEl.addEventListener("scroll", handleScroll, { passive: true })
 
   return {
-    getSnapshot: () => isFollowing,
-    getMode: () => mode,
+    getSnapshot: () => mode,
 
     subscribe(onChange) {
       listener = onChange
@@ -135,10 +133,7 @@ export function useScrollFollow(
   const subscribe = useCallback((onChange: () => void) => {
     const store = getStore()
     if (!store) return () => {}
-    const unsubscribe = store.subscribe(() => {
-      modeRef.current = store.getMode()
-      onChange()
-    })
+    const unsubscribe = store.subscribe(onChange)
     return () => {
       unsubscribe()
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
@@ -148,15 +143,16 @@ export function useScrollFollow(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRef, sentinelRef])
 
-  const getSnapshot = useCallback(() => {
+  const getSnapshot = useCallback((): ScrollMode => {
     const store = getStore()
-    if (!store) return false
-    modeRef.current = store.getMode()
-    return store.getSnapshot()
+    if (!store) return "anchoring"
+    modeRef.current = store.getSnapshot()
+    return modeRef.current
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRef, sentinelRef])
 
-  const isFollowing = useSyncExternalStore(subscribe, getSnapshot, () => false)
+  const scrollMode = useSyncExternalStore(subscribe, getSnapshot, (): ScrollMode => "anchoring")
+  const isFollowing = shouldAutoFollow(scrollMode)
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const store = getStore()
@@ -164,7 +160,7 @@ export function useScrollFollow(
     if (!store || !element) return
     store.beginProgrammaticScroll()
     store.handleScrollToBottom()
-    modeRef.current = store.getMode()
+    modeRef.current = store.getSnapshot()
     element.scrollTo({ top: element.scrollHeight, behavior })
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     rafRef.current = requestAnimationFrame(() => {
@@ -178,7 +174,7 @@ export function useScrollFollow(
     const store = getStore()
     if (!store) return
     store.handleInitialScrollDone(anchor)
-    modeRef.current = store.getMode()
+    modeRef.current = store.getSnapshot()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRef, sentinelRef])
 
@@ -186,7 +182,7 @@ export function useScrollFollow(
     const store = getStore()
     if (!store) return
     store.handleChatChanged()
-    modeRef.current = store.getMode()
+    modeRef.current = store.getSnapshot()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRef, sentinelRef])
 
