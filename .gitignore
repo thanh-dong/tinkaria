@@ -40,3 +40,10 @@ public/icon-*.png
 
 # tauri / rust build output
 src-tauri/target/
+
+# packaging artifacts
+*.tgz
+
+# codex
+.codex
+.codex/
