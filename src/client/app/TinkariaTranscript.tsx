@@ -1,26 +1,29 @@
-import React, { useLayoutEffect, useMemo, useRef, type RefObject } from "react"
+import React, { lazy, Suspense, useLayoutEffect, useMemo, useRef, type RefObject } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import type { AskUserQuestionItem, ProcessedToolCall } from "../components/messages/types"
 import type { AskUserQuestionAnswerMap, HydratedTranscriptMessage } from "../../shared/types"
 import { useMessageHeights } from "../lib/useMessageHeights"
 import type { RenderItem } from "../lib/messageHeights"
-import { UserMessage } from "../components/messages/UserMessage"
 import { RawJsonMessage } from "../components/messages/RawJsonMessage"
 import { SystemMessage } from "../components/messages/SystemMessage"
 import { AccountInfoMessage } from "../components/messages/AccountInfoMessage"
-import { TextMessage } from "../components/messages/TextMessage"
+const TextMessage = lazy(() => import("../components/messages/TextMessage").then(m => ({ default: m.TextMessage })))
 import { AskUserQuestionMessage } from "../components/messages/AskUserQuestionMessage"
-import { ExitPlanModeMessage } from "../components/messages/ExitPlanModeMessage"
 import { PresentContentMessage } from "../components/messages/PresentContentMessage"
 import { TodoWriteMessage } from "../components/messages/TodoWriteMessage"
 import { ToolCallMessage } from "../components/messages/ToolCallMessage"
 import { ResultMessage } from "../components/messages/ResultMessage"
 import { InterruptedMessage } from "../components/messages/InterruptedMessage"
 import { CompactBoundaryMessage, ContextClearedMessage } from "../components/messages/CompactBoundaryMessage"
-import { CompactSummaryMessage } from "../components/messages/CompactSummaryMessage"
+
+// Lazy-loaded: these components import react-markdown and are only needed after chat starts
+const UserMessage = lazy(() => import("../components/messages/UserMessage").then(m => ({ default: m.UserMessage })))
+const ExitPlanModeMessage = lazy(() => import("../components/messages/ExitPlanModeMessage").then(m => ({ default: m.ExitPlanModeMessage })))
+const CompactSummaryMessage = lazy(() => import("../components/messages/CompactSummaryMessage").then(m => ({ default: m.CompactSummaryMessage })))
 import { StatusMessage } from "../components/messages/StatusMessage"
 import { CollapsedToolGroup } from "../components/messages/CollapsedToolGroup"
 import { getReadBlockAnchorId, OpenLocalLinkProvider } from "../components/messages/shared"
+import { LOG_PREFIX } from "../../shared/branding"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
 import { SPECIAL_TOOL_NAMES } from "./derived"
 
@@ -65,6 +68,41 @@ export function getRenderItemIndexForMessageId(renderItems: RenderItem[], messag
       ? item.messages.some((message) => message.id === messageId)
       : item.message.id === messageId
   ))
+}
+
+const BLOCK_SCROLL_MAX_ATTEMPTS = 10
+
+export function waitForBlockNode(
+  id: string,
+  maxAttempts: number,
+  onDone: (node: HTMLElement | null) => void,
+  lookup: (id: string) => HTMLElement | null = (nodeId) => document.getElementById(nodeId),
+): () => void {
+  let attempt = 0
+  let cancelled = false
+  let frameId: number | null = null
+
+  function check() {
+    if (cancelled) return
+    const node = lookup(id)
+    if (node) {
+      onDone(node)
+      return
+    }
+    attempt++
+    if (attempt >= maxAttempts) {
+      onDone(null)
+      return
+    }
+    frameId = requestAnimationFrame(check)
+  }
+
+  frameId = requestAnimationFrame(check)
+
+  return () => {
+    cancelled = true
+    if (frameId !== null) cancelAnimationFrame(frameId)
+  }
 }
 
 interface TinkariaTranscriptProps {
@@ -114,6 +152,7 @@ export function TinkariaTranscript({
 
   const renderItems = useMemo(() => groupMessages(messages), [messages])
   const lastInitialScrollAnchorRef = useRef<string | null>(null)
+  const cleanupRetryRef = useRef<(() => void) | null>(null)
 
   const { estimateSize } = useMessageHeights(renderItems, scrollRef)
 
@@ -138,12 +177,25 @@ export function TinkariaTranscript({
     virtualizer.scrollToIndex(renderIndex, { align: "start", behavior: "auto" })
     lastInitialScrollAnchorRef.current = anchorKey
 
-    window.requestAnimationFrame(() => {
-      const blockIndex = initialScrollBlockIndex ?? 0
-      const blockNode = document.getElementById(getReadBlockAnchorId(initialScrollMessageId, blockIndex))
-      blockNode?.scrollIntoView({ block: "start", behavior: "auto" })
+    cleanupRetryRef.current?.()
+
+    const blockIndex = initialScrollBlockIndex ?? 0
+    const anchorId = getReadBlockAnchorId(initialScrollMessageId, blockIndex)
+
+    cleanupRetryRef.current = waitForBlockNode(anchorId, BLOCK_SCROLL_MAX_ATTEMPTS, (node) => {
+      cleanupRetryRef.current = null
+      if (node) {
+        node.scrollIntoView({ block: "start", behavior: "auto" })
+      } else {
+        console.warn(LOG_PREFIX, `Block anchor ${anchorId} not found after ${BLOCK_SCROLL_MAX_ATTEMPTS} frames, using virtualizer position`)
+      }
       onInitialScrollMessageResolved?.()
     })
+
+    return () => {
+      cleanupRetryRef.current?.()
+      cleanupRetryRef.current = null
+    }
   }, [initialScrollBlockIndex, initialScrollMessageId, onInitialScrollMessageResolved, renderItems, virtualizer])
 
   function renderMessage(message: HydratedTranscriptMessage, index: number): React.ReactNode {
@@ -225,6 +277,7 @@ export function TinkariaTranscript({
 
   return (
     <OpenLocalLinkProvider onOpenLocalLink={onOpenLocalLink} onOpenExternalLink={onOpenExternalLink}>
+      <Suspense fallback={<div className="min-h-[24px]" />}>
       <div
         style={{
           height: virtualizer.getTotalSize(),
@@ -287,6 +340,7 @@ export function TinkariaTranscript({
           )
         })}
       </div>
+      </Suspense>
     </OpenLocalLinkProvider>
   )
 }
