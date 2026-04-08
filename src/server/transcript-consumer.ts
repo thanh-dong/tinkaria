@@ -1,11 +1,13 @@
 import { jetstream, DeliverPolicy } from "@nats-io/jetstream"
 import type { ConsumerMessages } from "@nats-io/jetstream"
 import type { NatsConnection } from "@nats-io/transport-node"
+import { Kvm } from "@nats-io/kv"
 import { RUNNER_EVENTS_STREAM, type RunnerTurnEvent } from "../shared/runner-protocol"
 import type { SessionStatus, TranscriptEntry, AgentProvider } from "../shared/types"
 import { LOG_PREFIX } from "../shared/branding"
 
 const decoder = new TextDecoder()
+const encoder = new TextEncoder()
 
 // ── Store interface (subset of EventStore) ──────────────────────────
 
@@ -60,9 +62,18 @@ export class TranscriptConsumer {
     this.running = true
 
     const js = jetstream(this.nc)
-    const consumer = await js.consumers.get(RUNNER_EVENTS_STREAM, {
-      deliver_policy: DeliverPolicy.New,
-    })
+
+    // Read last-processed sequence from KV for resume
+    const kvm = new Kvm(this.nc)
+    const stateBucket = await kvm.create("kanna_consumer_state")
+    const entry = await stateBucket.get("transcript_last_seq")
+    const lastSeq = entry ? Number(decoder.decode(entry.value)) : 0
+
+    const consumerOpts = lastSeq > 0
+      ? { deliver_policy: DeliverPolicy.StartSequence, opt_start_seq: lastSeq + 1 }
+      : { deliver_policy: DeliverPolicy.New }
+
+    const consumer = await js.consumers.get(RUNNER_EVENTS_STREAM, consumerOpts)
     const messages = await consumer.consume()
     this.messages = messages
 
@@ -73,6 +84,8 @@ export class TranscriptConsumer {
         try {
           const event = JSON.parse(decoder.decode(msg.data)) as RunnerTurnEvent
           await this.handleEvent(event)
+          msg.ack()
+          await stateBucket.put("transcript_last_seq", encoder.encode(String(msg.seq)))
         } catch (err) {
           console.warn(
             LOG_PREFIX,

@@ -1,4 +1,7 @@
 import { describe, test, expect, afterEach, beforeEach } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect, type NatsConnection } from "@nats-io/transport-node"
 import { jetstreamManager, RetentionPolicy, StorageType } from "@nats-io/jetstream"
@@ -72,7 +75,7 @@ async function ensureStream(nc: NatsConnection) {
     name: RUNNER_EVENTS_STREAM,
     subjects: [ALL_RUNNER_EVENTS],
     retention: RetentionPolicy.Limits,
-    storage: StorageType.Memory,
+    storage: StorageType.File,
     max_age: 5 * 60 * 1_000_000_000,
     max_msgs: 10_000,
     max_bytes: 64 * 1024 * 1024,
@@ -84,9 +87,11 @@ async function ensureStream(nc: NatsConnection) {
 describe("RunnerAgent", () => {
   let server: NatsServer
   let nc: NatsConnection
+  let tmpDir: string | null = null
 
   beforeEach(async () => {
-    server = await NatsServer.start({ jetstream: true })
+    tmpDir = mkdtempSync(join(tmpdir(), "runner-test-"))
+    server = await NatsServer.start({ jetstream: true, storeDir: tmpDir })
     nc = await connect({ servers: server.url })
     await ensureStream(nc)
   })
@@ -94,6 +99,10 @@ describe("RunnerAgent", () => {
   afterEach(async () => {
     await nc?.drain()
     await server?.stop()
+    if (tmpDir) {
+      rmSync(tmpDir, { recursive: true, force: true })
+      tmpDir = null
+    }
   })
 
   test("startTurn publishes user_prompt, transcript, and turn_finished events", async () => {

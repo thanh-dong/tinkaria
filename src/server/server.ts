@@ -10,6 +10,7 @@ import type { UpdateInstallAttemptResult } from "./cli-runtime"
 import { NatsDaemonManager, type NatsDaemonReadiness } from "./nats-daemon-manager"
 import { NatsConnector } from "./nats-connector"
 import { generateAuthToken } from "./nats-auth"
+import { readToken } from "../nats/nats-token"
 import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
 import { ensureTerminalEventsStream, ensureChatMessageStream, ensureKitTurnEventsStream, ensureRunnerEventsStream } from "./nats-streams"
@@ -94,9 +95,32 @@ export async function startServer(options: StartServerOptions = {}) {
     })
     : null
 
-  const authToken = generateAuthToken()
-  const daemonManager = new NatsDaemonManager()
-  const daemonInfo = await daemonManager.ensureDaemon({ token: authToken, host: hostname })
+  const natsMode = process.env.NATS_MODE ?? "embedded"
+  const runnerMode = process.env.RUNNER_MODE ?? "spawn"
+
+  let authToken: string
+  let daemonManager: NatsDaemonManager
+  let daemonInfo: { url: string; wsUrl: string; wsPort: number }
+
+  if (natsMode === "external") {
+    const natsUrl = process.env.NATS_URL
+    const natsWsPort = Number(process.env.NATS_WS_PORT)
+    const natsDataDir = process.env.NATS_DATA_DIR
+    if (!natsUrl || !natsWsPort || !natsDataDir) {
+      throw new Error("NATS_MODE=external requires NATS_URL, NATS_WS_PORT, and NATS_DATA_DIR")
+    }
+    authToken = await readToken(natsDataDir)
+    daemonManager = NatsDaemonManager.fromExternal({ natsUrl, wsPort: natsWsPort })
+    const url = new URL(natsUrl)
+    daemonInfo = { url: natsUrl, wsUrl: `ws://${url.hostname}:${natsWsPort}`, wsPort: natsWsPort }
+    console.warn(LOG_PREFIX, `NATS_MODE=external — connecting to ${natsUrl}`)
+  } else {
+    authToken = generateAuthToken()
+    daemonManager = NatsDaemonManager.embedded()
+    const info = await daemonManager.ensureDaemon({ token: authToken, host: hostname })
+    daemonInfo = info
+  }
+
   const natsConnector = await NatsConnector.connect({
     natsUrl: daemonInfo.url,
     natsWsUrl: daemonInfo.wsUrl,
@@ -205,6 +229,7 @@ export async function startServer(options: StartServerOptions = {}) {
       nc: natsConnector.nc,
       natsUrl: daemonInfo.url,
       authToken,
+      mode: runnerMode as "spawn" | "discover",
     })
     const runnerId = await runnerManager.ensureRunner()
 
@@ -310,7 +335,14 @@ export async function startServer(options: StartServerOptions = {}) {
           }
 
           if (url.pathname === "/auth/token") {
-            return Response.json({ token: authToken })
+            const advertisedHost = process.env.NATS_ADVERTISED_HOST
+            const natsWsUrl = advertisedHost
+              ? `ws://${advertisedHost}:${natsConnector.natsWsPort}`
+              : undefined
+            return Response.json({
+              token: authToken,
+              ...(natsWsUrl ? { natsWsUrl } : {}),
+            })
           }
 
           if (url.pathname.startsWith("/api/project/")) {

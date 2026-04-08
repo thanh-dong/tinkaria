@@ -3,6 +3,9 @@ import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect } from "@nats-io/transport-node"
 import { jetstreamManager, RetentionPolicy, StorageType } from "@nats-io/jetstream"
 import { Kvm } from "@nats-io/kv"
+import { mkdtempSync, rmSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import {
   runnerCmdSubject,
   RUNNER_EVENTS_STREAM,
@@ -17,6 +20,7 @@ const decoder = new TextDecoder()
 describe("runner process", () => {
   let server: NatsServer
   let proc: ReturnType<typeof Bun.spawn> | null = null
+  let tmpDir: string | null = null
 
   afterEach(async () => {
     if (proc) {
@@ -25,10 +29,15 @@ describe("runner process", () => {
       proc = null
     }
     await server?.stop()
+    if (tmpDir) {
+      rmSync(tmpDir, { recursive: true, force: true })
+      tmpDir = null
+    }
   })
 
   test("starts, registers in KV, and accepts start_turn commands", async () => {
-    server = await NatsServer.start({ jetstream: true })
+    tmpDir = mkdtempSync(join(tmpdir(), "runner-test-"))
+    server = await NatsServer.start({ jetstream: true, storeDir: tmpDir })
     const nc = await connect({ servers: server.url })
 
     // Create required stream
@@ -37,7 +46,7 @@ describe("runner process", () => {
       name: RUNNER_EVENTS_STREAM,
       subjects: [ALL_RUNNER_EVENTS],
       retention: RetentionPolicy.Limits,
-      storage: StorageType.Memory,
+      storage: StorageType.File,
       max_age: 5 * 60 * 1_000_000_000,
       max_msgs: 10_000,
       max_bytes: 64 * 1024 * 1024,
@@ -90,7 +99,8 @@ describe("runner process", () => {
   })
 
   test("shuts down cleanly on SIGTERM", async () => {
-    server = await NatsServer.start({ jetstream: true })
+    tmpDir = mkdtempSync(join(tmpdir(), "runner-test-"))
+    server = await NatsServer.start({ jetstream: true, storeDir: tmpDir })
     const nc = await connect({ servers: server.url })
 
     const jsm = await jetstreamManager(nc)
@@ -98,7 +108,7 @@ describe("runner process", () => {
       name: RUNNER_EVENTS_STREAM,
       subjects: [ALL_RUNNER_EVENTS],
       retention: RetentionPolicy.Limits,
-      storage: StorageType.Memory,
+      storage: StorageType.File,
       max_age: 5 * 60 * 1_000_000_000,
       max_msgs: 10_000,
       max_bytes: 64 * 1024 * 1024,

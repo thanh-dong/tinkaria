@@ -79,16 +79,52 @@ export class NatsSocket implements AppTransport {
   private async discoverAndConnect(): Promise<void> {
     try {
       const authRes = await fetch("/auth/token")
-      const auth = await authRes.json() as { token?: string }
+      const auth = await authRes.json() as { token?: string; natsWsUrl?: string }
       this.resolvedToken = auth.token
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-      this.resolvedWsUrl = `${protocol}//${window.location.host}/nats-ws`
+
+      const proxyProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+      const proxyWsUrl = `${proxyProtocol}//${window.location.host}/nats-ws`
+
+      // Try direct NATS WS if available and not blocked by mixed-content
+      if (auth.natsWsUrl && window.location.protocol !== "https:") {
+        const directUrl = auth.natsWsUrl
+        console.warn(LOG_PREFIX, `Trying direct NATS WS: ${directUrl}`)
+        this.resolvedWsUrl = directUrl
+        const directOk = await this.probeConnection(directUrl, 2000)
+        if (directOk) {
+          console.warn(LOG_PREFIX, `Direct NATS WS connected: ${directUrl}`)
+          return // connect() already succeeded in probeConnection
+        }
+        console.warn(LOG_PREFIX, `Direct NATS WS failed, falling back to proxy: ${proxyWsUrl}`)
+      }
+
+      this.resolvedWsUrl = proxyWsUrl
       void this.connect()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.warn(LOG_PREFIX, `NATS discovery failed: ${message}`)
       this.emitStatus("disconnected")
       this.scheduleReconnect()
+    }
+  }
+
+  /** Probe a direct NATS WS URL with a timeout. Returns true if connect() succeeds. */
+  private async probeConnection(wsUrl: string, timeoutMs: number): Promise<boolean> {
+    this.resolvedWsUrl = wsUrl
+    try {
+      await Promise.race([
+        this.connect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
+      ])
+      return this.currentStatus === "connected"
+    } catch {
+      // Dispose failed connection attempt
+      if (this.nc) {
+        await this.nc.close().catch(() => {})
+        this.nc = null
+        this.js = null
+      }
+      return false
     }
   }
 

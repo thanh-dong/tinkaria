@@ -16,6 +16,8 @@ export interface RunnerManagerOptions {
   nc: NatsConnection
   natsUrl: string
   authToken?: string
+  /** 'spawn' (default): spawn runner if not found. 'discover': only discover existing runner from KV. */
+  mode?: "spawn" | "discover"
 }
 
 export interface RunnerReadiness {
@@ -33,6 +35,7 @@ export class RunnerManager {
   private readonly nc: NatsConnection
   private readonly natsUrl: string
   private readonly authToken: string | undefined
+  private readonly mode: "spawn" | "discover"
   private proc: ReturnType<typeof Bun.spawn> | null = null
   private runnerId: string | null = null
   private runnerRegistration: RunnerRegistration | null = null
@@ -43,6 +46,7 @@ export class RunnerManager {
     this.nc = options.nc
     this.natsUrl = options.natsUrl
     this.authToken = options.authToken
+    this.mode = options.mode ?? "spawn"
   }
 
   getRunnerId(): string {
@@ -79,12 +83,16 @@ export class RunnerManager {
             process.kill(reg.pid, 0) // check alive (signal 0 = no signal, just check)
             return this.runnerId
           } catch {
-            // Process dead, fall through to respawn
+            // Process dead, fall through to respawn or discover
           }
         }
       } catch {
-        // KV bucket might not exist yet, proceed to spawn
+        // KV bucket might not exist yet, proceed to spawn or discover
       }
+    }
+
+    if (this.mode === "discover") {
+      return this.discoverExternalRunner()
     }
 
     // Spawn new runner
@@ -171,9 +179,49 @@ export class RunnerManager {
     throw new Error(`Runner ${this.runnerId ?? "unknown"} did not publish heartbeat within ${timeoutMs}ms`)
   }
 
+  /** Discover mode: poll KV for any registered runner instead of spawning one. */
+  private async discoverExternalRunner(): Promise<string> {
+    const deadline = Date.now() + 15_000
+    const kvm = new Kvm(this.nc)
+    while (Date.now() < deadline) {
+      try {
+        const kvStore = await kvm.open(RUNNER_REGISTRY_BUCKET)
+        const keys = await kvStore.keys()
+        for await (const key of keys) {
+          const entry = await kvStore.get(key)
+          if (!entry) continue
+          const reg = JSON.parse(decoder.decode(entry.value)) as RunnerRegistration
+          try {
+            process.kill(reg.pid, 0)
+          } catch {
+            continue // dead runner, skip
+          }
+          this.runnerId = key
+          this.runnerRegistration = reg
+          this.subscribeToHeartbeat(key)
+          await this.waitForHeartbeat(5_000)
+          console.warn(LOG_PREFIX, `Discovered external runner ${key} (pid: ${reg.pid})`)
+          return key
+        }
+      } catch {
+        // KV not ready yet
+      }
+      await new Promise((r) => setTimeout(r, 500))
+    }
+    throw new Error("No external runner found in KV registry within 15s — is kanna-runner.service running?")
+  }
+
   async dispose(): Promise<void> {
     this.heartbeatSubscription?.unsubscribe()
     this.heartbeatSubscription = null
+    if (this.mode === "discover") {
+      // External runner — don't kill it, just disconnect
+      this.runnerId = null
+      this.runnerRegistration = null
+      this.lastHeartbeatAt = null
+      console.warn(LOG_PREFIX, "Runner manager disposed (external runner left running)")
+      return
+    }
     if (this.runnerId && this.proc) {
       // Try graceful shutdown via NATS command, then SIGTERM as fallback
       try {

@@ -14,11 +14,37 @@ export interface NatsDaemonReadiness extends NatsDaemonInfo {
 export class NatsDaemonManager {
   private daemonProcess: ReturnType<typeof Bun.spawn> | null = null
   private info: NatsDaemonInfo | null = null
+  private readonly external: boolean
+
+  private constructor(external: boolean) {
+    this.external = external
+  }
+
+  /** Create a manager that spawns and owns the NATS daemon process. */
+  static embedded(): NatsDaemonManager {
+    return new NatsDaemonManager(false)
+  }
+
+  /** Create a manager that connects to an externally-managed NATS daemon (e.g. separate systemd unit). */
+  static fromExternal(opts: { natsUrl: string; wsPort: number }): NatsDaemonManager {
+    const mgr = new NatsDaemonManager(true)
+    const url = new URL(opts.natsUrl)
+    mgr.info = {
+      url: opts.natsUrl,
+      wsUrl: `ws://${url.hostname}:${opts.wsPort}`,
+      wsPort: opts.wsPort,
+      pid: 0, // external — no PID to track
+    }
+    console.warn(LOG_PREFIX, `Connected to external NATS — url: ${opts.natsUrl}, ws: ${opts.wsPort}`)
+    return mgr
+  }
 
   async ensureDaemon(options: {
     token: string
     host?: string
   }): Promise<NatsDaemonInfo> {
+    if (this.external && this.info) return this.info
+
     // Reuse if already running and alive
     if (this.info && this.daemonProcess) {
       try {
@@ -70,6 +96,10 @@ export class NatsDaemonManager {
 
   getReadiness(): NatsDaemonReadiness | null {
     if (!this.info) return null
+    if (this.external) {
+      // External daemon: no PID to check — rely on NATS connection health instead
+      return { ...this.info, ok: true }
+    }
     let ok = false
     try {
       process.kill(this.info.pid, 0)
@@ -84,6 +114,7 @@ export class NatsDaemonManager {
   }
 
   async dispose(): Promise<void> {
+    if (this.external) return // don't kill external daemon
     if (this.daemonProcess) {
       this.daemonProcess.kill("SIGTERM")
       await this.daemonProcess.exited

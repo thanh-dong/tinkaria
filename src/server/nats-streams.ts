@@ -14,6 +14,7 @@ interface StreamConfig {
   max_age_ns: number
   max_msgs: number
   max_bytes: number
+  storage?: StorageType
 }
 
 const FIVE_MINUTES_NS = 5 * 60 * 1_000_000_000
@@ -26,7 +27,7 @@ async function ensureStream(nc: NatsConnection, config: StreamConfig): Promise<v
     name: config.name,
     subjects: config.subjects,
     retention: RetentionPolicy.Limits,
-    storage: StorageType.Memory,
+    storage: config.storage ?? StorageType.Memory,
     max_age: config.max_age_ns,
     max_msgs: config.max_msgs,
     max_bytes: config.max_bytes,
@@ -77,7 +78,7 @@ export function ensureChatMessageStream(nc: NatsConnection): Promise<void> {
   })
 }
 
-/** Creates or updates the JetStream stream for runner turn events (memory-backed, 30 min / 50K msg retention). */
+/** Creates or updates the JetStream stream for runner turn events (file-backed, 30 min / 50K msg retention). */
 export function ensureRunnerEventsStream(nc: NatsConnection): Promise<void> {
   return ensureStream(nc, {
     name: RUNNER_EVENTS_STREAM,
@@ -85,5 +86,6 @@ export function ensureRunnerEventsStream(nc: NatsConnection): Promise<void> {
     max_age_ns: THIRTY_MINUTES_NS,
     max_msgs: 50_000,
     max_bytes: 128 * 1024 * 1024,
+    storage: StorageType.File,
   })
 }
