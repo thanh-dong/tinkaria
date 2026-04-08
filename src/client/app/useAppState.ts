@@ -25,25 +25,23 @@ import type { ChatMessageEvent, ChatSnapshot, HydratedTranscriptMessage, LocalPr
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import type { AskUserQuestionItem } from "../components/messages/types"
 import { useAppDialog } from "../components/ui/app-dialog"
+import { useSessionPolling } from "./useSessionPolling"
 import { createIncrementalHydrator, processTranscriptMessages } from "../lib/parseTranscript"
 import type { IncrementalHydrator } from "../lib/parseTranscript"
 import { getCachedChat, setCachedChat, deleteCachedChat, clearChatCache, markCachedChatsStale } from "./chatCache"
 import { canCancelStatus, getLatestToolIds, isProcessingStatus } from "./derived"
 import {
-  clearQueuedSubmit,
   completeQueuedFlush,
   createProjectSelectionState,
-  createSubmitPipelineState,
   failQueuedFlush,
-  getQueuedText,
   getSubmitPipelineMode,
   markPostFlushBusyObserved,
   resolveProjectSelection,
   startQueuedFlush,
-  type SubmitPipelineState,
   transitionProjectSelection,
   queueSubmit as queueSubmitTransition,
 } from "./useAppState.machine"
+import { useSubmitPipeline } from "./useSubmitPipeline"
 import { NatsSocket } from "./nats-socket"
 import type { AppTransport, SocketStatus } from "./socket-interface"
 import {
@@ -56,7 +54,6 @@ import {
   getNewestRemainingChatId,
   getReadableBlockCount,
   getReadTimestampToPersistAfterReply,
-  getResumeRefreshSessionProjectIds,
   getSidebarChatLabels,
   getSidebarChatRow,
   getUiUpdateRestartReconnectAction,
@@ -66,7 +63,6 @@ import {
   resolveLockedAnchor,
   shouldBackfillTranscriptWindow,
   shouldQueueChatSubmit,
-  shouldRefreshStaleSessionOnResume,
   shouldStickToBottomOnComposerSubmit,
   summarizeTranscriptWindow,
   TRANSCRIPT_TAIL_SIZE,
@@ -76,6 +72,7 @@ import {
   type ProjectRequest,
   type StartChatIntent,
 } from "./appState.helpers"
+import { usePwaResume } from "./usePwaResume"
 
 // Re-export all moved helpers so existing consumers continue to work
 export {
@@ -169,16 +166,6 @@ function logAppState(message: string, details?: unknown) {
   }
 
   console.info(`[useAppState] ${message}`, details)
-}
-
-const RESUME_REFRESH_DEDUP_WINDOW_MS = 1_000
-
-function isStandalonePwaDisplay(): boolean {
-  if (typeof window === "undefined") return false
-
-  const isIOSStandalone = "standalone" in navigator && (navigator as Navigator & { standalone?: boolean }).standalone === true
-  const isDisplayStandalone = window.matchMedia("(display-mode: standalone)").matches
-  return isIOSStandalone || isDisplayStandalone
 }
 
 // Chat cache module re-exports (extracted to ./chatCache.ts)
@@ -298,8 +285,6 @@ export function useAppState(activeChatId: string | null): AppState {
   const [updateSnapshot, setUpdateSnapshot] = useState<UpdateSnapshot | null>(null)
   const [chatSnapshot, setChatSnapshot] = useState<ChatSnapshot | null>(null)
   const [orchestrationHierarchy, setOrchestrationHierarchy] = useState<OrchestrationHierarchySnapshot | null>(null)
-  const [currentSessionRuntime, setCurrentSessionRuntime] = useState<CurrentSessionSnapshot["runtime"]>(null)
-  const [currentRepoStatus, setCurrentRepoStatus] = useState<CurrentRepoStatusSnapshot | null>(null)
   const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
   const [messages, setMessages] = useState<HydratedTranscriptMessage[]>([])
   const messagesRef = useRef<HydratedTranscriptMessage[]>(messages)
@@ -317,22 +302,18 @@ export function useAppState(activeChatId: string | null): AppState {
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
   const [pendingMergeProjectId, setPendingMergeProjectId] = useState<string | null>(null)
   const [pendingSessionBootstrap, setPendingSessionBootstrap] = useState<PendingSessionBootstrap | null>(null)
-  const submitPipelineRef = useRef<SubmitPipelineState>(createSubmitPipelineState({
-    queuedTextByChat: Object.fromEntries(
-      Object.entries(useChatInputStore.getState().queuedDrafts).map(([chatId, draft]) => [chatId, draft.text])
-    ),
-    optionsByChat: Object.fromEntries(
-      Object.entries(useChatInputStore.getState().queuedDrafts).map(([chatId, draft]) => [chatId, draft.options])
-    ),
-  }))
-  const [submitPipeline, setSubmitPipeline] = useState<SubmitPipelineState>(submitPipelineRef.current)
+  const {
+    submitPipelineRef,
+    submitPipeline,
+    activeQueuedText,
+    updateSubmitPipeline,
+    clearQueuedText,
+    restoreQueuedText,
+  } = useSubmitPipeline({ activeChatId })
   const [localFilePreview, setLocalFilePreview] = useState<LocalFilePreview | null>(null)
   const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
   const [sessionsWindowDays, setSessionsWindowDays] = useState<Map<string, number>>(new Map())
-  const [resumeRefreshNonce, setResumeRefreshNonce] = useState(0)
   const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
-  const backgroundedAtRef = useRef<number | null>(null)
-  const lastResumeRefreshAtRef = useRef(0)
   const lastReadBlockIndex = useChatReadStateStore((store) => (
     activeChatId ? store.lastReadBlockIndexByChat[activeChatId] : undefined
   ))
@@ -358,30 +339,17 @@ export function useAppState(activeChatId: string | null): AppState {
     beginProgrammaticScroll,
     endProgrammaticScroll,
   } = useScrollFollow(scrollRef, sentinelRef)
-  const activeQueuedText = getQueuedText(submitPipeline, activeChatId)
   const setNormalizedCommandError = useCallback((error: unknown) => {
     setCommandError(normalizeCommandErrorMessage(error))
   }, [])
 
-  function updateSubmitPipeline(updater: (current: SubmitPipelineState) => SubmitPipelineState): SubmitPipelineState {
-    const next = updater(submitPipelineRef.current)
-    submitPipelineRef.current = next
-    setSubmitPipeline(next)
-    useChatInputStore.getState().syncQueuedDrafts(
-      Object.fromEntries(
-        Object.entries(next.queuedTextByChat).flatMap(([chatId, text]) => {
-          const trimmed = text.trim()
-          if (!trimmed) return []
-          return [[chatId, {
-            text: trimmed,
-            updatedAt: Date.now(),
-            options: next.optionsByChat[chatId],
-          }]]
-        })
-      )
-    )
-    return next
-  }
+  const { resumeRefreshNonce } = usePwaResume({
+    socket,
+    activeChatId,
+    connectionStatus,
+    openSessionProjectIds: activeSessionsSubs.current.keys(),
+    setNormalizedCommandError,
+  })
 
   useEffect(() => socket.onStatus((status) => {
     setConnectionStatus(status)
@@ -458,74 +426,6 @@ export function useAppState(activeChatId: string | null): AppState {
       window.removeEventListener("focus", handleWindowFocus)
     }
   }, [setNormalizedCommandError, socket, updateSnapshot?.lastCheckedAt])
-
-  useEffect(() => {
-    function maybeRefreshAfterResume(trigger: "focus" | "online" | "pageshow" | "visibilitychange") {
-      const resumedAt = Date.now()
-      if (!shouldRefreshStaleSessionOnResume({
-        isStandalone: isStandalonePwaDisplay(),
-        hiddenAt: backgroundedAtRef.current,
-        resumedAt,
-        connectionStatus,
-      })) return
-
-      if (resumedAt - lastResumeRefreshAtRef.current < RESUME_REFRESH_DEDUP_WINDOW_MS) return
-      lastResumeRefreshAtRef.current = resumedAt
-      backgroundedAtRef.current = null
-
-      logAppState("refreshing stale session after app resume", {
-        trigger,
-        activeChatId,
-        connectionStatus,
-      })
-      void socket.ensureHealthyConnection()
-      setResumeRefreshNonce((current) => current + 1)
-    }
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "hidden") {
-        backgroundedAtRef.current = Date.now()
-        return
-      }
-
-      if (document.visibilityState === "visible") {
-        maybeRefreshAfterResume("visibilitychange")
-      }
-    }
-
-    function handleWindowFocus() {
-      maybeRefreshAfterResume("focus")
-    }
-
-    function handleWindowOnline() {
-      maybeRefreshAfterResume("online")
-    }
-
-    function handlePageShow() {
-      maybeRefreshAfterResume("pageshow")
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    window.addEventListener("focus", handleWindowFocus)
-    window.addEventListener("online", handleWindowOnline)
-    window.addEventListener("pageshow", handlePageShow)
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-      window.removeEventListener("focus", handleWindowFocus)
-      window.removeEventListener("online", handleWindowOnline)
-      window.removeEventListener("pageshow", handlePageShow)
-    }
-  }, [activeChatId, connectionStatus, socket])
-
-  useEffect(() => {
-    if (resumeRefreshNonce === 0) return
-
-    for (const projectId of getResumeRefreshSessionProjectIds(activeSessionsSubs.current.keys())) {
-      void socket.command({ type: "sessions.refresh", projectId }).catch((error) => {
-        setNormalizedCommandError(error)
-      })
-    }
-  }, [resumeRefreshNonce, setNormalizedCommandError, socket])
 
   useEffect(() => {
     if (!activeChatId) {
@@ -949,93 +849,14 @@ export function useAppState(activeChatId: string | null): AppState {
     }
   }, [activeChatId, scrollModeRef, syncReadBoundaryFromHooks])
 
-  useEffect(() => {
-    const provider = activeChatSnapshot?.runtime.provider
-    const sessionToken = activeChatSnapshot?.runtime.sessionToken
-    if (!activeChatId || !provider || !sessionToken) {
-      setCurrentSessionRuntime(null)
-      return
-    }
-
-    const chatId = activeChatId
-    let cancelled = false
-
-    async function refreshCurrentSessionRuntime() {
-      try {
-        const result = await socket.command<CurrentSessionSnapshot>({
-          type: "chat.getSessionRuntime",
-          chatId,
-        })
-        if (!cancelled) {
-          setCurrentSessionRuntime(result.runtime)
-        }
-      } catch {
-        if (!cancelled) {
-          setCurrentSessionRuntime(null)
-        }
-      }
-    }
-
-    void refreshCurrentSessionRuntime()
-
-    if (!isProcessing) {
-      return () => {
-        cancelled = true
-      }
-    }
-
-    const interval = window.setInterval(() => {
-      void refreshCurrentSessionRuntime()
-    }, 5000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
-  }, [activeChatId, activeChatSnapshot?.runtime.provider, activeChatSnapshot?.runtime.sessionToken, isProcessing, resumeRefreshNonce, socket])
-
-  useEffect(() => {
-    if (!activeChatId) {
-      setCurrentRepoStatus(null)
-      return
-    }
-
-    const chatId = activeChatId
-    let cancelled = false
-
-    async function refreshCurrentRepoStatus() {
-      try {
-        const result = await socket.command<{ repoStatus: CurrentRepoStatusSnapshot | null }>({
-          type: "chat.getRepoStatus",
-          chatId,
-        })
-        if (!cancelled) {
-          setCurrentRepoStatus(result.repoStatus)
-        }
-      } catch {
-        if (!cancelled) {
-          setCurrentRepoStatus(null)
-        }
-      }
-    }
-
-    void refreshCurrentRepoStatus()
-
-    if (!isProcessing) {
-      return () => {
-        cancelled = true
-      }
-    }
-
-    const interval = window.setInterval(() => {
-      void refreshCurrentRepoStatus()
-    }, 5000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
-  }, [activeChatId, isProcessing, resumeRefreshNonce, socket])
+  const { currentSessionRuntime, currentRepoStatus } = useSessionPolling({
+    socket,
+    activeChatId,
+    sessionProvider: activeChatSnapshot?.runtime.provider,
+    sessionToken: activeChatSnapshot?.runtime.sessionToken,
+    isProcessing,
+    resumeRefreshNonce,
+  })
 
   useEffect(() => {
     if (!activeChatId) return
@@ -1082,8 +903,7 @@ export function useAppState(activeChatId: string | null): AppState {
     })
     if (!flushRequest) return
 
-    submitPipelineRef.current = nextState
-    setSubmitPipeline(nextState)
+    updateSubmitPipeline(() => nextState)
 
     void handleSend(flushRequest.text, flushRequest.options)
       .then(() => {
@@ -1283,18 +1103,6 @@ export function useAppState(activeChatId: string | null): AppState {
 
     await handleSend(content, options)
     return "sent"
-  }
-
-  function clearQueuedText() {
-    if (!activeChatId) return
-    updateSubmitPipeline((current) => clearQueuedSubmit(current, activeChatId))
-  }
-
-  function restoreQueuedText(): string {
-    const restored = activeQueuedText
-    if (!activeChatId) return restored
-    updateSubmitPipeline((current) => clearQueuedSubmit(current, activeChatId))
-    return restored
   }
 
   async function handleCancel() {
