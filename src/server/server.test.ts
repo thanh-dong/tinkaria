@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { startTinkariaServer } from "./server"
+import { TranscriptConsumer } from "./transcript-consumer"
 
 const originalSplit = process.env.TINKARIA_SPLIT
 
@@ -59,6 +60,40 @@ describe("startTinkariaServer healthcheck", () => {
       expect(typeof body.runner.pid).toBe("number")
     } finally {
       await started.stop()
+    }
+  }, 30_000)
+
+  test("waits for transcript consumer startup before split-mode server resolves", async () => {
+    process.env.TINKARIA_SPLIT = "true"
+
+    const originalStart = TranscriptConsumer.prototype.start
+    let releaseStart!: () => void
+    const startEntered = new Promise<void>((resolve) => {
+      TranscriptConsumer.prototype.start = async function(this: TranscriptConsumer) {
+        resolve()
+        await new Promise<void>((resume) => {
+          releaseStart = resume
+        })
+        return originalStart.call(this)
+      }
+    })
+
+    let started: Awaited<ReturnType<typeof startTinkariaServer>> | null = null
+    const serverPromise = startTinkariaServer({ port: 4323, host: "127.0.0.1", strictPort: true })
+
+    try {
+      await startEntered
+      const resolvedBeforeConsumerReady = await Promise.race([
+        serverPromise.then(() => true),
+        new Promise<false>((resolve) => setTimeout(() => resolve(false), 200)),
+      ])
+      expect(resolvedBeforeConsumerReady).toBe(false)
+
+      releaseStart()
+      started = await serverPromise
+    } finally {
+      TranscriptConsumer.prototype.start = originalStart
+      await started?.stop()
     }
   }, 30_000)
 })

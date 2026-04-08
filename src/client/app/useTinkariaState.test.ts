@@ -30,7 +30,10 @@ import {
   shouldStickToBottomOnComposerSubmit,
   PWA_RESUME_STALE_AFTER_MS,
   TRANSCRIPT_TAIL_SIZE,
+  compareReadBoundary,
+  resolveLockedAnchor,
 } from "./useTinkariaState"
+import type { InitialChatReadAnchor } from "./useTinkariaState"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarData } from "../../shared/types"
 import { createIncrementalHydrator } from "../lib/parseTranscript"
 
@@ -1036,5 +1039,79 @@ describe("chatCache", () => {
 
     // Still stale (no unnecessary re-save)
     expect(getCachedChat("chat-1")?.stale).toBe(true)
+  })
+})
+
+describe("compareReadBoundary", () => {
+  test("returns advance when the next message appears later in the array", () => {
+    const messages = [assistantMessage("msg-1"), assistantMessage("msg-2"), assistantMessage("msg-3")]
+    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 0 }, { messageId: "msg-2", blockIndex: 0 })).toBe("advance")
+  })
+
+  test("returns regress when the next message appears earlier in the array", () => {
+    const messages = [assistantMessage("msg-1"), assistantMessage("msg-2"), assistantMessage("msg-3")]
+    expect(compareReadBoundary(messages, { messageId: "msg-2", blockIndex: 0 }, { messageId: "msg-1", blockIndex: 0 })).toBe("regress")
+  })
+
+  test("returns advance for higher blockIndex on same message", () => {
+    const messages = [paragraphMessage("msg-1", "One\n\nTwo\n\nThree")]
+    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 0 }, { messageId: "msg-1", blockIndex: 2 })).toBe("advance")
+  })
+
+  test("returns regress for lower blockIndex on same message", () => {
+    const messages = [paragraphMessage("msg-1", "One\n\nTwo\n\nThree")]
+    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 2 }, { messageId: "msg-1", blockIndex: 0 })).toBe("regress")
+  })
+
+  test("returns same for identical boundary", () => {
+    const messages = [assistantMessage("msg-1")]
+    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 0 }, { messageId: "msg-1", blockIndex: 0 })).toBe("same")
+  })
+
+  test("returns advance when stored messageId is not in array (compacted away)", () => {
+    const messages = [assistantMessage("msg-3"), assistantMessage("msg-4")]
+    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 5 }, { messageId: "msg-3", blockIndex: 0 })).toBe("advance")
+  })
+
+  test("returns same when next messageId is not found in array", () => {
+    const messages = [assistantMessage("msg-1")]
+    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 0 }, { messageId: "gone", blockIndex: 0 })).toBe("same")
+  })
+
+  test("returns same for empty messages array", () => {
+    expect(compareReadBoundary([], { messageId: "msg-1", blockIndex: 0 }, { messageId: "msg-2", blockIndex: 0 })).toBe("same")
+  })
+
+  test("returns advance when current has no stored messageId", () => {
+    const messages = [assistantMessage("msg-1")]
+    expect(compareReadBoundary(messages, {}, { messageId: "msg-1", blockIndex: 0 })).toBe("advance")
+  })
+})
+
+describe("resolveLockedAnchor", () => {
+  test("resolves wait to the next anchor on first call for a chatId", () => {
+    const state = { chatId: null as string | null, anchor: { kind: "wait" } as InitialChatReadAnchor }
+    const result = resolveLockedAnchor(state, "chat-1", { kind: "block", messageId: "msg-1", blockIndex: 0 }, false)
+    expect(result.anchor).toEqual({ kind: "block", messageId: "msg-1", blockIndex: 0 })
+    expect(result.chatId).toBe("chat-1")
+  })
+
+  test("resets to wait on chatId change then resolves next anchor", () => {
+    const state = { chatId: "chat-1", anchor: { kind: "block", messageId: "msg-1", blockIndex: 0 } as InitialChatReadAnchor }
+    const result = resolveLockedAnchor(state, "chat-2", { kind: "tail" } as InitialChatReadAnchor, false)
+    expect(result.chatId).toBe("chat-2")
+    expect(result.anchor).toEqual({ kind: "tail" })
+  })
+
+  test("freezes anchor after scroll completed", () => {
+    const state = { chatId: "chat-1", anchor: { kind: "block", messageId: "msg-1", blockIndex: 0 } as InitialChatReadAnchor }
+    const result = resolveLockedAnchor(state, "chat-1", { kind: "tail" } as InitialChatReadAnchor, true)
+    expect(result.anchor).toEqual({ kind: "block", messageId: "msg-1", blockIndex: 0 })
+  })
+
+  test("keeps wait when next anchor is also wait", () => {
+    const state = { chatId: "chat-1", anchor: { kind: "wait" } as InitialChatReadAnchor }
+    const result = resolveLockedAnchor(state, "chat-1", { kind: "wait" } as InitialChatReadAnchor, false)
+    expect(result.anchor).toEqual({ kind: "wait" })
   })
 })

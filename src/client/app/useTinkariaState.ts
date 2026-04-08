@@ -93,6 +93,33 @@ export interface ReadBlockBoundary {
   blockIndex: number
 }
 
+export type BoundaryComparison = "advance" | "same" | "regress"
+
+export function compareReadBoundary(
+  messages: HydratedTranscriptMessage[],
+  current: { messageId?: string; blockIndex?: number },
+  next: { messageId: string; blockIndex: number },
+): BoundaryComparison {
+  if (messages.length === 0) return "same"
+
+  const nextIndex = messages.findIndex((m) => m.id === next.messageId)
+  if (nextIndex < 0) return "same"
+
+  if (!current.messageId) return "advance"
+
+  const currentIndex = messages.findIndex((m) => m.id === current.messageId)
+  if (currentIndex < 0) return "advance"
+
+  if (nextIndex > currentIndex) return "advance"
+  if (nextIndex < currentIndex) return "regress"
+
+  const currentBlock = current.blockIndex ?? 0
+  if (next.blockIndex > currentBlock) return "advance"
+  if (next.blockIndex < currentBlock) return "regress"
+
+  return "same"
+}
+
 export interface PendingSessionBootstrap {
   chatId: string
   kind: "fork" | "merge"
@@ -260,6 +287,43 @@ export function getLockedInitialChatReadAnchor(
   if (initialScrollCompleted) return current
   if (next.kind === "wait") return current
   return current.kind === "wait" ? next : current
+}
+
+export interface LockedAnchorState {
+  chatId: string | null
+  anchor: InitialChatReadAnchor
+}
+
+export function resolveLockedAnchor(
+  state: LockedAnchorState,
+  chatId: string | null,
+  nextAnchor: InitialChatReadAnchor,
+  scrollCompleted: boolean,
+): LockedAnchorState {
+  if (chatId !== state.chatId) {
+    return resolveLockedAnchor({ chatId, anchor: { kind: "wait" } }, chatId, nextAnchor, false)
+  }
+
+  const locked = getLockedInitialChatReadAnchor(state.anchor, nextAnchor, scrollCompleted)
+  return { chatId, anchor: locked }
+}
+
+function useLockedAnchor(
+  chatId: string | null,
+  nextAnchor: InitialChatReadAnchor,
+  scrollCompletedRef: RefObject<boolean>,
+): InitialChatReadAnchor {
+  const stateRef = useRef<LockedAnchorState>({ chatId: null, anchor: { kind: "wait" } })
+
+  return useMemo(() => {
+    stateRef.current = resolveLockedAnchor(
+      stateRef.current,
+      chatId,
+      nextAnchor,
+      scrollCompletedRef.current,
+    )
+    return stateRef.current.anchor
+  }, [chatId, nextAnchor, scrollCompletedRef])
 }
 
 function useTinkariaSocket(): TinkariaTransport {
@@ -1173,21 +1237,12 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     lastSeenMessageAt,
     lastMessageAt: activeSidebarChat?.lastMessageAt,
   })
-  const [initialChatReadAnchor, setInitialChatReadAnchor] = useState<InitialChatReadAnchor>({ kind: "wait" })
+  const initialChatReadAnchor = useLockedAnchor(activeChatId, nextInitialChatReadAnchor, initialScrollCompletedRef)
 
   useEffect(() => {
     initialScrollCompletedRef.current = false
     scrollFollowChatChanged()
-    setInitialChatReadAnchor({ kind: "wait" })
   }, [activeChatId, scrollFollowChatChanged])
-
-  useEffect(() => {
-    if (initialScrollCompletedRef.current) return
-
-    setInitialChatReadAnchor((current) => {
-      return getLockedInitialChatReadAnchor(current, nextInitialChatReadAnchor, initialScrollCompletedRef.current)
-    })
-  }, [nextInitialChatReadAnchor])
 
   const transcriptPaddingBottom = FIXED_TRANSCRIPT_PADDING_BOTTOM
   const showScrollButton = shouldShowScrollButton(scrollModeRef.current, messages.length)
@@ -1237,11 +1292,16 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     if (!element || !activeChatId) return
     const progress = getHookReadProgressBoundary(element)
     if (!progress || progress.state !== "read") return
+    if (compareReadBoundary(
+      messages,
+      { messageId: lastReadMessageId, blockIndex: lastReadBlockIndex },
+      { messageId: progress.messageId, blockIndex: progress.blockIndex },
+    ) !== "advance") return
     markChatRead(activeChatId, {
       messageId: progress.messageId,
       blockIndex: progress.blockIndex,
     })
-  }, [activeChatId, markChatRead])
+  }, [activeChatId, lastReadBlockIndex, lastReadMessageId, markChatRead, messages])
 
   useEffect(() => {
     const element = scrollRef.current
@@ -1252,6 +1312,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     const resizeTarget = scrollElement.firstElementChild instanceof HTMLElement ? scrollElement.firstElementChild : scrollElement
 
     function scheduleHookSync() {
+      if (!initialScrollCompletedRef.current) return
       if (frameId !== null) return
       frameId = window.requestAnimationFrame(() => {
         frameId = null
@@ -1268,7 +1329,6 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       scheduleHookSync()
     }
 
-    scheduleHookSync()
     scrollElement.addEventListener("scroll", handleScroll, { passive: true })
 
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -1378,12 +1438,22 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     if (!activeChatId) return
     const lastMessageAt = activeSidebarChat?.lastMessageAt
     if (!initialScrollCompletedRef.current || scrollModeRef.current !== "following" || lastMessageAt === undefined) return
+    if (!latestReadableMessage) return
+    const nextBlockIndex = Math.max(0, getReadableBlockCount(latestReadableMessage) - 1)
+    if (compareReadBoundary(
+      messages,
+      { messageId: lastReadMessageId, blockIndex: lastReadBlockIndex },
+      { messageId: latestReadableMessage.id, blockIndex: nextBlockIndex },
+    ) !== "advance") {
+      markChatRead(activeChatId, { lastMessageAt })
+      return
+    }
     markChatRead(activeChatId, {
-      messageId: latestReadableMessage?.id,
-      blockIndex: latestReadableMessage ? Math.max(0, getReadableBlockCount(latestReadableMessage) - 1) : undefined,
+      messageId: latestReadableMessage.id,
+      blockIndex: nextBlockIndex,
       lastMessageAt,
     })
-  }, [activeChatId, activeSidebarChat?.lastMessageAt, isFollowing, latestReadableMessage, markChatRead])
+  }, [activeChatId, activeSidebarChat?.lastMessageAt, isFollowing, lastReadBlockIndex, lastReadMessageId, latestReadableMessage, markChatRead, messages])
 
   function scrollToBottom() {
     scrollFollowToBottom("smooth")

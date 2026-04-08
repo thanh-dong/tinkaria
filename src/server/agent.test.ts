@@ -526,6 +526,70 @@ describe("AgentCoordinator codex integration", () => {
     ])
   })
 
+  test("clears a stale session token when binding a legacy chat to codex", async () => {
+    const sessionCalls: Array<{ chatId: string; sessionToken: string | null }> = []
+    const fakeCodexManager = {
+      async startSession(args: { chatId: string; sessionToken: string | null }) {
+        sessionCalls.push({ chatId: args.chatId, sessionToken: args.sessionToken })
+      },
+      async startTurn(): Promise<HarnessTurn> {
+        async function* stream() {
+          yield { type: "session_token" as const, sessionToken: "thread-1" }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+    }
+
+    const store = createFakeStore()
+    store.chat.sessionToken = "legacy-claude-session"
+
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexManager: fakeCodexManager as never,
+    })
+
+    await coordinator.send({
+      type: "chat.send",
+      chatId: "chat-1",
+      provider: "codex",
+      content: "first",
+    })
+
+    await waitFor(() => store.turnFinishedCount === 1)
+    expect(store.chat.provider).toBe("codex")
+    expect(store.chat.sessionToken).toBe("thread-1")
+    expect(sessionCalls).toEqual([{ chatId: "chat-1", sessionToken: null }])
+  })
+
   test("maps codex model options into session and turn settings", async () => {
     const sessionCalls: Array<{ chatId: string; sessionToken: string | null; serviceTier?: string }> = []
     const turnCalls: Array<{ effort?: string; serviceTier?: string }> = []

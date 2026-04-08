@@ -464,7 +464,10 @@ export class AgentCoordinator {
       throw new Error("Chat is already running")
     }
 
-    if (!chat.provider) {
+    if (chat.provider !== args.provider) {
+      if (chat.sessionToken) {
+        await this.store.setSessionToken(args.chatId, null)
+      }
       await this.store.setChatProvider(args.chatId, args.provider)
     }
     await this.store.setPlanMode(args.chatId, args.planMode)

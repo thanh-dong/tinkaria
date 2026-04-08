@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from "react"
+import { useState, useMemo, useCallback, memo } from "react"
 import { ChevronRight } from "lucide-react"
 import { ToolCallMessage } from "./ToolCallMessage"
 import { MetaRow, MetaLabel } from "./shared"
@@ -79,11 +79,13 @@ export const CollapsedToolGroup = memo(function CollapsedToolGroup({ messages, i
 
   const label = useMemo(() => getToolGroupLabel(messages), [messages])
 
-  // Check if any tool in the group is still in progress
-  const anyInProgress = messages.some(msg => {
-    const processed = msg as ProcessedToolCall
-    return processed.result === undefined
-  })
+  const anyInProgress = useMemo(
+    () => messages.some(msg => (msg as ProcessedToolCall).result === undefined),
+    [messages],
+  )
+
+  const toggleExpanded = useCallback(() => setExpanded(prev => !prev), [])
+  const collapse = useCallback(() => setExpanded(false), [])
 
   const showLoadingState = anyInProgress && isLoading
 
@@ -92,7 +94,7 @@ export const CollapsedToolGroup = memo(function CollapsedToolGroup({ messages, i
     <MetaRow className="w-full">
       <div className="flex flex-col w-full">
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={toggleExpanded}
           className={`group cursor-pointer grid grid-cols-[auto_1fr] items-center gap-1 text-sm ${!expanded && !showLoadingState ? "hover:opacity-60 transition-opacity" : ""}`}
           {...getUiIdentityAttributeProps(TOOL_GROUP_EXPAND_DESCRIPTOR)}
         >
@@ -119,7 +121,7 @@ export const CollapsedToolGroup = memo(function CollapsedToolGroup({ messages, i
             ))}
             {messages.length > 5 && (
               <button
-                onClick={() => setExpanded(false)}
+                onClick={collapse}
                 className="cursor-pointer grid grid-cols-[auto_1fr] items-center gap-1 text-xs hover:opacity-80 transition-opacity"
               >
                 <div className="grid grid-cols-[auto_1fr] items-center gap-1.5">

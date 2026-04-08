@@ -183,9 +183,14 @@ function parseJsonLine(line: string): unknown | null {
 function isRecoverableResumeError(error: unknown): boolean {
   const message = errorMessage(error).toLowerCase()
   if (!message.includes("thread/resume")) return false
-  return ["not found", "missing thread", "no such thread", "unknown thread", "does not exist"].some((snippet) =>
-    message.includes(snippet)
-  )
+  return [
+    "not found",
+    "missing thread",
+    "no such thread",
+    "unknown thread",
+    "does not exist",
+    "no rollout found",
+  ].some((snippet) => message.includes(snippet))
 }
 
 const MULTI_SELECT_HINT_PATTERN = /\b(all that apply|select all|choose all|pick all|select multiple|choose multiple|pick multiple|multiple selections?|multiple choice|more than one|one or more)\b/i
