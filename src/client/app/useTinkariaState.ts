@@ -10,6 +10,7 @@ import {
   type CurrentRepoStatusSnapshot,
   type CurrentSessionSnapshot,
   type ModelOptions,
+  type OrchestrationHierarchySnapshot,
   type ProviderCatalogEntry,
   type SessionsSnapshot,
   type UpdateInstallResult,
@@ -580,6 +581,7 @@ export interface TinkariaState {
   localProjects: LocalProjectsSnapshot | null
   updateSnapshot: UpdateSnapshot | null
   chatSnapshot: ChatSnapshot | null
+  orchestrationHierarchy: OrchestrationHierarchySnapshot | null
   connectionStatus: SocketStatus
   sidebarReady: boolean
   localProjectsReady: boolean
@@ -670,6 +672,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   const [localProjects, setLocalProjects] = useState<LocalProjectsSnapshot | null>(null)
   const [updateSnapshot, setUpdateSnapshot] = useState<UpdateSnapshot | null>(null)
   const [chatSnapshot, setChatSnapshot] = useState<ChatSnapshot | null>(null)
+  const [orchestrationHierarchy, setOrchestrationHierarchy] = useState<OrchestrationHierarchySnapshot | null>(null)
   const [currentSessionRuntime, setCurrentSessionRuntime] = useState<CurrentSessionSnapshot["runtime"]>(null)
   const [currentRepoStatus, setCurrentRepoStatus] = useState<CurrentRepoStatusSnapshot | null>(null)
   const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
@@ -901,6 +904,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     if (!activeChatId) {
       logTinkariaState("clearing chat snapshot for non-chat route")
       setChatSnapshot(null)
+      setOrchestrationHierarchy(null)
       setProjectSelection((current) => transitionProjectSelection(current, { type: "chat.cleared" }))
       // Don't mutate cached hydrator — create a fresh one
       hydratorRef.current = createIncrementalHydrator()
@@ -1064,9 +1068,18 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       }
     )
 
+    const orchestrationUnsub = socket.subscribe<OrchestrationHierarchySnapshot>(
+      { type: "orchestration", chatId: activeChatId },
+      (snapshot) => {
+        if (cancelled) return
+        setOrchestrationHierarchy(snapshot)
+      },
+    )
+
     return () => {
       cancelled = true
       unsub()
+      orchestrationUnsub()
       // Save departing chat to cache — use sidebar's lastMessageAt as the source of truth
       const departingSidebarChat = sidebarData.projectGroups
         .flatMap((g) => g.chats)
@@ -1962,6 +1975,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     localProjects,
     updateSnapshot,
     chatSnapshot,
+    orchestrationHierarchy,
     connectionStatus,
     sidebarReady,
     localProjectsReady,
