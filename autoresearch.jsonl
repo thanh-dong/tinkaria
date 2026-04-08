@@ -1,0 +1,1 @@
+{"run":1,"commit":"c7d872b","metrics":{"burst_p50_ms":1.794,"burst_p95_ms":4.625,"js_roundtrip_p50_ms":0.093,"js_publish_await_p50_ms":0.069},"status":"keep","description":"Baseline: no changes, measuring existing performance","timestamp":1744097400}
