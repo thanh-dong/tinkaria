@@ -156,7 +156,20 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   // Use indirection to break the circular dependency:
   // coordinator -> onStateChange -> publisher.broadcastSnapshots
   // publisher -> coordinator.getActiveStatuses
-  let broadcast = () => {}
+  //
+  // Debounce: during streaming, dozens of events arrive per second.
+  // Each calls onStateChange() which would trigger broadcastSnapshots().
+  // Coalesce into one broadcast per microtask tick using queueMicrotask.
+  let broadcastPending = false
+  let broadcastFn = () => {}
+  const broadcast = () => {
+    if (broadcastPending) return
+    broadcastPending = true
+    queueMicrotask(() => {
+      broadcastPending = false
+      broadcastFn()
+    })
+  }
   let publishMessage: (chatId: string, entry: TranscriptEntry) => void = () => {}
 
   const onMessageAppended = (chatId: string, entry: TranscriptEntry) => {
@@ -245,7 +258,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     orchestrator,
   })
 
-  broadcast = () => publisher.broadcastSnapshots()
+  broadcastFn = () => publisher.broadcastSnapshots()
   publishMessage = (chatId, entry) => publisher.publishChatMessage(chatId, entry)
 
   const responders = registerCommandResponders({
