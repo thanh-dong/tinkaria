@@ -47,3 +47,7 @@ src-tauri/target/
 # codex
 .codex
 .codex/
+
+# session-local working docs
+docs/superpowers/
+tasks/
