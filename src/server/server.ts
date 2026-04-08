@@ -156,7 +156,27 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   // Use indirection to break the circular dependency:
   // coordinator -> onStateChange -> publisher.broadcastSnapshots
   // publisher -> coordinator.getActiveStatuses
-  let broadcast = () => {}
+  //
+  // Debounce: during streaming, dozens of events arrive per second.
+  // Each calls onStateChange() which would trigger broadcastSnapshots().
+  // Coalesce into one broadcast per microtask tick using queueMicrotask.
+  // Selective invalidation: only recompute topic types that changed.
+  let broadcastPending = false
+  const pendingTypes = new Set<string>()
+  let broadcastFn: (changedTypes?: ReadonlySet<string>) => void = () => {}
+  const broadcast = (changedTypes?: ReadonlySet<string>) => {
+    if (changedTypes) {
+      for (const t of changedTypes) pendingTypes.add(t)
+    }
+    if (broadcastPending) return
+    broadcastPending = true
+    queueMicrotask(() => {
+      broadcastPending = false
+      const types = pendingTypes.size > 0 ? new Set(pendingTypes) : undefined
+      pendingTypes.clear()
+      broadcastFn(types)
+    })
+  }
   let publishMessage: (chatId: string, entry: TranscriptEntry) => void = () => {}
 
   const onMessageAppended = (chatId: string, entry: TranscriptEntry) => {
@@ -188,10 +208,11 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     })
     const runnerId = await runnerManager.ensureRunner()
 
+    const chatSidebarTypes = new Set(["chat", "sidebar", "orchestration"])
     transcriptConsumer = new TranscriptConsumer({
       nc: natsConnector.nc,
       store,
-      onStateChange: () => broadcast(),
+      onStateChange: () => broadcast(chatSidebarTypes),
       onMessageAppended,
     })
     await transcriptConsumer.start()
@@ -212,9 +233,10 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
       registry: projectKitRegistry,
     })
 
+    const inProcessChatTypes = new Set(["chat", "sidebar", "orchestration"])
     const agent = new AgentCoordinator({
       store,
-      onStateChange: () => broadcast(),
+      onStateChange: () => broadcast(inProcessChatTypes),
       codexRuntime,
       skillCache,
       onMessageAppended,
@@ -245,7 +267,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     orchestrator,
   })
 
-  broadcast = () => publisher.broadcastSnapshots()
+  broadcastFn = (types) => publisher.broadcastSnapshots(types)
   publishMessage = (chatId, entry) => publisher.publishChatMessage(chatId, entry)
 
   const responders = registerCommandResponders({

@@ -30,7 +30,11 @@ export function compressPayload(raw: Uint8Array): Uint8Array {
 
 export async function decompressPayload(data: Uint8Array): Promise<Uint8Array> {
   if (!isGzipped(data)) return data
-  // DecompressionStream works in both Bun and browser (Bun.gunzipSync is server-only)
+  // Server (Bun): use synchronous gunzip — no stream overhead
+  if (typeof Bun !== "undefined") {
+    return Bun.gunzipSync(toBunBytes(data))
+  }
+  // Browser fallback: DecompressionStream
   const ds = new DecompressionStream("gzip")
   const writer = ds.writable.getWriter()
   void writer.write(toBunBytes(data)).then(() => writer.close())
