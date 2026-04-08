@@ -209,9 +209,10 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     return data
   }
 
-  async function broadcastSnapshots(): Promise<void> {
+  async function broadcastSnapshots(changedTypes?: ReadonlySet<string>): Promise<void> {
     const published = new Set<string>()
     for (const [, topic] of activeSubscriptions) {
+      if (changedTypes && !changedTypes.has(topic.type)) continue
       const key = snapshotKvKey(topic)
       if (published.has(key)) continue
       published.add(key)

@@ -160,14 +160,21 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   // Debounce: during streaming, dozens of events arrive per second.
   // Each calls onStateChange() which would trigger broadcastSnapshots().
   // Coalesce into one broadcast per microtask tick using queueMicrotask.
+  // Selective invalidation: only recompute topic types that changed.
   let broadcastPending = false
-  let broadcastFn = () => {}
-  const broadcast = () => {
+  const pendingTypes = new Set<string>()
+  let broadcastFn: (changedTypes?: ReadonlySet<string>) => void = () => {}
+  const broadcast = (changedTypes?: ReadonlySet<string>) => {
+    if (changedTypes) {
+      for (const t of changedTypes) pendingTypes.add(t)
+    }
     if (broadcastPending) return
     broadcastPending = true
     queueMicrotask(() => {
       broadcastPending = false
-      broadcastFn()
+      const types = pendingTypes.size > 0 ? new Set(pendingTypes) : undefined
+      pendingTypes.clear()
+      broadcastFn(types)
     })
   }
   let publishMessage: (chatId: string, entry: TranscriptEntry) => void = () => {}
@@ -201,10 +208,11 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     })
     const runnerId = await runnerManager.ensureRunner()
 
+    const chatSidebarTypes = new Set(["chat", "sidebar", "orchestration"])
     transcriptConsumer = new TranscriptConsumer({
       nc: natsConnector.nc,
       store,
-      onStateChange: () => broadcast(),
+      onStateChange: () => broadcast(chatSidebarTypes),
       onMessageAppended,
     })
     void transcriptConsumer.start()
@@ -225,9 +233,10 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
       registry: projectKitRegistry,
     })
 
+    const inProcessChatTypes = new Set(["chat", "sidebar", "orchestration"])
     const agent = new AgentCoordinator({
       store,
-      onStateChange: () => broadcast(),
+      onStateChange: () => broadcast(inProcessChatTypes),
       codexRuntime,
       skillCache,
       onMessageAppended,
@@ -258,7 +267,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     orchestrator,
   })
 
-  broadcastFn = () => publisher.broadcastSnapshots()
+  broadcastFn = (types) => publisher.broadcastSnapshots(types)
   publishMessage = (chatId, entry) => publisher.publishChatMessage(chatId, entry)
 
   const responders = registerCommandResponders({
