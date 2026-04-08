@@ -1288,7 +1288,10 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       beginProgrammaticScroll()
       element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
       const frameId = window.requestAnimationFrame(() => endProgrammaticScroll())
-      return () => window.cancelAnimationFrame(frameId)
+      return () => {
+        window.cancelAnimationFrame(frameId)
+        endProgrammaticScroll()
+      }
     }
   }, [activeChatId, beginProgrammaticScroll, endProgrammaticScroll, initialChatReadAnchor, inputHeight, messages.length, runtime?.status, handleInitialScrollDone, scrollModeRef])
 
