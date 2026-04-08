@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { createElement } from "react"
+import { createElement, Suspense } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { MemoryRouter } from "react-router-dom"
 import { TooltipProvider } from "../components/ui/tooltip"
 import { getSidebarUiIdentityDescriptor, TinkariaSidebar } from "./TinkariaSidebar"
 import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import type { SidebarData, UpdateSnapshot } from "../../shared/types"
+
+// Pre-warm lazy chunks so renderToStaticMarkup can resolve them synchronously
+await import("../components/chat-ui/sidebar/LocalProjectsSection")
 
 function createSidebarData(): SidebarData {
   return { projectGroups: [] }
