@@ -80,15 +80,16 @@ export class RunnerAgent {
 
   // ── Publishing ──────────────────────────────────────────────────
 
-  private async publishEvent(chatId: string, event: RunnerTurnEvent): Promise<void> {
-    await this.js.publish(
-      runnerEventsSubject(chatId),
-      encoder.encode(JSON.stringify(event))
-    )
+  private publishEvent(chatId: string, event: RunnerTurnEvent): void {
+    const subject = runnerEventsSubject(chatId)
+    void this.js.publish(subject, encoder.encode(JSON.stringify(event))).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(LOG_PREFIX, `JetStream publish failed on ${subject}: ${message}`)
+    })
   }
 
-  private async publishTranscript(chatId: string, entry: TranscriptEntry): Promise<void> {
-    await this.publishEvent(chatId, { type: "transcript", chatId, entry })
+  private publishTranscript(chatId: string, entry: TranscriptEntry): void {
+    this.publishEvent(chatId, { type: "transcript", chatId, entry })
   }
 
   // ── Public API ────────────────────────────────────────────────────
@@ -119,7 +120,7 @@ export class RunnerAgent {
 
     // Publish user prompt
     if (cmd.appendUserPrompt) {
-      await this.publishTranscript(
+      this.publishTranscript(
         cmd.chatId,
         timestamped({ kind: "user_prompt", content: cmd.content })
       )
@@ -131,12 +132,12 @@ export class RunnerAgent {
       if (!active) throw new Error("Chat turn ended unexpectedly")
 
       active.status = "waiting_for_user"
-      await this.publishEvent(cmd.chatId, {
+      this.publishEvent(cmd.chatId, {
         type: "status_change",
         chatId: cmd.chatId,
         status: "waiting_for_user",
       })
-      await this.publishEvent(cmd.chatId, {
+      this.publishEvent(cmd.chatId, {
         type: "pending_tool",
         chatId: cmd.chatId,
         tool: { toolUseId: request.tool.toolId, toolKind: request.tool.toolKind },
@@ -179,7 +180,7 @@ export class RunnerAgent {
     }
     this.activeTurns.set(cmd.chatId, active)
 
-    await this.publishEvent(cmd.chatId, {
+    this.publishEvent(cmd.chatId, {
       type: "status_change",
       chatId: cmd.chatId,
       status: "starting",
@@ -205,7 +206,7 @@ export class RunnerAgent {
 
     if (pendingTool) {
       const result = discardedToolResult(pendingTool.tool)
-      await this.publishTranscript(
+      this.publishTranscript(
         chatId,
         timestamped({ kind: "tool_result", toolId: pendingTool.toolUseId, content: result })
       )
@@ -214,8 +215,8 @@ export class RunnerAgent {
       }
     }
 
-    await this.publishTranscript(chatId, timestamped({ kind: "interrupted" }))
-    await this.publishEvent(chatId, { type: "turn_cancelled", chatId })
+    this.publishTranscript(chatId, timestamped({ kind: "interrupted" }))
+    this.publishEvent(chatId, { type: "turn_cancelled", chatId })
     active.cancelRecorded = true
     active.hasFinalResult = true
 
@@ -234,7 +235,7 @@ export class RunnerAgent {
     if (active.pendingTool.toolUseId !== toolUseId) throw new Error("Tool response does not match active request")
 
     const pending = active.pendingTool
-    await this.publishTranscript(
+    this.publishTranscript(
       chatId,
       timestamped({ kind: "tool_result", toolId: toolUseId, content: result })
     )
@@ -242,15 +243,15 @@ export class RunnerAgent {
     active.pendingTool = null
     active.status = "running"
 
-    await this.publishEvent(chatId, { type: "pending_tool", chatId, tool: null })
-    await this.publishEvent(chatId, { type: "status_change", chatId, status: "running" })
+    this.publishEvent(chatId, { type: "pending_tool", chatId, tool: null })
+    this.publishEvent(chatId, { type: "status_change", chatId, status: "running" })
 
     // Handle exit_plan_mode follow-up for Codex
     if (pending.tool.toolKind === "exit_plan_mode") {
       const res = (result ?? {}) as { confirmed?: boolean; clearContext?: boolean; message?: string }
       if (res.confirmed && res.clearContext) {
-        await this.publishEvent(chatId, { type: "session_token", chatId, sessionToken: "" })
-        await this.publishTranscript(chatId, timestamped({ kind: "context_cleared" }))
+        this.publishEvent(chatId, { type: "session_token", chatId, sessionToken: "" })
+        this.publishTranscript(chatId, timestamped({ kind: "context_cleared" }))
       }
       if (active.provider === "codex") {
         active.postToolFollowUp = res.confirmed
@@ -279,7 +280,7 @@ export class RunnerAgent {
     try {
       const title = await this.generateTitle(content, cwd)
       if (!title) return
-      await this.publishEvent(chatId, { type: "title_generated", chatId, title })
+      this.publishEvent(chatId, { type: "title_generated", chatId, title })
     } catch {
       // Ignore background title generation failures
     }
@@ -289,7 +290,7 @@ export class RunnerAgent {
     try {
       for await (const event of active.turn.stream) {
         if (event.type === "session_token" && event.sessionToken) {
-          await this.publishEvent(active.chatId, {
+          this.publishEvent(active.chatId, {
             type: "session_token",
             chatId: active.chatId,
             sessionToken: event.sessionToken,
@@ -304,11 +305,11 @@ export class RunnerAgent {
           continue
         }
 
-        await this.publishTranscript(active.chatId, event.entry)
+        this.publishTranscript(active.chatId, event.entry)
 
         if (event.entry.kind === "system_init") {
           active.status = "running"
-          await this.publishEvent(active.chatId, {
+          this.publishEvent(active.chatId, {
             type: "status_change",
             chatId: active.chatId,
             status: "running",
@@ -318,13 +319,13 @@ export class RunnerAgent {
         if (event.entry.kind === "result") {
           active.hasFinalResult = true
           if (event.entry.isError) {
-            await this.publishEvent(active.chatId, {
+            this.publishEvent(active.chatId, {
               type: "turn_failed",
               chatId: active.chatId,
               error: event.entry.result || "Turn failed",
             })
           } else if (!active.cancelRequested) {
-            await this.publishEvent(active.chatId, {
+            this.publishEvent(active.chatId, {
               type: "turn_finished",
               chatId: active.chatId,
             })
@@ -334,11 +335,11 @@ export class RunnerAgent {
     } catch (error) {
       if (!active.cancelRequested) {
         const message = error instanceof Error ? error.message : String(error)
-        await this.publishTranscript(
+        this.publishTranscript(
           active.chatId,
           timestamped({ kind: "result", subtype: "error", isError: true, durationMs: 0, result: message })
         )
-        await this.publishEvent(active.chatId, {
+        this.publishEvent(active.chatId, {
           type: "turn_failed",
           chatId: active.chatId,
           error: message,
@@ -346,7 +347,7 @@ export class RunnerAgent {
       }
     } finally {
       if (active.cancelRequested && !active.cancelRecorded) {
-        await this.publishEvent(active.chatId, { type: "turn_cancelled", chatId: active.chatId })
+        this.publishEvent(active.chatId, { type: "turn_cancelled", chatId: active.chatId })
       }
       active.turn.close()
       this.activeTurns.delete(active.chatId)
@@ -362,11 +363,11 @@ export class RunnerAgent {
           })
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          await this.publishTranscript(
+          this.publishTranscript(
             active.chatId,
             timestamped({ kind: "result", subtype: "error", isError: true, durationMs: 0, result: message })
           )
-          await this.publishEvent(active.chatId, { type: "turn_failed", chatId: active.chatId, error: message })
+          this.publishEvent(active.chatId, { type: "turn_failed", chatId: active.chatId, error: message })
         }
       }
     }
