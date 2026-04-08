@@ -50,6 +50,41 @@ Default URL: `http://localhost:3210`
 - Plan-mode approval flows inside the UI
 - Local-first event-log persistence
 
+## Upgrade Safety
+
+The current runtime is multi-process and partially ephemeral:
+
+- the server starts a dedicated embedded NATS daemon process on boot
+- Codex work uses a background local kit daemon over NATS
+- optional split mode (`TINKARIA_SPLIT=true`) starts a separate runner process for turn execution
+
+For RC upgrades or machine handoff, do not assume live turns survive restart. Quiesce or cancel active work first, then verify a fresh Claude/Codex send after the upgraded instance starts.
+
+For proxied deployments, prefer side-by-side cutover over in-place restart:
+
+- keep the old backend running on its current port
+- start the new release on a new port, ideally in split mode for the new deployment model
+- verify `/health`, `/auth/token`, `/`, and `/nats-ws` against the new backend directly
+- switch the reverse proxy upstream to the new port
+- retire the old backend only after the public route reports the new backend healthy
+
+## Operational Health
+
+`GET /health` returns structured runtime status for the components Tinkaria owns:
+
+- `natsDaemon`: embedded NATS subprocess pid/ports/aliveness
+- `natsConnection`: hub connection readiness from the Bun server
+- `runner`: split-mode runner registration and heartbeat freshness
+- `codexKit`: background Codex kit registration and heartbeat freshness
+
+HTTP `503` is reserved for required-component failure:
+
+- embedded NATS daemon is down
+- server NATS connection is closed
+- split mode is enabled and the runner is not registered or heartbeat-fresh
+
+Codex kit failure is reported as degraded component state in the payload without taking the whole server down.
+
 ## Install
 
 Global install:
@@ -93,13 +128,22 @@ Embedded terminal support currently targets macOS and Linux through Bun PTY APIs
 
 [![Architecture diagram](https://diashort.apps.quickable.co/e/e69a07ad)](https://diashort.apps.quickable.co/d/e69a07ad)
 
-The browser connects to an embedded NATS server over WebSocket. Tinkaria uses three internal subject families:
+The browser connects to an embedded NATS server over WebSocket. The runtime currently includes:
+
+- the main Bun HTTP/WebSocket server
+- an embedded NATS daemon process
+- a background local Codex kit daemon
+- an optional split runner process for turn execution
+
+Tinkaria uses these internal transport families:
 
 | Namespace | Pattern | Purpose |
 |-----------|---------|---------|
 | Snapshots | `runtime.snap.*` | Push state for sidebar, chat, settings, terminals |
 | Events | `runtime.evt.*` | JetStream-backed terminal and chat event streams |
 | Commands | `runtime.cmd.*` | Request/reply mutations from browser to server |
+| Kits | `runtime.kit.*` | Codex kit registration, session lifecycle, turns, interrupts, tool replies |
+| Runner | `runtime.runner.*` | Optional split-mode runner registration, commands, heartbeats, turn events |
 
 The `runtime.*` subject prefix keeps the internal transport namespace generic and separate from product branding.
 
@@ -153,7 +197,7 @@ This fork diverged by:
 - introducing embedded NATS as the runtime transport
 - expanding into a broader Claude Code + Codex workbench
 - adding local-first event-log persistence and richer session management
-- exploring Tauri-based desktop shell support
+- removing the obsolete Tauri companion path in favor of a browser/PWA-first runtime
 
 ## License
 

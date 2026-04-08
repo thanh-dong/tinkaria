@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0-rc.8 - 2026-04-08
+
+This release candidate hardens the deployment-model shift before the next cut by making the new runtime actors publishable and documenting the safe-upgrade contract.
+
+### Changed
+
+- Updated the published package contents so the runtime subprocess entrypoints under `src/nats/` and `src/runner/` ship with the tarball instead of only working from source checkouts.
+- Updated the architecture and handoff docs to describe the current multi-process runtime: embedded NATS daemon, background Codex kit daemon, and optional split runner mode.
+- Expanded `/health` into an operational runtime contract with component status for embedded NATS, the server NATS connection, split runner readiness, and background Codex kit readiness.
+
+### Fixed
+
+- Fixed the RC packaging contract so installed builds can boot the spawned NATS daemon process introduced by the deployment-model change.
+- Fixed operator docs that still referenced `Kanna`, `~/.kanna*`, and stale transport assumptions instead of Tinkaria's current runtime and data roots.
+- Fixed split-mode health reporting so runner CLI readiness now requires both registration and fresh heartbeat instead of a blind process-up assumption.
+- Fixed NATS snapshot publishing for active orchestration subscriptions so delegated-session hierarchy snapshots no longer spam `Unknown topic type: orchestration` in long-running deployments.
+
+### Upgrade Notes
+
+- Active turns are still not restart-safe across RC upgrade or machine handoff. Quiesce or cancel active Codex/runner work before cutover.
+- After upgrade, verify `/health`, fetch a fresh auth token/browser session, and smoke-test at least one Claude send plus one Codex send.
+
+### Verification
+
+- `npm pack --dry-run`
+- `bun test src/server/nats-publisher.test.ts`
+- `bun test src/server/nats-daemon-manager.test.ts src/server/runner-manager.test.ts src/server/transcript-consumer.test.ts src/shared/runner-protocol.test.ts src/nats/nats-daemon.test.ts src/runner/runner.test.ts`
+- `bunx @typescript/native-preview --noEmit -p tsconfig.json`
+- `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`
+
 ## 1.0.0-rc.7 - 2026-04-07
 
 This release candidate rolls up the verified branch work into an explicit RC cut focused on session hygiene, faster merge flows, and mobile-safe dialog/composer behavior.
@@ -90,7 +120,7 @@ This release simplifies Tinkaria into a browser/PWA-first product, removes obsol
 ### Breaking Changes
 
 - Removed the experimental Tauri desktop companion and native webview/runtime plumbing.
-- Removed the browser settings route and embedded terminal UI surfaces.
+- Removed the standalone browser settings experience and the old navbar/editor-driven terminal entrypoints.
 - Removed editor handoff and `open_editor` infrastructure, including configurable keybindings and editor preset handling.
 - Renamed the internal transport namespace from `kanna.*` to `runtime.*`.
 - Removed legacy `~/.kanna*` startup migration support from the active runtime.
@@ -103,7 +133,7 @@ This release simplifies Tinkaria into a browser/PWA-first product, removes obsol
 ### Changed
 
 - Repositioned Tinkaria as PWA/browser-first across docs, package surface, and architecture.
-- Simplified chat, navbar, sidebar, and app-shell flows after removing desktop/settings/terminal UI branches.
+- Simplified chat, navbar, sidebar, and app-shell flows after removing desktop/native branches and de-emphasizing browser settings/terminal product surfaces.
 - Kept core keyboard shortcuts as direct built-ins instead of routing through the old keybinding system.
 - Tightened C3 topology by removing stale terminal components and wiring defensive rules across affected components.
 
@@ -166,5 +196,5 @@ This release marks the transition from `Kanna` to `Tinkaria` and rolls up the cu
 - `bunx @typescript/native-preview --noEmit -p tsconfig.json`
 - `bun test`
 - `bun run build`
-- `agent-browser` smoke check against `http://127.0.0.1:3210/settings/general`
+- `agent-browser` smoke check against `http://127.0.0.1:3210/`
 - `C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check`
