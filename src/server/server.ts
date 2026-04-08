@@ -390,7 +390,18 @@ async function serveStatic(distDir: string, pathname: string) {
 
   const file = Bun.file(filePath)
   if (await file.exists()) {
-    return new Response(file)
+    const isHashedAsset = requestedPath.startsWith("/assets/")
+    const isHtml = requestedPath.endsWith(".html")
+    const cacheControl = isHashedAsset
+      ? "public, max-age=31536000, immutable"
+      : isHtml
+        ? "no-cache"
+        : undefined
+
+    const headers: Record<string, string> = {}
+    if (cacheControl) headers["Cache-Control"] = cacheControl
+
+    return new Response(file, { headers })
   }
 
   const indexFile = Bun.file(indexPath)
@@ -398,6 +409,7 @@ async function serveStatic(distDir: string, pathname: string) {
     return new Response(indexFile, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-cache",
       },
     })
   }

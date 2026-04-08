@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { ArrowDown, Loader2 } from "lucide-react"
 import { useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
@@ -8,7 +8,8 @@ import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
 import { ForkSessionDialog } from "../components/chat-ui/ForkSessionDialog"
 import { MergeSessionDialog } from "../components/chat-ui/MergeSessionDialog"
 import { RightSidebar } from "../components/chat-ui/RightSidebar"
-import { LocalFilePreviewDialog } from "../components/messages/LocalFilePreviewDialog"
+// Lazy-loaded: imports react-markdown, only needed when user opens a file preview
+const LocalFilePreviewDialog = lazy(() => import("../components/messages/LocalFilePreviewDialog").then(m => ({ default: m.LocalFilePreviewDialog })))
 import { ProcessingMessage } from "../components/messages/ProcessingMessage"
 import { Card, CardContent } from "../components/ui/card"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../components/ui/resizable"
@@ -438,13 +439,15 @@ export function ChatPage() {
   const chatCard = (
     <Card ref={chatCardRef} className="bg-background h-full flex flex-col overflow-hidden border-0 rounded-none relative">
       <CardContent className="flex flex-1 min-h-0 flex-col p-0 overflow-hidden relative">
-        <LocalFilePreviewDialog
-          preview={state.localFilePreview}
-          onClose={state.closeLocalFilePreview}
-          onOpenLocalLink={(target) => {
-            void state.handleOpenLocalLink(target)
-          }}
-        />
+        <Suspense fallback={null}>
+          <LocalFilePreviewDialog
+            preview={state.localFilePreview}
+            onClose={state.closeLocalFilePreview}
+            onOpenLocalLink={(target) => {
+              void state.handleOpenLocalLink(target)
+            }}
+          />
+        </Suspense>
 
         <ChatNavbar
           sidebarCollapsed={state.sidebarCollapsed}
