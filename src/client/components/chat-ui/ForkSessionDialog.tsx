@@ -189,7 +189,7 @@ function ForkSessionDialogBody({
       </DialogHeader>
       <div className="px-4 pb-4 pt-3.5 space-y-3 flex flex-col flex-1 min-h-0">
         <p className="text-sm text-muted-foreground">
-          Describe what this fork should focus on. Tinkaria will combine that with the current chat to seed the new session.
+          Describe what this fork should focus on. Tinkaria will compact the selected context first, then start a dedicated session with that brief.
         </p>
         <InputPopover
           triggerUiId={FORK_SESSION_UI_DESCRIPTORS.presetAction}

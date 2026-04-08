@@ -116,23 +116,44 @@ describe("generateTitleForChat", () => {
 })
 
 describe("generateForkPromptForChat", () => {
-  test("returns a sanitized generated fork prompt", async () => {
+  test("builds a dedicated-session brief from analyzed intent and compacted context", async () => {
     const prompt = await generateForkPromptForChat(
       "Focus on the auth race fix",
       [],
       "/tmp/project",
       undefined,
       new QuickResponseAdapter({
-        runClaudeStructured: async () => ({
-          prompt: "  ## Objective\nFix the auth race.\n\n## Constraints\nKeep the existing API.  ",
-        }),
+        runClaudeStructured: async (args) => {
+          if (args.task.includes("analysis")) {
+            return {
+              compactInstruction: "Keep the auth-race evidence only.",
+              nextInstruction: "Fix the auth race.",
+            }
+          }
+          return {
+            summary: "## Relevant Context\nKeep the existing API.",
+          }
+        },
       }),
     )
 
-    expect(prompt).toBe("## Objective\nFix the auth race.\n\n## Constraints\nKeep the existing API.")
+    expect(prompt).toBe([
+      "## Objective",
+      "Fix the auth race.",
+      "",
+      "## Relevant Context",
+      "## Relevant Context",
+      "Keep the existing API.",
+      "",
+      "## Constraints",
+      "Preserve proven constraints from the context above. Call out contradictions or missing evidence before making risky changes.",
+      "",
+      "## Next Step",
+      "Start directly on the objective using the compacted context above.",
+    ].join("\n"))
   })
 
-  test("falls back to the normalized fork intent when structured output is invalid", async () => {
+  test("falls back to a composed brief when structured output is invalid", async () => {
     const prompt = await generateForkPromptForChat(
       "   Continue the mobile keyboard fix   ",
       [],
@@ -144,10 +165,11 @@ describe("generateForkPromptForChat", () => {
       }),
     )
 
-    expect(prompt).toBe("Continue the mobile keyboard fix")
+    expect(prompt).toContain("## Objective\nContinue the mobile keyboard fix")
+    expect(prompt).toContain("## Relevant Context\nNo prior transcript context was available.")
   })
 
-  test("includes preset guidance in the generation prompt", async () => {
+  test("includes preset guidance in the analysis prompt", async () => {
     let capturedPrompt = ""
     await generateForkPromptForChat(
       "Focus on an alternative design",
@@ -156,13 +178,19 @@ describe("generateForkPromptForChat", () => {
       "alternative_approach",
       new QuickResponseAdapter({
         runClaudeStructured: async (args) => {
-          capturedPrompt = args.prompt
-          return { prompt: "## Objective\nExplore the alternative." }
+          if (args.task.includes("analysis")) {
+            capturedPrompt = args.prompt
+            return {
+              compactInstruction: "Preserve only the key constraints.",
+              nextInstruction: "Explore the alternative.",
+            }
+          }
+          return { summary: "## Relevant Context\nAlternative-ready constraints." }
         },
       }),
     )
 
-    expect(capturedPrompt).toContain("Selected fork preset: Alternative approach.")
+    expect(capturedPrompt).toContain("Selected preset: Alternative approach.")
     expect(capturedPrompt).toContain("exploring a different solution path")
   })
 })

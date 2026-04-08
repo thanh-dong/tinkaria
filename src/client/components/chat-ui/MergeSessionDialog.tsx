@@ -250,7 +250,7 @@ function MergeSessionDialogBody({
       </DialogHeader>
       <div className="px-4 pb-4 pt-3.5 space-y-3 flex flex-col flex-1 min-h-0">
         <p className="text-sm text-muted-foreground">
-          Select sessions to merge and describe how they should be combined.
+          Select sessions to merge and describe the target outcome. Tinkaria will compact each selected session, then start a dedicated session with the merged brief.
         </p>
 
         {/* Session search + list */}

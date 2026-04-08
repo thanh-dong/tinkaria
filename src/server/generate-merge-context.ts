@@ -1,13 +1,13 @@
 import type { TranscriptEntry } from "../shared/types"
 import { getMergePreset, MAX_MERGE_SESSIONS } from "../shared/merge-presets"
 import { QuickResponseAdapter } from "./quick-response"
-import { PROMPT_SCHEMA, normalizeGeneratedPrompt, normalizeIntent, toTranscriptLine, truncateLine } from "./transcript-utils"
+import { toTranscriptLine, truncateLine } from "./transcript-utils"
+import { buildSessionSeedPrompt } from "./session-seed"
 
 const LOG_PREFIX = "[generate-merge-context]"
 
 export const MAX_MERGE_TOTAL_CHARS = 14_000
 export const MERGE_FLOOR_PER_SESSION_CHARS = 500
-const MAX_MERGE_PROMPT_CHARS = 6_000
 const MAX_MERGE_LINE_CHARS = 700
 
 /** Slice entries to only those after the last context_cleared boundary, if any. */
@@ -130,47 +130,12 @@ export async function generateMergePromptForChats(
   }
 
   const preset = getMergePreset(presetId)
-  const normalizedIntent = normalizeIntent(mergeIntent) || preset?.defaultIntent || ""
-
-  const budgets = allocateSessionBudgets(sessions)
-
-  const labeledExcerpts = sessions
-    .map((session, index) => {
-      const excerpt = buildBudgetedTranscriptExcerpt(session.entries, budgets[index]!)
-      return `Session ${index + 1} (chatId: ${session.chatId}):\n${excerpt}`
-    })
-    .join("\n\n")
-
-  try {
-    const result = await adapter.generateStructured<string>({
-      cwd,
-      task: "merge session prompt generation",
-      prompt: [
-        `Write the first user message for a new session that merges context from ${sessions.length} source sessions.`,
-        "The new session should synthesize the relevant context without needing to read the originals.",
-        "Use the merge intent as the highest-priority instruction.",
-        preset
-          ? `Selected merge preset: ${preset.label}. ${preset.generatorHint}`
-          : "No explicit merge preset was selected. Infer the cleanest framing from the user intent and source context.",
-        "Prefer a concise markdown brief with sections: Objective, Merged Context, Constraints, Open Questions.",
-        "Do not mention parent/child chats, delegation, orchestration, or that this was merged from other sessions.",
-        "Do not return JSON or code fences.",
-        "",
-        `Merge intent:\n${normalizedIntent || "Synthesize the most useful combined context."}`,
-        "",
-        labeledExcerpts,
-      ].join("\n"),
-      schema: PROMPT_SCHEMA,
-      parse: (value) => {
-        const output = value && typeof value === "object" ? (value as { prompt?: unknown }) : {}
-        return normalizeGeneratedPrompt(output.prompt, MAX_MERGE_PROMPT_CHARS)
-      },
-    })
-
-    return result ?? normalizedIntent
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.warn(`${LOG_PREFIX} Adapter failed, using fallback intent: ${message}`)
-    return normalizedIntent
-  }
+  return buildSessionSeedPrompt({
+    mode: "merge",
+    intent: mergeIntent,
+    preset,
+    sources: sessions,
+    cwd,
+    adapter,
+  })
 }

@@ -155,28 +155,31 @@ describe("buildBudgetedTranscriptExcerpt", () => {
 // ── generateMergePromptForChats ─────────────────────────────────────────
 
 describe("generateMergePromptForChats", () => {
-  function createMockAdapter(response: { prompt: string } | null = { prompt: "merged result" }) {
-    let capturedArgs: StructuredQuickResponseArgs<string> | null = null
+  function createMockAdapter(
+    respond?: (args: StructuredQuickResponseArgs<unknown>) => unknown | null,
+  ) {
+    const capturedArgs: StructuredQuickResponseArgs<unknown>[] = []
 
     const adapter = {
       generateStructured: async <T>(args: StructuredQuickResponseArgs<T>): Promise<T | null> => {
-        capturedArgs = args as unknown as StructuredQuickResponseArgs<string>
-        if (!response) return null
-        return args.parse(response) as T | null
+        capturedArgs.push(args as StructuredQuickResponseArgs<unknown>)
+        const result = respond ? respond(args as StructuredQuickResponseArgs<unknown>) : null
+        if (result === null) return null
+        return args.parse(result) as T | null
       },
     } as QuickResponseAdapter
 
     return { adapter, getCapturedArgs: () => capturedArgs }
   }
 
-  test("calls adapter with labeled excerpts", async () => {
+  test("analyzes intent, compacts each source, and labels the final brief by chat id", async () => {
     const { adapter, getCapturedArgs } = createMockAdapter()
     const sessions = [
       { chatId: "abc", entries: [userPrompt("session one context")] },
       { chatId: "def", entries: [userPrompt("session two context")] },
     ]
 
-    await generateMergePromptForChats(
+    const result = await generateMergePromptForChats(
       "Merge these sessions",
       sessions,
       "/tmp/test",
@@ -185,15 +188,17 @@ describe("generateMergePromptForChats", () => {
     )
 
     const args = getCapturedArgs()
-    expect(args).not.toBeNull()
-    expect(args!.prompt).toContain("Session 1 (chatId: abc)")
-    expect(args!.prompt).toContain("Session 2 (chatId: def)")
-    expect(args!.prompt).toContain("session one context")
-    expect(args!.prompt).toContain("session two context")
-    expect(args!.task).toContain("merge")
+    expect(args).toHaveLength(3)
+    expect(args[0]!.task).toContain("analysis")
+    expect(args[1]!.task).toBe("session context compaction")
+    expect(args[2]!.task).toBe("session context compaction")
+    expect(args[1]!.prompt).toContain("session one context")
+    expect(args[2]!.prompt).toContain("session two context")
+    expect(result).toContain("### abc")
+    expect(result).toContain("### def")
   })
 
-  test("includes preset hint when provided", async () => {
+  test("includes preset hint in the analysis call when provided", async () => {
     const { adapter, getCapturedArgs } = createMockAdapter()
     const sessions = [
       { chatId: "a", entries: [userPrompt("one")] },
@@ -209,8 +214,7 @@ describe("generateMergePromptForChats", () => {
     )
 
     const args = getCapturedArgs()
-    expect(args).not.toBeNull()
-    expect(args!.prompt).toContain("Compare & decide")
+    expect(args[0]!.prompt).toContain("Selected preset: Compare & decide.")
   })
 
   test("throws for empty sessions", async () => {
@@ -233,8 +237,8 @@ describe("generateMergePromptForChats", () => {
     ).rejects.toThrow()
   })
 
-  test("returns fallback intent on adapter failure", async () => {
-    const { adapter } = createMockAdapter(null)
+  test("returns a composed fallback brief when adapter calls fail", async () => {
+    const { adapter } = createMockAdapter(() => null)
     const sessions = [
       { chatId: "a", entries: [userPrompt("one")] },
       { chatId: "b", entries: [userPrompt("two")] },
@@ -248,11 +252,24 @@ describe("generateMergePromptForChats", () => {
       adapter,
     )
 
-    expect(result).toBe("My merge intent")
+    expect(result).toContain("## Objective\nMy merge intent")
+    expect(result).toContain("### a")
+    expect(result).toContain("### b")
   })
 
-  test("returns generated prompt on success", async () => {
-    const { adapter } = createMockAdapter({ prompt: "Synthesized merge context here." })
+  test("returns a generated brief on success", async () => {
+    const { adapter } = createMockAdapter((args) => {
+      if (args.task.includes("analysis")) {
+        return {
+          compactInstruction: "Keep only the verified findings.",
+          nextInstruction: "Resolve the best combined next step.",
+        }
+      }
+      if (args.prompt.includes("User: one")) {
+        return { summary: "Summary for source one." }
+      }
+      return { summary: "Summary for source two." }
+    })
     const sessions = [
       { chatId: "a", entries: [userPrompt("one")] },
       { chatId: "b", entries: [userPrompt("two")] },
@@ -266,6 +283,8 @@ describe("generateMergePromptForChats", () => {
       adapter,
     )
 
-    expect(result).toBe("Synthesized merge context here.")
+    expect(result).toContain("## Objective\nResolve the best combined next step.")
+    expect(result).toContain("### a\nSummary for source one.")
+    expect(result).toContain("### b\nSummary for source two.")
   })
 })

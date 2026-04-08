@@ -1,13 +1,12 @@
 import type { TranscriptEntry } from "../shared/types"
 import { getForkPreset } from "../shared/fork-presets"
 import { QuickResponseAdapter } from "./quick-response"
-import { PROMPT_SCHEMA, normalizeGeneratedPrompt, normalizeIntent, toTranscriptLine } from "./transcript-utils"
+import { toTranscriptLine } from "./transcript-utils"
+import { buildSessionSeedPrompt } from "./session-seed"
 
 const MAX_FORK_TRANSCRIPT_LINES = 32
 const MAX_FORK_TRANSCRIPT_CHARS = 14_000
 const MAX_FORK_LINE_CHARS = 700
-const MAX_FORK_PROMPT_CHARS = 4_000
-
 /** Build a bounded transcript excerpt from a list of transcript entries.
  * Exported for reuse by merge-context generation. */
 export function buildForkTranscriptExcerpt(entries: TranscriptEntry[]): string {
@@ -48,34 +47,12 @@ export async function generateForkPromptForChat(
   adapter = new QuickResponseAdapter(),
 ): Promise<string> {
   const preset = getForkPreset(presetId)
-  const normalizedIntent = normalizeIntent(forkIntent) || preset?.defaultIntent || ""
-  const transcriptExcerpt = buildForkTranscriptExcerpt(entries)
-
-  const result = await adapter.generateStructured<string>({
+  return buildSessionSeedPrompt({
+    mode: "fork",
+    intent: forkIntent,
+    preset,
+    sources: [{ chatId: "current-session", entries }],
     cwd,
-    task: "fork session prompt generation",
-    prompt: [
-      "Write the first user message for a new independent forked coding session.",
-      "The new session should be able to start work without reading the original chat.",
-      "Use the user's fork intent as the highest-priority instruction.",
-      preset
-        ? `Selected fork preset: ${preset.label}. ${preset.generatorHint}`
-        : "No explicit fork preset was selected. Infer the cleanest framing from the user intent and source context.",
-      "Carry forward only the context from the source transcript that is genuinely needed.",
-      "Prefer a concise markdown brief with these sections when relevant: Objective, Relevant Context, Constraints, Open Questions.",
-      "Do not mention parent/child chats, delegation, orchestration, or that this content was summarized from another session.",
-      "Do not return JSON or code fences.",
-      "",
-      `Fork intent:\n${normalizedIntent || "Continue the most useful independent next step."}`,
-      "",
-      transcriptExcerpt,
-    ].join("\n"),
-    schema: PROMPT_SCHEMA,
-    parse: (value) => {
-      const output = value && typeof value === "object" ? value as { prompt?: unknown } : {}
-      return normalizeGeneratedPrompt(output.prompt, MAX_FORK_PROMPT_CHARS)
-    },
+    adapter,
   })
-
-  return result ?? normalizedIntent
 }

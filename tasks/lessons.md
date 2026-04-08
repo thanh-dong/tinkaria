@@ -9,6 +9,9 @@ Keep this file short and durable. Merge repeats. Drop stale one-off notes before
 - [2026-04-07] Match `spawn_agent` guidance to real fork semantics. If a delegated chat can inherit bounded parent transcript context, expose it explicitly as `fork_context` and keep the visible child prompt clean.
 - [2026-04-07] Treat user-facing forking as derived session seeding, not delegation. The fork textarea is intent input to a context builder, not the literal first prompt to send unchanged.
 - [2026-04-07] Fork presets should be scaffolds, not workflows. Let preset selection prefill editable intent and pass the preset into the builder as a lens, not as the final generated prompt.
+- [2026-04-08] Diashort embeds should keep the full `/d/` controller surface when zoom/navigation matters. Prefer iframe rendering of the document URL over forcing the stripped `/e/` embed URL.
+- [2026-04-08] Live transcript follow must account for streaming growth after the view has already reached bottom. Exact-bottom intersection fixes are necessary but not sufficient on their own.
+- [2026-04-08] When repo instructions name `agent-browser`, treat it as the installed CLI and run live browser verification directly instead of assuming the tool is unavailable.
 - [2026-04-03] For attach/connectivity work, prefer the public server-origin path. Do not rely on WSL-local bootstrap files or hidden WS ports; prove the Windows-facing `/nats-ws` endpoint returns `101 Switching Protocols` before changing native code.
 - [2026-04-03] Keep queued drafts as local per-chat pending state with cleanup rules and original submit options. Do not promote them into transcript/server state just to survive refresh.
 - [2026-04-03] Busy-composer UX should keep the queue affordance explicit as `Queue`, keep queued content above the composer only, and preserve `ArrowUp` as the restore path.

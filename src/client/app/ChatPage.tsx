@@ -534,10 +534,26 @@ export function ChatPage() {
           >
             <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
               <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 opacity-70">
-                {state.mergePendingChatId === state.activeChatId ? (
+                {state.pendingSessionBootstrap?.chatId === state.activeChatId ? (
                   <>
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
-                    <span className="text-sm text-muted-foreground">Generating merge summary...</span>
+                    <span className="text-sm text-muted-foreground">
+                      {state.pendingSessionBootstrap.phase === "compacting"
+                        ? `Compacting ${state.pendingSessionBootstrap.sourceLabels.length} context${state.pendingSessionBootstrap.sourceLabels.length === 1 ? "" : "s"}...`
+                        : "Starting dedicated session..."}
+                    </span>
+                    {state.pendingSessionBootstrap.phase === "compacting" ? (
+                      <div className="flex max-w-md flex-wrap items-center justify-center gap-2">
+                        {state.pendingSessionBootstrap.sourceLabels.map((label) => (
+                          <span
+                            key={label}
+                            className="rounded-full border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -613,7 +629,7 @@ export function ChatPage() {
             queuedText={state.queuedText}
             onClearQueuedText={state.clearQueuedText}
             onRestoreQueuedText={state.restoreQueuedText}
-            disabled={!state.hasSelectedProject || state.runtime?.status === "waiting_for_user" || state.mergePendingChatId === state.activeChatId}
+            disabled={!state.hasSelectedProject || state.runtime?.status === "waiting_for_user" || state.pendingSessionBootstrap?.chatId === state.activeChatId}
             canCancel={state.canCancel}
             chatId={state.activeChatId}
             activeProvider={state.runtime?.provider ?? null}
