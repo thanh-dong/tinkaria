@@ -3,6 +3,7 @@ import { ArrowDown, Loader2 } from "lucide-react"
 import { useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
+import { SubagentIndicator } from "../components/chat-ui/SubagentIndicator"
 import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
 import { ForkSessionDialog } from "../components/chat-ui/ForkSessionDialog"
 import { MergeSessionDialog } from "../components/chat-ui/MergeSessionDialog"
@@ -619,6 +620,11 @@ export function ChatPage() {
           {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.composer)}
         >
         <div className="bg-gradient-to-t from-background via-background pointer-events-auto" ref={state.inputRef}>
+          <div className="px-3">
+            <div className="max-w-[840px] mx-auto flex justify-end">
+              <SubagentIndicator hierarchy={state.orchestrationHierarchy} />
+            </div>
+          </div>
           <ChatInput
             ref={chatInputRef}
             key={state.activeChatId ?? "new-chat"}
