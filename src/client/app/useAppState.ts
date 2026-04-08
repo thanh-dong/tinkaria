@@ -2,77 +2,55 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useScrollFollow } from "./useScrollFollow"
 import { shouldShowScrollButton } from "./scrollMachine"
 import { useNavigate } from "react-router-dom"
-import { APP_NAME } from "../../shared/branding"
 import {
   PROVIDERS,
   type AgentProvider,
   type AskUserQuestionAnswerMap,
+  type AskUserQuestionItem,
   type CurrentRepoStatusSnapshot,
   type CurrentSessionSnapshot,
   type ModelOptions,
   type OrchestrationHierarchySnapshot,
   type ProviderCatalogEntry,
   type SessionsSnapshot,
-  type UpdateInstallResult,
   type UpdateSnapshot,
 } from "../../shared/types"
-import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
 import { useChatReadStateStore } from "../stores/chatReadStateStore"
-import { useRightSidebarStore } from "../stores/rightSidebarStore"
-import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
 import { useChatInputStore } from "../stores/chatInputStore"
-import type { ChatMessageEvent, ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
+import type { ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
-import type { AskUserQuestionItem } from "../components/messages/types"
 import { useAppDialog } from "../components/ui/app-dialog"
 import { useSessionPolling } from "./useSessionPolling"
-import { createIncrementalHydrator, processTranscriptMessages } from "../lib/parseTranscript"
-import type { IncrementalHydrator } from "../lib/parseTranscript"
-import { getCachedChat, setCachedChat, deleteCachedChat, clearChatCache, markCachedChatsStale } from "./chatCache"
+import { clearChatCache, markCachedChatsStale } from "./chatCache"
 import { canCancelStatus, getLatestToolIds, isProcessingStatus } from "./derived"
 import {
-  completeQueuedFlush,
   createProjectSelectionState,
-  failQueuedFlush,
-  getSubmitPipelineMode,
-  markPostFlushBusyObserved,
   resolveProjectSelection,
-  startQueuedFlush,
   transitionProjectSelection,
-  queueSubmit as queueSubmitTransition,
 } from "./useAppState.machine"
 import { useSubmitPipeline } from "./useSubmitPipeline"
 import { NatsSocket } from "./nats-socket"
 import type { AppTransport, SocketStatus } from "./socket-interface"
 import {
   compareReadBoundary,
-  computeTailOffset,
   getActiveChatSnapshot,
   getHookReadProgressBoundary,
   getInitialChatReadAnchor,
   getLastReadableMessage,
-  getNewestRemainingChatId,
   getReadableBlockCount,
-  getReadTimestampToPersistAfterReply,
-  getSidebarChatLabels,
   getSidebarChatRow,
   getUiUpdateRestartReconnectAction,
   normalizeCommandErrorMessage,
-  normalizeLocalFilePreviewErrorMessage,
-  resolveComposeIntent,
   resolveLockedAnchor,
-  shouldBackfillTranscriptWindow,
-  shouldQueueChatSubmit,
   shouldStickToBottomOnComposerSubmit,
-  summarizeTranscriptWindow,
-  TRANSCRIPT_TAIL_SIZE,
   type InitialChatReadAnchor,
   type LockedAnchorState,
   type PendingSessionBootstrap,
   type ProjectRequest,
-  type StartChatIntent,
 } from "./appState.helpers"
 import { usePwaResume } from "./usePwaResume"
+import { useTranscriptLifecycle } from "./useTranscriptLifecycle"
+import { useChatCommands, getUiUpdateRestartPhase, setUiUpdateRestartPhase, clearUiUpdateRestartPhase } from "./useChatCommands"
 
 // Re-export all moved helpers so existing consumers continue to work
 export {
@@ -172,19 +150,6 @@ function logAppState(message: string, details?: unknown) {
 export { type CachedChatState, MAX_CACHED_CHATS } from "./chatCache"
 
 const FIXED_TRANSCRIPT_PADDING_BOTTOM = 320
-const UI_UPDATE_RESTART_STORAGE_KEY = "tinkaria:ui-update-restart"
-
-function getUiUpdateRestartPhase() {
-  return window.sessionStorage.getItem(UI_UPDATE_RESTART_STORAGE_KEY)
-}
-
-function setUiUpdateRestartPhase(phase: "awaiting_disconnect" | "awaiting_reconnect") {
-  window.sessionStorage.setItem(UI_UPDATE_RESTART_STORAGE_KEY, phase)
-}
-
-function clearUiUpdateRestartPhase() {
-  window.sessionStorage.removeItem(UI_UPDATE_RESTART_STORAGE_KEY)
-}
 
 export interface AppState {
   socket: AppTransport
@@ -283,25 +248,15 @@ export function useAppState(activeChatId: string | null): AppState {
   const [sidebarData, setSidebarData] = useState<SidebarData>({ projectGroups: [] })
   const [localProjects, setLocalProjects] = useState<LocalProjectsSnapshot | null>(null)
   const [updateSnapshot, setUpdateSnapshot] = useState<UpdateSnapshot | null>(null)
-  const [chatSnapshot, setChatSnapshot] = useState<ChatSnapshot | null>(null)
-  const [orchestrationHierarchy, setOrchestrationHierarchy] = useState<OrchestrationHierarchySnapshot | null>(null)
-  const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
-  const [messages, setMessages] = useState<HydratedTranscriptMessage[]>([])
-  const messagesRef = useRef<HydratedTranscriptMessage[]>(messages)
-  const messageCountRef = useRef(0)
   const [connectionStatus, setConnectionStatus] = useState<SocketStatus>("connecting")
   const [sidebarReady, setSidebarReady] = useState(false)
   const [localProjectsReady, setLocalProjectsReady] = useState(false)
-  const [chatReady, setChatReady] = useState(false)
   const [projectSelection, setProjectSelection] = useState(createProjectSelectionState)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [inputHeight, setInputHeight] = useState(148)
   const [commandError, setCommandError] = useState<string | null>(null)
-  const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
-  const [pendingMergeProjectId, setPendingMergeProjectId] = useState<string | null>(null)
-  const [pendingSessionBootstrap, setPendingSessionBootstrap] = useState<PendingSessionBootstrap | null>(null)
   const {
     submitPipelineRef,
     submitPipeline,
@@ -310,10 +265,6 @@ export function useAppState(activeChatId: string | null): AppState {
     clearQueuedText,
     restoreQueuedText,
   } = useSubmitPipeline({ activeChatId })
-  const [localFilePreview, setLocalFilePreview] = useState<LocalFilePreview | null>(null)
-  const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
-  const [sessionsWindowDays, setSessionsWindowDays] = useState<Map<string, number>>(new Map())
-  const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
   const lastReadBlockIndex = useChatReadStateStore((store) => (
     activeChatId ? store.lastReadBlockIndexByChat[activeChatId] : undefined
   ))
@@ -342,6 +293,8 @@ export function useAppState(activeChatId: string | null): AppState {
   const setNormalizedCommandError = useCallback((error: unknown) => {
     setCommandError(normalizeCommandErrorMessage(error))
   }, [])
+  const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
+  const snapshotCallbackRef = useRef<(snapshot: ChatSnapshot) => void>(() => {})
 
   const { resumeRefreshNonce } = usePwaResume({
     socket,
@@ -427,227 +380,27 @@ export function useAppState(activeChatId: string | null): AppState {
     }
   }, [setNormalizedCommandError, socket, updateSnapshot?.lastCheckedAt])
 
-  useEffect(() => {
-    if (!activeChatId) {
-      logAppState("clearing chat snapshot for non-chat route")
-      setChatSnapshot(null)
-      setOrchestrationHierarchy(null)
-      setProjectSelection((current) => transitionProjectSelection(current, { type: "chat.cleared" }))
-      // Don't mutate cached hydrator — create a fresh one
-      hydratorRef.current = createIncrementalHydrator()
-      setMessages([])
-      setChatReady(true)
-      return
-    }
+  const handleChatSnapshotReceived = useCallback((snapshot: ChatSnapshot) => {
+    snapshotCallbackRef.current(snapshot)
+  }, [])
 
-    // Restore from cache or create fresh state
-    const cached = getCachedChat(activeChatId)
-    const restoredFromCache = cached !== null
-    const hydrator = cached?.hydrator ?? createIncrementalHydrator()
-    hydratorRef.current = hydrator
-
-    if (restoredFromCache) {
-      logAppState("restoring chat from cache", {
-        activeChatId,
-        cachedMessages: cached.messages.length,
-        cachedDiagnostics: summarizeTranscriptWindow(cached.messages),
-        stale: cached.stale,
-      })
-      setMessages(cached.messages)
-      setChatSnapshot(null) // will be replaced when snapshot arrives
-      setChatReady(true)    // show stale content immediately
-    } else {
-      logAppState("subscribing to chat (no cache)", { activeChatId })
-      setChatSnapshot(null)
-      setMessages([])
-      setChatReady(false)
-    }
-
-    // Buffer message events that arrive before the initial fetch completes
-    let cancelled = false
-    let initialFetchDone = false
-    let fetchTriggered = false
-    const buffer: TranscriptEntry[] = []
-    const chatId = activeChatId
-
-    function flushTail(entries: TranscriptEntry[], source: "fetched" | "fallback_empty") {
-      if (cancelled) return
-      initialFetchDone = true
-      const bufferedEntries = buffer.length
-      const allEntries = bufferedEntries > 0 ? [...entries, ...buffer] : entries
-      buffer.length = 0
-      // Only reset on fresh load — cache-restored hydrators skip duplicates via seenEntryIds
-      if (!restoredFromCache) {
-        hydrator.reset()
-      }
-      for (const entry of allEntries) hydrator.hydrate(entry)
-      const hydratedMessages = hydrator.getMessages()
-      setMessages(hydratedMessages)
-      logAppState("transcript tail flushed", {
-        chatId,
-        source,
-        restoredFromCache,
-        fetchedEntryCount: entries.length,
-        bufferedEntryCount: bufferedEntries,
-        hydratedDiagnostics: summarizeTranscriptWindow(hydratedMessages),
-      })
-    }
-
-    async function fetchTail(messageCount: number) {
-      if (fetchTriggered) return
-      fetchTriggered = true
-      try {
-        let offset = computeTailOffset(messageCount)
-        let entries = await socket.command<TranscriptEntry[]>({
-          type: "chat.getMessages", chatId, offset, limit: TRANSCRIPT_TAIL_SIZE,
-        })
-        let hydratedPreview = processTranscriptMessages(entries)
-
-        logAppState("transcript tail fetched", {
-          chatId,
-          messageCount,
-          offset,
-          rawEntryCount: entries.length,
-          hydratedDiagnostics: summarizeTranscriptWindow(hydratedPreview),
-        })
-
-        while (shouldBackfillTranscriptWindow({
-          messages: hydratedPreview,
-          messageCount,
-          offset,
-        })) {
-          const nextOffset = Math.max(0, offset - TRANSCRIPT_TAIL_SIZE)
-          logAppState("transcript tail needs backfill", {
-            chatId,
-            messageCount,
-            offset,
-            hydratedDiagnostics: summarizeTranscriptWindow(hydratedPreview),
-          })
-          const olderEntries = await socket.command<TranscriptEntry[]>({
-            type: "chat.getMessages",
-            chatId,
-            offset: nextOffset,
-            limit: offset - nextOffset,
-          })
-          if (olderEntries.length === 0) break
-          entries = [...olderEntries, ...entries]
-          offset = nextOffset
-          hydratedPreview = processTranscriptMessages(entries)
-          logAppState("backfilling transcript window", {
-            chatId,
-            messageCount,
-            offset,
-            fetchedEntries: entries.length,
-            hydratedDiagnostics: summarizeTranscriptWindow(hydratedPreview),
-          })
-        }
-
-        flushTail(entries, "fetched")
-      } catch (error) {
-        logAppState("transcript tail fetch failed", {
-          chatId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        flushTail([], "fallback_empty")
-      }
-    }
-
-    const unsub = socket.subscribe<ChatSnapshot | null, ChatMessageEvent>(
-      { type: "chat", chatId: activeChatId },
-      (snapshot) => {
-        if (cancelled) return
-        logAppState("chat snapshot received", {
-          activeChatId,
-          snapshotChatId: snapshot?.runtime.chatId ?? null,
-          snapshotProvider: snapshot?.runtime.provider ?? null,
-          snapshotStatus: snapshot?.runtime.status ?? null,
-        })
-        setChatSnapshot(snapshot)
-        if (snapshot) {
-          messageCountRef.current = snapshot.messageCount
-          setProjectSelection((current) => transitionProjectSelection(current, {
-            type: "chat.snapshot_received",
-            projectId: snapshot.runtime.projectId,
-          }))
-          if (isProcessingStatus(snapshot.runtime.status)) {
-            updateSubmitPipeline((current) => markPostFlushBusyObserved(current, snapshot.runtime.chatId))
-          } else {
-            maybeFlushQueuedSubmit(snapshot.runtime.chatId, false)
-          }
-        }
-        setChatReady(true)
-        setCommandError(null)
-
-        // Fetch tail on first snapshot — messageCount tells us where the end is
-        if (snapshot && !initialFetchDone) {
-          void fetchTail(snapshot.messageCount)
-        }
-      },
-      (event) => {
-        if (cancelled) return
-        if (event.chatId !== activeChatId) return
-        if (initialFetchDone) {
-          hydrator.hydrate(event.entry)
-          setMessages(hydrator.getMessages())
-        } else {
-          buffer.push(event.entry)
-        }
-      }
-    )
-
-    const orchestrationUnsub = socket.subscribe<OrchestrationHierarchySnapshot>(
-      { type: "orchestration", chatId: activeChatId },
-      (snapshot) => {
-        if (cancelled) return
-        setOrchestrationHierarchy(snapshot)
-      },
-    )
-
-    return () => {
-      cancelled = true
-      unsub()
-      orchestrationUnsub()
-      // Save departing chat to cache — use sidebar's lastMessageAt as the source of truth
-      const departingSidebarChat = sidebarData.projectGroups
-        .flatMap((g) => g.chats)
-        .find((c) => c.chatId === chatId)
-      if (chatId && messagesRef.current.length > 0) {
-        setCachedChat(chatId, {
-          hydrator,
-          messages: messagesRef.current,
-          messageCount: messageCountRef.current,
-          cachedAt: Date.now(),
-          lastMessageAt: departingSidebarChat?.lastMessageAt,
-          stale: false,
-        })
-      }
-    }
-  }, [activeChatId, resumeRefreshNonce, socket])
-
-  useEffect(() => {
-    if (!activeChatId) return
-    if (!sidebarReady || !chatReady) return
-    const exists = sidebarData.projectGroups.some((group) => group.chats.some((chat) => chat.chatId === activeChatId))
-    if (exists) {
-      if (pendingChatId === activeChatId) {
-        setPendingChatId(null)
-      }
-      return
-    }
-    if (pendingChatId === activeChatId) {
-      return
-    }
-    navigate("/")
-  }, [activeChatId, chatReady, navigate, pendingChatId, sidebarData.projectGroups, sidebarReady])
-
-  useEffect(() => {
-    if (!chatSnapshot) return
-    if (pendingChatId === chatSnapshot.runtime.chatId) {
-      setPendingChatId(null)
-    }
-  }, [chatSnapshot, pendingChatId])
-
-  useLayoutEffect(() => { messagesRef.current = messages }, [messages])
+  const {
+    messages,
+    chatSnapshot,
+    orchestrationHierarchy,
+  } = useTranscriptLifecycle({
+    socket,
+    activeChatId,
+    resumeRefreshNonce,
+    sidebarData,
+    sidebarReady,
+    pendingChatId,
+    setPendingChatId,
+    navigate,
+    setProjectSelection,
+    setCommandError,
+    onChatSnapshotReceived: handleChatSnapshotReceived,
+  })
 
   useLayoutEffect(() => {
     const element = inputRef.current
@@ -896,558 +649,40 @@ export function useAppState(activeChatId: string | null): AppState {
     scrollFollowToBottom("auto")
   }
 
-  function maybeFlushQueuedSubmit(chatId: string, isProcessing: boolean) {
-    const { state: nextState, flushRequest } = startQueuedFlush(submitPipelineRef.current, {
-      chatId,
-      isProcessing,
-    })
-    if (!flushRequest) return
+  const commands = useChatCommands({
+    socket,
+    activeChatId,
+    navigate,
+    dialog,
+    sidebarData,
+    chatSnapshot,
+    runtime,
+    selectedProjectId,
+    fallbackLocalProjectPath,
+    isProcessing,
+    messages,
+    latestReadableMessage,
+    lastSeenMessageAt,
+    activeSidebarChat,
+    localProjects,
+    setProjectSelection,
+    setPendingChatId,
+    setSidebarOpen,
+    setCommandError,
+    setNormalizedCommandError,
+    scrollFollowToBottom,
+    keepComposerSubmitAnchored,
+    activeQueuedText,
+    updateSubmitPipeline,
+    submitPipeline,
+    submitPipelineRef,
+    markChatRead,
+    clearChatReadState,
+    activeSessionsSubs,
+  })
 
-    updateSubmitPipeline(() => nextState)
-
-    void handleSend(flushRequest.text, flushRequest.options)
-      .then(() => {
-        updateSubmitPipeline((current) => completeQueuedFlush(current, chatId))
-      })
-      .catch(() => {
-        updateSubmitPipeline((current) => failQueuedFlush(current, {
-          chatId,
-          flushedText: flushRequest.text,
-        }))
-      })
-  }
-
-  async function createChatForProject(projectId: string) {
-    useChatPreferencesStore.getState().initializeComposerForNewChat()
-    const result = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
-    setProjectSelection((current) => transitionProjectSelection(current, {
-      type: "project.explicitly_selected",
-      projectId,
-    }))
-    setPendingChatId(result.chatId)
-    navigate(`/chat/${result.chatId}`)
-    setSidebarOpen(false)
-    setCommandError(null)
-  }
-
-  async function resolveProjectIdForStartChat(intent: StartChatIntent): Promise<{ projectId: string; localPath?: string }> {
-    if (intent.kind === "project_id") {
-      return { projectId: intent.projectId }
-    }
-
-    if (intent.kind === "local_path") {
-      const result = await socket.command<{ projectId: string }>({ type: "project.open", localPath: intent.localPath })
-      return { projectId: result.projectId, localPath: intent.localPath }
-    }
-
-    const result = await socket.command<{ projectId: string }>(
-      intent.project.mode === "new"
-        ? { type: "project.create", localPath: intent.project.localPath, title: intent.project.title }
-        : { type: "project.open", localPath: intent.project.localPath }
-    )
-    return { projectId: result.projectId, localPath: intent.project.localPath }
-  }
-
-  async function startChatFromIntent(intent: StartChatIntent) {
-    try {
-      const localPath = intent.kind === "project_id"
-        ? null
-        : intent.kind === "local_path"
-          ? intent.localPath
-          : intent.project.localPath
-      if (localPath) {
-        setStartingLocalPath(localPath)
-      }
-
-      const { projectId } = await resolveProjectIdForStartChat(intent)
-      await createChatForProject(projectId)
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setStartingLocalPath(null)
-    }
-  }
-
-  async function handleCreateChat(projectId: string) {
-    await startChatFromIntent({ kind: "project_id", projectId })
-  }
-
-  async function handleOpenLocalProject(localPath: string) {
-    await startChatFromIntent({ kind: "local_path", localPath })
-  }
-
-  async function handleCreateProject(project: ProjectRequest) {
-    await startChatFromIntent({ kind: "project_request", project })
-  }
-
-  async function handleCheckForUpdates(options?: { force?: boolean }) {
-    try {
-      await socket.command<UpdateSnapshot>({ type: "update.check", force: options?.force })
-      setCommandError(null)
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function handleInstallUpdate() {
-    try {
-      const result = await socket.command<UpdateInstallResult>({ type: "update.install" })
-      if (!result.ok) {
-        clearUiUpdateRestartPhase()
-        setCommandError(null)
-        await dialog.alert({
-          title: result.userTitle ?? "Update failed",
-          description: result.userMessage ?? `${APP_NAME} could not install the update. Try again later.`,
-          closeLabel: "OK",
-        })
-        return
-      }
-
-      if (result.ok && result.action === "reload") {
-        window.location.reload()
-        return
-      }
-
-      if (result.ok && result.action === "restart") {
-        setUiUpdateRestartPhase("awaiting_disconnect")
-      }
-      setCommandError(null)
-    } catch (error) {
-      clearUiUpdateRestartPhase()
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function handleSend(
-    content: string,
-    options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
-  ) {
-    try {
-      let projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
-      if (!activeChatId && !projectId && fallbackLocalProjectPath) {
-        const project = await socket.command<{ projectId: string }>({
-          type: "project.open",
-          localPath: fallbackLocalProjectPath,
-        })
-        projectId = project.projectId
-        setProjectSelection((current) => transitionProjectSelection(current, {
-          type: "project.explicitly_selected",
-          projectId,
-        }))
-      }
-
-      if (!activeChatId && !projectId) {
-        throw new Error("Open a project first")
-      }
-
-      scrollFollowToBottom("auto")
-
-      const result = await socket.command<{ chatId?: string }>({
-        type: "chat.send",
-        chatId: activeChatId ?? undefined,
-        projectId: activeChatId ? undefined : projectId ?? undefined,
-        provider: options?.provider,
-        content,
-        model: options?.model,
-        modelOptions: options?.modelOptions,
-        planMode: options?.planMode,
-      })
-
-      if (!activeChatId && result.chatId) {
-        setPendingChatId(result.chatId)
-        navigate(`/chat/${result.chatId}`)
-      }
-
-      const readTimestampToPersist = getReadTimestampToPersistAfterReply(lastSeenMessageAt, activeSidebarChat?.lastMessageAt)
-      if (activeChatId && readTimestampToPersist !== null) {
-        markChatRead(activeChatId, {
-          messageId: latestReadableMessage?.id,
-          blockIndex: latestReadableMessage ? Math.max(0, getReadableBlockCount(latestReadableMessage) - 1) : undefined,
-          lastMessageAt: readTimestampToPersist,
-        })
-      }
-
-      setCommandError(null)
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-      throw error
-    }
-  }
-
-  async function handleSubmitFromComposer(
-    content: string,
-    options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
-  ) {
-    keepComposerSubmitAnchored()
-
-    if (!activeChatId) {
-      await handleSend(content, options)
-      return "sent"
-    }
-
-    if (
-      shouldQueueChatSubmit(isProcessing, activeQueuedText)
-      || getSubmitPipelineMode(submitPipeline, activeChatId) === "flushing"
-      || getSubmitPipelineMode(submitPipeline, activeChatId) === "awaiting_busy_ack"
-    ) {
-      updateSubmitPipeline((current) => queueSubmitTransition(current, {
-        chatId: activeChatId,
-        content,
-        options: options ?? undefined,
-      }))
-      if (!isProcessing) {
-        maybeFlushQueuedSubmit(activeChatId, false)
-      }
-      return "queued"
-    }
-
-    await handleSend(content, options)
-    return "sent"
-  }
-
-  async function handleCancel() {
-    if (!activeChatId) return
-    try {
-      await socket.command({ type: "chat.cancel", chatId: activeChatId })
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function handleDeleteChat(chat: SidebarChatRow) {
-    const confirmed = await dialog.confirm({
-      title: "Delete Chat",
-      description: `Delete "${chat.title}"? This cannot be undone.`,
-      confirmLabel: "Delete",
-      confirmVariant: "destructive",
-    })
-    if (!confirmed) return
-    try {
-      await socket.command({ type: "chat.delete", chatId: chat.chatId })
-      useChatInputStore.getState().clearQueuedDraft(chat.chatId)
-      clearChatReadState(chat.chatId)
-      deleteCachedChat(chat.chatId)
-      if (chat.chatId === activeChatId) {
-        const nextChatId = getNewestRemainingChatId(sidebarData.projectGroups, chat.chatId)
-        navigate(nextChatId ? `/chat/${nextChatId}` : "/")
-      }
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function handleRenameChat(chatId: string, title: string) {
-    const trimmed = title.trim()
-    if (!trimmed) return
-    try {
-      await socket.command({ type: "chat.rename", chatId, title: trimmed })
-      setCommandError(null)
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function handleRemoveProject(projectId: string) {
-    const project = sidebarData.projectGroups.find((group) => group.groupKey === projectId)
-    if (!project) return
-    const projectName = project.localPath.split("/").filter(Boolean).pop() ?? project.localPath
-    const confirmed = await dialog.confirm({
-      title: "Remove",
-      description: `Remove "${projectName}" from the sidebar? Existing chats will be removed from ${APP_NAME}.`,
-      confirmLabel: "Remove",
-      confirmVariant: "destructive",
-    })
-    if (!confirmed) return
-
-    try {
-      await socket.command({ type: "project.remove", projectId })
-      for (const chat of project.chats) {
-        useChatInputStore.getState().clearQueuedDraft(chat.chatId)
-        deleteCachedChat(chat.chatId)
-      }
-      useTerminalLayoutStore.getState().clearProject(projectId)
-      useRightSidebarStore.getState().clearProject(projectId)
-      if (runtime?.projectId === projectId) {
-        navigate("/")
-      }
-      setCommandError(null)
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function handleOpenExternal(action: "open_finder") {
-    const localPath = runtime?.localPath ?? localProjects?.projects[0]?.localPath ?? sidebarData.projectGroups[0]?.localPath
-    if (!localPath) return
-    try {
-      await openExternal({
-        action,
-        localPath,
-      })
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function handleOpenLocalLink(target: { path: string; line?: number; column?: number }) {
-    try {
-      const result = await socket.command<{ localPath: string; content: string }>({
-        type: "system.readLocalFilePreview",
-        localPath: target.path,
-      })
-      setLocalFilePreview({
-        path: result.localPath,
-        content: result.content,
-        line: target.line,
-        column: target.column,
-      })
-      setCommandError(null)
-    } catch (error) {
-      setCommandError(normalizeLocalFilePreviewErrorMessage(error))
-    }
-  }
-
-  async function handleOpenExternalPath(action: "open_finder", localPath: string) {
-    try {
-      await openExternal({
-        action,
-        localPath,
-      })
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  function handleOpenExternalLink(href: string): boolean {
-    void href
-    return false
-  }
-
-  async function openExternal(command: {
-    action: "open_finder"
-    localPath: string
-  }) {
-    setCommandError(null)
-    await socket.command({
-      type: "system.openExternal",
-      ...command,
-    })
-  }
-
-  const handleOpenSessionPicker = useCallback(
-    (projectId: string, open: boolean) => {
-      if (open) {
-        if (activeSessionsSubs.current.has(projectId)) return
-        const unsub = socket.subscribe<SessionsSnapshot>(
-          { type: "sessions", projectId },
-          (snapshot) => {
-            setSessionsSnapshots((prev) => new Map(prev).set(projectId, snapshot))
-          }
-        )
-        activeSessionsSubs.current.set(projectId, unsub)
-      } else {
-        const unsub = activeSessionsSubs.current.get(projectId)
-        unsub?.()
-        activeSessionsSubs.current.delete(projectId)
-      }
-    },
-    [socket]
-  )
-
-  const handleResumeSession = useCallback(
-    async (projectId: string, sessionId: string, provider: AgentProvider) => {
-      try {
-        const result = await socket.command<{ chatId: string }>({
-          type: "sessions.resume",
-          projectId,
-          sessionId,
-          provider,
-        })
-        if (result?.chatId) {
-          setPendingChatId(result.chatId)
-          navigate(`/chat/${result.chatId}`)
-        }
-        setCommandError(null)
-      } catch (error) {
-        setCommandError(error instanceof Error ? error.message : String(error))
-      }
-    },
-    [navigate, socket]
-  )
-
-  const handleRefreshSessions = useCallback(
-    (projectId: string) => {
-      void socket.command({ type: "sessions.refresh", projectId }).catch((error) => {
-        setCommandError(error instanceof Error ? error.message : String(error))
-      })
-    },
-    [socket]
-  )
-
-  const handleShowMoreSessions = useCallback(
-    (projectId: string) => {
-      setSessionsWindowDays((prev) => {
-        const current = prev.get(projectId) ?? 7
-        return new Map(prev).set(projectId, current + 7)
-      })
-    },
-    []
-  )
-
-  function handleCompose() {
-    const intent = resolveComposeIntent({
-      selectedProjectId,
-      sidebarProjectId: sidebarData.projectGroups[0]?.groupKey,
-      fallbackLocalProjectPath,
-    })
-    if (intent) {
-      void startChatFromIntent(intent)
-      return
-    }
-
-    navigate("/")
-  }
-
-  async function handleForkSession(intent: string, provider: AgentProvider, model: string, preset?: string) {
-    if (!activeChatId) {
-      throw new Error("Open a chat first")
-    }
-    const projectId = chatSnapshot?.runtime?.projectId ?? selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
-    if (!projectId) {
-      throw new Error("Open a project first")
-    }
-
-    const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
-    setPendingChatId(chatId)
-    setPendingSessionBootstrap({
-      chatId,
-      kind: "fork",
-      phase: "compacting",
-      sourceLabels: [getSidebarChatRow(sidebarData.projectGroups, activeChatId)?.title?.trim() || activeChatId],
-    })
-    navigate(`/chat/${chatId}`)
-    setSidebarOpen(false)
-    setCommandError(null)
-
-    void (async () => {
-      try {
-        const { prompt } = await socket.command<{ prompt: string }>({
-          type: "chat.generateForkPrompt",
-          chatId: activeChatId,
-          intent,
-          preset,
-        })
-        setPendingSessionBootstrap((current) => current?.chatId === chatId
-          ? { ...current, phase: "starting" }
-          : current)
-        const defaults = useChatPreferencesStore.getState().providerDefaults[provider]
-        const modelOptions: ModelOptions = provider === "claude"
-          ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
-          : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
-
-        await socket.command({ type: "chat.send", chatId, provider, content: prompt, model, modelOptions })
-      } catch (error) {
-        console.warn("[fork] background fork failed:", error instanceof Error ? error.message : String(error))
-      } finally {
-        setPendingSessionBootstrap((current) => current?.chatId === chatId ? null : current)
-      }
-    })()
-  }
-
-  async function handleMergeSession(chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) {
-    if (chatIds.length < 1) {
-      throw new Error("Select at least 1 session to merge")
-    }
-
-    const projectId = pendingMergeProjectId ?? selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
-    if (!projectId) {
-      throw new Error("Open a project first")
-    }
-
-    // Step 1: Create chat + navigate instantly
-    const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
-    setPendingChatId(chatId)
-    setPendingSessionBootstrap({
-      chatId,
-      kind: "merge",
-      phase: "compacting",
-      sourceLabels: getSidebarChatLabels(sidebarData.projectGroups, chatIds),
-    })
-    navigate(`/chat/${chatId}`)
-    setSidebarOpen(false)
-    setCommandError(null)
-
-    // Step 2: Background — generate prompt + send + optional cleanup
-    void (async () => {
-      try {
-        const { prompt } = await socket.command<{ prompt: string }>({
-          type: "chat.generateMergePrompt", chatIds, intent, preset,
-        })
-        setPendingSessionBootstrap((current) => current?.chatId === chatId
-          ? { ...current, phase: "starting" }
-          : current)
-        const defaults = useChatPreferencesStore.getState().providerDefaults[provider]
-        const modelOptions: ModelOptions = provider === "claude"
-          ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
-          : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
-
-        await socket.command({ type: "chat.send", chatId, provider, content: prompt, model, modelOptions })
-
-        if (closeSources) {
-          for (const sourceId of chatIds) {
-            try {
-              await socket.command({ type: "chat.delete", chatId: sourceId })
-            } catch (deleteError) {
-              console.warn("[merge] failed to delete source chat:", sourceId, deleteError instanceof Error ? deleteError.message : String(deleteError))
-            }
-          }
-        }
-      } catch (error) {
-        console.warn("[merge] background merge failed:", error instanceof Error ? error.message : String(error))
-      } finally {
-        setPendingSessionBootstrap((current) => current?.chatId === chatId ? null : current)
-      }
-    })()
-  }
-
-  async function handleAskUserQuestion(
-    toolUseId: string,
-    questions: AskUserQuestionItem[],
-    answers: AskUserQuestionAnswerMap
-  ) {
-    if (!activeChatId) return
-    try {
-      await socket.command({
-        type: "chat.respondTool",
-        chatId: activeChatId,
-        toolUseId,
-        result: { questions, answers },
-      })
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
-
-  async function handleExitPlanMode(toolUseId: string, confirmed: boolean, clearContext?: boolean, message?: string) {
-    if (!activeChatId) return
-    if (confirmed) {
-      useChatPreferencesStore.getState().setComposerPlanMode(false)
-    }
-    try {
-      await socket.command({
-        type: "chat.respondTool",
-        chatId: activeChatId,
-        toolUseId,
-        result: {
-          confirmed,
-          ...(clearContext ? { clearContext: true } : {}),
-          ...(message ? { message } : {}),
-        },
-      })
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
-    }
-  }
+  // Wire up the snapshot callback ref now that commands is available
+  snapshotCallbackRef.current = commands.updateSubmitPipelineFromSnapshot
 
   return {
     socket,
@@ -1461,7 +696,7 @@ export function useAppState(activeChatId: string | null): AppState {
     sidebarReady,
     localProjectsReady,
     commandError,
-    startingLocalPath,
+    startingLocalPath: commands.startingLocalPath,
     sidebarOpen,
     sidebarCollapsed,
     scrollRef,
@@ -1484,7 +719,7 @@ export function useAppState(activeChatId: string | null): AppState {
     navbarLocalPath,
     hasSelectedProject,
     chatHasKnownMessages,
-    localFilePreview,
+    localFilePreview: commands.localFilePreview,
     openSidebar: () => {
       setSidebarOpen(true)
       if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
@@ -1494,40 +729,40 @@ export function useAppState(activeChatId: string | null): AppState {
     closeSidebar: () => setSidebarOpen(false),
     collapseSidebar: () => setSidebarCollapsed(true),
     expandSidebar: () => setSidebarCollapsed(false),
-    closeLocalFilePreview: () => setLocalFilePreview(null),
+    closeLocalFilePreview: commands.closeLocalFilePreview,
     handleInitialReadAnchorScrolled,
     scrollToBottom,
-    handleCreateChat,
-    handleOpenLocalProject,
-    handleCreateProject,
-    handleCheckForUpdates,
-    handleInstallUpdate,
-    handleSend,
-    handleSubmitFromComposer,
-    handleCancel,
+    handleCreateChat: commands.handleCreateChat,
+    handleOpenLocalProject: commands.handleOpenLocalProject,
+    handleCreateProject: commands.handleCreateProject,
+    handleCheckForUpdates: commands.handleCheckForUpdates,
+    handleInstallUpdate: commands.handleInstallUpdate,
+    handleSend: commands.handleSend,
+    handleSubmitFromComposer: commands.handleSubmitFromComposer,
+    handleCancel: commands.handleCancel,
     clearQueuedText,
     restoreQueuedText,
-    handleDeleteChat,
-    handleRenameChat,
-    handleRemoveProject,
-    handleOpenExternal,
-    handleOpenExternalPath,
-    handleOpenLocalLink,
-    handleOpenExternalLink,
-    sessionsSnapshots,
-    sessionsWindowDays,
-    handleOpenSessionPicker,
-    handleResumeSession,
-    handleRefreshSessions,
-    handleShowMoreSessions,
-    handleCompose,
-    handleForkSession,
-    handleMergeSession,
-    pendingMergeProjectId,
-    pendingSessionBootstrap,
-    requestMerge: (projectId: string) => setPendingMergeProjectId(projectId),
-    clearMergeRequest: () => setPendingMergeProjectId(null),
-    handleAskUserQuestion,
-    handleExitPlanMode,
+    handleDeleteChat: commands.handleDeleteChat,
+    handleRenameChat: commands.handleRenameChat,
+    handleRemoveProject: commands.handleRemoveProject,
+    handleOpenExternal: commands.handleOpenExternal,
+    handleOpenExternalPath: commands.handleOpenExternalPath,
+    handleOpenLocalLink: commands.handleOpenLocalLink,
+    handleOpenExternalLink: commands.handleOpenExternalLink,
+    sessionsSnapshots: commands.sessionsSnapshots,
+    sessionsWindowDays: commands.sessionsWindowDays,
+    handleOpenSessionPicker: commands.handleOpenSessionPicker,
+    handleResumeSession: commands.handleResumeSession,
+    handleRefreshSessions: commands.handleRefreshSessions,
+    handleShowMoreSessions: commands.handleShowMoreSessions,
+    handleCompose: commands.handleCompose,
+    handleForkSession: commands.handleForkSession,
+    handleMergeSession: commands.handleMergeSession,
+    pendingMergeProjectId: commands.pendingMergeProjectId,
+    pendingSessionBootstrap: commands.pendingSessionBootstrap,
+    requestMerge: commands.requestMerge,
+    clearMergeRequest: commands.clearMergeRequest,
+    handleAskUserQuestion: commands.handleAskUserQuestion,
+    handleExitPlanMode: commands.handleExitPlanMode,
   }
 }
