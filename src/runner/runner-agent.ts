@@ -10,7 +10,7 @@ import type {
   AgentProvider,
   NormalizedToolCall,
   PendingToolSnapshot,
-  TinkariaStatus,
+  SessionStatus,
   TranscriptEntry,
 } from "../shared/types"
 import { timestamped, discardedToolResult } from "../server/agent"
@@ -46,7 +46,7 @@ interface ActiveTurn {
   effort?: string
   serviceTier?: "fast"
   planMode: boolean
-  status: TinkariaStatus
+  status: SessionStatus
   pendingTool: PendingToolRequest | null
   postToolFollowUp: { content: string; planMode: boolean } | null
   hasFinalResult: boolean
@@ -94,8 +94,8 @@ export class RunnerAgent {
 
   // ── Public API ────────────────────────────────────────────────────
 
-  getActiveStatuses(): Map<string, TinkariaStatus> {
-    const statuses = new Map<string, TinkariaStatus>()
+  getActiveStatuses(): Map<string, SessionStatus> {
+    const statuses = new Map<string, SessionStatus>()
     for (const [chatId, turn] of this.activeTurns.entries()) {
       statuses.set(chatId, turn.status)
     }

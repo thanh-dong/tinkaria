@@ -1,10 +1,10 @@
 import { useNavigate, useOutletContext } from "react-router-dom"
 import type { DiscoveredSession } from "../../shared/types"
 import { LocalDev } from "../components/LocalDev"
-import type { TinkariaState } from "./useTinkariaState"
+import type { AppState } from "./useAppState"
 
 export function LocalProjectsPage() {
-  const state = useOutletContext<TinkariaState>()
+  const state = useOutletContext<AppState>()
   const navigate = useNavigate()
 
   async function handleResumeHomepageSession(projectId: string, session: DiscoveredSession) {

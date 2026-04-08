@@ -2,7 +2,7 @@ import { afterEach, describe, test, expect } from "bun:test"
 import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect, type NatsConnection } from "@nats-io/transport-node"
 import { RunnerProxy, type RunnerProxyOptions } from "./runner-proxy"
-import type { TinkariaStatus } from "../shared/types"
+import type { SessionStatus } from "../shared/types"
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -77,7 +77,7 @@ describe("RunnerProxy", () => {
 
     mockRunner = createMockRunner(runnerNc, RUNNER_ID)
 
-    const activeStatuses = new Map<string, TinkariaStatus>()
+    const activeStatuses = new Map<string, SessionStatus>()
 
     proxy = new RunnerProxy({
       nc: clientNc,

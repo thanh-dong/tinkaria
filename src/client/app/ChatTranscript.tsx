@@ -105,7 +105,7 @@ export function waitForBlockNode(
   }
 }
 
-interface TinkariaTranscriptProps {
+interface ChatTranscriptProps {
   messages: HydratedTranscriptMessage[]
   scrollRef: RefObject<HTMLDivElement | null>
   isLoading: boolean
@@ -124,7 +124,7 @@ interface TinkariaTranscriptProps {
   onExitPlanModeConfirm: (toolUseId: string, confirmed: boolean, clearContext?: boolean, message?: string) => void
 }
 
-export function TinkariaTranscript({
+export function ChatTranscript({
   messages,
   scrollRef,
   isLoading,
@@ -137,7 +137,7 @@ export function TinkariaTranscript({
   onOpenExternalLink,
   onAskUserQuestionSubmit,
   onExitPlanModeConfirm,
-}: TinkariaTranscriptProps) {
+}: ChatTranscriptProps) {
   // Precompute first-occurrence indices to avoid O(n) findIndex per render
   const firstIndices = useMemo(() => {
     let systemInit = -1

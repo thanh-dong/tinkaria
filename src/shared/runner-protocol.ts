@@ -1,4 +1,4 @@
-import type { AgentProvider, TranscriptEntry, TinkariaStatus, PendingToolSnapshot } from "./types"
+import type { AgentProvider, TranscriptEntry, SessionStatus, PendingToolSnapshot } from "./types"
 
 // ── Subject helpers ──────────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ interface SessionTokenEvent extends RunnerTurnEventBase {
 
 interface StatusChangeEvent extends RunnerTurnEventBase {
   type: "status_change"
-  status: TinkariaStatus
+  status: SessionStatus
 }
 
 interface PendingToolEvent extends RunnerTurnEventBase {

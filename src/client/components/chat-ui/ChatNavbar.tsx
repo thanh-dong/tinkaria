@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
-import type { CurrentRepoStatusSnapshot, DiscoveredSessionRuntime, TinkariaStatus } from "../../../shared/types"
+import type { CurrentRepoStatusSnapshot, DiscoveredSessionRuntime, SessionStatus } from "../../../shared/types"
 import { PROVIDER_ICONS, getProviderFromModel } from "../icons/ProviderIcons"
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
   currentSessionRuntime?: DiscoveredSessionRuntime | null
   currentRepoStatus?: CurrentRepoStatusSnapshot | null
   chatTitle?: string
-  chatStatus?: TinkariaStatus
+  chatStatus?: SessionStatus
 }
 
 function getPathLabel(localPath: string | undefined, repoStatus: CurrentRepoStatusSnapshot | null | undefined): string | null {
@@ -145,7 +145,7 @@ function RepoDetailPopover({
   )
 }
 
-function getStatusDotClass(status: TinkariaStatus | undefined): string {
+function getStatusDotClass(status: SessionStatus | undefined): string {
   switch (status) {
     case "running":
     case "starting":

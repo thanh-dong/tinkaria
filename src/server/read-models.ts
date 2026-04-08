@@ -1,7 +1,7 @@
 import type {
   ChatRuntime,
   ChatSnapshot,
-  TinkariaStatus,
+  SessionStatus,
   LocalProjectsSnapshot,
   SessionsSnapshot,
   SidebarChatRow,
@@ -12,7 +12,7 @@ import type { ChatRecord, StoreState } from "./events"
 import { resolveLocalPath } from "./paths"
 import { SERVER_PROVIDERS } from "./provider-catalog"
 
-export function deriveStatus(chat: ChatRecord, activeStatus?: TinkariaStatus): TinkariaStatus {
+export function deriveStatus(chat: ChatRecord, activeStatus?: SessionStatus): SessionStatus {
   if (activeStatus) return activeStatus
   if (chat.lastTurnOutcome === "failed") return "failed"
   return "idle"
@@ -20,7 +20,7 @@ export function deriveStatus(chat: ChatRecord, activeStatus?: TinkariaStatus): T
 
 export function deriveSidebarData(
   state: StoreState,
-  activeStatuses: Map<string, TinkariaStatus>
+  activeStatuses: Map<string, SessionStatus>
 ): SidebarData {
   const projects = [...state.projectsById.values()]
     .filter((project) => !project.deletedAt)
@@ -97,7 +97,7 @@ export function deriveLocalProjectsSnapshot(
 
 export function deriveChatSnapshot(
   state: StoreState,
-  activeStatuses: Map<string, TinkariaStatus>,
+  activeStatuses: Map<string, SessionStatus>,
   chatId: string,
   messageCount: number,
   availableSkills?: string[],

@@ -8,7 +8,7 @@ import { snapshotSubject, snapshotKvKey, terminalEventSubject, chatMessageSubjec
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
 import type { ChatMessageEvent, SessionsSnapshot, TranscriptEntry } from "../shared/types"
-import type { TinkariaStatus } from "../shared/types"
+import type { SessionStatus } from "../shared/types"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
 import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSessionsSnapshot, deriveSidebarData } from "./read-models"
@@ -37,7 +37,7 @@ const DEFAULT_UPDATE_SNAPSHOT = {
 export interface CreateNatsPublisherArgs {
   nc: NatsConnection
   store: EventStore
-  agent: { getActiveStatuses(): Map<string, TinkariaStatus> }
+  agent: { getActiveStatuses(): Map<string, SessionStatus> }
   terminals: TerminalManager
   refreshDiscovery: () => Promise<DiscoveredProject[]>
   getDiscoveredProjects: () => DiscoveredProject[]

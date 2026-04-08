@@ -1,5 +1,5 @@
 import type { AgentProvider, ModelOptions } from "../../shared/types"
-import { appendQueuedText, prependQueuedText } from "./useTinkariaState"
+import { appendQueuedText, prependQueuedText } from "./useAppState"
 
 export interface ProjectSelectionState {
   explicitProjectId: string | null

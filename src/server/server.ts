@@ -16,7 +16,7 @@ import { ensureTerminalEventsStream, ensureChatMessageStream, ensureKitTurnEvent
 import { RunnerManager, type RunnerReadiness } from "./runner-manager"
 import { RunnerProxy } from "./runner-proxy"
 import { TranscriptConsumer } from "./transcript-consumer"
-import type { AgentProvider, TranscriptEntry, TinkariaStatus } from "../shared/types"
+import type { AgentProvider, TranscriptEntry, SessionStatus } from "../shared/types"
 import type { ClientCommand } from "../shared/protocol"
 import { SessionOrchestrator } from "./orchestration"
 import { SessionIndex } from "./session-index"
@@ -27,7 +27,7 @@ import { createProjectAgentRouter } from "./project-agent-routes"
 import { LocalCodexKitDaemon, ProjectKitRegistry, RemoteCodexRuntime } from "./local-codex-kit"
 import { SkillCache } from "./skill-discovery"
 
-export interface StartTinkariaServerOptions {
+export interface StartServerOptions {
   port?: number
   host?: string
   strictPort?: boolean
@@ -39,7 +39,7 @@ export interface StartTinkariaServerOptions {
   }
 }
 
-export interface TinkariaHealthcheck {
+export interface ServerHealthcheck {
   ok: boolean
   status: "ok" | "degraded" | "fail"
   port: number
@@ -57,7 +57,7 @@ interface SessionCoordinator {
   cancel(chatId: string): Promise<void>
   respondTool(command: Extract<ClientCommand, { type: "chat.respondTool" }>): Promise<void>
   disposeChat(chatId: string): Promise<void>
-  getActiveStatuses(): Map<string, TinkariaStatus>
+  getActiveStatuses(): Map<string, SessionStatus>
   activeTurns: { has(key: string): boolean }
   startTurnForChat(args: {
     chatId: string; provider: AgentProvider; content: string
@@ -66,7 +66,7 @@ interface SessionCoordinator {
   }): Promise<void>
 }
 
-export async function startTinkariaServer(options: StartTinkariaServerOptions = {}) {
+export async function startServer(options: StartServerOptions = {}) {
   const port = options.port ?? 3210
   const hostname = options.host ?? "127.0.0.1"
   const strictPort = options.strictPort ?? false
@@ -110,7 +110,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   ])
 
   const splitMode = process.env.TINKARIA_SPLIT === "true"
-  const getHealthcheck = (): TinkariaHealthcheck => {
+  const getHealthcheck = (): ServerHealthcheck => {
     const natsDaemon = daemonManager.getReadiness()
     const natsConnection = natsConnector.getReadiness()
     const codexKit = projectKitRegistry.getReadiness()

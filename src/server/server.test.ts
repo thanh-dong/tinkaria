@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { startTinkariaServer } from "./server"
+import { startServer } from "./server"
 import { TranscriptConsumer } from "./transcript-consumer"
 
 const originalSplit = process.env.TINKARIA_SPLIT
 
-describe("startTinkariaServer healthcheck", () => {
+describe("startServer healthcheck", () => {
   beforeEach(() => {
     delete process.env.TINKARIA_SPLIT
   })
@@ -18,7 +18,7 @@ describe("startTinkariaServer healthcheck", () => {
   })
 
   test("reports liveness in default mode", async () => {
-    const started = await startTinkariaServer({ port: 4321, host: "127.0.0.1", strictPort: true })
+    const started = await startServer({ port: 4321, host: "127.0.0.1", strictPort: true })
     try {
       const response = await fetch(`http://127.0.0.1:${started.port}/health`)
       expect(response.ok).toBe(true)
@@ -39,7 +39,7 @@ describe("startTinkariaServer healthcheck", () => {
 
   test("reports runner readiness in split mode", async () => {
     process.env.TINKARIA_SPLIT = "true"
-    const started = await startTinkariaServer({ port: 4322, host: "127.0.0.1", strictPort: true })
+    const started = await startServer({ port: 4322, host: "127.0.0.1", strictPort: true })
     try {
       const response = await fetch(`http://127.0.0.1:${started.port}/health`)
       expect(response.ok).toBe(true)
@@ -78,8 +78,8 @@ describe("startTinkariaServer healthcheck", () => {
       }
     })
 
-    let started: Awaited<ReturnType<typeof startTinkariaServer>> | null = null
-    const serverPromise = startTinkariaServer({ port: 4323, host: "127.0.0.1", strictPort: true })
+    let started: Awaited<ReturnType<typeof startServer>> | null = null
+    const serverPromise = startServer({ port: 4323, host: "127.0.0.1", strictPort: true })
 
     try {
       await startEntered

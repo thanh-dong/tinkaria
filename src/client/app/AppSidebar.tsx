@@ -12,7 +12,7 @@ import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, Upd
 import type { SocketStatus } from "./socket-interface"
 import { shouldCloseMobileSidebarFromSwipe, type MobileSidebarSwipeState } from "./ChatPage"
 
-interface TinkariaSidebarProps {
+interface AppSidebarProps {
   data: SidebarData
   activeChatId: string | null
   connectionStatus: SocketStatus
@@ -49,7 +49,7 @@ export function getSidebarUiIdentityDescriptor() {
   return SIDEBAR_UI_DESCRIPTOR
 }
 
-export function TinkariaSidebar({
+export function AppSidebar({
   data,
   activeChatId,
   connectionStatus,
@@ -74,7 +74,7 @@ export function TinkariaSidebar({
   onRefreshSessions,
   onShowMoreSessions,
   onMergeSession,
-}: TinkariaSidebarProps) {
+}: AppSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const scrollContainerRef = useRef<HTMLDivElement>(null)

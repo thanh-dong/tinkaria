@@ -5,7 +5,7 @@ import { jetstream } from "@nats-io/jetstream"
 import { ensureRunnerEventsStream } from "./nats-streams"
 import { runnerEventsSubject } from "../shared/runner-protocol"
 import { TranscriptConsumer, type TranscriptConsumerStore } from "./transcript-consumer"
-import type { TranscriptEntry, TinkariaStatus, AgentProvider } from "../shared/types"
+import type { TranscriptEntry, SessionStatus, AgentProvider } from "../shared/types"
 
 const encoder = new TextEncoder()
 
@@ -120,7 +120,7 @@ describe("TranscriptConsumer", () => {
     await consumer.start()
 
     // First set a status so there's something to remove
-    await publishEvent(conn, "chat-2", { type: "status_change", status: "running" satisfies TinkariaStatus })
+    await publishEvent(conn, "chat-2", { type: "status_change", status: "running" satisfies SessionStatus })
     await waitFor(() => stateChanges >= 1)
     expect(consumer.getActiveStatuses().get("chat-2")).toBe("running")
 
@@ -146,7 +146,7 @@ describe("TranscriptConsumer", () => {
     })
     await consumer.start()
 
-    await publishEvent(conn, "chat-3", { type: "status_change", status: "running" satisfies TinkariaStatus })
+    await publishEvent(conn, "chat-3", { type: "status_change", status: "running" satisfies SessionStatus })
     await waitFor(() => stateChanges >= 1)
 
     await publishEvent(conn, "chat-3", { type: "turn_failed", error: "something broke" })
@@ -170,7 +170,7 @@ describe("TranscriptConsumer", () => {
     })
     await consumer.start()
 
-    await publishEvent(conn, "chat-4", { type: "status_change", status: "running" satisfies TinkariaStatus })
+    await publishEvent(conn, "chat-4", { type: "status_change", status: "running" satisfies SessionStatus })
     await waitFor(() => stateChanges >= 1)
 
     await publishEvent(conn, "chat-4", { type: "turn_cancelled" })
@@ -232,11 +232,11 @@ describe("TranscriptConsumer", () => {
     })
     await consumer.start()
 
-    await publishEvent(conn, "chat-7", { type: "status_change", status: "running" satisfies TinkariaStatus })
+    await publishEvent(conn, "chat-7", { type: "status_change", status: "running" satisfies SessionStatus })
     await waitFor(() => stateChanges >= 1)
     expect(consumer.getActiveStatuses().get("chat-7")).toBe("running")
 
-    await publishEvent(conn, "chat-7", { type: "status_change", status: "waiting_for_user" satisfies TinkariaStatus })
+    await publishEvent(conn, "chat-7", { type: "status_change", status: "waiting_for_user" satisfies SessionStatus })
     await waitFor(() => stateChanges >= 2)
     expect(consumer.getActiveStatuses().get("chat-7")).toBe("waiting_for_user")
   })
@@ -293,7 +293,7 @@ describe("TranscriptConsumer", () => {
 
     const entry: TranscriptEntry = { _id: "msg-x", createdAt: Date.now(), kind: "assistant_text", text: "hi" }
     await publishEvent(conn, "chat-x", { type: "transcript", entry })
-    await publishEvent(conn, "chat-x", { type: "status_change", status: "running" satisfies TinkariaStatus })
+    await publishEvent(conn, "chat-x", { type: "status_change", status: "running" satisfies SessionStatus })
     await publishEvent(conn, "chat-x", { type: "turn_finished" })
 
     await waitFor(() => stateChanges >= 3)

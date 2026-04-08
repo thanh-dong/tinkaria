@@ -45,9 +45,9 @@ import {
   type SubmitPipelineState,
   transitionProjectSelection,
   queueSubmit as queueSubmitTransition,
-} from "./useTinkariaState.machine"
+} from "./useAppState.machine"
 import { NatsSocket } from "./nats-socket"
-import type { TinkariaTransport, SocketStatus } from "./socket-interface"
+import type { AppTransport, SocketStatus } from "./socket-interface"
 
 export function getNewestRemainingChatId(projectGroups: SidebarData["projectGroups"], activeChatId: string): string | null {
   const projectGroup = projectGroups.find((group) => group.chats.some((chat) => chat.chatId === activeChatId))
@@ -326,8 +326,8 @@ function useLockedAnchor(
   }, [chatId, nextAnchor, scrollCompletedRef])
 }
 
-function useTinkariaSocket(): TinkariaTransport {
-  const socketRef = useRef<TinkariaTransport | null>(null)
+function useAppSocket(): AppTransport {
+  const socketRef = useRef<AppTransport | null>(null)
   if (!socketRef.current) {
     socketRef.current = new NatsSocket()
   }
@@ -340,16 +340,16 @@ function useTinkariaSocket(): TinkariaTransport {
     }
   }, [])
 
-  return socketRef.current as TinkariaTransport
+  return socketRef.current as AppTransport
 }
 
-function logTinkariaState(message: string, details?: unknown) {
+function logAppState(message: string, details?: unknown) {
   if (details === undefined) {
-    console.info(`[useTinkariaState] ${message}`)
+    console.info(`[useAppState] ${message}`)
     return
   }
 
-  console.info(`[useTinkariaState] ${message}`, details)
+  console.info(`[useAppState] ${message}`, details)
 }
 
 export function shouldStickToBottomOnComposerSubmit(distanceFromBottom: number, viewportHeight = 0) {
@@ -628,7 +628,7 @@ export function getActiveChatSnapshot(chatSnapshot: ChatSnapshot | null, activeC
   if (!chatSnapshot) return null
   if (!activeChatId) return null
   if (chatSnapshot.runtime.chatId !== activeChatId) {
-    logTinkariaState("stale snapshot masked", {
+    logAppState("stale snapshot masked", {
       routeChatId: activeChatId,
       snapshotChatId: chatSnapshot.runtime.chatId,
       snapshotProvider: chatSnapshot.runtime.provider,
@@ -638,8 +638,8 @@ export function getActiveChatSnapshot(chatSnapshot: ChatSnapshot | null, activeC
   return chatSnapshot
 }
 
-export interface TinkariaState {
-  socket: TinkariaTransport
+export interface AppState {
+  socket: AppTransport
   activeChatId: string | null
   sidebarData: SidebarData
   localProjects: LocalProjectsSnapshot | null
@@ -727,9 +727,9 @@ export interface TinkariaState {
   ) => Promise<void>
 }
 
-export function useTinkariaState(activeChatId: string | null): TinkariaState {
+export function useAppState(activeChatId: string | null): AppState {
   const navigate = useNavigate()
-  const socket = useTinkariaSocket()
+  const socket = useAppSocket()
   const dialog = useAppDialog()
 
   const [sidebarData, setSidebarData] = useState<SidebarData>({ projectGroups: [] })
@@ -912,7 +912,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       lastResumeRefreshAtRef.current = resumedAt
       backgroundedAtRef.current = null
 
-      logTinkariaState("refreshing stale session after app resume", {
+      logAppState("refreshing stale session after app resume", {
         trigger,
         activeChatId,
         connectionStatus,
@@ -968,7 +968,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
   useEffect(() => {
     if (!activeChatId) {
-      logTinkariaState("clearing chat snapshot for non-chat route")
+      logAppState("clearing chat snapshot for non-chat route")
       setChatSnapshot(null)
       setOrchestrationHierarchy(null)
       setProjectSelection((current) => transitionProjectSelection(current, { type: "chat.cleared" }))
@@ -986,7 +986,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     hydratorRef.current = hydrator
 
     if (restoredFromCache) {
-      logTinkariaState("restoring chat from cache", {
+      logAppState("restoring chat from cache", {
         activeChatId,
         cachedMessages: cached.messages.length,
         cachedDiagnostics: summarizeTranscriptWindow(cached.messages),
@@ -996,7 +996,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       setChatSnapshot(null) // will be replaced when snapshot arrives
       setChatReady(true)    // show stale content immediately
     } else {
-      logTinkariaState("subscribing to chat (no cache)", { activeChatId })
+      logAppState("subscribing to chat (no cache)", { activeChatId })
       setChatSnapshot(null)
       setMessages([])
       setChatReady(false)
@@ -1022,7 +1022,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       for (const entry of allEntries) hydrator.hydrate(entry)
       const hydratedMessages = hydrator.getMessages()
       setMessages(hydratedMessages)
-      logTinkariaState("transcript tail flushed", {
+      logAppState("transcript tail flushed", {
         chatId,
         source,
         restoredFromCache,
@@ -1042,7 +1042,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
         })
         let hydratedPreview = processTranscriptMessages(entries)
 
-        logTinkariaState("transcript tail fetched", {
+        logAppState("transcript tail fetched", {
           chatId,
           messageCount,
           offset,
@@ -1056,7 +1056,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
           offset,
         })) {
           const nextOffset = Math.max(0, offset - TRANSCRIPT_TAIL_SIZE)
-          logTinkariaState("transcript tail needs backfill", {
+          logAppState("transcript tail needs backfill", {
             chatId,
             messageCount,
             offset,
@@ -1072,7 +1072,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
           entries = [...olderEntries, ...entries]
           offset = nextOffset
           hydratedPreview = processTranscriptMessages(entries)
-          logTinkariaState("backfilling transcript window", {
+          logAppState("backfilling transcript window", {
             chatId,
             messageCount,
             offset,
@@ -1083,7 +1083,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
 
         flushTail(entries, "fetched")
       } catch (error) {
-        logTinkariaState("transcript tail fetch failed", {
+        logAppState("transcript tail fetch failed", {
           chatId,
           error: error instanceof Error ? error.message : String(error),
         })
@@ -1095,7 +1095,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
       { type: "chat", chatId: activeChatId },
       (snapshot) => {
         if (cancelled) return
-        logTinkariaState("chat snapshot received", {
+        logAppState("chat snapshot received", {
           activeChatId,
           snapshotChatId: snapshot?.runtime.chatId ?? null,
           snapshotProvider: snapshot?.runtime.provider ?? null,
@@ -1209,7 +1209,7 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     [activeChatId, sidebarData.projectGroups]
   )
   useEffect(() => {
-    logTinkariaState("active snapshot resolved", {
+    logAppState("active snapshot resolved", {
       routeChatId: activeChatId,
       rawSnapshotChatId: chatSnapshot?.runtime.chatId ?? null,
       rawSnapshotProvider: chatSnapshot?.runtime.provider ?? null,
@@ -1241,10 +1241,54 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
   })
   const initialChatReadAnchor = useLockedAnchor(activeChatId, nextInitialChatReadAnchor, initialScrollCompletedRef)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     initialScrollCompletedRef.current = false
     scrollFollowChatChanged()
   }, [activeChatId, scrollFollowChatChanged])
+
+  // Tail-settle: keep scrolling to bottom while virtualizer measures and settles
+  useEffect(() => {
+    console.warn("[SETTLE]", { completed: initialScrollCompletedRef.current, anchor: initialChatReadAnchor.kind, msgLen: messages.length, hasEl: !!scrollRef.current })
+    if (initialScrollCompletedRef.current) return
+    if (initialChatReadAnchor.kind !== "tail") return
+    if (messages.length === 0) return
+    const element = scrollRef.current
+    if (!element) return
+
+    beginProgrammaticScroll()
+    let lastScrollHeight = 0
+    let stableCount = 0
+    const capturedElement = element
+    const interval = window.setInterval(() => {
+      if (!capturedElement.isConnected) { window.clearInterval(interval); endProgrammaticScroll(); return }
+      capturedElement.scrollTo({ top: capturedElement.scrollHeight, behavior: "auto" })
+      if (capturedElement.scrollHeight === lastScrollHeight) {
+        stableCount++
+      } else {
+        lastScrollHeight = capturedElement.scrollHeight
+        stableCount = 0
+      }
+      if (stableCount >= 5 && capturedElement.scrollHeight > capturedElement.clientHeight) {
+        window.clearInterval(interval)
+        initialScrollCompletedRef.current = true
+        handleInitialScrollDone("tail")
+        endProgrammaticScroll()
+      }
+    }, 50)
+    const timeout = window.setTimeout(() => {
+      window.clearInterval(interval)
+      if (!initialScrollCompletedRef.current) {
+        initialScrollCompletedRef.current = true
+        handleInitialScrollDone("tail")
+        endProgrammaticScroll()
+      }
+    }, 2000)
+    return () => {
+      window.clearInterval(interval)
+      window.clearTimeout(timeout)
+      endProgrammaticScroll()
+    }
+  }, [activeChatId, beginProgrammaticScroll, endProgrammaticScroll, handleInitialScrollDone, initialChatReadAnchor.kind, messages.length])
 
   const transcriptPaddingBottom = FIXED_TRANSCRIPT_PADDING_BOTTOM
   const showScrollButton = shouldShowScrollButton(scrollModeRef.current, messages.length)
@@ -1270,21 +1314,11 @@ export function useTinkariaState(activeChatId: string | null): TinkariaState {
     const element = scrollRef.current
     if (!element) return
 
-    // Phase 1: Initial scroll to tail (once per chat, only after messages exist)
-    if (!initialScrollCompletedRef.current && initialChatReadAnchor.kind === "tail" && messages.length > 0) {
-      element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
-      // Defer completion to next frame so virtualizer measurement settles first
-      const frameId = window.requestAnimationFrame(() => {
-        const el = scrollRef.current
-        if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" })
-        initialScrollCompletedRef.current = true
-        handleInitialScrollDone("tail")
-      })
-      return () => window.cancelAnimationFrame(frameId)
-    }
+    // Tail-follow: scroll to bottom on initial load and auto-follow
+    const wantsTail = !initialScrollCompletedRef.current && initialChatReadAnchor.kind === "tail" && messages.length > 0
+    const isAutoFollowing = initialScrollCompletedRef.current && scrollModeRef.current === "following"
 
-    // Phase 2: Auto-follow — reads mode ref, NOT state
-    if (initialScrollCompletedRef.current && scrollModeRef.current === "following") {
+    if (wantsTail || isAutoFollowing) {
       beginProgrammaticScroll()
       element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
       const frameId = window.requestAnimationFrame(() => endProgrammaticScroll())

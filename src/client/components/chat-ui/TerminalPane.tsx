@@ -3,7 +3,7 @@ import { SerializeAddon } from "@xterm/addon-serialize"
 import { WebLinksAddon } from "@xterm/addon-web-links"
 import { Terminal, type ITheme } from "@xterm/xterm"
 import type { TerminalSnapshot } from "../../../shared/protocol"
-import type { TinkariaTransport, SocketStatus } from "../../app/socket-interface"
+import type { AppTransport, SocketStatus } from "../../app/socket-interface"
 import { useTheme } from "../../hooks/useTheme"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 
@@ -16,7 +16,7 @@ const TERMINAL_PANE_UI_DESCRIPTOR = createUiIdentityDescriptor({
 interface Props {
   projectId: string
   terminalId: string
-  socket: TinkariaTransport
+  socket: AppTransport
   scrollback: number
   connectionStatus: SocketStatus
   clearVersion?: number

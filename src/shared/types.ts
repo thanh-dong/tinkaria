@@ -152,7 +152,7 @@ export function resolveClaudeApiModelId(modelId: string, contextWindow?: ClaudeC
   return contextWindow === "1m" ? `${modelId}[1m]` : modelId
 }
 
-export type TinkariaStatus =
+export type SessionStatus =
   | "idle"
   | "starting"
   | "running"
@@ -172,7 +172,7 @@ export interface SidebarChatRow {
   _creationTime: number
   chatId: string
   title: string
-  status: TinkariaStatus
+  status: SessionStatus
   localPath: string
   provider: AgentProvider | null
   lastMessageAt?: number
@@ -629,7 +629,7 @@ export interface ChatRuntime {
   projectId: string
   localPath: string
   title: string
-  status: TinkariaStatus
+  status: SessionStatus
   provider: AgentProvider | null
   planMode: boolean
   sessionToken: string | null
@@ -662,7 +662,7 @@ export interface ChatMessageEvent {
   entry: TranscriptEntry
 }
 
-export interface TinkariaSnapshot {
+export interface AppSnapshot {
   sidebar: SidebarData
   chat?: ChatSnapshot | null
 }

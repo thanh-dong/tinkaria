@@ -6,7 +6,7 @@ import { snapshotSubject, terminalEventSubject, chatMessageSubject, commandSubje
 import { LOG_PREFIX } from "../../shared/branding"
 import { decompressPayload } from "../../shared/compression"
 import type {
-  TinkariaTransport,
+  AppTransport,
   SnapshotListener,
   EventListener,
   SocketStatus,
@@ -56,7 +56,7 @@ export function reactivateSubscriptionsAfterReconnect(
   }
 }
 
-export class NatsSocket implements TinkariaTransport {
+export class NatsSocket implements AppTransport {
   private resolvedWsUrl: string | null = null
   private nc: NatsConnection | null = null
   private js: JetStreamClient | null = null

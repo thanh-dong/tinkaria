@@ -17,11 +17,11 @@ import {
   type UiIdentityOverlayAnchorRect,
 } from "../components/ui/UiIdentityOverlay"
 import { TooltipProvider } from "../components/ui/tooltip"
-import { TinkariaSidebar } from "./TinkariaSidebar"
+import { AppSidebar } from "./AppSidebar"
 import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalProjectsPage"
-import { TinkariaStateContext } from "./TinkariaStateContext"
-import { useTinkariaState } from "./useTinkariaState"
+import { AppStateContext } from "./AppStateContext"
+import { useAppState } from "./useAppState"
 
 const UI_IDENTITY_OVERLAY_COPY_DURATION_MS = 1200
 const UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS = 320
@@ -316,11 +316,11 @@ function UiIdentityOverlayController() {
   )
 }
 
-function TinkariaLayout() {
+function AppLayout() {
   const location = useLocation()
-  const state = useContext(TinkariaStateContext)
+  const state = useContext(AppStateContext)
   if (!state) {
-    throw new Error("Tinkaria layout requires app state context")
+    throw new Error("App layout requires state context")
   }
   const showMobileOpenButton = location.pathname === "/"
 
@@ -330,7 +330,7 @@ function TinkariaLayout() {
       {...getUiIdentityAttributeProps(APP_LAYOUT_UI_DESCRIPTOR)}
     >
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <TinkariaSidebar
+        <AppSidebar
           data={state.sidebarData}
           activeChatId={state.activeChatId}
           connectionStatus={state.connectionStatus}
@@ -385,18 +385,18 @@ function AppInner() {
   const activeChatId = location.pathname.startsWith("/chat/")
     ? location.pathname.slice("/chat/".length)
     : null
-  const state = useTinkariaState(activeChatId || null)
+  const state = useAppState(activeChatId || null)
 
   return (
-    <TinkariaStateContext.Provider value={state}>
+    <AppStateContext.Provider value={state}>
       <Routes>
-        <Route element={<TinkariaLayout />}>
+        <Route element={<AppLayout />}>
           <Route path="/" element={<LocalProjectsPage />} />
           <Route path="/settings/*" element={<Navigate to="/" replace />} />
           <Route path="/chat/:chatId" element={<ChatPage />} />
         </Route>
       </Routes>
-    </TinkariaStateContext.Provider>
+    </AppStateContext.Provider>
   )
 }
 

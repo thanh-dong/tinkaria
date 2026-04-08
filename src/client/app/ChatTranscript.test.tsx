@@ -41,9 +41,9 @@ afterEach(() => {
   mock.restore()
 })
 
-describe("TinkariaTranscript", () => {
+describe("ChatTranscript", () => {
   test("maps an unread message id to the containing render row, including collapsed tool groups", async () => {
-    const { getRenderItemIndexForMessageId } = await import("./TinkariaTranscript")
+    const { getRenderItemIndexForMessageId } = await import("./ChatTranscript")
 
     const renderItems: RenderItem[] = [
       { type: "single", index: 0, message: { ...createMessage(), id: "single-1" } },
@@ -74,10 +74,10 @@ describe("TinkariaTranscript", () => {
       }),
     }))
 
-    const { TinkariaTranscript } = await import("./TinkariaTranscript")
+    const { ChatTranscript } = await import("./ChatTranscript")
     const scrollRef = { current: null } as RefObject<HTMLDivElement | null>
     const html = renderToStaticMarkup(
-      <TinkariaTranscript
+      <ChatTranscript
         messages={[createMessage()]}
         scrollRef={scrollRef}
         isLoading={false}
@@ -125,7 +125,7 @@ describe("waitForBlockNode", () => {
   }
 
   test("calls onDone with the node when found on first frame", async () => {
-    const { waitForBlockNode } = await import("./TinkariaTranscript")
+    const { waitForBlockNode } = await import("./ChatTranscript")
     const fakeNode = { id: "block-1" } as unknown as HTMLElement
     const lookup = (id: string) => id === "block-1" ? fakeNode : null
 
@@ -137,7 +137,7 @@ describe("waitForBlockNode", () => {
   })
 
   test("calls onDone with null after max attempts", async () => {
-    const { waitForBlockNode } = await import("./TinkariaTranscript")
+    const { waitForBlockNode } = await import("./ChatTranscript")
     const lookup = () => null
 
     let result: HTMLElement | null | undefined = undefined
@@ -150,7 +150,7 @@ describe("waitForBlockNode", () => {
   })
 
   test("cleanup prevents callback from firing", async () => {
-    const { waitForBlockNode } = await import("./TinkariaTranscript")
+    const { waitForBlockNode } = await import("./ChatTranscript")
     const lookup = () => null
 
     let callbackFired = false
@@ -164,7 +164,7 @@ describe("waitForBlockNode", () => {
   })
 
   test("retries across multiple frames before finding node", async () => {
-    const { waitForBlockNode } = await import("./TinkariaTranscript")
+    const { waitForBlockNode } = await import("./ChatTranscript")
     let callCount = 0
     const fakeNode = { id: "block-delayed" } as unknown as HTMLElement
     const lookup = () => {

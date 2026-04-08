@@ -1,6 +1,6 @@
 import type { NatsConnection } from "@nats-io/transport-node"
 import type { ClientCommand } from "../shared/protocol"
-import type { AgentProvider, TinkariaStatus, PendingToolSnapshot } from "../shared/types"
+import type { AgentProvider, SessionStatus, PendingToolSnapshot } from "../shared/types"
 import { resolveClaudeApiModelId } from "../shared/types"
 import { runnerCmdSubject, type StartTurnCommand } from "../shared/runner-protocol"
 import type { EventStore } from "./event-store"
@@ -17,7 +17,7 @@ export interface RunnerProxyOptions {
   nc: NatsConnection
   store: EventStore
   runnerId: string
-  getActiveStatuses: () => Map<string, TinkariaStatus>
+  getActiveStatuses: () => Map<string, SessionStatus>
   getPendingTool?: (chatId: string) => PendingToolSnapshot | null
 }
 
@@ -25,7 +25,7 @@ export class RunnerProxy {
   private readonly nc: NatsConnection
   private readonly store: EventStore
   private readonly runnerId: string
-  private readonly _getActiveStatuses: () => Map<string, TinkariaStatus>
+  private readonly _getActiveStatuses: () => Map<string, SessionStatus>
 
   /** Orchestration compatibility: check if a chat has an active turn */
   readonly activeTurns: { has(chatId: string): boolean }
@@ -40,7 +40,7 @@ export class RunnerProxy {
     }
   }
 
-  getActiveStatuses(): Map<string, TinkariaStatus> {
+  getActiveStatuses(): Map<string, SessionStatus> {
     return this._getActiveStatuses()
   }
 

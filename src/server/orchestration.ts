@@ -1,6 +1,6 @@
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk"
 import { z } from "zod/v4"
-import type { AgentProvider, OrchestrationChildNode, OrchestrationChildStatus, OrchestrationHierarchySnapshot, TranscriptEntry, TinkariaStatus } from "../shared/types"
+import type { AgentProvider, OrchestrationChildNode, OrchestrationChildStatus, OrchestrationHierarchySnapshot, TranscriptEntry, SessionStatus } from "../shared/types"
 import { LOG_PREFIX } from "../shared/branding"
 import { normalizeServerModel } from "./provider-catalog"
 import { toTranscriptLine } from "./transcript-utils"
@@ -16,7 +16,7 @@ interface OriginRecord {
 
 interface OrchestratorCoordinator {
   activeTurns: { has(key: string): boolean }
-  getActiveStatuses(): Map<string, TinkariaStatus>
+  getActiveStatuses(): Map<string, SessionStatus>
   startTurnForChat(args: {
     chatId: string
     provider: AgentProvider
@@ -288,7 +288,7 @@ export class SessionOrchestrator {
 
   private buildChildNode(
     childId: string,
-    statuses: Map<string, TinkariaStatus>,
+    statuses: Map<string, SessionStatus>,
   ): OrchestrationChildNode {
     const origin = this.origins.get(childId)
     const now = Date.now()
@@ -326,7 +326,7 @@ export class SessionOrchestrator {
   private resolveChildStatus(
     _childId: string,
     origin: OriginRecord,
-    statuses: Map<string, TinkariaStatus>,
+    statuses: Map<string, SessionStatus>,
   ): OrchestrationChildStatus {
     if (origin.lastStatus === "closed") return "closed"
 

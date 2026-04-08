@@ -2,7 +2,7 @@ import { jetstream, DeliverPolicy } from "@nats-io/jetstream"
 import type { ConsumerMessages } from "@nats-io/jetstream"
 import type { NatsConnection } from "@nats-io/transport-node"
 import { RUNNER_EVENTS_STREAM, type RunnerTurnEvent } from "../shared/runner-protocol"
-import type { TinkariaStatus, TranscriptEntry, AgentProvider } from "../shared/types"
+import type { SessionStatus, TranscriptEntry, AgentProvider } from "../shared/types"
 import { LOG_PREFIX } from "../shared/branding"
 
 const decoder = new TextDecoder()
@@ -36,7 +36,7 @@ export class TranscriptConsumer {
   private readonly store: TranscriptConsumerStore
   private readonly onStateChange: () => void
   private readonly onMessageAppended: ((chatId: string, entry: TranscriptEntry) => void) | undefined
-  private readonly activeStatuses = new Map<string, TinkariaStatus>()
+  private readonly activeStatuses = new Map<string, SessionStatus>()
   private messages: ConsumerMessages | null = null
   private running = false
 
@@ -47,7 +47,7 @@ export class TranscriptConsumer {
     this.onMessageAppended = options.onMessageAppended
   }
 
-  getActiveStatuses(): Map<string, TinkariaStatus> {
+  getActiveStatuses(): Map<string, SessionStatus> {
     return new Map(this.activeStatuses)
   }
 

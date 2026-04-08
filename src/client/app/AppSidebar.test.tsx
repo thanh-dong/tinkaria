@@ -3,7 +3,7 @@ import { createElement, Suspense } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { MemoryRouter } from "react-router-dom"
 import { TooltipProvider } from "../components/ui/tooltip"
-import { getSidebarUiIdentityDescriptor, TinkariaSidebar } from "./TinkariaSidebar"
+import { getSidebarUiIdentityDescriptor, AppSidebar } from "./AppSidebar"
 import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import type { SidebarData, UpdateSnapshot } from "../../shared/types"
 
@@ -14,10 +14,10 @@ function createSidebarData(): SidebarData {
   return { projectGroups: [] }
 }
 
-function renderSidebar(overrides: Partial<Parameters<typeof TinkariaSidebar>[0]> = {}) {
+function renderSidebar(overrides: Partial<Parameters<typeof AppSidebar>[0]> = {}) {
   return renderToStaticMarkup(
     createElement(TooltipProvider, null,
-      createElement(MemoryRouter, null, createElement(TinkariaSidebar, {
+      createElement(MemoryRouter, null, createElement(AppSidebar, {
         data: createSidebarData(),
         activeChatId: null,
         connectionStatus: "connected",
@@ -47,7 +47,7 @@ function renderSidebar(overrides: Partial<Parameters<typeof TinkariaSidebar>[0]>
   )
 }
 
-describe("TinkariaSidebar", () => {
+describe("AppSidebar", () => {
   test("exposes a C3-owned sidebar shell descriptor", () => {
     expect(getUiIdentityAttributeProps(getSidebarUiIdentityDescriptor())).toEqual({
       "data-ui-id": "chat.sidebar",

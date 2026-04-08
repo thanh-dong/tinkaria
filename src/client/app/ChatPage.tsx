@@ -28,8 +28,8 @@ import {
 } from "../stores/rightSidebarStore"
 import { useSkillCompositionStore } from "../stores/skillCompositionStore"
 import { useRightSidebarToggleAnimation } from "./useRightSidebarToggleAnimation"
-import type { TinkariaState } from "./useTinkariaState"
-import { TinkariaTranscript } from "./TinkariaTranscript"
+import type { AppState } from "./useAppState"
+import { ChatTranscript } from "./ChatTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
 import type { HydratedTranscriptMessage } from "../../shared/types"
 
@@ -247,7 +247,7 @@ export function ChatEmptyStateBrandMark() {
 }
 
 export function ChatPage() {
-  const state = useOutletContext<TinkariaState>()
+  const state = useOutletContext<AppState>()
   const chatCardRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const mobileSidebarSwipeRef = useRef<MobileSidebarSwipeState | null>(null)
@@ -499,7 +499,7 @@ export function ChatPage() {
             {state.messages.length > 0 ? (
               <>
                 <div className="animate-fade-in space-y-5 pt-[72px] max-w-[800px] mx-auto">
-                  <TinkariaTranscript
+                  <ChatTranscript
                     messages={state.messages}
                     scrollRef={state.scrollRef}
                     isLoading={state.isProcessing}

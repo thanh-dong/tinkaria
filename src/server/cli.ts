@@ -15,7 +15,7 @@ import {
   runCli,
 } from "./cli-runtime"
 import { CLI_STARTUP_UPDATE_RESTART_EXIT_CODE, CLI_UI_UPDATE_RESTART_EXIT_CODE } from "./restart"
-import { startTinkariaServer } from "./server"
+import { startServer } from "./server"
 
 // Read version from package.json at the package root
 const pkg = await Bun.file(new URL("../../package.json", import.meta.url)).json()
@@ -28,7 +28,7 @@ const result = await runCli(argv, {
   version: VERSION,
   bunVersion: Bun.version,
   startServer: async (options) => {
-    const started = await startTinkariaServer(options)
+    const started = await startServer(options)
     if (started.updateManager && options.update) {
       started.updateManager.onChange((snapshot) => {
         if (snapshot.status !== "restart_pending") return
