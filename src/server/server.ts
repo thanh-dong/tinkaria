@@ -194,7 +194,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
       onStateChange: () => broadcast(),
       onMessageAppended,
     })
-    void transcriptConsumer.start()
+    await transcriptConsumer.start()
 
     const proxy = new RunnerProxy({
       nc: natsConnector.nc,
