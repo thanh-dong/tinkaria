@@ -1,5 +1,13 @@
 import process from "node:process"
 import { LOG_PREFIX } from "../shared/branding"
+
+// Safety net: prevent stray unhandled rejections from crashing the server.
+// Root causes should still be fixed, but this prevents cascading process death
+// when a child process (e.g., Codex, vendored rg) dies unexpectedly.
+process.on("unhandledRejection", (reason) => {
+  const message = reason instanceof Error ? reason.message : String(reason)
+  console.warn(LOG_PREFIX, "unhandled rejection (swallowed):", message)
+})
 import {
   fetchLatestPackageVersion,
   installPackageVersion,

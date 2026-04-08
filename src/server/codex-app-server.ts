@@ -11,7 +11,7 @@ import type {
   TodoItem,
   TranscriptEntry,
 } from "../shared/types"
-import { getWebContextPrompt } from "./agent"
+import { getWebContextPrompt } from "../shared/web-context"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
 import { normalizeToolCall } from "../shared/tools"
 import { z, type ZodIssue } from "zod"
@@ -964,12 +964,16 @@ export class CodexAppServerManager {
         }
 
         if (isServerRequest(parsed)) {
-          void this.handleServerRequest(context, parsed)
+          this.handleServerRequest(context, parsed).catch(() => {
+            // Swallow — failContext already handles cleanup
+          })
           continue
         }
 
         if (isServerNotification(parsed)) {
-          void this.handleNotification(context, parsed)
+          this.handleNotification(context, parsed).catch(() => {
+            // Swallow — failContext already handles cleanup
+          })
         }
       }
     })()
@@ -1464,6 +1468,11 @@ export class CodexAppServerManager {
   }
 
   private writeMessage(context: SessionContext, message: Record<string, unknown>) {
-    context.child.stdin.write(`${JSON.stringify(message)}\n`)
+    if (context.closed) return
+    try {
+      context.child.stdin.write(`${JSON.stringify(message)}\n`)
+    } catch {
+      // Child process already dead — ignore write failures (EPIPE etc.)
+    }
   }
 }

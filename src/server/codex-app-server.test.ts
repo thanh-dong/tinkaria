@@ -1934,4 +1934,93 @@ describe("CodexAppServerManager", () => {
     expect(resultEvent?.entry.subtype).toBe("error")
     expect(resultEvent?.entry.result).toContain("fatal: app-server crashed")
   })
+
+  test("stopSession marks context closed, silencing subsequent writes", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+      } else if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    // Stop session — marks context as closed
+    manager.stopSession("chat-1")
+
+    // Starting a new turn on a stopped session should throw cleanly, not EPIPE
+    expect(() => manager.stopSession("chat-1")).not.toThrow()
+  })
+
+  test("child crash during handleServerRequest does not produce unhandled rejection", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+      } else if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+      } else if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        // Send a server request, then immediately crash the child
+        child.writeServerMessage({
+          method: "item/tool/requestUserInput",
+          id: "req-1",
+          params: {
+            itemId: "tool-crash",
+            questions: [{ type: "text", text: "Pick:", options: ["x"] }],
+          },
+        })
+        // Simulate child crash while request is in flight
+        queueMicrotask(() => {
+          child.closeWithCode(1)
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "crash during request",
+      planMode: false,
+      onToolRequest: async () => {
+        // Simulate slow tool response — child will crash before this resolves
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        return { answer: "x" }
+      },
+    })
+
+    // Should produce an error event, not an unhandled rejection
+    const events = await collectStream(turn.stream)
+    const resultEvent = events.find((event) => event.type === "transcript" && event.entry.kind === "result")
+    expect(resultEvent?.entry.isError).toBe(true)
+  })
 })
