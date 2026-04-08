@@ -444,7 +444,7 @@ describe("SessionOrchestrator", () => {
       expect(ctx.coordinator.disposedChats).toContain(targetId)
     })
 
-    test("cleans up origin chain tracking", async () => {
+    test("cleans up origin chain tracking after prune", async () => {
       ctx = createOrchestrator()
       const caller = await seedCallerChat(ctx.store)
       const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
@@ -452,13 +452,45 @@ describe("SessionOrchestrator", () => {
       })
 
       await ctx.orchestrator.closeAgent(caller.id, { targetChatId: targetId })
+      ctx.orchestrator.pruneTombstones()
 
-      // After cleanup, spawning again should not count toward the old concurrency
-      // Spawn up to maxConcurrency to confirm the slot was freed
+      // After prune, spawning again should not count toward the old concurrency
       const { chatId: newId } = await ctx.orchestrator.spawnAgent(caller.id, {
         instruction: "replacement agent",
       })
       expect(newId).toBeDefined()
+    })
+
+    test("marks child as closed in hierarchy before disposing", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "closeable agent",
+      })
+
+      await ctx.orchestrator.closeAgent(caller.id, { targetChatId: targetId })
+
+      // Hierarchy should show the child as "closed" (tombstone)
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+      expect(hierarchy.children).toHaveLength(1)
+      expect(hierarchy.children[0]!.status).toBe("closed")
+    })
+
+    test("pruneTombstones removes closed children", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "closeable agent",
+      })
+
+      await ctx.orchestrator.closeAgent(caller.id, { targetChatId: targetId })
+
+      // Before prune
+      expect(ctx.orchestrator.getHierarchy(caller.id).children).toHaveLength(1)
+
+      // After prune
+      ctx.orchestrator.pruneTombstones()
+      expect(ctx.orchestrator.getHierarchy(caller.id).children).toHaveLength(0)
     })
   })
 

@@ -234,8 +234,34 @@ export class SessionOrchestrator {
     _callerChatId: string,
     args: { targetChatId: string },
   ): Promise<void> {
+    // Mark as closed tombstone first (visible in hierarchy)
+    const origin = this.origins.get(args.targetChatId)
+    if (origin) {
+      origin.lastStatus = "closed"
+      origin.lastStatusAt = Date.now()
+    }
+
+    // Clear any pending waiter
+    const waiter = this.waiters.get(args.targetChatId)
+    if (waiter) {
+      clearTimeout(waiter.timer)
+      this.waiters.delete(args.targetChatId)
+    }
+
+    // Dispose the underlying chat (async)
     await this.coordinator.disposeChat(args.targetChatId)
-    this.cleanup(args.targetChatId)
+  }
+
+  pruneTombstones(): void {
+    const toRemove: string[] = []
+    for (const [chatId, origin] of this.origins) {
+      if (origin.lastStatus === "closed") {
+        toRemove.push(chatId)
+      }
+    }
+    for (const chatId of toRemove) {
+      this.cleanup(chatId)
+    }
   }
 
   destroy(): void {
