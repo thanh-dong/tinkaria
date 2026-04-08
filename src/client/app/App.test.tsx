@@ -355,5 +355,6 @@ describe("sidebar ui identity coverage", () => {
 
     expect(chatRowHtml).toContain('data-ui-id="sidebar.chat-row"')
     expect(localProjectsHtml).toContain('data-ui-id="sidebar.project-group"')
+    expect(localProjectsHtml).not.toContain("cursor-grab")
   })
 })

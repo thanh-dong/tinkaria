@@ -1,24 +1,7 @@
-import { type ReactNode, useMemo, useRef } from "react"
+import { type ReactNode, useMemo } from "react"
 import { ChevronRight, FolderOpen, Loader2, Merge, SquarePen } from "lucide-react"
 import type { AgentProvider, DiscoveredSession } from "../../../../shared/types"
 import { SessionPicker } from "../SessionPicker"
-import {
-  DndContext,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-  type DragStartEvent,
-  type DragEndEvent,
-} from "@dnd-kit/core"
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
 import { Button } from "../../ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
 import type { SidebarChatRow, SidebarProjectGroup } from "../../../../shared/types"
@@ -51,7 +34,6 @@ interface Props {
   chatsPerProject: number
   onNewLocalChat?: (localPath: string) => void
   onRemoveProject?: (projectId: string) => void
-  onReorderGroups?: (newOrder: string[]) => void
   isConnected?: boolean
   startingLocalPath?: string | null
   sessionsForProject?: (projectId: string) => DiscoveredSession[]
@@ -64,7 +46,7 @@ interface Props {
   onMergeSession?: (projectId: string) => void
 }
 
-interface SortableProjectGroupProps {
+interface ProjectGroupSectionProps {
   group: SidebarProjectGroup
   collapsedSections: Set<string>
   expandedGroups: Set<string>
@@ -86,7 +68,7 @@ interface SortableProjectGroupProps {
   onMergeSession?: (projectId: string) => void
 }
 
-function SortableProjectGroup({
+function ProjectGroupSection({
   group,
   collapsedSections,
   expandedGroups,
@@ -106,7 +88,7 @@ function SortableProjectGroup({
   onRefreshSessions,
   onShowMoreSessions,
   onMergeSession,
-}: SortableProjectGroupProps) {
+}: ProjectGroupSectionProps) {
   const { groupKey, localPath, chats: pathChats } = group
 
   const sidebarChatIds = useMemo(
@@ -118,31 +100,12 @@ function SortableProjectGroup({
   const displayChats = isExpanded ? pathChats : pathChats.slice(0, chatsPerProject)
   const hasMore = pathChats.length > chatsPerProject
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: groupKey })
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-  }
-
   const header = (
     <div
-      ref={setActivatorNodeRef}
       className={cn(
-        "sticky top-0 bg-background dark:bg-card z-10 relative p-[10px] flex items-center justify-between",
-        "cursor-grab active:cursor-grabbing",
-        isDragging && "cursor-grabbing"
+        "sticky top-0 bg-background dark:bg-card z-10 relative p-[10px] flex items-center justify-between"
       )}
       onClick={() => onToggleSection(groupKey)}
-      {...listeners}
     >
       <div className="flex items-center gap-2">
         <span className="relative size-3.5 shrink-0 cursor-pointer">
@@ -245,14 +208,8 @@ function SortableProjectGroup({
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       {...getUiIdentityAttributeProps(PROJECT_GROUP_DESCRIPTOR)}
-      className={cn(
-        "group/section",
-        isDragging && "opacity-50 shadow-lg z-50 relative"
-      )}
-      {...attributes}
+      className="group/section"
     >
       {onRemoveProject ? (
         <ProjectSectionMenu onRemove={() => onRemoveProject(groupKey)}>
@@ -287,7 +244,6 @@ export function LocalProjectsSection({
   chatsPerProject,
   onNewLocalChat,
   onRemoveProject,
-  onReorderGroups,
   isConnected,
   startingLocalPath,
   sessionsForProject,
@@ -299,80 +255,32 @@ export function LocalProjectsSection({
   onShowMoreSessions,
   onMergeSession,
 }: Props) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor)
-  )
-
-  const groupIds = useMemo(
-    () => projectGroups.map((g) => g.groupKey),
-    [projectGroups]
-  )
-
-  const wasOpenBeforeDragRef = useRef<string | null>(null)
-
-  function handleDragStart(event: DragStartEvent) {
-    const key = event.active.id as string
-    if (!collapsedSections.has(key)) {
-      wasOpenBeforeDragRef.current = key
-      onToggleSection(key)
-    } else {
-      wasOpenBeforeDragRef.current = null
-    }
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-
-    if (over && active.id !== over.id && onReorderGroups) {
-      const oldIndex = groupIds.indexOf(active.id as string)
-      const newIndex = groupIds.indexOf(over.id as string)
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newOrder = arrayMove(groupIds, oldIndex, newIndex)
-        onReorderGroups(newOrder)
-      }
-    }
-
-    if (wasOpenBeforeDragRef.current) {
-      const keyToReopen = wasOpenBeforeDragRef.current
-      wasOpenBeforeDragRef.current = null
-      requestAnimationFrame(() => onToggleSection(keyToReopen))
-    }
-  }
-
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={groupIds} strategy={verticalListSortingStrategy}>
-        {projectGroups.map((group) => (
-          <SortableProjectGroup
-            key={group.groupKey}
-            group={group}
-            collapsedSections={collapsedSections}
-            expandedGroups={expandedGroups}
-            onToggleSection={onToggleSection}
-            onToggleExpandedGroup={onToggleExpandedGroup}
-            renderChatRow={renderChatRow}
-            chatsPerProject={chatsPerProject}
-            onNewLocalChat={onNewLocalChat}
-            onRemoveProject={onRemoveProject}
-            isConnected={isConnected}
-            startingLocalPath={startingLocalPath}
-            sessions={sessionsForProject?.(group.groupKey)}
-            sessionsWindowDays={sessionsWindowDaysForProject?.(group.groupKey)}
-            onOpenSessionPicker={onOpenSessionPicker}
-            onNavigateToChat={onNavigateToChat}
-            onResumeSession={onResumeSession}
-            onRefreshSessions={onRefreshSessions}
-            onShowMoreSessions={onShowMoreSessions}
-            onMergeSession={onMergeSession}
-          />
-        ))}
-      </SortableContext>
-    </DndContext>
+    <>
+      {projectGroups.map((group) => (
+        <ProjectGroupSection
+          key={group.groupKey}
+          group={group}
+          collapsedSections={collapsedSections}
+          expandedGroups={expandedGroups}
+          onToggleSection={onToggleSection}
+          onToggleExpandedGroup={onToggleExpandedGroup}
+          renderChatRow={renderChatRow}
+          chatsPerProject={chatsPerProject}
+          onNewLocalChat={onNewLocalChat}
+          onRemoveProject={onRemoveProject}
+          isConnected={isConnected}
+          startingLocalPath={startingLocalPath}
+          sessions={sessionsForProject?.(group.groupKey)}
+          sessionsWindowDays={sessionsWindowDaysForProject?.(group.groupKey)}
+          onOpenSessionPicker={onOpenSessionPicker}
+          onNavigateToChat={onNavigateToChat}
+          onResumeSession={onResumeSession}
+          onRefreshSessions={onRefreshSessions}
+          onShowMoreSessions={onShowMoreSessions}
+          onMergeSession={onMergeSession}
+        />
+      ))}
+    </>
   )
 }

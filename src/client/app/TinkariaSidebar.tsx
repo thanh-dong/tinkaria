@@ -10,7 +10,6 @@ import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProjectsSection"
 import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
 import type { SocketStatus } from "./socket-interface"
-import { useProjectGroupOrderStore } from "../stores/projectGroupOrderStore"
 import { shouldCloseMobileSidebarFromSwipe, type MobileSidebarSwipeState } from "./ChatPage"
 
 interface TinkariaSidebarProps {
@@ -124,29 +123,7 @@ export function TinkariaSidebar({
     }
   }, [])
 
-  const savedOrder = useProjectGroupOrderStore((s) => s.order)
-  const setGroupOrder = useProjectGroupOrderStore((s) => s.setOrder)
-
-  const orderedProjectGroups = useMemo(() => {
-    if (savedOrder.length === 0) return data.projectGroups
-
-    const groupMap = new Map(data.projectGroups.map((g) => [g.groupKey, g]))
-    const ordered = savedOrder
-      .filter((key) => groupMap.has(key))
-      .map((key) => groupMap.get(key)!)
-
-    const orderedKeys = new Set(savedOrder)
-    for (const group of data.projectGroups) {
-      if (!orderedKeys.has(group.groupKey)) ordered.push(group)
-    }
-
-    return ordered
-  }, [data.projectGroups, savedOrder])
-
-  const handleReorderGroups = useCallback(
-    (newOrder: string[]) => setGroupOrder(newOrder),
-    [setGroupOrder]
-  )
+  const orderedProjectGroups = data.projectGroups
 
   const projectIdByPath = useMemo(
     () => new Map(data.projectGroups.map((group) => [group.localPath, group.groupKey])),
@@ -376,7 +353,6 @@ export function TinkariaSidebar({
 
             <LocalProjectsSection
               projectGroups={orderedProjectGroups}
-              onReorderGroups={handleReorderGroups}
               collapsedSections={collapsedSections}
               expandedGroups={expandedGroups}
               onToggleSection={toggleSection}
