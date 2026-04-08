@@ -1185,6 +1185,44 @@ describe("AgentCoordinator codex integration", () => {
 })
 
 describe("AgentCoordinator skill discovery", () => {
+  test("records turn error when codex startSession throws", async () => {
+    const fakeCodexManager = {
+      async startSession(): Promise<void> {
+        throw new Error("thread/resume failed: thread is not rollable")
+      },
+      async startTurn(): Promise<HarnessTurn> {
+        throw new Error("should not be called")
+      },
+      stopSession() {},
+    }
+
+    const store = createFakeStore()
+    const failedMessages: string[] = []
+    store.recordTurnFailed = async (_chatId: string, message: string) => {
+      failedMessages.push(message)
+    }
+
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexManager: fakeCodexManager as never,
+    })
+
+    await coordinator.send({
+      type: "chat.send",
+      chatId: "chat-1",
+      provider: "codex",
+      content: "hello",
+      model: "gpt-5.4",
+    })
+
+    await waitFor(() => failedMessages.length > 0)
+
+    expect(failedMessages[0]).toContain("thread is not rollable")
+    const errorResult = store.messages.find((e) => e.kind === "result" && e.isError)
+    expect(errorResult).toBeDefined()
+  })
+
   test("passes resolved skills to codex startTurn", async () => {
     const receivedSkills: Array<string[] | undefined> = []
     const runtime: CodexRuntime = {

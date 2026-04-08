@@ -521,25 +521,36 @@ export class AgentCoordinator {
         chatId: args.chatId,
       })
     } else {
-      await this.codexRuntime.startSession({
-        chatId: args.chatId,
-        projectId: project.id,
-        cwd: project.localPath,
-        model: args.model,
-        serviceTier: args.serviceTier,
-        sessionToken: chat.sessionToken,
-      })
-      const skills = await this.skillCache?.get(project.localPath)
-      turn = await this.codexRuntime.startTurn({
-        chatId: args.chatId,
-        content: buildTurnPrompt(args.content, { delegatedContext: args.delegatedContext, isSpawned: args.isSpawned, chatId: args.chatId }),
-        model: args.model,
-        effort: args.effort as any,
-        serviceTier: args.serviceTier,
-        planMode: args.planMode,
-        skills,
-        onToolRequest,
-      })
+      try {
+        await this.codexRuntime.startSession({
+          chatId: args.chatId,
+          projectId: project.id,
+          cwd: project.localPath,
+          model: args.model,
+          serviceTier: args.serviceTier,
+          sessionToken: chat.sessionToken,
+        })
+        const skills = await this.skillCache?.get(project.localPath)
+        turn = await this.codexRuntime.startTurn({
+          chatId: args.chatId,
+          content: buildTurnPrompt(args.content, { delegatedContext: args.delegatedContext, isSpawned: args.isSpawned, chatId: args.chatId }),
+          model: args.model,
+          effort: args.effort as any,
+          serviceTier: args.serviceTier,
+          planMode: args.planMode,
+          skills,
+          onToolRequest,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        await this.appendAndPublish(
+          args.chatId,
+          timestamped({ kind: "result", subtype: "error", isError: true, durationMs: 0, result: message })
+        )
+        await this.store.recordTurnFailed(args.chatId, message)
+        this.onStateChange()
+        return
+      }
     }
 
     const active: ActiveTurn = {
