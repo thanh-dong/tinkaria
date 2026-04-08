@@ -7,13 +7,13 @@ import { getMachineDisplayName } from "./machine-name"
 import { TerminalManager } from "./terminal-manager"
 import { UpdateManager } from "./update-manager"
 import type { UpdateInstallAttemptResult } from "./cli-runtime"
-import { NatsDaemonManager } from "./nats-daemon-manager"
+import { NatsDaemonManager, type NatsDaemonReadiness } from "./nats-daemon-manager"
 import { NatsConnector } from "./nats-connector"
 import { generateAuthToken } from "./nats-auth"
 import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
 import { ensureTerminalEventsStream, ensureChatMessageStream, ensureKitTurnEventsStream, ensureRunnerEventsStream } from "./nats-streams"
-import { RunnerManager } from "./runner-manager"
+import { RunnerManager, type RunnerReadiness } from "./runner-manager"
 import { RunnerProxy } from "./runner-proxy"
 import { TranscriptConsumer } from "./transcript-consumer"
 import type { AgentProvider, TranscriptEntry, TinkariaStatus } from "../shared/types"
@@ -37,6 +37,18 @@ export interface StartTinkariaServerOptions {
     fetchLatestVersion: (packageName: string) => Promise<string>
     installVersion: (packageName: string, version: string) => UpdateInstallAttemptResult
   }
+}
+
+export interface TinkariaHealthcheck {
+  ok: boolean
+  status: "ok" | "degraded" | "fail"
+  port: number
+  natsWsPort: number
+  splitMode: boolean
+  natsDaemon: NatsDaemonReadiness | null
+  natsConnection: ReturnType<NatsConnector["getReadiness"]>
+  runner: RunnerReadiness | null
+  codexKit: ReturnType<ProjectKitRegistry["getReadiness"]>
 }
 
 /** Duck-typed coordinator — satisfied by both AgentCoordinator (in-process) and RunnerProxy (split mode). */
@@ -98,6 +110,32 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
   ])
 
   const splitMode = process.env.TINKARIA_SPLIT === "true"
+  const getHealthcheck = (): TinkariaHealthcheck => {
+    const natsDaemon = daemonManager.getReadiness()
+    const natsConnection = natsConnector.getReadiness()
+    const codexKit = projectKitRegistry.getReadiness()
+    const runner = splitMode ? runnerManager?.getReadiness() ?? {
+      ok: false,
+      runnerId: null,
+      pid: null,
+      registered: false,
+      heartbeatFresh: false,
+      lastHeartbeatAt: null,
+    } : null
+    const hardFailure = !natsDaemon?.ok || !natsConnection.ok || (splitMode && !runner?.ok)
+    const degraded = !hardFailure && !codexKit.ok
+    return {
+      ok: !hardFailure,
+      status: hardFailure ? "fail" : degraded ? "degraded" : "ok",
+      port: actualPort,
+      natsWsPort: natsConnector.natsWsPort,
+      splitMode,
+      natsDaemon,
+      natsConnection,
+      runner,
+      codexKit,
+    }
+  }
 
   // Project agent: cross-session awareness and coordination
   const sessionIndex = new SessionIndex()
@@ -243,10 +281,9 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
           }
 
           if (url.pathname === "/health") {
-            return Response.json({
-              ok: true,
-              port: actualPort,
-              natsWsPort: natsConnector.natsWsPort,
+            const healthcheck = getHealthcheck()
+            return Response.json(healthcheck, {
+              status: healthcheck.ok ? 200 : 503,
             })
           }
 
@@ -306,10 +343,14 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     authToken,
   }).then((daemon) => {
     localCodexKit = daemon
+    projectKitRegistry.setError(null)
   }).catch((error) => {
     const message = error instanceof Error ? error.message : String(error)
+    projectKitRegistry.setError(message)
     console.warn(LOG_PREFIX, `Codex kit daemon failed to start: ${message}`)
   })
+
+  console.warn(LOG_PREFIX, `Operational health initialized — status: ${getHealthcheck().status}, splitMode: ${splitMode}`)
 
   const shutdown = async () => {
     clearInterval(abandonInterval)
@@ -337,6 +378,7 @@ export async function startTinkariaServer(options: StartTinkariaServerOptions = 
     port: actualPort,
     store,
     updateManager,
+    healthcheck: getHealthcheck,
     stop: shutdown,
   }
 }

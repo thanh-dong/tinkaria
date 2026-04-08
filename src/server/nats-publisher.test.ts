@@ -367,4 +367,51 @@ describe("createNatsPublisher", () => {
 
     publisher.dispose()
   })
+
+  test("broadcastSnapshots publishes orchestration snapshots without throwing", async () => {
+    server = await NatsServer.start({ jetstream: true })
+    nc = await connect({ servers: server.url })
+
+    const publisher = await createNatsPublisher(
+      mockArgs({
+        orchestrator: {
+          getHierarchy: () => ({
+            children: [
+              {
+                chatId: "child-1",
+                provider: "claude",
+                model: "sonnet",
+                instruction: "audit the latest release candidate",
+                status: "running",
+                depth: 1,
+                spawnedAt: Date.now(),
+                lastStatusAt: Date.now(),
+              },
+            ],
+          }),
+          pruneTombstones: () => {},
+        } as unknown as CreateNatsPublisherArgs["orchestrator"],
+      })
+    )
+
+    const topic: SubscriptionTopic = { type: "orchestration", chatId: "chat-parent" }
+    const sub = nc.subscribe(snapshotSubject(topic))
+
+    publisher.addSubscription("sub-orch", topic)
+    await expect(publisher.broadcastSnapshots()).resolves.toBeUndefined()
+
+    const msgs = await collectMessages(sub, 1)
+    expect(msgs.length).toBe(1)
+    expect(JSON.parse(msgs[0])).toEqual({
+      children: [
+        expect.objectContaining({
+          chatId: "child-1",
+          status: "running",
+          instruction: "audit the latest release candidate",
+        }),
+      ],
+    })
+
+    publisher.dispose()
+  })
 })

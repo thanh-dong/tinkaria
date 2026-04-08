@@ -1,6 +1,7 @@
 import { jetstreamManager, RetentionPolicy, StorageType } from "@nats-io/jetstream"
 import type { NatsConnection } from "@nats-io/transport-node"
 import { ALL_TERMINAL_EVENTS, ALL_CHAT_MESSAGE_EVENTS, ALL_KIT_TURN_EVENTS, CHAT_MESSAGE_EVENTS_STREAM_NAME } from "../shared/nats-subjects"
+import { RUNNER_EVENTS_STREAM, ALL_RUNNER_EVENTS } from "../shared/runner-protocol"
 import { LOG_PREFIX } from "../shared/branding"
 
 export const TERMINAL_EVENTS_STREAM = "KANNA_TERMINAL_EVENTS"
@@ -70,6 +71,17 @@ export function ensureChatMessageStream(nc: NatsConnection): Promise<void> {
   return ensureStream(nc, {
     name: CHAT_MESSAGE_EVENTS_STREAM,
     subjects: [ALL_CHAT_MESSAGE_EVENTS],
+    max_age_ns: THIRTY_MINUTES_NS,
+    max_msgs: 50_000,
+    max_bytes: 128 * 1024 * 1024,
+  })
+}
+
+/** Creates or updates the JetStream stream for runner turn events (memory-backed, 30 min / 50K msg retention). */
+export function ensureRunnerEventsStream(nc: NatsConnection): Promise<void> {
+  return ensureStream(nc, {
+    name: RUNNER_EVENTS_STREAM,
+    subjects: [ALL_RUNNER_EVENTS],
     max_age_ns: THIRTY_MINUTES_NS,
     max_msgs: 50_000,
     max_bytes: 128 * 1024 * 1024,

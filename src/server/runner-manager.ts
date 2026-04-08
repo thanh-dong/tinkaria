@@ -1,8 +1,10 @@
-import type { NatsConnection } from "@nats-io/transport-node"
+import type { Msg, NatsConnection, Subscription } from "@nats-io/transport-node"
 import { Kvm } from "@nats-io/kv"
 import {
   runnerCmdSubject,
+  runnerHeartbeatSubject,
   RUNNER_REGISTRY_BUCKET,
+  type RunnerHeartbeat,
   type RunnerRegistration,
 } from "../shared/runner-protocol"
 import { LOG_PREFIX } from "../shared/branding"
@@ -16,12 +18,26 @@ export interface RunnerManagerOptions {
   authToken?: string
 }
 
+export interface RunnerReadiness {
+  ok: boolean
+  runnerId: string | null
+  pid: number | null
+  registered: boolean
+  heartbeatFresh: boolean
+  lastHeartbeatAt: number | null
+}
+
+const RUNNER_HEARTBEAT_TIMEOUT_MS = 30_000
+
 export class RunnerManager {
   private readonly nc: NatsConnection
   private readonly natsUrl: string
   private readonly authToken: string | undefined
   private proc: ReturnType<typeof Bun.spawn> | null = null
   private runnerId: string | null = null
+  private runnerRegistration: RunnerRegistration | null = null
+  private lastHeartbeatAt: number | null = null
+  private heartbeatSubscription: Subscription | null = null
 
   constructor(options: RunnerManagerOptions) {
     this.nc = options.nc
@@ -34,6 +50,21 @@ export class RunnerManager {
     return this.runnerId
   }
 
+  getReadiness(now = Date.now()): RunnerReadiness {
+    const heartbeatFresh =
+      this.lastHeartbeatAt !== null &&
+      now - this.lastHeartbeatAt <= RUNNER_HEARTBEAT_TIMEOUT_MS
+    const registered = this.runnerRegistration !== null
+    return {
+      ok: this.runnerId !== null && registered && heartbeatFresh,
+      runnerId: this.runnerId,
+      pid: this.runnerRegistration?.pid ?? this.proc?.pid ?? null,
+      registered,
+      heartbeatFresh,
+      lastHeartbeatAt: this.lastHeartbeatAt,
+    }
+  }
+
   async ensureRunner(): Promise<string> {
     // Check if runner already exists in KV and is alive
     if (this.runnerId) {
@@ -43,6 +74,7 @@ export class RunnerManager {
         const entry = await kvStore.get(this.runnerId)
         if (entry) {
           const reg = JSON.parse(decoder.decode(entry.value)) as RunnerRegistration
+          this.runnerRegistration = reg
           try {
             process.kill(reg.pid, 0) // check alive (signal 0 = no signal, just check)
             return this.runnerId
@@ -59,6 +91,8 @@ export class RunnerManager {
     const runnerId = `runner-${Date.now()}-${process.pid}`
     const runnerScript = new URL("../runner/runner.ts", import.meta.url).pathname
 
+    this.subscribeToHeartbeat(runnerId)
+
     this.proc = Bun.spawn(["bun", "run", runnerScript], {
       env: {
         ...process.env,
@@ -73,6 +107,7 @@ export class RunnerManager {
 
     // Wait for runner to register in KV
     await this.waitForRegistration(runnerId, 15_000)
+    await this.waitForHeartbeat(5_000)
 
     console.warn(LOG_PREFIX, `Runner ${runnerId} spawned (pid: ${this.proc.pid})`)
 
@@ -87,7 +122,10 @@ export class RunnerManager {
       try {
         if (!kvStore) kvStore = await kvm.open(RUNNER_REGISTRY_BUCKET)
         const entry = await kvStore.get(runnerId)
-        if (entry) return
+        if (entry) {
+          this.runnerRegistration = JSON.parse(decoder.decode(entry.value)) as RunnerRegistration
+          return
+        }
       } catch {
         kvStore = null // KV not ready yet, retry open next iteration
       }
@@ -96,7 +134,46 @@ export class RunnerManager {
     throw new Error(`Runner ${runnerId} did not register within ${timeoutMs}ms`)
   }
 
+  private subscribeToHeartbeat(runnerId: string): void {
+    this.heartbeatSubscription?.unsubscribe()
+    this.lastHeartbeatAt = null
+    const sub = this.nc.subscribe(runnerHeartbeatSubject(runnerId))
+    this.heartbeatSubscription = sub
+    void this.consumeHeartbeats(sub, runnerId)
+  }
+
+  private async consumeHeartbeats(sub: Subscription, runnerId: string): Promise<void> {
+    for await (const msg of sub) {
+      if (sub !== this.heartbeatSubscription || runnerId !== this.runnerId) {
+        continue
+      }
+      this.recordHeartbeat(msg)
+    }
+  }
+
+  private recordHeartbeat(msg: Msg): void {
+    try {
+      const heartbeat = JSON.parse(decoder.decode(msg.data)) as RunnerHeartbeat
+      if (heartbeat.runnerId !== this.runnerId) return
+      this.lastHeartbeatAt = heartbeat.ts
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(LOG_PREFIX, `Runner heartbeat decode failed: ${message}`)
+    }
+  }
+
+  private async waitForHeartbeat(timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      if (this.getReadiness().heartbeatFresh) return
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    throw new Error(`Runner ${this.runnerId ?? "unknown"} did not publish heartbeat within ${timeoutMs}ms`)
+  }
+
   async dispose(): Promise<void> {
+    this.heartbeatSubscription?.unsubscribe()
+    this.heartbeatSubscription = null
     if (this.runnerId && this.proc) {
       // Try graceful shutdown via NATS command, then SIGTERM as fallback
       try {
@@ -124,6 +201,8 @@ export class RunnerManager {
     }
 
     this.runnerId = null
+    this.runnerRegistration = null
+    this.lastHeartbeatAt = null
     console.warn(LOG_PREFIX, "Runner manager disposed")
   }
 }

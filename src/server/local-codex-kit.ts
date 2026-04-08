@@ -81,6 +81,17 @@ export interface CodexKitRegistration {
   registeredAt: number
 }
 
+export interface CodexKitReadiness {
+  ok: boolean
+  kitId: string | null
+  displayName: string | null
+  registered: boolean
+  heartbeatFresh: boolean
+  lastHeartbeatAt: number | null
+  assignedProjects: number
+  error: string | null
+}
+
 type KitRequest<T> =
   | { ok: true; result: T }
   | { ok: false; error: string }
@@ -117,6 +128,10 @@ export class ProjectKitRegistry {
   private readonly projectAssignments = new Map<string, string>()
   private readonly subscriptions: Subscription[]
   private readonly waiters = new Set<(kit: CodexKitRegistration) => void>()
+  private readonly lastHeartbeatAt = new Map<string, number>()
+  private lastError: string | null = null
+
+  static readonly HEARTBEAT_TIMEOUT_MS = 30_000
 
   constructor(nc: NatsConnection) {
     this.subscriptions = [
@@ -132,13 +147,20 @@ export class ProjectKitRegistry {
     for await (const msg of sub) {
       try {
         const registration = msg.json<CodexKitRegistration>()
+        const previous = this.kits.get(registration.kitId)
         this.kits.set(registration.kitId, registration)
+        this.lastHeartbeatAt.set(registration.kitId, Date.now())
+        this.lastError = null
+        if (!previous) {
+          console.warn(LOG_PREFIX, `Codex kit registration seen — ${registration.kitId} (${registration.displayName})`)
+        }
         for (const waiter of this.waiters) {
           waiter(registration)
         }
         this.waiters.clear()
-      } catch {
-        // Ignore malformed kit metadata.
+      } catch (error) {
+        this.lastError = errorMessage(error)
+        console.warn(LOG_PREFIX, `Malformed Codex kit metadata ignored: ${this.lastError}`)
       }
     }
   }
@@ -186,6 +208,27 @@ export class ProjectKitRegistry {
   getAssignedKit(projectId: string): CodexKitRegistration | null {
     const kitId = this.projectAssignments.get(projectId)
     return kitId ? this.kits.get(kitId) ?? null : null
+  }
+
+  getReadiness(now = Date.now()): CodexKitReadiness {
+    const kit = this.firstKit()
+    const lastHeartbeatAt = kit ? this.lastHeartbeatAt.get(kit.kitId) ?? null : null
+    const heartbeatFresh =
+      lastHeartbeatAt !== null && now - lastHeartbeatAt <= ProjectKitRegistry.HEARTBEAT_TIMEOUT_MS
+    return {
+      ok: kit !== null && heartbeatFresh,
+      kitId: kit?.kitId ?? null,
+      displayName: kit?.displayName ?? null,
+      registered: kit !== null,
+      heartbeatFresh,
+      lastHeartbeatAt,
+      assignedProjects: this.projectAssignments.size,
+      error: this.lastError,
+    }
+  }
+
+  setError(message: string | null): void {
+    this.lastError = message
   }
 
   dispose() {
@@ -261,6 +304,7 @@ export class LocalCodexKitDaemon {
 
     this.publishRegistration(codexKitRegisterSubject())
     this.publishRegistration(codexKitHeartbeatSubject(this.kitId))
+    console.warn(LOG_PREFIX, `Local Codex kit ready — ${this.kitId}`)
     this.heartbeatTimer = setInterval(() => {
       this.publishRegistration(codexKitHeartbeatSubject(this.kitId))
     }, 10_000)

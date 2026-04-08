@@ -59,4 +59,13 @@ export class NatsConnector {
     }
     console.warn(LOG_PREFIX, "NATS connector disconnected")
   }
+
+  getReadiness() {
+    return {
+      ok: !this.disposed && !this.nc.isClosed(),
+      natsUrl: this.natsUrl,
+      natsWsUrl: this.natsWsUrl,
+      natsWsPort: this.natsWsPort,
+    }
+  }
 }

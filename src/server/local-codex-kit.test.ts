@@ -44,6 +44,14 @@ async function setup() {
   return { hubNc, registry }
 }
 
+async function waitFor(predicate: () => boolean, timeoutMs = 3000, intervalMs = 20): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("waitFor timeout")
+    await new Promise((r) => setTimeout(r, intervalMs))
+  }
+}
+
 describe("local codex kit", () => {
   test("supports a shared hub connection without opening a second client connection", async () => {
     const ctx = await setup()
@@ -159,6 +167,37 @@ describe("local codex kit", () => {
     expect(first.kitId).toBe("kit-a")
     expect(second.kitId).toBe("kit-a")
     expect(ctx.registry.getAssignedKit("project-1")?.kitId).toBe("kit-a")
+  })
+
+  test("registry readiness reports fresh kit heartbeat", async () => {
+    const ctx = await setup()
+
+    daemon = await LocalCodexKitDaemon.start({
+      natsUrl: server!.url,
+      kitId: "kit-health",
+      codexManager: {
+        async startSession() {},
+        async startTurn(): Promise<HarnessTurn> {
+          async function* stream() {}
+          return {
+            provider: "codex",
+            stream: stream(),
+            interrupt: async () => {},
+            close: () => {},
+          }
+        },
+        stopSession() {},
+        stopAll() {},
+      } as never,
+    })
+
+    await waitFor(() => ctx.registry.getReadiness().ok)
+    expect(ctx.registry.getReadiness()).toMatchObject({
+      ok: true,
+      kitId: "kit-health",
+      registered: true,
+      heartbeatFresh: true,
+    })
   })
 
   test("streams kit turn events and relays tool responses back to the daemon", async () => {
