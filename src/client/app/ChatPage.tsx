@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { ArrowDown, Loader2 } from "lucide-react"
+import { AlertCircle, ArrowDown, Loader2 } from "lucide-react"
 import { useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
@@ -539,26 +539,47 @@ export function ChatPage() {
             <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
               <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 opacity-70">
                 {state.pendingSessionBootstrap?.chatId === state.activeChatId ? (
-                  <>
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
-                    <span className="text-sm text-muted-foreground">
-                      {state.pendingSessionBootstrap.phase === "compacting"
-                        ? `Compacting ${state.pendingSessionBootstrap.sourceLabels.length} context${state.pendingSessionBootstrap.sourceLabels.length === 1 ? "" : "s"}...`
-                        : "Starting dedicated session..."}
-                    </span>
-                    {state.pendingSessionBootstrap.phase === "compacting" ? (
-                      <div className="flex max-w-md flex-wrap items-center justify-center gap-2">
-                        {state.pendingSessionBootstrap.sourceLabels.map((label) => (
-                          <span
-                            key={label}
-                            className="rounded-full border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground"
-                          >
-                            {label}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </>
+                  state.pendingSessionBootstrap.phase === "error" ? (
+                    <div className="pointer-events-auto flex flex-col items-center gap-3">
+                      <AlertCircle className="h-8 w-8 text-destructive/60" />
+                      <span className="text-sm font-medium text-destructive">
+                        {state.pendingSessionBootstrap.kind === "fork" ? "Fork" : "Merge"} failed
+                      </span>
+                      {state.pendingSessionBootstrap.errorMessage ? (
+                        <span className="max-w-sm text-center text-xs text-muted-foreground">
+                          {state.pendingSessionBootstrap.errorMessage}
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+                        onClick={() => state.dismissBootstrapError()}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+                      <span className="text-sm text-muted-foreground">
+                        {state.pendingSessionBootstrap.phase === "compacting"
+                          ? `Compacting ${state.pendingSessionBootstrap.sourceLabels.length} context${state.pendingSessionBootstrap.sourceLabels.length === 1 ? "" : "s"}...`
+                          : "Starting dedicated session..."}
+                      </span>
+                      {state.pendingSessionBootstrap.phase === "compacting" ? (
+                        <div className="flex max-w-md flex-wrap items-center justify-center gap-2">
+                          {state.pendingSessionBootstrap.sourceLabels.map((label) => (
+                            <span
+                              key={label}
+                              className="rounded-full border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  )
                 ) : (
                   <>
                     <ChatEmptyStateBrandMark />

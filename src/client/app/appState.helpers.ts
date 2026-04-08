@@ -1,38 +1,34 @@
 import { APP_NAME } from "../../shared/branding"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarChatRow, SidebarData } from "../../shared/types"
-import remarkGfm from "remark-gfm"
-import remarkParse from "remark-parse"
-import { unified } from "unified"
 import type { SocketStatus } from "./socket-interface"
-
-export interface ReadBlockBoundary {
-  messageId: string
-  blockIndex: number
-}
-
-export type BoundaryComparison = "advance" | "same" | "regress"
-
-export type ReadHookProgressState = "reading" | "read"
-
-export interface ReadHookProgressBoundary extends ReadBlockBoundary {
-  state: ReadHookProgressState
-}
 
 export interface PendingSessionBootstrap {
   chatId: string
   kind: "fork" | "merge"
-  phase: "compacting" | "starting"
+  phase: "compacting" | "starting" | "error"
   sourceLabels: string[]
+  errorMessage?: string
 }
 
-export type InitialChatReadAnchor =
-  | { kind: "wait" }
-  | { kind: "tail" }
-  | ({ kind: "block" } & ReadBlockBoundary)
+export function transitionPendingSessionBootstrapToError(
+  current: PendingSessionBootstrap | null,
+  chatId: string,
+  errorMessage: string,
+): PendingSessionBootstrap | null {
+  if (current?.chatId !== chatId) return current
+  return {
+    ...current,
+    phase: "error",
+    errorMessage,
+  }
+}
 
-export interface LockedAnchorState {
-  chatId: string | null
-  anchor: InitialChatReadAnchor
+export function clearPendingSessionBootstrapAfterAttempt(
+  current: PendingSessionBootstrap | null,
+  chatId: string,
+): PendingSessionBootstrap | null {
+  if (current?.chatId !== chatId) return current
+  return current.phase === "error" ? current : null
 }
 
 export interface TranscriptWindowDiagnostics {
@@ -54,9 +50,6 @@ export type StartChatIntent =
   | { kind: "local_path"; localPath: string }
   | { kind: "project_request"; project: ProjectRequest }
 
-export const COMPOSER_STICK_DISTANCE_RATIO = 0.12
-export const READ_HOOK_READING_START_RATIO = 0.5
-export const READ_HOOK_READ_START_RATIO = 0.75
 export const TRANSCRIPT_TAIL_SIZE = 200
 export const PWA_RESUME_STALE_AFTER_MS = 15_000
 
@@ -88,205 +81,8 @@ export function getSidebarChatLabels(
   return chatIds.map((chatId) => getSidebarChatRow(projectGroups, chatId)?.title?.trim() || chatId)
 }
 
-export function isChatRead(lastSeenMessageAt?: number, lastMessageAt?: number): boolean {
-  if (lastMessageAt === undefined) return true
-  return (lastSeenMessageAt ?? Number.NEGATIVE_INFINITY) >= lastMessageAt
-}
-
-export function getReadTimestampToPersistAfterReply(lastSeenMessageAt?: number, lastMessageAt?: number): number | null {
-  if (lastMessageAt === undefined) return null
-  if ((lastSeenMessageAt ?? Number.NEGATIVE_INFINITY) >= lastMessageAt) return null
-  return lastMessageAt
-}
-
-export function compareReadBoundary(
-  messages: HydratedTranscriptMessage[],
-  current: { messageId?: string; blockIndex?: number },
-  next: { messageId: string; blockIndex: number },
-): BoundaryComparison {
-  if (messages.length === 0) return "same"
-
-  const nextIndex = messages.findIndex((m) => m.id === next.messageId)
-  if (nextIndex < 0) return "same"
-
-  if (!current.messageId) return "advance"
-
-  const currentIndex = messages.findIndex((m) => m.id === current.messageId)
-  if (currentIndex < 0) return "advance"
-
-  if (nextIndex > currentIndex) return "advance"
-  if (nextIndex < currentIndex) return "regress"
-
-  const currentBlock = current.blockIndex ?? 0
-  if (next.blockIndex > currentBlock) return "advance"
-  if (next.blockIndex < currentBlock) return "regress"
-
-  return "same"
-}
-
-export function isReadableTranscriptMessage(message: HydratedTranscriptMessage): boolean {
-  if (message.hidden) return false
-
-  switch (message.kind) {
-    case "system_init":
-    case "account_info":
-    case "status":
-    case "compact_boundary":
-      return false
-    default:
-      return true
-  }
-}
-
-export function getLastReadableMessage(messages: HydratedTranscriptMessage[]): HydratedTranscriptMessage | null {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (isReadableTranscriptMessage(message)) return message
-  }
-
-  return null
-}
-
-export function getReadableBlockCount(message: HydratedTranscriptMessage): number {
-  if (!isReadableTranscriptMessage(message)) return 0
-  if (message.kind !== "assistant_text") return 1
-
-  try {
-    const tree = unified().use(remarkParse).use(remarkGfm).parse(message.text) as { children?: Array<{ type?: string; children?: unknown[] }> }
-    const nodes = tree.children ?? []
-    let count = 0
-    for (const node of nodes) {
-      if (node.type === "list") {
-        const items = Array.isArray(node.children) ? node.children.length : 0
-        count += Math.max(1, items)
-        continue
-      }
-      count += 1
-    }
-    return Math.max(1, count)
-  } catch {
-    return 1
-  }
-}
-
-export function getNextReadableBoundary(args: {
-  messages: HydratedTranscriptMessage[]
-  lastReadMessageId?: string
-  lastReadBlockIndex?: number
-  lastSeenMessageAt?: number
-  lastMessageAt?: number
-}): ReadBlockBoundary | null {
-  const readableMessages = args.messages.filter(isReadableTranscriptMessage)
-  if (readableMessages.length === 0) return null
-
-  if (isChatRead(args.lastSeenMessageAt, args.lastMessageAt)) return null
-
-  if (args.lastReadMessageId) {
-    const messageIndex = readableMessages.findIndex((message) => message.id === args.lastReadMessageId)
-    if (messageIndex >= 0) {
-      const currentMessage = readableMessages[messageIndex]
-      const nextBlockIndex = (args.lastReadBlockIndex ?? 0) + 1
-      if (nextBlockIndex < getReadableBlockCount(currentMessage)) {
-        return { messageId: currentMessage.id, blockIndex: nextBlockIndex }
-      }
-
-      const nextMessage = readableMessages[messageIndex + 1]
-      if (nextMessage) {
-        return { messageId: nextMessage.id, blockIndex: 0 }
-      }
-      return null
-    }
-  }
-
-  return { messageId: readableMessages[0].id, blockIndex: 0 }
-}
-
-export function getInitialChatReadAnchor(args: {
-  activeChatId: string | null
-  sidebarReady: boolean
-  hasSidebarChat: boolean
-  messages: HydratedTranscriptMessage[]
-  lastReadMessageId?: string
-  lastReadBlockIndex?: number
-  lastSeenMessageAt?: number
-  lastMessageAt?: number
-}): InitialChatReadAnchor {
-  if (args.activeChatId && (!args.sidebarReady || !args.hasSidebarChat)) return { kind: "wait" }
-
-  const nextBoundary = getNextReadableBoundary({
-    messages: args.messages,
-    lastReadMessageId: args.lastReadMessageId,
-    lastReadBlockIndex: args.lastReadBlockIndex,
-    lastSeenMessageAt: args.lastSeenMessageAt,
-    lastMessageAt: args.lastMessageAt,
-  })
-
-  if (nextBoundary) {
-    return { kind: "block", ...nextBoundary }
-  }
-
-  return { kind: "tail" }
-}
-
-export function getLockedInitialChatReadAnchor(
-  current: InitialChatReadAnchor,
-  next: InitialChatReadAnchor,
-  initialScrollCompleted: boolean,
-): InitialChatReadAnchor {
-  if (initialScrollCompleted) return current
-  if (next.kind === "wait") return current
-  return current.kind === "wait" ? next : current
-}
-
-export function resolveLockedAnchor(
-  state: LockedAnchorState,
-  chatId: string | null,
-  nextAnchor: InitialChatReadAnchor,
-  scrollCompleted: boolean,
-): LockedAnchorState {
-  if (chatId !== state.chatId) {
-    return resolveLockedAnchor({ chatId, anchor: { kind: "wait" } }, chatId, nextAnchor, false)
-  }
-
-  const locked = getLockedInitialChatReadAnchor(state.anchor, nextAnchor, scrollCompleted)
-  return { chatId, anchor: locked }
-}
-
-export function getViewportRatioThresholdPx(viewportHeight: number, ratio: number, minimumPx: number): number {
-  return Math.max(minimumPx, viewportHeight * ratio)
-}
-
-export function getHookReadProgressBoundary(container: HTMLElement): ReadHookProgressBoundary | null {
-  const blockNodes = Array.from(container.querySelectorAll<HTMLElement>("[data-read-anchor-message-id][data-read-anchor-block-index]"))
-  if (blockNodes.length === 0) return null
-
-  const viewportRect = container.getBoundingClientRect()
-  const viewportHeight = Math.max(0, viewportRect.height)
-  const viewportBottom = viewportRect.bottom - 8
-  const readingThresholdTop = viewportRect.top + viewportHeight * READ_HOOK_READING_START_RATIO
-  const readThresholdTop = viewportRect.top + viewportHeight * READ_HOOK_READ_START_RATIO
-  let candidate: ReadHookProgressBoundary | null = null
-
-  for (const node of blockNodes) {
-    const messageId = node.dataset.readAnchorMessageId
-    const rawBlockIndex = node.dataset.readAnchorBlockIndex
-    const blockIndex = rawBlockIndex ? Number.parseInt(rawBlockIndex, 10) : Number.NaN
-    if (!messageId || !Number.isFinite(blockIndex)) continue
-
-    const rect = node.getBoundingClientRect()
-    if (rect.top < readingThresholdTop || rect.top > viewportBottom) continue
-    candidate = {
-      messageId,
-      blockIndex,
-      state: rect.top >= readThresholdTop ? "read" : "reading",
-    }
-  }
-
-  return candidate
-}
-
 export function shouldStickToBottomOnComposerSubmit(distanceFromBottom: number, viewportHeight = 0) {
-  return distanceFromBottom < getViewportRatioThresholdPx(viewportHeight, COMPOSER_STICK_DISTANCE_RATIO, 97)
+  return distanceFromBottom < Math.max(97, viewportHeight * 0.12)
 }
 
 export function getUiUpdateRestartReconnectAction(

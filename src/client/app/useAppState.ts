@@ -144,6 +144,7 @@ export interface AppState {
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
   pendingSessionBootstrap: PendingSessionBootstrap | null
+  dismissBootstrapError: () => void
   pendingMergeProjectId: string | null
   requestMerge: (projectId: string) => void
   clearMergeRequest: () => void
@@ -513,6 +514,7 @@ export function useAppState(activeChatId: string | null): AppState {
     handleMergeSession: commands.handleMergeSession,
     pendingMergeProjectId: commands.pendingMergeProjectId,
     pendingSessionBootstrap: commands.pendingSessionBootstrap,
+    dismissBootstrapError: commands.dismissBootstrapError,
     requestMerge: commands.requestMerge,
     clearMergeRequest: commands.clearMergeRequest,
     handleAskUserQuestion: commands.handleAskUserQuestion,

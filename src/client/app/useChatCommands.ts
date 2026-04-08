@@ -19,14 +19,14 @@ import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDi
 import type { useAppDialog } from "../components/ui/app-dialog"
 import { deleteCachedChat } from "./chatCache"
 import {
+  clearPendingSessionBootstrapAfterAttempt,
   getNewestRemainingChatId,
-  getReadableBlockCount,
-  getReadTimestampToPersistAfterReply,
   getSidebarChatLabels,
   getSidebarChatRow,
   normalizeLocalFilePreviewErrorMessage,
   resolveComposeIntent,
   shouldQueueChatSubmit,
+  transitionPendingSessionBootstrapToError,
   type PendingSessionBootstrap,
   type ProjectRequest,
   type StartChatIntent,
@@ -72,17 +72,12 @@ export interface ChatCommandsArgs {
   fallbackLocalProjectPath: string | null
   isProcessing: boolean
   messages: HydratedTranscriptMessage[]
-  latestReadableMessage: HydratedTranscriptMessage | null
-  lastSeenMessageAt: number | undefined
-  activeSidebarChat: SidebarChatRow | null
   localProjects: LocalProjectsSnapshot | null
   setProjectSelection: React.Dispatch<React.SetStateAction<import("./useAppState.machine").ProjectSelectionState>>
   setPendingChatId: (id: string | null) => void
   setSidebarOpen: (open: boolean) => void
   setCommandError: (error: string | null) => void
   setNormalizedCommandError: (error: unknown) => void
-  markChatRead: (chatId: string, boundary: { messageId?: string; blockIndex?: number; lastMessageAt?: number }) => void
-  clearChatReadState: (chatId: string) => void
   scrollFollowToBottom: (behavior?: ScrollBehavior) => void
   keepComposerSubmitAnchored: () => void
   activeQueuedText: string
@@ -128,6 +123,7 @@ export interface ChatCommandsReturn {
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
+  dismissBootstrapError: () => void
   requestMerge: (projectId: string) => void
   clearMergeRequest: () => void
   handleAskUserQuestion: (
@@ -159,9 +155,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     selectedProjectId,
     fallbackLocalProjectPath,
     isProcessing,
-    latestReadableMessage,
-    lastSeenMessageAt,
-    activeSidebarChat,
     localProjects,
     setProjectSelection,
     setPendingChatId,
@@ -173,8 +166,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     updateSubmitPipeline,
     submitPipeline,
     submitPipelineRef,
-    markChatRead,
-    clearChatReadState,
     activeSessionsSubs,
   } = args
 
@@ -350,15 +341,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
         navigate(`/chat/${result.chatId}`)
       }
 
-      const readTimestampToPersist = getReadTimestampToPersistAfterReply(lastSeenMessageAt, activeSidebarChat?.lastMessageAt)
-      if (activeChatId && readTimestampToPersist !== null) {
-        markChatRead(activeChatId, {
-          messageId: latestReadableMessage?.id,
-          blockIndex: latestReadableMessage ? Math.max(0, getReadableBlockCount(latestReadableMessage) - 1) : undefined,
-          lastMessageAt: readTimestampToPersist,
-        })
-      }
-
       setCommandError(null)
     } catch (error) {
       setCommandError(error instanceof Error ? error.message : String(error))
@@ -417,7 +399,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     try {
       await socket.command({ type: "chat.delete", chatId: chat.chatId })
       useChatInputStore.getState().clearQueuedDraft(chat.chatId)
-      clearChatReadState(chat.chatId)
       deleteCachedChat(chat.chatId)
       if (chat.chatId === activeChatId) {
         const nextChatId = getNewestRemainingChatId(sidebarData.projectGroups, chat.chatId)
@@ -662,9 +643,11 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
         await socket.command({ type: "chat.send", chatId, provider, content: prompt, model, modelOptions })
       } catch (error) {
-        console.warn("[fork] background fork failed:", error instanceof Error ? error.message : String(error))
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn("[fork] background fork failed:", message)
+        setPendingSessionBootstrap((current) => transitionPendingSessionBootstrapToError(current, chatId, message))
       } finally {
-        setPendingSessionBootstrap((current) => current?.chatId === chatId ? null : current)
+        setPendingSessionBootstrap((current) => clearPendingSessionBootstrapAfterAttempt(current, chatId))
       }
     })()
   }
@@ -718,9 +701,11 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
           }
         }
       } catch (error) {
-        console.warn("[merge] background merge failed:", error instanceof Error ? error.message : String(error))
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn("[merge] background merge failed:", message)
+        setPendingSessionBootstrap((current) => transitionPendingSessionBootstrapToError(current, chatId, message))
       } finally {
-        setPendingSessionBootstrap((current) => current?.chatId === chatId ? null : current)
+        setPendingSessionBootstrap((current) => clearPendingSessionBootstrapAfterAttempt(current, chatId))
       }
     })()
   }
@@ -799,6 +784,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     handleCompose,
     handleForkSession,
     handleMergeSession,
+    dismissBootstrapError: () => setPendingSessionBootstrap(null),
     requestMerge: (projectId: string) => setPendingMergeProjectId(projectId),
     clearMergeRequest: () => setPendingMergeProjectId(null),
     handleAskUserQuestion,

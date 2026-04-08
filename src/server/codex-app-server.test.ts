@@ -1064,6 +1064,79 @@ describe("CodexAppServerManager", () => {
     expect(toolCall.entry.tool.input).toEqual({ subagentType: "spawnAgent" })
   })
 
+  test("marks failed collab agent tool calls as transcript errors", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+      } else if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+      } else if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          method: "item/completed",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            item: {
+              type: "collabAgentToolCall",
+              id: "agent-failed-1",
+              tool: "spawnAgent",
+              status: "failed",
+              senderThreadId: "thread-1",
+              receiverThreadIds: [],
+              prompt: "Inspect tests",
+              agentsStates: {},
+              error: { message: "spawn failed" },
+            },
+          },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "spawn an agent",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+
+    const events = await collectStream(turn.stream)
+    const toolCall = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_call")
+    const toolResult = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_result")
+
+    expect(toolCall?.entry.kind).toBe("tool_call")
+    if (!toolCall || toolCall.entry.kind !== "tool_call") throw new Error("missing tool call")
+    expect(toolCall.entry.tool.toolKind).toBe("subagent_task")
+    expect(toolResult?.entry.kind).toBe("tool_result")
+    if (!toolResult || toolResult.entry.kind !== "tool_result") throw new Error("missing tool result")
+    expect(toolResult.entry.isError).toBe(true)
+  })
+
   test("uses the completed webSearch query when the started item is empty", async () => {
     const process = new FakeCodexProcess((message, child) => {
       if (message.method === "initialize") {
@@ -1309,6 +1382,81 @@ describe("CodexAppServerManager", () => {
         success: true,
       },
     })
+  })
+
+  test("marks failed MCP tool calls as transcript errors", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+        return
+      }
+      if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+        return
+      }
+      if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          method: "item/completed",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            item: {
+              type: "mcpToolCall",
+              id: "mcp-1",
+              server: "sentry",
+              tool: "search_issues",
+              arguments: { query: "regression" },
+              status: "failed",
+              content: [{ type: "input_text", text: "MCP server unavailable" }],
+            },
+          },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "call mcp",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+
+    const events = await collectStream(turn.stream)
+    const toolCall = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_call")
+    const toolResult = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_result")
+
+    expect(toolCall?.entry.kind).toBe("tool_call")
+    if (!toolCall || toolCall.entry.kind !== "tool_call") throw new Error("missing tool call")
+    expect(toolCall.entry.tool.toolKind).toBe("mcp_generic")
+    expect(toolResult?.entry.kind).toBe("tool_result")
+    if (!toolResult || toolResult.entry.kind !== "tool_result") throw new Error("missing tool result")
+    expect(toolResult.entry.isError).toBe(true)
   })
 
   test("rejects present_content payloads with wrong optional types without crashing the turn", async () => {
