@@ -1,5 +1,5 @@
 import type { AgentProvider, ModelOptions } from "../../shared/types"
-import { appendQueuedText, prependQueuedText } from "./useAppState"
+import { appendQueuedText, prependQueuedText } from "./appState.helpers"
 
 export interface ProjectSelectionState {
   explicitProjectId: string | null

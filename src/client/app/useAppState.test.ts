@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import {
-  computeTailOffset,
-  getActiveChatSnapshot,
   getCachedChat,
   setCachedChat,
   deleteCachedChat,
   clearChatCache,
   markCachedChatsStale,
   MAX_CACHED_CHATS,
+} from "./chatCache"
+import {
+  computeTailOffset,
+  getActiveChatSnapshot,
   getNextReadableBoundary,
   getReadableBlockCount,
   getInitialChatReadAnchor,
@@ -32,8 +34,8 @@ import {
   TRANSCRIPT_TAIL_SIZE,
   compareReadBoundary,
   resolveLockedAnchor,
-} from "./useAppState"
-import type { InitialChatReadAnchor } from "./useAppState"
+} from "./appState.helpers"
+import type { InitialChatReadAnchor } from "./appState.helpers"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarData } from "../../shared/types"
 import { createIncrementalHydrator } from "../lib/parseTranscript"
 
@@ -756,7 +758,7 @@ describe("getLockedInitialChatReadAnchor", () => {
 
 describe("appendQueuedText", () => {
   test("uses the incoming text when the queue is empty", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const append = (module as Record<string, unknown>).appendQueuedText
 
     expect(typeof append).toBe("function")
@@ -767,7 +769,7 @@ describe("appendQueuedText", () => {
   })
 
   test("uses the current text when the incoming text is blank", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const append = (module as Record<string, unknown>).appendQueuedText
 
     expect(typeof append).toBe("function")
@@ -777,7 +779,7 @@ describe("appendQueuedText", () => {
   })
 
   test("appends a blank line between queued paragraphs", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const append = (module as Record<string, unknown>).appendQueuedText
 
     expect(typeof append).toBe("function")
@@ -790,7 +792,7 @@ describe("appendQueuedText", () => {
 
 describe("shouldQueueChatSubmit", () => {
   test("returns false when runtime is idle and no queue exists", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
 
     expect(typeof shouldQueue).toBe("function")
@@ -801,7 +803,7 @@ describe("shouldQueueChatSubmit", () => {
   })
 
   test("returns true when queued text already exists even if runtime is idle", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
 
     expect(typeof shouldQueue).toBe("function")
@@ -811,7 +813,7 @@ describe("shouldQueueChatSubmit", () => {
   })
 
   test("returns true when the runtime is busy", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const shouldQueue = (module as Record<string, unknown>).shouldQueueChatSubmit
 
     expect(typeof shouldQueue).toBe("function")
@@ -823,7 +825,7 @@ describe("shouldQueueChatSubmit", () => {
 
 describe("shouldFlushQueuedText", () => {
   test("returns true only when the queued text belongs to the active idle chat", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const shouldFlush = (module as Record<string, unknown>).shouldFlushQueuedText
 
     expect(typeof shouldFlush).toBe("function")
@@ -849,7 +851,7 @@ describe("shouldFlushQueuedText", () => {
   })
 
   test("returns false while processing, in flight, or blank", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const shouldFlush = (module as Record<string, unknown>).shouldFlushQueuedText
 
     expect(typeof shouldFlush).toBe("function")
@@ -895,7 +897,7 @@ describe("shouldFlushQueuedText", () => {
 
 describe("prependQueuedText", () => {
   test("restores a failed flushed message ahead of newer queued text", async () => {
-    const module = await import("./useAppState")
+    const module = await import("./appState.helpers")
     const prepend = (module as Record<string, unknown>).prependQueuedText
 
     expect(typeof prepend).toBe("function")
