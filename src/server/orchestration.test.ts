@@ -83,6 +83,13 @@ function createFakeCoordinator() {
     activeTurns,
     cancelledChats,
     disposedChats,
+    getActiveStatuses(): Map<string, "idle" | "starting" | "running" | "waiting_for_user" | "failed"> {
+      const statuses = new Map<string, "idle" | "starting" | "running" | "waiting_for_user" | "failed">()
+      for (const [chatId] of activeTurns) {
+        statuses.set(chatId, "running")
+      }
+      return statuses
+    },
     async startTurnForChat(args: { chatId: string; content: string; delegatedContext?: string; isSpawned?: boolean; provider: string }) {
       startedTurns.push(args)
       activeTurns.set(args.chatId, { chatId: args.chatId })
@@ -569,6 +576,101 @@ describe("SessionOrchestrator", () => {
       // After destroy, origin tracking is cleared — new spawns should work
       const { chatId } = await ctx.orchestrator.spawnAgent(caller.id, { instruction: "post-destroy" })
       expect(chatId).toBeDefined()
+    })
+  })
+
+  // =========================================================================
+  // getHierarchy
+  // =========================================================================
+
+  describe("getHierarchy", () => {
+    test("returns empty children when chat has no spawned agents", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+
+      expect(hierarchy).toEqual({ children: [] })
+    })
+
+    test("returns children with status after spawnAgent", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      const { chatId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Do the thing",
+      })
+
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+
+      expect(hierarchy.children).toHaveLength(1)
+      expect(hierarchy.children[0]!.chatId).toBe(chatId)
+      expect(hierarchy.children[0]!.instruction).toBe("Do the thing")
+      expect(hierarchy.children[0]!.spawnedAt).toBeGreaterThan(0)
+      expect(hierarchy.children[0]!.children).toEqual([])
+    })
+
+    test("maps activeTurns starting/running to running status", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "task",
+      })
+      // The fake coordinator sets activeTurns on startTurnForChat,
+      // so the child should be in activeTurns -> status should be "running"
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+
+      expect(hierarchy.children[0]!.status).toBe("running")
+    })
+
+    test("shows completed when child finishes (removed from activeTurns)", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      const { chatId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "quick task",
+      })
+
+      // Simulate turn completion: remove from activeTurns
+      ctx.coordinator.activeTurns.delete(chatId)
+
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+
+      expect(hierarchy.children[0]!.status).toBe("completed")
+    })
+
+    test("truncates instruction to 120 characters", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      const longInstruction = "A".repeat(200)
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: longInstruction,
+      })
+
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+
+      expect(hierarchy.children[0]!.instruction).toHaveLength(120)
+    })
+
+    test("nested children rendered in hierarchy tree", async () => {
+      ctx = createOrchestrator({ maxDepth: 3 })
+      const caller = await seedCallerChat(ctx.store)
+
+      const child1 = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "parent task",
+      })
+      const child2 = await ctx.orchestrator.spawnAgent(child1.chatId, {
+        instruction: "nested task",
+      })
+
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+
+      expect(hierarchy.children).toHaveLength(1)
+      expect(hierarchy.children[0]!.chatId).toBe(child1.chatId)
+      expect(hierarchy.children[0]!.children).toHaveLength(1)
+      expect(hierarchy.children[0]!.children[0]!.chatId).toBe(child2.chatId)
     })
   })
 })

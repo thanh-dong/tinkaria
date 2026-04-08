@@ -1,6 +1,6 @@
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk"
 import { z } from "zod/v4"
-import type { AgentProvider, TranscriptEntry } from "../shared/types"
+import type { AgentProvider, OrchestrationChildNode, OrchestrationChildStatus, OrchestrationHierarchySnapshot, TranscriptEntry, TinkariaStatus } from "../shared/types"
 import { LOG_PREFIX } from "../shared/branding"
 import { normalizeServerModel } from "./provider-catalog"
 import { toTranscriptLine } from "./transcript-utils"
@@ -8,10 +8,15 @@ import { toTranscriptLine } from "./transcript-utils"
 interface OriginRecord {
   originChatId: string
   depth: number
+  instruction: string
+  spawnedAt: number
+  lastStatus: OrchestrationChildStatus
+  lastStatusAt: number
 }
 
 interface OrchestratorCoordinator {
-  activeTurns: Map<string, unknown>
+  activeTurns: { has(key: string): boolean }
+  getActiveStatuses(): Map<string, TinkariaStatus>
   startTurnForChat(args: {
     chatId: string
     provider: AgentProvider
@@ -143,7 +148,15 @@ export class SessionOrchestrator {
     }
 
     const newChat = await this.store.createChat(callerChat.projectId)
-    this.origins.set(newChat.id, { originChatId: callerChatId, depth: newDepth })
+    const now = Date.now()
+    this.origins.set(newChat.id, {
+      originChatId: callerChatId,
+      depth: newDepth,
+      instruction: args.instruction.slice(0, 120),
+      spawnedAt: now,
+      lastStatus: "spawning",
+      lastStatusAt: now,
+    })
 
     let siblings = this.children.get(callerChatId)
     if (!siblings) {
@@ -233,6 +246,80 @@ export class SessionOrchestrator {
     this.waiters.clear()
     this.origins.clear()
     this.children.clear()
+  }
+
+  getHierarchy(chatId: string): OrchestrationHierarchySnapshot {
+    const childSet = this.children.get(chatId)
+    if (!childSet || childSet.size === 0) {
+      return { children: [] }
+    }
+
+    const statuses = this.coordinator.getActiveStatuses()
+    return {
+      children: [...childSet].map((childId) => this.buildChildNode(childId, statuses)),
+    }
+  }
+
+  private buildChildNode(
+    childId: string,
+    statuses: Map<string, TinkariaStatus>,
+  ): OrchestrationChildNode {
+    const origin = this.origins.get(childId)
+    const now = Date.now()
+
+    if (!origin) {
+      return {
+        chatId: childId,
+        status: "closed",
+        spawnedAt: now,
+        lastStatusAt: now,
+        instruction: "",
+        children: [],
+      }
+    }
+
+    const resolvedStatus = this.resolveChildStatus(childId, origin, statuses)
+    if (resolvedStatus !== origin.lastStatus) {
+      origin.lastStatus = resolvedStatus
+      origin.lastStatusAt = now
+    }
+
+    const nestedChildren = this.children.get(childId)
+    return {
+      chatId: childId,
+      status: origin.lastStatus,
+      spawnedAt: origin.spawnedAt,
+      lastStatusAt: origin.lastStatusAt,
+      instruction: origin.instruction,
+      children: nestedChildren
+        ? [...nestedChildren].map((id) => this.buildChildNode(id, statuses))
+        : [],
+    }
+  }
+
+  private resolveChildStatus(
+    _childId: string,
+    origin: OriginRecord,
+    statuses: Map<string, TinkariaStatus>,
+  ): OrchestrationChildStatus {
+    if (origin.lastStatus === "closed") return "closed"
+
+    const tinkariaStatus = statuses.get(_childId)
+    if (!tinkariaStatus) {
+      return "completed"
+    }
+
+    switch (tinkariaStatus) {
+      case "starting":
+      case "running":
+        return "running"
+      case "waiting_for_user":
+        return "waiting"
+      case "failed":
+        return "failed"
+      default:
+        return "running"
+    }
   }
 
   async cancelWithCascade(chatId: string): Promise<void> {

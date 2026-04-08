@@ -692,3 +692,5 @@ export interface OrchestrationChildNode {
 export interface OrchestrationHierarchySnapshot {
   children: OrchestrationChildNode[]
 }
+
+export type TinkariaStatus = "idle" | "starting" | "running" | "waiting_for_user" | "failed"
