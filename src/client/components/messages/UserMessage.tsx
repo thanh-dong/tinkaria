@@ -53,20 +53,23 @@ export const UserMessage = memo(function UserMessage({ content }: Props) {
       ) : null}
       <div className="flex gap-2 justify-end">
         <div className="group/user-message relative max-w-[85%] sm:max-w-[80%]">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "absolute top-2 right-2 z-10 h-7 w-7 rounded-full bg-background/70 backdrop-blur-sm opacity-0 transition-opacity group-hover/user-message:opacity-100 focus-visible:opacity-100",
-              !copied && "hover:text-foreground",
-              copied && "hover:!bg-background/70 hover:!border-transparent"
-            )}
-            aria-label={copied ? "Copied prompt" : "Copy prompt"}
-            onClick={handleCopy}
-          >
-            {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
-          </Button>
+          <div className="mb-1 flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-7 rounded-full border border-border/70 bg-background/80 px-2.5 text-xs text-muted-foreground backdrop-blur-sm",
+                !copied && "hover:text-foreground",
+                copied && "hover:!bg-background/80 hover:!border-border/70"
+              )}
+              aria-label={copied ? "Copied prompt" : "Copy prompt"}
+              onClick={handleCopy}
+            >
+              {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+              <span>{copied ? "Copied" : "Copy"}</span>
+            </Button>
+          </div>
           <div className="rounded-[20px] py-1.5 px-3.5 bg-muted text-primary border border-border prose prose-sm prose-invert break-normal [overflow-wrap:break-word] [&_p]:whitespace-pre-line [&_p]:break-normal [&_p]:[overflow-wrap:break-word]">
             <Markdown remarkPlugins={[remarkGfm]} components={createMarkdownComponents()}>{parsed.content}</Markdown>
           </div>
