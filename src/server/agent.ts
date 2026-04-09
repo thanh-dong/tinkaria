@@ -1,4 +1,5 @@
-import { query, type CanUseTool, type McpServerConfig, type PermissionResult, type Query } from "@anthropic-ai/claude-agent-sdk"
+import * as ClaudeAgentSdk from "@anthropic-ai/claude-agent-sdk"
+import type { CanUseTool, McpServerConfig, Options as ClaudeOptions, PermissionResult, Query } from "@anthropic-ai/claude-agent-sdk"
 import type {
   AgentProvider,
   NormalizedToolCall,
@@ -333,26 +334,34 @@ export async function startClaudeTurn(args: {
       ? { "session-orchestration": createOrchestrationMcpServer(args.orchestrator, args.chatId) }
       : undefined
 
-  const q = query({
-    prompt: args.content,
-    options: {
-      cwd: args.localPath,
-      model: args.model,
-      effort: args.effort as "low" | "medium" | "high" | "max" | undefined,
-      resume: args.sessionToken ?? undefined,
-      permissionMode: args.planMode ? "plan" : "acceptEdits",
-      canUseTool,
-      tools: [...CLAUDE_TOOLSET],
-      mcpServers,
-      systemPrompt: {
-        type: "preset",
-        preset: "claude_code",
-        append: getWebContextPrompt("claude"),
-      },
-      settingSources: ["user", "project", "local"],
-      env: (() => { const { CLAUDECODE: _, ...env } = process.env; return env })(),
+  const options = {
+    cwd: args.localPath,
+    model: args.model,
+    effort: args.effort as "low" | "medium" | "high" | "max" | undefined,
+    resume: args.sessionToken ?? undefined,
+    permissionMode: (args.planMode ? "plan" : "acceptEdits") as ClaudeOptions["permissionMode"],
+    canUseTool,
+    tools: [...CLAUDE_TOOLSET],
+    mcpServers,
+    systemPrompt: {
+      type: "preset" as const,
+      preset: "claude_code" as const,
+      append: getWebContextPrompt("claude"),
     },
-  })
+    settingSources: ["user", "project", "local"] as const,
+    env: (() => { const { CLAUDECODE: _, ...env } = process.env; return env })(),
+  } satisfies ClaudeOptions
+
+  // Warm the Claude session first so the initial delegated prompt is sent only after
+  // the session bootstrap is ready. This avoids fresh spawned sessions dropping their
+  // first instruction on startup.
+  const startup = (ClaudeAgentSdk as typeof ClaudeAgentSdk & {
+    startup?: (args?: { options?: typeof options }) => Promise<{ query: (prompt: string) => Query }>
+  }).startup
+
+  const q = startup
+    ? (await startup({ options })).query(args.content)
+    : ClaudeAgentSdk.query({ prompt: args.content, options })
 
   return {
     provider: "claude",
