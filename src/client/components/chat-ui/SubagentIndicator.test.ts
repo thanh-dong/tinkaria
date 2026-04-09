@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
 import type { OrchestrationChildStatus, OrchestrationChildNode } from "../../../shared/types"
+import { SubagentIndicator } from "./SubagentIndicator"
 
 // Replicate helpers from SubagentIndicator for unit testing
 // (component owns the logic, tests verify the contracts)
@@ -124,5 +127,30 @@ describe("SubagentIndicator helpers", () => {
         }),
       ])).toBe(false)
     })
+  })
+})
+
+describe("SubagentIndicator", () => {
+  test("renders nothing when no hierarchy is available", () => {
+    const html = renderToStaticMarkup(createElement(SubagentIndicator, { hierarchy: null }))
+
+    expect(html).toBe("")
+  })
+
+  test("renders running summary when spawned agents are present", () => {
+    const html = renderToStaticMarkup(
+      createElement(SubagentIndicator, {
+        hierarchy: {
+          children: [
+            makeNode({ chatId: "agent-1", status: "running", instruction: "Inspect regression" }),
+            makeNode({ chatId: "agent-2", status: "failed", instruction: "Review failing path" }),
+          ],
+        },
+      }),
+    )
+
+    expect(html).toContain("1 running")
+    expect(html).toContain("1 failed")
+    expect(html).toContain("chat.composer.subagents.indicator")
   })
 })

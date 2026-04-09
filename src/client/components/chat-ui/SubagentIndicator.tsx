@@ -208,21 +208,16 @@ export const SubagentIndicator = memo(function SubagentIndicator({
     return countNodes(hierarchy.children)
   }, [hierarchy])
 
+  const pillDots = useMemo(() => {
+    if (!hierarchy) return []
+    return hierarchy.children.map((child) => child.status)
+  }, [hierarchy])
+
   // Nothing to show
   if (!counts || !hierarchy) return null
 
   // Auto-collapse when everything is terminal
   const shouldAutoCollapse = allTerminal(hierarchy.children)
-
-  // Build the collapsed pill summary
-  const pillDots = useMemo(() => {
-    if (!hierarchy) return []
-    const dots: OrchestrationChildStatus[] = []
-    for (const child of hierarchy.children) {
-      dots.push(child.status)
-    }
-    return dots
-  }, [hierarchy])
 
   return (
     <div
