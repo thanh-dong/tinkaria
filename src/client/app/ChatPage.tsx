@@ -107,6 +107,25 @@ interface ComposerLiftArgs {
   isTouchDevice: boolean
 }
 
+export function TranscriptTailBoundary({
+  hasMessages,
+  sentinelRef,
+}: {
+  hasMessages: boolean
+  sentinelRef: AppState["sentinelRef"]
+}) {
+  if (!hasMessages) {
+    return <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+  }
+
+  return (
+    <>
+      <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+      <div style={{ height: 250 }} aria-hidden="true" />
+    </>
+  )
+}
+
 function getSkillsFromDebugRaw(debugRaw?: string): string[] | null {
   if (!debugRaw) return null
   try {
@@ -552,10 +571,10 @@ export function ChatPage() {
                     </div>
                   ) : null}
                 </div>
-                <div style={{ height: 250 }} aria-hidden="true" />
+                <TranscriptTailBoundary hasMessages={true} sentinelRef={state.sentinelRef} />
               </>
             ) : null}
-            <div ref={state.sentinelRef} className="h-px" aria-hidden="true" />
+            {state.messages.length === 0 ? <TranscriptTailBoundary hasMessages={false} sentinelRef={state.sentinelRef} /> : null}
           </ScrollArea>
         </div>
 

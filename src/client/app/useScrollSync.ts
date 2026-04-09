@@ -1,10 +1,24 @@
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react"
-import { useScrollFollow } from "./useScrollFollow"
+import { isWithinBottomFollowBand, useScrollFollow } from "./useScrollFollow"
 import { shouldShowScrollButton } from "./scrollMachine"
+import type { ScrollMode } from "./scrollMachine"
 import type { ChatSnapshot, HydratedTranscriptMessage } from "../../shared/types"
 import { shouldStickToBottomOnComposerSubmit } from "./appState.helpers"
 
 const FIXED_TRANSCRIPT_PADDING_BOTTOM = 320
+
+export function shouldReconcileDetachedScrollMode(args: {
+  initialScrollCompleted: boolean
+  scrollMode: ScrollMode
+  scrollHeight: number
+  scrollTop: number
+  clientHeight: number
+}): boolean {
+  if (!args.initialScrollCompleted) return false
+  if (args.scrollMode !== "detached") return false
+  const bottomGap = args.scrollHeight - args.scrollTop - args.clientHeight
+  return isWithinBottomFollowBand(bottomGap, args.clientHeight)
+}
 
 export function useScrollSync(args: {
   activeChatId: string | null
@@ -107,6 +121,13 @@ export function useScrollSync(args: {
 
     const wantsTail = !initialScrollCompletedRef.current && messages.length > 0
     const isAutoFollowing = initialScrollCompletedRef.current && scrollModeRef.current === "following"
+    const shouldReconcileDetachedMode = shouldReconcileDetachedScrollMode({
+      initialScrollCompleted: initialScrollCompletedRef.current,
+      scrollMode: scrollModeRef.current,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+      clientHeight: element.clientHeight,
+    })
 
     if (wantsTail || isAutoFollowing) {
       beginProgrammaticScroll()
@@ -117,7 +138,11 @@ export function useScrollSync(args: {
         endProgrammaticScroll()
       }
     }
-  }, [activeChatId, beginProgrammaticScroll, endProgrammaticScroll, inputHeight, messages.length, runtime?.status, scrollModeRef])
+
+    if (shouldReconcileDetachedMode) {
+      scrollFollowToBottom("auto")
+    }
+  }, [activeChatId, beginProgrammaticScroll, endProgrammaticScroll, inputHeight, messages.length, runtime?.status, scrollFollowToBottom, scrollModeRef])
 
 
   useEffect(() => {
@@ -128,8 +153,20 @@ export function useScrollSync(args: {
     const resizeTarget = scrollElement.firstElementChild instanceof HTMLElement ? scrollElement.firstElementChild : scrollElement
 
     function keepFollowPinnedOnResize() {
-      if (!initialScrollCompletedRef.current || scrollModeRef.current !== "following") return
-      scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: "auto" })
+      if (scrollModeRef.current === "following" && initialScrollCompletedRef.current) {
+        scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: "auto" })
+        return
+      }
+
+      if (!shouldReconcileDetachedScrollMode({
+        initialScrollCompleted: initialScrollCompletedRef.current,
+        scrollMode: scrollModeRef.current,
+        scrollHeight: scrollElement.scrollHeight,
+        scrollTop: scrollElement.scrollTop,
+        clientHeight: scrollElement.clientHeight,
+      })) return
+
+      scrollFollowToBottom("auto")
     }
 
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -142,7 +179,7 @@ export function useScrollSync(args: {
     return () => {
       resizeObserver?.disconnect()
     }
-  }, [activeChatId, scrollModeRef])
+  }, [activeChatId, scrollFollowToBottom, scrollModeRef])
 
 
   function scrollToBottom() {

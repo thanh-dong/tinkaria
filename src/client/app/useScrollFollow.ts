@@ -15,10 +15,14 @@ export interface ScrollFollowStore {
 
 const BOTTOM_FOLLOW_DISTANCE_RATIO = 0.02
 
-function isScrolledToBottom(element: HTMLElement): boolean {
-  const bottomGap = element.scrollHeight - element.scrollTop - element.clientHeight
-  const followBand = Math.max(2, element.clientHeight * BOTTOM_FOLLOW_DISTANCE_RATIO)
+export function isWithinBottomFollowBand(bottomGap: number, clientHeight: number): boolean {
+  const followBand = Math.max(2, clientHeight * BOTTOM_FOLLOW_DISTANCE_RATIO)
   return bottomGap <= followBand
+}
+
+export function isScrolledToBottom(element: HTMLElement): boolean {
+  const bottomGap = element.scrollHeight - element.scrollTop - element.clientHeight
+  return isWithinBottomFollowBand(bottomGap, element.clientHeight)
 }
 
 export function createScrollFollowStore(

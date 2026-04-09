@@ -15,6 +15,7 @@ import {
   getEmptyStateTypingDurationMs,
   getPendingSessionBootstrapStatusLabel,
   getScrollButtonBottomPx,
+  TranscriptTailBoundary,
   shouldRenderTranscriptCommandError,
   shouldDismissMobileKeyboardOnFirstMessage,
   shouldIgnoreMobileSidebarSwipeStart,
@@ -123,6 +124,36 @@ describe("getScrollButtonBottomPx", () => {
       hasAvailableSkills: true,
       skillsRibbonVisible: true,
     })).toBe(172)
+  })
+})
+
+describe("TranscriptTailBoundary", () => {
+  test("renders the bottom sentinel before the trailing spacer when messages exist", () => {
+    const html = renderToStaticMarkup(
+      createElement(TranscriptTailBoundary, {
+        hasMessages: true,
+        sentinelRef: { current: null },
+      })
+    )
+
+    const sentinelIndex = html.indexOf('class="h-px"')
+    const spacerIndex = html.indexOf("height:250px")
+
+    expect(sentinelIndex).toBeGreaterThan(-1)
+    expect(spacerIndex).toBeGreaterThan(-1)
+    expect(sentinelIndex).toBeLessThan(spacerIndex)
+  })
+
+  test("does not render the trailing spacer in the empty state", () => {
+    const html = renderToStaticMarkup(
+      createElement(TranscriptTailBoundary, {
+        hasMessages: false,
+        sentinelRef: { current: null },
+      })
+    )
+
+    expect(html).toContain('class="h-px"')
+    expect(html).not.toContain("height:250px")
   })
 })
 
