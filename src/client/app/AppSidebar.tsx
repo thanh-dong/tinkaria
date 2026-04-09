@@ -262,7 +262,16 @@ export function AppSidebar({
         onPointerCancel={handleSwipePointerEnd}
       >
         <div className=" pl-3 pr-[7px] h-[64px] max-h-[64px] md:h-[55px] md:max-h-[55px] border-b flex items-center justify-between">
-          <div className="group/sidebar-shell flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            className="group/sidebar-shell flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:text-foreground"
+            onClick={() => {
+              navigate("/")
+              onClose()
+            }}
+            title="Home"
+            aria-label="Go to homepage"
+          >
             <div className="relative hidden md:flex h-8 w-8 shrink-0 items-center justify-center">
               <TinkariaSidebarMark
                 className="absolute inset-0 size-full"
@@ -273,7 +282,7 @@ export function AppSidebar({
             <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">
               {APP_NAME}
             </span>
-          </div>
+          </button>
           <div className="flex items-center">
             {showDevBadge ? (
               <span
@@ -303,7 +312,8 @@ export function AppSidebar({
                 onClose()
               }}
               className="size-10 rounded-lg"
-              title="New project"
+              title="Add project"
+              aria-label="Add project"
             >
               <Plus className="size-4" />
             </Button>
