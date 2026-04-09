@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { createElement, Suspense } from "react"
+import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { MemoryRouter } from "react-router-dom"
 import { TooltipProvider } from "../components/ui/tooltip"
@@ -93,6 +93,7 @@ describe("AppSidebar", () => {
               status: "idle",
               localPath: "/tmp/demo",
               provider: "codex",
+              unread: false,
               lastMessageAt: 1,
               hasAutomation: false,
             }],

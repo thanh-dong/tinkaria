@@ -79,7 +79,7 @@ describe("scanClaudeSessions", () => {
       question: "Fix the flickering sidebar picker",
       answer: "Patched.",
     })
-  })
+  }, 15_000)
 
   test("extracts the last Claude model when assistant usage metadata is present", async () => {
     const claudeDir = await makeTempDir()

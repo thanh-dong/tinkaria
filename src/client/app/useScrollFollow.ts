@@ -26,14 +26,12 @@ export function createScrollFollowStore(
   sentinelEl: HTMLElement,
 ): ScrollFollowStore {
   let mode: ScrollMode = "anchoring"
-  let isFollowing = false
   let isProgrammatic = false
   let listener: (() => void) | null = null
 
   function transition(event: Parameters<typeof nextScrollMode>[1]) {
     const prev = mode
     mode = nextScrollMode(prev, event)
-    isFollowing = shouldAutoFollow(mode)
     if (mode !== prev) {
       listener?.()
     }

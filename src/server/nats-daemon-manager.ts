@@ -58,10 +58,20 @@ export class NatsDaemonManager {
     }
 
     const daemonScript = new URL("../nats/nats-daemon.ts", import.meta.url).pathname
+    const {
+      NATS_DATA_DIR: _natsDataDir,
+      NATS_URL: _natsUrl,
+      NATS_MODE: _natsMode,
+      NATS_WS_PORT: _natsWsPort,
+      NATS_PORT: _natsPort,
+      NATS_STORE_DIR: _natsStoreDir,
+      NATS_HTTP_PORT: _natsHttpPort,
+      ...spawnEnv
+    } = process.env
 
     const child = Bun.spawn(["bun", "run", daemonScript], {
       env: {
-        ...process.env,
+        ...spawnEnv,
         NATS_TOKEN: options.token,
         ...(options.host ? { NATS_HOST: options.host } : {}),
       },

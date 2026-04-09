@@ -82,6 +82,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.create",
   "chat.rename",
   "chat.delete",
+  "chat.markRead",
   "chat.send",
   "chat.cancel",
   "chat.respondTool",
@@ -217,6 +218,11 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       case "chat.delete": {
         await agent.disposeChat(command.chatId)
         await store.deleteChat(command.chatId)
+        return undefined
+      }
+
+      case "chat.markRead": {
+        await store.setChatReadState(command.chatId, false)
         return undefined
       }
 

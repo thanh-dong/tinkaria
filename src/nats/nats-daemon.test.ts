@@ -1,6 +1,24 @@
 import { describe, test, expect, afterEach } from "bun:test"
 import { connect } from "@nats-io/transport-node"
 
+function createDaemonTestEnv(token: string): NodeJS.ProcessEnv {
+  const {
+    NATS_DATA_DIR: _natsDataDir,
+    NATS_URL: _natsUrl,
+    NATS_MODE: _natsMode,
+    NATS_WS_PORT: _natsWsPort,
+    NATS_PORT: _natsPort,
+    NATS_STORE_DIR: _natsStoreDir,
+    NATS_HTTP_PORT: _natsHttpPort,
+    ...spawnEnv
+  } = process.env
+
+  return {
+    ...spawnEnv,
+    NATS_TOKEN: token,
+  }
+}
+
 describe("nats-daemon", () => {
   let proc: ReturnType<typeof Bun.spawn> | null = null
 
@@ -15,7 +33,7 @@ describe("nats-daemon", () => {
   test("starts and outputs JSON with url, wsUrl, wsPort, pid", async () => {
     const token = "test-token-" + Date.now()
     proc = Bun.spawn(["bun", "run", "src/nats/nats-daemon.ts"], {
-      env: { ...process.env, NATS_TOKEN: token },
+      env: createDaemonTestEnv(token),
       stdio: ["ignore", "pipe", "inherit"],
     })
     const reader = proc.stdout.getReader()
@@ -31,7 +49,7 @@ describe("nats-daemon", () => {
   test("accepts NATS connections with token auth", async () => {
     const token = "test-token-" + Date.now()
     proc = Bun.spawn(["bun", "run", "src/nats/nats-daemon.ts"], {
-      env: { ...process.env, NATS_TOKEN: token },
+      env: createDaemonTestEnv(token),
       stdio: ["ignore", "pipe", "inherit"],
     })
     const reader = proc.stdout.getReader()
@@ -45,7 +63,7 @@ describe("nats-daemon", () => {
 
   test("shuts down cleanly on SIGTERM", async () => {
     proc = Bun.spawn(["bun", "run", "src/nats/nats-daemon.ts"], {
-      env: { ...process.env, NATS_TOKEN: "test" },
+      env: createDaemonTestEnv("test"),
       stdio: ["ignore", "pipe", "inherit"],
     })
     const reader = proc.stdout.getReader()

@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { createJSONStorage, persist } from "zustand/middleware"
 
 export interface TerminalPaneLayout {
   id: string
@@ -176,17 +176,7 @@ export const useTerminalLayoutStore = create<TerminalLayoutState>()(
     {
       name: "terminal-layouts",
       version: 1,
-      storage: {
-        getItem: (name) => {
-          try { return localStorage.getItem(name) } catch { return null }
-        },
-        setItem: (name, value) => {
-          try { localStorage.setItem(name, value) } catch { /* no storage available */ }
-        },
-        removeItem: (name) => {
-          try { localStorage.removeItem(name) } catch { /* no storage available */ }
-        },
-      },
+      storage: createJSONStorage(() => localStorage),
     }
   )
 )

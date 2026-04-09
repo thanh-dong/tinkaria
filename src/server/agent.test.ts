@@ -1410,7 +1410,7 @@ function createFakeStore() {
     async recordTurnFinished() {
       this.turnFinishedCount += 1
     },
-    async recordTurnFailed() {
+    async recordTurnFailed(_chatId: string, _error: string): Promise<void> {
       throw new Error("Did not expect turn failure")
     },
     async recordTurnCancelled() {},

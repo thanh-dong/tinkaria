@@ -19,11 +19,11 @@ function makeState(): StoreState {
   const chatsById = new Map<string, ChatRecord>([
     ["c1", {
       id: "c1", projectId: "p1", title: "Chat 1", createdAt: Date.now(), updatedAt: Date.now(),
-      provider: "claude", planMode: false, sessionToken: null, lastTurnOutcome: null,
+      unread: false, provider: "claude", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
     ["c2", {
       id: "c2", projectId: "p1", title: "Chat 2", createdAt: Date.now(), updatedAt: Date.now(),
-      provider: "codex", planMode: false, sessionToken: null, lastTurnOutcome: null,
+      unread: false, provider: "codex", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
   ])
   return { projectsById, projectIdsByPath, chatsById }

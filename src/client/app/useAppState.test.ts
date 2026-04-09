@@ -10,17 +10,8 @@ import {
 import {
   computeTailOffset,
   getActiveChatSnapshot,
-  getNextReadableBoundary,
-  getReadableBlockCount,
-  getInitialChatReadAnchor,
-  getHookReadProgressBoundary,
-  getLockedInitialChatReadAnchor,
-  getLastReadableMessage,
   getNewestRemainingChatId,
-  getReadTimestampToPersistAfterReply,
   getResumeRefreshSessionProjectIds,
-  isReadableTranscriptMessage,
-  isChatRead,
   normalizeLocalFilePreviewErrorMessage,
   normalizeCommandErrorMessage,
   getUiUpdateRestartReconnectAction,
@@ -32,30 +23,9 @@ import {
   shouldStickToBottomOnComposerSubmit,
   PWA_RESUME_STALE_AFTER_MS,
   TRANSCRIPT_TAIL_SIZE,
-  compareReadBoundary,
-  resolveLockedAnchor,
 } from "./appState.helpers"
-import type { InitialChatReadAnchor } from "./appState.helpers"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarData } from "../../shared/types"
 import { createIncrementalHydrator } from "../lib/parseTranscript"
-
-function assistantMessage(id: string): HydratedTranscriptMessage {
-  return {
-    id,
-    kind: "assistant_text",
-    text: `message-${id}`,
-    timestamp: "2026-04-01T00:00:00.000Z",
-  }
-}
-
-function paragraphMessage(id: string, text: string): HydratedTranscriptMessage {
-  return {
-    id,
-    kind: "assistant_text",
-    text,
-    timestamp: "2026-04-01T00:00:00.000Z",
-  }
-}
 
 function createSidebarData(): SidebarData {
   return {
@@ -70,6 +40,7 @@ function createSidebarData(): SidebarData {
             chatId: "chat-3",
             title: "Newest",
             status: "idle",
+            unread: false,
             localPath: "/tmp/project-1",
             provider: null,
             lastMessageAt: 3,
@@ -81,6 +52,7 @@ function createSidebarData(): SidebarData {
             chatId: "chat-2",
             title: "Older",
             status: "idle",
+            unread: false,
             localPath: "/tmp/project-1",
             provider: null,
             lastMessageAt: 2,
@@ -92,6 +64,7 @@ function createSidebarData(): SidebarData {
             chatId: "chat-1",
             title: "Oldest",
             status: "idle",
+            unread: false,
             localPath: "/tmp/project-1",
             provider: null,
             lastMessageAt: 1,
@@ -109,6 +82,7 @@ function createSidebarData(): SidebarData {
             chatId: "chat-4",
             title: "Other project",
             status: "idle",
+            unread: false,
             localPath: "/tmp/project-2",
             provider: null,
             lastMessageAt: 1,
@@ -153,70 +127,6 @@ describe("shouldStickToBottomOnComposerSubmit", () => {
   })
 })
 
-describe("getHookReadProgressBoundary", () => {
-  function createBoundaryNode(messageId: string, blockIndex: number, top: number) {
-    return {
-      dataset: {
-        readAnchorMessageId: messageId,
-        readAnchorBlockIndex: String(blockIndex),
-      },
-      getBoundingClientRect: () => ({
-        top,
-        bottom: top + 20,
-      }),
-    }
-  }
-
-  function createBoundaryContainer(
-    tops: Array<{ messageId: string; blockIndex: number; top: number }>,
-    height = 800,
-  ) {
-    const nodes = tops.map((item) => createBoundaryNode(item.messageId, item.blockIndex, item.top))
-    return {
-      querySelectorAll: () => nodes,
-      getBoundingClientRect: () => ({
-        top: 0,
-        bottom: height,
-        height,
-      }),
-    } as unknown as HTMLElement
-  }
-
-  test("returns the deepest hook in the lower-half reading lane", () => {
-    const container = createBoundaryContainer([
-      { messageId: "m1", blockIndex: 0, top: 200 },
-      { messageId: "m1", blockIndex: 1, top: 460 },
-      { messageId: "m2", blockIndex: 0, top: 520 },
-    ])
-
-    expect(getHookReadProgressBoundary(container)).toEqual({
-      messageId: "m2",
-      blockIndex: 0,
-      state: "reading",
-    })
-  })
-
-  test("marks hooks near the composer in the committed read lane", () => {
-    const container = createBoundaryContainer([
-      { messageId: "m1", blockIndex: 0, top: 610 },
-    ])
-
-    expect(getHookReadProgressBoundary(container)).toEqual({
-      messageId: "m1",
-      blockIndex: 0,
-      state: "read",
-    })
-  })
-
-  test("returns null when no hook has entered the lower-half reading lane", () => {
-    const container = createBoundaryContainer([
-      { messageId: "m1", blockIndex: 0, top: 120 },
-      { messageId: "m1", blockIndex: 1, top: 260 },
-    ])
-
-    expect(getHookReadProgressBoundary(container)).toBeNull()
-  })
-})
 
 describe("shouldRefreshStaleSessionOnResume", () => {
   test("returns false outside standalone/PWA mode", () => {
@@ -559,202 +469,6 @@ describe("shouldBackfillTranscriptWindow", () => {
   })
 })
 
-describe("isChatRead", () => {
-  test("treats chats with unseen newer messages as unread", () => {
-    expect(isChatRead(10, 11)).toBe(false)
-  })
-
-  test("treats chats with matching last seen timestamps as read", () => {
-    expect(isChatRead(11, 11)).toBe(true)
-    expect(isChatRead(12, 11)).toBe(true)
-  })
-
-  test("treats chats without message timestamps as read", () => {
-    expect(isChatRead(undefined, undefined)).toBe(true)
-    expect(isChatRead(undefined, 11)).toBe(false)
-  })
-})
-
-describe("getReadTimestampToPersistAfterReply", () => {
-  test("promotes the latest visible message to read after a successful reply", () => {
-    const persistedReadAt = getReadTimestampToPersistAfterReply(10, 11)
-
-    expect(persistedReadAt).toBe(11)
-    expect(isChatRead(persistedReadAt ?? undefined, 11)).toBe(true)
-    expect(getInitialChatReadAnchor({
-      activeChatId: "chat-1",
-      sidebarReady: true,
-      hasSidebarChat: true,
-      messages: [assistantMessage("assistant-1")],
-      lastSeenMessageAt: persistedReadAt ?? undefined,
-      lastMessageAt: 11,
-    })).toEqual({ kind: "tail" })
-  })
-
-  test("does nothing when the chat has no latest message timestamp yet", () => {
-    expect(getReadTimestampToPersistAfterReply(10, undefined)).toBeNull()
-  })
-})
-
-describe("read-boundary helpers", () => {
-  test("ignores metadata-only transcript messages when choosing a readable boundary", () => {
-    expect(isReadableTranscriptMessage({
-      id: "status-1",
-      kind: "status",
-      status: "running",
-      timestamp: "2026-04-01T00:00:00.000Z",
-    })).toBe(false)
-    expect(isReadableTranscriptMessage(assistantMessage("assistant-1"))).toBe(true)
-  })
-
-  test("returns the latest readable transcript message", () => {
-    expect(getLastReadableMessage([
-      {
-        id: "status-1",
-        kind: "status",
-        status: "running",
-        timestamp: "2026-04-01T00:00:00.000Z",
-      },
-      assistantMessage("assistant-1"),
-      {
-        id: "status-2",
-        kind: "status",
-        status: "done",
-        timestamp: "2026-04-01T00:00:01.000Z",
-      },
-    ])?.id).toBe("assistant-1")
-  })
-
-  test("counts assistant text paragraphs and list items as readable blocks", () => {
-    expect(getReadableBlockCount(paragraphMessage("assistant-1", "One\n\nTwo\n\nThree"))).toBe(3)
-    expect(getReadableBlockCount(paragraphMessage("assistant-2", "- A\n- B\n- C"))).toBe(3)
-  })
-
-  test("finds the next unread block inside the same long message after the exact last-read block", () => {
-    expect(getNextReadableBoundary({
-      messages: [
-        paragraphMessage("assistant-1", "One\n\nTwo\n\nThree"),
-      ],
-      lastReadMessageId: "assistant-1",
-      lastReadBlockIndex: 0,
-      lastSeenMessageAt: 1,
-      lastMessageAt: 2,
-    })).toEqual({ messageId: "assistant-1", blockIndex: 1 })
-  })
-
-  test("moves to the next message when the last-read block was already the final block of the message", () => {
-    expect(getNextReadableBoundary({
-      messages: [
-        paragraphMessage("assistant-1", "One\n\nTwo"),
-        assistantMessage("assistant-2"),
-      ],
-      lastReadMessageId: "assistant-1",
-      lastReadBlockIndex: 1,
-      lastSeenMessageAt: 1,
-      lastMessageAt: 3,
-    })).toEqual({ messageId: "assistant-2", blockIndex: 0 })
-  })
-
-  test("falls back to the earliest loaded readable message when only legacy timestamp state says the chat is unread", () => {
-    expect(getNextReadableBoundary({
-      messages: [
-        assistantMessage("assistant-1"),
-        assistantMessage("assistant-2"),
-      ],
-      lastSeenMessageAt: 1,
-      lastMessageAt: 2,
-    })).toEqual({ messageId: "assistant-1", blockIndex: 0 })
-  })
-
-  test("returns null when the latest readable block is already the exact read boundary", () => {
-    expect(getNextReadableBoundary({
-      messages: [
-        paragraphMessage("assistant-1", "One\n\nTwo"),
-      ],
-      lastReadMessageId: "assistant-1",
-      lastReadBlockIndex: 1,
-      lastSeenMessageAt: 2,
-      lastMessageAt: 2,
-    })).toBeNull()
-  })
-})
-
-describe("getInitialChatReadAnchor", () => {
-  test("waits for the sidebar row before deciding whether the chat is read", () => {
-    expect(getInitialChatReadAnchor({
-      activeChatId: "chat-1",
-      sidebarReady: false,
-      hasSidebarChat: false,
-      messages: [assistantMessage("assistant-1")],
-      lastSeenMessageAt: 1,
-      lastMessageAt: 2,
-    })).toEqual({ kind: "wait" })
-  })
-
-  test("anchors unread chats to the first unread message once the sidebar row is known", () => {
-    expect(getInitialChatReadAnchor({
-      activeChatId: "chat-1",
-      sidebarReady: true,
-      hasSidebarChat: true,
-      messages: [
-        paragraphMessage("assistant-1", "One\n\nTwo\n\nThree"),
-        assistantMessage("assistant-2"),
-      ],
-      lastReadMessageId: "assistant-1",
-      lastReadBlockIndex: 0,
-      lastSeenMessageAt: 1,
-      lastMessageAt: 3,
-    })).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
-  })
-
-  test("opens fully read chats at the tail", () => {
-    expect(getInitialChatReadAnchor({
-      activeChatId: "chat-1",
-      sidebarReady: true,
-      hasSidebarChat: true,
-      messages: [
-        assistantMessage("assistant-1"),
-        assistantMessage("assistant-2"),
-      ],
-      lastReadMessageId: "assistant-2",
-      lastSeenMessageAt: 2,
-      lastMessageAt: 2,
-    })).toEqual({ kind: "tail" })
-  })
-
-  test("treats the home route as already resolved", () => {
-    expect(getInitialChatReadAnchor({
-      activeChatId: null,
-      sidebarReady: false,
-      hasSidebarChat: false,
-      messages: [],
-    })).toEqual({ kind: "tail" })
-  })
-})
-
-describe("getLockedInitialChatReadAnchor", () => {
-  test("locks the first resolved unread anchor for the active chat", () => {
-    expect(getLockedInitialChatReadAnchor(
-      { kind: "wait" },
-      { kind: "block", messageId: "assistant-1", blockIndex: 1 },
-      false,
-    )).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
-
-    expect(getLockedInitialChatReadAnchor(
-      { kind: "block", messageId: "assistant-1", blockIndex: 1 },
-      { kind: "block", messageId: "assistant-2", blockIndex: 0 },
-      false,
-    )).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
-  })
-
-  test("ignores follow-up anchor changes after the initial scroll completed", () => {
-    expect(getLockedInitialChatReadAnchor(
-      { kind: "block", messageId: "assistant-1", blockIndex: 1 },
-      { kind: "tail" },
-      true,
-    )).toEqual({ kind: "block", messageId: "assistant-1", blockIndex: 1 })
-  })
-})
 
 describe("appendQueuedText", () => {
   test("uses the incoming text when the queue is empty", async () => {
@@ -1044,76 +758,4 @@ describe("chatCache", () => {
   })
 })
 
-describe("compareReadBoundary", () => {
-  test("returns advance when the next message appears later in the array", () => {
-    const messages = [assistantMessage("msg-1"), assistantMessage("msg-2"), assistantMessage("msg-3")]
-    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 0 }, { messageId: "msg-2", blockIndex: 0 })).toBe("advance")
-  })
 
-  test("returns regress when the next message appears earlier in the array", () => {
-    const messages = [assistantMessage("msg-1"), assistantMessage("msg-2"), assistantMessage("msg-3")]
-    expect(compareReadBoundary(messages, { messageId: "msg-2", blockIndex: 0 }, { messageId: "msg-1", blockIndex: 0 })).toBe("regress")
-  })
-
-  test("returns advance for higher blockIndex on same message", () => {
-    const messages = [paragraphMessage("msg-1", "One\n\nTwo\n\nThree")]
-    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 0 }, { messageId: "msg-1", blockIndex: 2 })).toBe("advance")
-  })
-
-  test("returns regress for lower blockIndex on same message", () => {
-    const messages = [paragraphMessage("msg-1", "One\n\nTwo\n\nThree")]
-    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 2 }, { messageId: "msg-1", blockIndex: 0 })).toBe("regress")
-  })
-
-  test("returns same for identical boundary", () => {
-    const messages = [assistantMessage("msg-1")]
-    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 0 }, { messageId: "msg-1", blockIndex: 0 })).toBe("same")
-  })
-
-  test("returns advance when stored messageId is not in array (compacted away)", () => {
-    const messages = [assistantMessage("msg-3"), assistantMessage("msg-4")]
-    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 5 }, { messageId: "msg-3", blockIndex: 0 })).toBe("advance")
-  })
-
-  test("returns same when next messageId is not found in array", () => {
-    const messages = [assistantMessage("msg-1")]
-    expect(compareReadBoundary(messages, { messageId: "msg-1", blockIndex: 0 }, { messageId: "gone", blockIndex: 0 })).toBe("same")
-  })
-
-  test("returns same for empty messages array", () => {
-    expect(compareReadBoundary([], { messageId: "msg-1", blockIndex: 0 }, { messageId: "msg-2", blockIndex: 0 })).toBe("same")
-  })
-
-  test("returns advance when current has no stored messageId", () => {
-    const messages = [assistantMessage("msg-1")]
-    expect(compareReadBoundary(messages, {}, { messageId: "msg-1", blockIndex: 0 })).toBe("advance")
-  })
-})
-
-describe("resolveLockedAnchor", () => {
-  test("resolves wait to the next anchor on first call for a chatId", () => {
-    const state = { chatId: null as string | null, anchor: { kind: "wait" } as InitialChatReadAnchor }
-    const result = resolveLockedAnchor(state, "chat-1", { kind: "block", messageId: "msg-1", blockIndex: 0 }, false)
-    expect(result.anchor).toEqual({ kind: "block", messageId: "msg-1", blockIndex: 0 })
-    expect(result.chatId).toBe("chat-1")
-  })
-
-  test("resets to wait on chatId change then resolves next anchor", () => {
-    const state = { chatId: "chat-1", anchor: { kind: "block", messageId: "msg-1", blockIndex: 0 } as InitialChatReadAnchor }
-    const result = resolveLockedAnchor(state, "chat-2", { kind: "tail" } as InitialChatReadAnchor, false)
-    expect(result.chatId).toBe("chat-2")
-    expect(result.anchor).toEqual({ kind: "tail" })
-  })
-
-  test("freezes anchor after scroll completed", () => {
-    const state = { chatId: "chat-1", anchor: { kind: "block", messageId: "msg-1", blockIndex: 0 } as InitialChatReadAnchor }
-    const result = resolveLockedAnchor(state, "chat-1", { kind: "tail" } as InitialChatReadAnchor, true)
-    expect(result.anchor).toEqual({ kind: "block", messageId: "msg-1", blockIndex: 0 })
-  })
-
-  test("keeps wait when next anchor is also wait", () => {
-    const state = { chatId: "chat-1", anchor: { kind: "wait" } as InitialChatReadAnchor }
-    const result = resolveLockedAnchor(state, "chat-1", { kind: "wait" } as InitialChatReadAnchor, false)
-    expect(result.anchor).toEqual({ kind: "wait" })
-  })
-})

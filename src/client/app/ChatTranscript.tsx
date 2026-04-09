@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useLayoutEffect, useMemo, useRef, type RefObject } from "react"
+import React, { lazy, Suspense, useMemo, type RefObject } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import type { AskUserQuestionItem, ProcessedToolCall } from "../components/messages/types"
 import type { AskUserQuestionAnswerMap, HydratedTranscriptMessage } from "../../shared/types"
@@ -22,8 +22,7 @@ const ExitPlanModeMessage = lazy(() => import("../components/messages/ExitPlanMo
 const CompactSummaryMessage = lazy(() => import("../components/messages/CompactSummaryMessage").then(m => ({ default: m.CompactSummaryMessage })))
 import { StatusMessage } from "../components/messages/StatusMessage"
 import { CollapsedToolGroup } from "../components/messages/CollapsedToolGroup"
-import { getReadBlockAnchorId, OpenLocalLinkProvider } from "../components/messages/shared"
-import { LOG_PREFIX } from "../../shared/branding"
+import { OpenLocalLinkProvider } from "../components/messages/shared"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
 import { SPECIAL_TOOL_NAMES } from "./derived"
 
@@ -70,49 +69,11 @@ export function getRenderItemIndexForMessageId(renderItems: RenderItem[], messag
   ))
 }
 
-const BLOCK_SCROLL_MAX_ATTEMPTS = 10
-
-export function waitForBlockNode(
-  id: string,
-  maxAttempts: number,
-  onDone: (node: HTMLElement | null) => void,
-  lookup: (id: string) => HTMLElement | null = (nodeId) => document.getElementById(nodeId),
-): () => void {
-  let attempt = 0
-  let cancelled = false
-  let frameId: number | null = null
-
-  function check() {
-    if (cancelled) return
-    const node = lookup(id)
-    if (node) {
-      onDone(node)
-      return
-    }
-    attempt++
-    if (attempt >= maxAttempts) {
-      onDone(null)
-      return
-    }
-    frameId = requestAnimationFrame(check)
-  }
-
-  frameId = requestAnimationFrame(check)
-
-  return () => {
-    cancelled = true
-    if (frameId !== null) cancelAnimationFrame(frameId)
-  }
-}
-
 interface ChatTranscriptProps {
   messages: HydratedTranscriptMessage[]
   scrollRef: RefObject<HTMLDivElement | null>
   isLoading: boolean
   localPath?: string
-  initialScrollMessageId?: string | null
-  initialScrollBlockIndex?: number | null
-  onInitialScrollMessageResolved?: () => void
   latestToolIds: Record<string, string | null>
   onOpenLocalLink: (target: { path: string; line?: number; column?: number }) => void
   onOpenExternalLink: (href: string) => boolean
@@ -129,9 +90,6 @@ export function ChatTranscript({
   scrollRef,
   isLoading,
   localPath,
-  initialScrollMessageId,
-  initialScrollBlockIndex,
-  onInitialScrollMessageResolved,
   latestToolIds,
   onOpenLocalLink,
   onOpenExternalLink,
@@ -151,8 +109,6 @@ export function ChatTranscript({
   }, [messages])
 
   const renderItems = useMemo(() => groupMessages(messages), [messages])
-  const lastInitialScrollAnchorRef = useRef<string | null>(null)
-  const cleanupRetryRef = useRef<(() => void) | null>(null)
 
   const { estimateSize } = useMessageHeights(renderItems, scrollRef)
 
@@ -162,41 +118,6 @@ export function ChatTranscript({
     estimateSize,
     overscan: 5,
   })
-
-  useLayoutEffect(() => {
-    if (!initialScrollMessageId) {
-      lastInitialScrollAnchorRef.current = null
-      return
-    }
-    const anchorKey = `${initialScrollMessageId}:${initialScrollBlockIndex ?? 0}`
-    if (lastInitialScrollAnchorRef.current === anchorKey) return
-
-    const renderIndex = getRenderItemIndexForMessageId(renderItems, initialScrollMessageId)
-    if (renderIndex < 0) return
-
-    virtualizer.scrollToIndex(renderIndex, { align: "start", behavior: "auto" })
-    lastInitialScrollAnchorRef.current = anchorKey
-
-    cleanupRetryRef.current?.()
-
-    const blockIndex = initialScrollBlockIndex ?? 0
-    const anchorId = getReadBlockAnchorId(initialScrollMessageId, blockIndex)
-
-    cleanupRetryRef.current = waitForBlockNode(anchorId, BLOCK_SCROLL_MAX_ATTEMPTS, (node) => {
-      cleanupRetryRef.current = null
-      if (node) {
-        node.scrollIntoView({ block: "start", behavior: "auto" })
-      } else {
-        console.warn(LOG_PREFIX, `Block anchor ${anchorId} not found after ${BLOCK_SCROLL_MAX_ATTEMPTS} frames, using virtualizer position`)
-      }
-      onInitialScrollMessageResolved?.()
-    })
-
-    return () => {
-      cleanupRetryRef.current?.()
-      cleanupRetryRef.current = null
-    }
-  }, [initialScrollBlockIndex, initialScrollMessageId, onInitialScrollMessageResolved, renderItems, virtualizer])
 
   function renderMessage(message: HydratedTranscriptMessage, index: number): React.ReactNode {
     if (message.kind === "user_prompt") {

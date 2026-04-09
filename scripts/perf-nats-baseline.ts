@@ -45,19 +45,20 @@ function stats(measurements: number[]) {
 
 function makeTranscriptEntry(size: "small" | "medium" | "large"): TranscriptEntry {
   const base = {
-    kind: "assistant" as const,
-    ts: Date.now(),
-    content: "",
+    _id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    kind: "assistant_text" as const,
+    text: "",
   }
   switch (size) {
     case "small":
-      base.content = "Hello, world! This is a short response."
+      base.text = "Hello, world! This is a short response."
       break
     case "medium":
-      base.content = "x".repeat(4096) // ~4KB typical tool call result
+      base.text = "x".repeat(4096) // ~4KB typical tool call result
       break
     case "large":
-      base.content = "x".repeat(65536) // ~64KB large code block
+      base.text = "x".repeat(65536) // ~64KB large code block
       break
   }
   return base
@@ -67,6 +68,18 @@ interface BenchResult {
   name: string
   unit: string
   stats: ReturnType<typeof stats>
+}
+
+function resolveElapsed(handler: ((elapsed: number) => void) | null, elapsed: number) {
+  if (typeof handler === "function") {
+    handler(elapsed)
+  }
+}
+
+function resolveBatch(handler: (() => void) | null) {
+  if (typeof handler === "function") {
+    handler()
+  }
 }
 
 // ── Benchmarks ────────────────────────────────────────────────────
@@ -184,7 +197,7 @@ async function benchJetStreamRoundTrip(nc: NatsConnection, js: JetStreamClient, 
   void (async () => {
     for await (const msg of messages) {
       const sent = JSON.parse(decoder.decode(msg.data)).sentAt as number
-      resolveNext?.(performance.now() - sent)
+      resolveElapsed(resolveNext, performance.now() - sent)
     }
   })()
 
@@ -461,7 +474,7 @@ async function benchHighFrequencyPipeline(nc: NatsConnection, js: JetStreamClien
     for await (const _msg of messages) {
       received++
       if (received % batchSize === 0) {
-        batchResolve?.()
+        resolveBatch(batchResolve)
       }
     }
   })()

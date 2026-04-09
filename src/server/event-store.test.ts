@@ -72,6 +72,7 @@ describe("EventStore", () => {
         title: "Chat",
         createdAt: 1,
         updatedAt: 5,
+        unread: false,
         provider: null,
         planMode: false,
         sessionToken: null,

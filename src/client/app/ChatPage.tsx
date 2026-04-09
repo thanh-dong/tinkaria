@@ -504,9 +504,6 @@ export function ChatPage() {
                     scrollRef={state.scrollRef}
                     isLoading={state.isProcessing}
                     localPath={state.runtime?.localPath}
-                    initialScrollMessageId={state.initialReadAnchorMessageId}
-                    initialScrollBlockIndex={state.initialReadAnchorBlockIndex}
-                    onInitialScrollMessageResolved={state.handleInitialReadAnchorScrolled}
                     latestToolIds={state.latestToolIds}
                     onOpenLocalLink={state.handleOpenLocalLink}
                     onOpenExternalLink={state.handleOpenExternalLink}

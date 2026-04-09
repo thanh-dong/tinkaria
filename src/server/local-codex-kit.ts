@@ -313,7 +313,12 @@ export class LocalCodexKitDaemon {
   }
 
   private publishRegistration(subject: string) {
-    this.nc.publish(subject, encode(this.registration))
+    try {
+      this.nc.publish(subject, encode(this.registration))
+    } catch (error) {
+      if (this.disposed) return
+      console.warn(LOG_PREFIX, `Codex kit registration publish failed: ${errorMessage(error)}`)
+    }
   }
 
   private async consume(sub: Subscription) {

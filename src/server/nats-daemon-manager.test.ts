@@ -11,7 +11,7 @@ describe("NatsDaemonManager", () => {
   })
 
   test("ensureDaemon starts daemon and returns connection info", async () => {
-    manager = new NatsDaemonManager()
+    manager = NatsDaemonManager.embedded()
     const info = await manager.ensureDaemon({ token: "test-" + Date.now() })
     expect(info).toHaveProperty("url")
     expect(info).toHaveProperty("wsUrl")
@@ -22,7 +22,7 @@ describe("NatsDaemonManager", () => {
 
   test("ensureDaemon returns working NATS connection", async () => {
     const token = "test-" + Date.now()
-    manager = new NatsDaemonManager()
+    manager = NatsDaemonManager.embedded()
     const info = await manager.ensureDaemon({ token })
 
     const nc = await connect({ servers: info.url, token })
@@ -32,7 +32,7 @@ describe("NatsDaemonManager", () => {
 
   test("ensureDaemon reuses existing daemon on second call", async () => {
     const token = "test-" + Date.now()
-    manager = new NatsDaemonManager()
+    manager = NatsDaemonManager.embedded()
     const info1 = await manager.ensureDaemon({ token })
     const info2 = await manager.ensureDaemon({ token })
     expect(info1.pid).toBe(info2.pid)
@@ -41,7 +41,7 @@ describe("NatsDaemonManager", () => {
 
   test("dispose kills the daemon process", async () => {
     const token = "test-" + Date.now()
-    manager = new NatsDaemonManager()
+    manager = NatsDaemonManager.embedded()
     const info = await manager.ensureDaemon({ token })
     const pid = info.pid
 

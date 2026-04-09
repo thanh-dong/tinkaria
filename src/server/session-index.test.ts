@@ -33,6 +33,7 @@ function makeChat(id: string, projectId = "p1", provider: "claude" | "codex" | n
     title: "Chat",
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    unread: false,
     provider,
     planMode: false,
     sessionToken: null,

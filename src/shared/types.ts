@@ -173,6 +173,7 @@ export interface SidebarChatRow {
   chatId: string
   title: string
   status: SessionStatus
+  unread: boolean
   localPath: string
   provider: AgentProvider | null
   lastMessageAt?: number

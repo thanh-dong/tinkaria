@@ -1,9 +1,8 @@
 import { describe, test, expect, afterEach, beforeEach } from "bun:test"
 import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect, type NatsConnection } from "@nats-io/transport-node"
-import { jetstreamManager, RetentionPolicy, StorageType } from "@nats-io/jetstream"
 import { RunnerManager } from "./runner-manager"
-import { RUNNER_EVENTS_STREAM, ALL_RUNNER_EVENTS } from "../shared/runner-protocol"
+import { ensureRunnerEventsStream } from "./nats-streams"
 
 describe("RunnerManager", () => {
   let server: NatsServer
@@ -12,17 +11,7 @@ describe("RunnerManager", () => {
   beforeEach(async () => {
     server = await NatsServer.start({ jetstream: true })
     nc = await connect({ servers: server.url })
-    // Create required JetStream stream (runner needs this to publish events)
-    const jsm = await jetstreamManager(nc)
-    await jsm.streams.add({
-      name: RUNNER_EVENTS_STREAM,
-      subjects: [ALL_RUNNER_EVENTS],
-      retention: RetentionPolicy.Limits,
-      storage: StorageType.Memory,
-      max_age: 5 * 60 * 1_000_000_000,
-      max_msgs: 10_000,
-      max_bytes: 64 * 1024 * 1024,
-    })
+    await ensureRunnerEventsStream(nc)
   })
 
   afterEach(async () => {

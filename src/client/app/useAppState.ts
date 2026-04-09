@@ -13,7 +13,6 @@ import {
   type SessionsSnapshot,
   type UpdateSnapshot,
 } from "../../shared/types"
-import { useChatReadStateStore } from "../stores/chatReadStateStore"
 import { useChatInputStore } from "../stores/chatInputStore"
 import type { ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
@@ -31,7 +30,6 @@ import { NatsSocket } from "./nats-socket"
 import type { AppTransport, SocketStatus } from "./socket-interface"
 import {
   getActiveChatSnapshot,
-  getLastReadableMessage,
   getSidebarChatRow,
   getUiUpdateRestartReconnectAction,
   normalizeCommandErrorMessage,
@@ -101,8 +99,6 @@ export interface AppState {
   queuedText: string
   transcriptPaddingBottom: number
   showScrollButton: boolean
-  initialReadAnchorMessageId: string | null
-  initialReadAnchorBlockIndex: number | null
   navbarLocalPath?: string
   hasSelectedProject: boolean
   chatHasKnownMessages: boolean
@@ -112,7 +108,6 @@ export interface AppState {
   collapseSidebar: () => void
   expandSidebar: () => void
   closeLocalFilePreview: () => void
-  handleInitialReadAnchorScrolled: () => void
   scrollToBottom: () => void
   handleCreateChat: (projectId: string) => Promise<void>
   handleOpenLocalProject: (localPath: string) => Promise<void>
@@ -186,17 +181,7 @@ export function useAppState(activeChatId: string | null): AppState {
     clearQueuedText,
     restoreQueuedText,
   } = useSubmitPipeline({ activeChatId })
-  const lastReadBlockIndex = useChatReadStateStore((store) => (
-    activeChatId ? store.lastReadBlockIndexByChat[activeChatId] : undefined
-  ))
-  const lastReadMessageId = useChatReadStateStore((store) => (
-    activeChatId ? store.lastReadMessageIdByChat[activeChatId] : undefined
-  ))
-  const lastSeenMessageAt = useChatReadStateStore((store) => (
-    activeChatId ? store.lastSeenMessageAtByChat[activeChatId] : undefined
-  ))
-  const markChatRead = useChatReadStateStore((store) => store.markChatRead)
-  const clearChatReadState = useChatReadStateStore((store) => store.clearChat)
+  const [focusEpoch, setFocusEpoch] = useState(0)
 
   const inputRef = useRef<HTMLDivElement>(null)
   const setNormalizedCommandError = useCallback((error: unknown) => {
@@ -342,7 +327,6 @@ export function useAppState(activeChatId: string | null): AppState {
     })
   }, [activeChatId, activeChatSnapshot, chatSnapshot, pendingChatId])
   const latestToolIds = useMemo(() => getLatestToolIds(messages), [messages])
-  const latestReadableMessage = useMemo(() => getLastReadableMessage(messages), [messages])
   const runtime = activeChatSnapshot?.runtime ?? null
   const currentAccountInfo = useMemo(() => {
     const firstAccountInfo = messages.find((message) => message.kind === "account_info")
@@ -359,9 +343,6 @@ export function useAppState(activeChatId: string | null): AppState {
     scrollFollowToBottom,
     showScrollButton,
     transcriptPaddingBottom,
-    initialReadAnchorMessageId,
-    initialReadAnchorBlockIndex,
-    handleInitialReadAnchorScrolled,
     scrollToBottom,
     keepComposerSubmitAnchored,
   } = useScrollSync({
@@ -371,12 +352,6 @@ export function useAppState(activeChatId: string | null): AppState {
     hasSidebarChat: hasResolvedActiveSidebarChat,
     inputHeight,
     runtime,
-    lastReadBlockIndex,
-    lastReadMessageId,
-    lastSeenMessageAt,
-    lastMessageAt: activeSidebarChat?.lastMessageAt,
-    latestReadableMessage,
-    markChatRead,
   })
 
   const fallbackLocalProjectPath = localProjects?.projects[0]?.localPath ?? null
@@ -403,6 +378,28 @@ export function useAppState(activeChatId: string | null): AppState {
     resumeRefreshNonce,
   })
 
+  // Mark active chat as read when navigating to it (tab must be visible + focused)
+  useEffect(() => {
+    if (!activeChatId || !sidebarReady) return
+    if (document.visibilityState !== "visible" || !document.hasFocus()) return
+    const chat = getSidebarChatRow(sidebarData.projectGroups, activeChatId)
+    if (!chat?.unread) return
+    void socket.command({ type: "chat.markRead", chatId: activeChatId }).catch(setNormalizedCommandError)
+  }, [activeChatId, focusEpoch, sidebarData.projectGroups, sidebarReady, socket, setNormalizedCommandError])
+
+  // Re-trigger mark-read when window regains focus
+  useEffect(() => {
+    function handleFocusChange() {
+      setFocusEpoch((value) => value + 1)
+    }
+    window.addEventListener("focus", handleFocusChange)
+    document.addEventListener("visibilitychange", handleFocusChange)
+    return () => {
+      window.removeEventListener("focus", handleFocusChange)
+      document.removeEventListener("visibilitychange", handleFocusChange)
+    }
+  }, [])
+
   const commands = useChatCommands({
     socket,
     activeChatId,
@@ -415,9 +412,6 @@ export function useAppState(activeChatId: string | null): AppState {
     fallbackLocalProjectPath,
     isProcessing,
     messages,
-    latestReadableMessage,
-    lastSeenMessageAt,
-    activeSidebarChat,
     localProjects,
     setProjectSelection,
     setPendingChatId,
@@ -430,8 +424,6 @@ export function useAppState(activeChatId: string | null): AppState {
     updateSubmitPipeline,
     submitPipeline,
     submitPipelineRef,
-    markChatRead,
-    clearChatReadState,
     activeSessionsSubs,
   })
 
@@ -468,8 +460,6 @@ export function useAppState(activeChatId: string | null): AppState {
     queuedText: activeQueuedText,
     transcriptPaddingBottom,
     showScrollButton,
-    initialReadAnchorMessageId,
-    initialReadAnchorBlockIndex,
     navbarLocalPath,
     hasSelectedProject,
     chatHasKnownMessages,
@@ -484,7 +474,6 @@ export function useAppState(activeChatId: string | null): AppState {
     collapseSidebar: () => setSidebarCollapsed(true),
     expandSidebar: () => setSidebarCollapsed(false),
     closeLocalFilePreview: commands.closeLocalFilePreview,
-    handleInitialReadAnchorScrolled,
     scrollToBottom,
     handleCreateChat: commands.handleCreateChat,
     handleOpenLocalProject: commands.handleOpenLocalProject,

@@ -31,7 +31,7 @@ export const TextMessage = memo(function TextMessage({ message }: Props) {
   const content = (
     <div className="text-pretty prose prose-sm dark:prose-invert px-0.5 w-full max-w-full space-y-4">
       <Streamdown
-        components={createMarkdownComponents({ readBlockMessageId: message.id })}
+        components={createMarkdownComponents()}
         linkSafety={{ enabled: false }}
         remarkPlugins={[remarkGfm, remarkRichContentHint]}
       >
