@@ -515,6 +515,8 @@ export function ChatPage() {
           currentRepoStatus={state.currentRepoStatus}
           chatTitle={state.runtime?.title}
           chatStatus={state.runtime?.status}
+          runtimeModel={state.runtime?.model}
+          runtimeProvider={state.runtime?.provider}
         />
 
         <ForkSessionDialog
@@ -744,6 +746,7 @@ export function ChatPage() {
             chatId={state.activeChatId}
             connectionStatus={state.connectionStatus}
             activeProvider={state.runtime?.provider ?? null}
+            runtimeModel={state.runtime?.model}
             availableProviders={state.availableProviders}
             availableSkills={availableSkills}
           />

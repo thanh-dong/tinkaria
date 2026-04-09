@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
-import type { CurrentRepoStatusSnapshot, DiscoveredSessionRuntime, SessionStatus } from "../../../shared/types"
+import type { AgentProvider, CurrentRepoStatusSnapshot, DiscoveredSessionRuntime, SessionStatus } from "../../../shared/types"
 import { PROVIDER_ICONS, getProviderFromModel } from "../icons/ProviderIcons"
 
 interface Props {
@@ -21,6 +21,8 @@ interface Props {
   currentRepoStatus?: CurrentRepoStatusSnapshot | null
   chatTitle?: string
   chatStatus?: SessionStatus
+  runtimeModel?: string | null
+  runtimeProvider?: AgentProvider | null
 }
 
 function getPathLabel(localPath: string | undefined, repoStatus: CurrentRepoStatusSnapshot | null | undefined): string | null {
@@ -76,7 +78,7 @@ function RepoDetailPopover({
   const hasDetails = Boolean(fullPath || repoStatus?.branch || repoStatus?.isRepo)
   if (!hasDetails) {
     return (
-      <span className="truncate text-[11px] leading-none text-muted-foreground" title={compactLabel}>
+      <span className="truncate text-xs leading-none text-muted-foreground" title={compactLabel}>
         {compactLabel}
       </span>
     )
@@ -88,7 +90,7 @@ function RepoDetailPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="truncate text-[11px] leading-none text-muted-foreground hover:text-foreground transition-colors cursor-default"
+          className="truncate text-xs leading-none text-muted-foreground hover:text-foreground transition-colors cursor-default"
           onPointerEnter={() => setOpen(true)}
           onPointerLeave={() => setOpen(false)}
         >
@@ -104,7 +106,7 @@ function RepoDetailPopover({
         onPointerLeave={() => setOpen(false)}
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <div className="space-y-1.5 text-[11px] leading-relaxed">
+        <div className="space-y-1.5 text-xs leading-relaxed">
           {fullPath ? (
             <div className="flex gap-2">
               <span className="text-muted-foreground shrink-0">Path</span>
@@ -171,6 +173,8 @@ export function ChatNavbar({
   currentRepoStatus,
   chatTitle,
   chatStatus,
+  runtimeModel,
+  runtimeProvider,
 }: Props) {
   const navbarAreaId = createUiIdentity("chat.navbar", "area")
   const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
@@ -178,8 +182,8 @@ export function ChatNavbar({
   const pathLabel = getPathLabel(localPath, currentRepoStatus)
   const compactRepoLabel = getCompactRepoLabel(pathLabel, currentRepoStatus)
   const contextPercent = currentSessionRuntime?.tokenUsage?.estimatedContextPercent
-  const modelName = currentSessionRuntime?.model
-  const provider = modelName ? getProviderFromModel(modelName) : null
+  const modelName = currentSessionRuntime?.model ?? runtimeModel ?? undefined
+  const provider = modelName ? getProviderFromModel(modelName) : (runtimeProvider ?? null)
   const ProviderIcon = provider ? PROVIDER_ICONS[provider] : null
 
   const hasRightContent = Boolean(compactRepoLabel || contextPercent !== undefined)
@@ -209,7 +213,7 @@ export function ChatNavbar({
           <Button
             variant="ghost"
             size="icon"
-            className="hidden md:flex"
+            className="hidden md:inline-flex"
             onClick={sidebarCollapsed ? onExpandSidebar : onCollapseSidebar}
             title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -219,6 +223,7 @@ export function ChatNavbar({
             {...getUiIdentityAttributeProps(forkSessionActionId)}
             variant="ghost"
             size="icon"
+            className="hidden md:inline-flex"
             onClick={onForkSession}
             title="Fork session"
           >
@@ -228,6 +233,7 @@ export function ChatNavbar({
             {...getUiIdentityAttributeProps(mergeSessionActionId)}
             variant="ghost"
             size="icon"
+            className="hidden md:inline-flex"
             onClick={onMergeSession}
             title="Merge sessions"
           >
@@ -254,18 +260,18 @@ export function ChatNavbar({
             data-testid="session-summary"
             data-status={chatStatus ?? "idle"}
           >
-            <span className={cn("size-1.5 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
-            <span className={cn(
-              "truncate text-[11px] leading-none text-muted-foreground",
-              !sidebarCollapsed && "max-md:max-w-[120px]"
-            )}>
+            <span className={cn("size-2 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
+            <span
+              className="truncate text-xs leading-none text-muted-foreground"
+              title={chatTitle}
+            >
               {chatTitle}
             </span>
           </div>
         ) : null}
 
-        {/* Right pill: compact repo + context bar */}
-        <div className="flex min-w-0 flex-1 justify-end">
+        {/* Right pill: compact repo + context bar — hidden on mobile */}
+        <div className="hidden md:flex min-w-0 flex-1 justify-end">
           {hasRightContent ? (
             <div className="flex min-w-0 max-w-full items-center gap-2 rounded-full border border-border/80 bg-background/78 px-2.5 py-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
               {compactRepoLabel ? (
@@ -278,7 +284,7 @@ export function ChatNavbar({
 
               {contextPercent !== undefined ? (
                 <div className="flex items-center gap-1.5 shrink-0" data-testid="context-bar">
-                  <span className={cn("text-[10px] font-medium leading-none tabular-nums", getContextPercentTextColor(contextPercent))}>
+                  <span className={cn("text-xs font-medium leading-none tabular-nums", getContextPercentTextColor(contextPercent))}>
                     {contextPercent}%
                   </span>
                   <div className="w-12 h-1.5 rounded-full bg-muted/60 overflow-hidden">

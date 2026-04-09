@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { AgentCoordinator, normalizeClaudeStreamMessage } from "./agent"
+import { AgentCoordinator } from "./agent"
+import { normalizeClaudeStreamMessage } from "./claude-harness"
 import type { CodexRuntime } from "./codex-runtime"
 import type { HarnessTurn } from "./harness-types"
 import type { TranscriptEntry } from "../shared/types"

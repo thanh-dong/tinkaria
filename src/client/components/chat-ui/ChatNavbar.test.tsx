@@ -11,11 +11,40 @@ function renderNavbar(props: Parameters<typeof ChatNavbar>[0]) {
   )
 }
 
+/** Returns the HTML region preceding a data-testid or title marker */
+function htmlBefore(html: string, marker: string): string {
+  const idx = html.indexOf(marker)
+  expect(idx).toBeGreaterThan(-1)
+  return html.slice(0, idx)
+}
+
+function htmlElementForMarker(html: string, marker: string): string {
+  const idx = html.indexOf(marker)
+  expect(idx).toBeGreaterThan(-1)
+  const start = html.lastIndexOf("<", idx)
+  const end = html.indexOf(">", idx)
+  expect(start).toBeGreaterThan(-1)
+  expect(end).toBeGreaterThan(-1)
+  return html.slice(start, end + 1)
+}
+
 const defaultProps = {
   onOpenSidebar: () => {},
   onCollapseSidebar: () => {},
   onExpandSidebar: () => {},
   onForkSession: () => {},
+  onMergeSession: () => {},
+} as const
+
+const cleanRepoStatus = {
+  localPath: "/workspace/kanna",
+  branch: "main",
+  stagedCount: 0,
+  unstagedCount: 0,
+  untrackedCount: 0,
+  ahead: 0,
+  behind: 0,
+  isRepo: true,
 } as const
 
 describe("ChatNavbar", () => {
@@ -172,7 +201,7 @@ describe("ChatNavbar", () => {
     expect(html).toContain('data-testid="session-summary"')
   })
 
-  test("session title is more compact on mobile when sidebar is expanded", () => {
+  test("session title renders without aggressive mobile truncation constraint", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,
       ...defaultProps,
@@ -181,7 +210,7 @@ describe("ChatNavbar", () => {
     })
 
     expect(html).toContain('data-testid="session-summary"')
-    expect(html).toContain("max-md:max-w-[120px]")
+    expect(html).not.toContain("max-md:max-w-[120px]")
   })
 
   test("shows status dot for running session", () => {
@@ -214,6 +243,122 @@ describe("ChatNavbar", () => {
     })
 
     expect(html).not.toContain('data-testid="session-summary"')
+  })
+
+  test("fork and merge buttons are hidden on mobile", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+    })
+
+    expect(htmlBefore(html, 'title="Fork session"')).toContain("hidden md:")
+    expect(htmlBefore(html, 'title="Merge sessions"')).toContain("hidden md:")
+  })
+
+  test("right pill content is hidden on mobile", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      localPath: "/workspace/kanna",
+      currentRepoStatus: cleanRepoStatus,
+      currentSessionRuntime: {
+        model: "claude-sonnet-4-5",
+        tokenUsage: { totalTokens: 1000, estimatedContextPercent: 25 },
+      },
+    })
+
+    expect(htmlBefore(html, 'data-testid="context-bar"')).toContain("hidden md:")
+  })
+
+  test("uses no text smaller than 12px", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      chatTitle: "Some title",
+      chatStatus: "running",
+      localPath: "/workspace/kanna",
+      currentRepoStatus: cleanRepoStatus,
+      currentSessionRuntime: {
+        model: "claude-sonnet-4-5",
+        tokenUsage: { totalTokens: 1000, estimatedContextPercent: 25 },
+      },
+    })
+
+    expect(html).not.toContain("text-[10px]")
+    expect(html).not.toContain("text-[11px]")
+  })
+
+  test("status dot is at least size-2", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      chatTitle: "Fix bug",
+      chatStatus: "running",
+    })
+
+    expect(html).toContain("size-2 shrink-0 rounded-full")
+    expect(html).not.toContain("size-1.5 shrink-0 rounded-full")
+  })
+
+  test("session title has title attribute for truncation accessibility", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      chatTitle: "A very long session title that will be truncated",
+      chatStatus: "idle",
+    })
+
+    expect(html).toContain('title="A very long session title that will be truncated"')
+  })
+
+  test("model indicator is always visible (not hidden on mobile)", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      currentSessionRuntime: { model: "claude-sonnet-4-5" },
+    })
+
+    expect(htmlElementForMarker(html, 'data-testid="model-indicator"')).not.toContain("hidden md:")
+  })
+
+  test("falls back to runtimeModel when currentSessionRuntime has no model", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      currentSessionRuntime: null,
+      runtimeModel: "opus",
+      runtimeProvider: "claude",
+    })
+
+    expect(html).toContain('data-testid="model-indicator"')
+    // Anthropic icon viewbox for claude provider
+    expect(html).toContain('viewBox="0 0 24 24"')
+  })
+
+  test("prefers polled model over runtimeModel when both available", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      currentSessionRuntime: { model: "gpt-5.4" },
+      runtimeModel: "opus",
+      runtimeProvider: "claude",
+    })
+
+    expect(html).toContain('data-testid="model-indicator"')
+    // Should use polled model (OpenAI icon for gpt-5.4), not runtimeModel
+    expect(html).toContain('viewBox="0 0 158.7128 157.296"')
+  })
+
+  test("hides model indicator when neither source provides a model", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      currentSessionRuntime: null,
+      runtimeModel: null,
+      runtimeProvider: null,
+    })
+
+    expect(html).not.toContain('data-testid="model-indicator"')
   })
 })
 

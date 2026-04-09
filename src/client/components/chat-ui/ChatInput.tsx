@@ -40,6 +40,7 @@ interface Props {
   chatId?: string | null
   connectionStatus: SocketStatus
   activeProvider: AgentProvider | null
+  runtimeModel?: string | null
   availableProviders: ProviderCatalogEntry[]
   availableSkills?: string[]
 }
@@ -71,13 +72,14 @@ function logChatInput(message: string, details?: unknown) {
 function createLockedComposerState(
   provider: AgentProvider,
   composerState: ComposerState,
-  providerDefaults: ReturnType<typeof useChatPreferencesStore.getState>["providerDefaults"]
+  providerDefaults: ReturnType<typeof useChatPreferencesStore.getState>["providerDefaults"],
+  runtimeModel?: string | null
 ): ComposerState {
   if (provider === "claude") {
     if (composerState.provider === "claude") {
       return {
         provider: "claude",
-        model: composerState.model,
+        model: runtimeModel ?? composerState.model,
         modelOptions: { ...composerState.modelOptions },
         planMode: composerState.planMode,
       }
@@ -85,7 +87,7 @@ function createLockedComposerState(
 
     return {
       provider: "claude",
-      model: providerDefaults.claude.model,
+      model: runtimeModel ?? providerDefaults.claude.model,
       modelOptions: { ...providerDefaults.claude.modelOptions },
       planMode: providerDefaults.claude.planMode,
     }
@@ -94,7 +96,7 @@ function createLockedComposerState(
   if (composerState.provider === "codex") {
     return {
       provider: "codex",
-      model: composerState.model,
+      model: runtimeModel ?? composerState.model,
       modelOptions: { ...composerState.modelOptions },
       planMode: composerState.planMode,
     }
@@ -102,7 +104,7 @@ function createLockedComposerState(
 
   return {
     provider: "codex",
-    model: providerDefaults.codex.model,
+    model: runtimeModel ?? providerDefaults.codex.model,
     modelOptions: { ...providerDefaults.codex.modelOptions },
     planMode: providerDefaults.codex.planMode,
   }
@@ -196,11 +198,12 @@ export function resolveComposerPreferences(args: {
   composerState: ComposerState
   providerDefaults: ReturnType<typeof useChatPreferencesStore.getState>["providerDefaults"]
   lockedOverrides: ComposerState | null
+  runtimeModel?: string | null
 }) {
   const providerLocked = args.activeProvider !== null
   const selectedProvider = args.activeProvider ?? args.composerState.provider
   const lockedBaseState = args.activeProvider
-    ? createLockedComposerState(args.activeProvider, args.composerState, args.providerDefaults)
+    ? createLockedComposerState(args.activeProvider, args.composerState, args.providerDefaults, args.runtimeModel)
     : null
   const providerPrefs = providerLocked
     ? args.lockedOverrides ?? lockedBaseState ?? args.composerState
@@ -229,6 +232,7 @@ interface ComposerPreferencesHandle {
 
 interface ComposerPreferencesProps {
   activeProvider: AgentProvider | null
+  runtimeModel?: string | null
   composerState: ComposerState
   providerDefaults: ReturnType<typeof useChatPreferencesStore.getState>["providerDefaults"]
   availableProviders: ProviderCatalogEntry[]
@@ -243,6 +247,7 @@ interface ComposerPreferencesProps {
 
 const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, ComposerPreferencesProps>(function ComposerPreferenceControls({
   activeProvider,
+  runtimeModel,
   composerState,
   providerDefaults,
   availableProviders,
@@ -260,6 +265,7 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
     composerState,
     providerDefaults,
     lockedOverrides,
+    runtimeModel,
   })
   const providerConfig = availableProviders.find((provider) => provider.id === resolved.selectedProvider) ?? availableProviders[0]
   const showPlanMode = providerConfig?.supportsPlanMode ?? false
@@ -389,6 +395,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   chatId,
   connectionStatus,
   activeProvider,
+  runtimeModel,
   availableProviders,
   availableSkills = [],
 }, forwardedRef) {
@@ -451,6 +458,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       composerState,
       providerDefaults,
       lockedOverrides: null,
+      runtimeModel,
     })
   }
 
@@ -841,6 +849,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
           key={composerControlsKey}
           ref={composerPreferencesRef}
           activeProvider={activeProvider}
+          runtimeModel={runtimeModel}
           composerState={composerState}
           providerDefaults={providerDefaults}
           availableProviders={availableProviders}

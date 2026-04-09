@@ -62,6 +62,85 @@ describe("resolveComposerPreferences", () => {
   })
 })
 
+describe("resolveComposerPreferences with runtimeModel", () => {
+  test("uses runtimeModel when provider is locked and composerState has a different model", () => {
+    const composerState: ComposerState = {
+      provider: "claude",
+      model: "sonnet",
+      modelOptions: { reasoningEffort: "high", contextWindow: "200k" },
+      planMode: false,
+    }
+
+    const resolved = resolveComposerPreferences({
+      activeProvider: "claude",
+      composerState,
+      providerDefaults: INITIAL_STATE.providerDefaults,
+      lockedOverrides: null,
+      runtimeModel: "opus",
+    })
+
+    expect(resolved.selectedProvider).toBe("claude")
+    expect(resolved.providerPrefs.model).toBe("opus")
+  })
+
+  test("uses runtimeModel even when composer provider differs from locked provider", () => {
+    const composerState: ComposerState = {
+      provider: "codex",
+      model: "gpt-5.4",
+      modelOptions: { reasoningEffort: "high", fastMode: false },
+      planMode: false,
+    }
+
+    const resolved = resolveComposerPreferences({
+      activeProvider: "claude",
+      composerState,
+      providerDefaults: INITIAL_STATE.providerDefaults,
+      lockedOverrides: null,
+      runtimeModel: "haiku",
+    })
+
+    expect(resolved.selectedProvider).toBe("claude")
+    expect(resolved.providerPrefs.model).toBe("haiku")
+  })
+
+  test("falls back to composerState model when no runtimeModel is provided", () => {
+    const composerState: ComposerState = {
+      provider: "claude",
+      model: "sonnet",
+      modelOptions: { reasoningEffort: "high", contextWindow: "200k" },
+      planMode: false,
+    }
+
+    const resolved = resolveComposerPreferences({
+      activeProvider: "claude",
+      composerState,
+      providerDefaults: INITIAL_STATE.providerDefaults,
+      lockedOverrides: null,
+    })
+
+    expect(resolved.providerPrefs.model).toBe("sonnet")
+  })
+
+  test("ignores runtimeModel when provider is not locked", () => {
+    const composerState: ComposerState = {
+      provider: "claude",
+      model: "sonnet",
+      modelOptions: { reasoningEffort: "high", contextWindow: "200k" },
+      planMode: false,
+    }
+
+    const resolved = resolveComposerPreferences({
+      activeProvider: null,
+      composerState,
+      providerDefaults: INITIAL_STATE.providerDefaults,
+      lockedOverrides: null,
+      runtimeModel: "opus",
+    })
+
+    expect(resolved.providerPrefs.model).toBe("sonnet")
+  })
+})
+
 describe("resolvePlanModeState", () => {
   test("updates composer plan mode when the provider is not locked", () => {
     const result = resolvePlanModeState({
