@@ -192,12 +192,13 @@ describe("LocalDev homepage", () => {
     expect(html).toContain('data-ui-id="home.project-secondary.action"')
     expect(html).toContain("Alpha")
     expect(html).toContain("/workspace/alpha")
-    expect(html).toContain("Project Overview")
-    expect(html).toContain("Continue")
-    expect(html).toContain("New Task")
+    expect(html).toContain("Active Project")
+    expect(html).toContain("Why now")
+    expect(html).toContain("Continue Fix homepage copy")
+    expect(html).toContain("Start Fresh Task")
     expect(html).toContain("Overview")
-    expect(html).toContain("Resume previous work")
-    expect(html).toContain("Pinned workspace")
+    expect(html).toContain("already has momentum")
+    expect(html).toContain("Pinned and ready")
 
     // Stats section is gone
     expect(html).not.toContain('data-ui-id="home.project-stats"')

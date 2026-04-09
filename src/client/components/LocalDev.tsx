@@ -13,7 +13,6 @@ import {
   Sparkles,
   ArrowRight,
   MessageSquarePlus,
-  Clock3,
 } from "lucide-react"
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
 import type {
@@ -133,6 +132,56 @@ function getSessionDisplayTitle(session: DiscoveredSession): string {
   if (session.title) return session.title
   if (session.lastExchange?.question) return session.lastExchange.question
   return session.sessionId
+}
+
+function truncateLabel(value: string, maxLength = 34): string {
+  if (value.length <= maxLength) return value
+  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
+}
+
+function getProjectTitle(project: LocalProjectsSnapshot["projects"][number]) {
+  return project.title || getPathBasename(project.localPath)
+}
+
+function getProjectPrimaryLabel(session: DiscoveredSession | null) {
+  if (!session) return "Open Project"
+  return `Continue ${truncateLabel(getSessionDisplayTitle(session), 28)}`
+}
+
+function getProjectSecondaryLabel(session: DiscoveredSession | null) {
+  return session ? "Start Fresh Task" : "Start First Task"
+}
+
+function getProjectOverviewSummary(
+  project: LocalProjectsSnapshot["projects"][number],
+  session: DiscoveredSession | null,
+) {
+  const projectTitle = getProjectTitle(project)
+  if (session) {
+    return `${projectTitle} already has momentum. Pick up the latest thread or open a fresh task without losing the project context.`
+  }
+
+  if (project.source === "saved") {
+    return `${projectTitle} is pinned and ready. Use it as the launch point for your next chat and project walkthrough.`
+  }
+
+  return `${projectTitle} was discovered from recent work. Review it here before deciding whether it deserves an active slot in your workspace.`
+}
+
+function getProjectWhyNow(
+  project: LocalProjectsSnapshot["projects"][number],
+  sessions: DiscoveredSession[],
+) {
+  const latestSession = sessions[0] ?? null
+  if (latestSession) {
+    return `Last thread: ${truncateLabel(getSessionDisplayTitle(latestSession), 56)}`
+  }
+
+  if (project.chatCount > 0) {
+    return `No recent session snapshot yet, but this workspace already has ${project.chatCount} saved ${project.chatCount === 1 ? "chat" : "chats"}.`
+  }
+
+  return "No conversation history yet. This is the cleanest place to start a new task."
 }
 
 export function getHomepageRecentSessions(
@@ -323,7 +372,6 @@ function RecentSessionRow({
 
 function ProjectCard({
   projectTitle,
-  title,
   localPath,
   source,
   chatCount,
@@ -335,7 +383,6 @@ function ProjectCard({
   onStartTask,
 }: {
   projectTitle: string
-  title: string
   localPath: string
   source: "saved" | "discovered"
   chatCount: number
@@ -347,9 +394,9 @@ function ProjectCard({
   onStartTask: () => void
 }) {
   const latestSession = sessions[0] ?? null
-  const sessionLabel = latestSession
-    ? getSessionDisplayTitle(latestSession)
-    : "No previous session yet"
+  const sessionLabel = latestSession ? getSessionDisplayTitle(latestSession) : "No previous session yet"
+  const primaryLabel = getProjectPrimaryLabel(latestSession)
+  const secondaryLabel = getProjectSecondaryLabel(latestSession)
 
   return (
     <Tooltip>
@@ -357,20 +404,30 @@ function ProjectCard({
         <div
           {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectCard)}
           className={cn(
-            "border group rounded-2xl bg-card p-4 text-left transition-colors",
+            "group rounded-[1.6rem] p-4 text-left transition-all duration-200",
             selected
-              ? "border-primary/40 bg-primary/[0.04]"
-              : "border-border hover:border-primary/30 hover:bg-muted/40",
+              ? "bg-[linear-gradient(180deg,rgba(242,114,109,0.12),rgba(255,255,255,0.96))] ring-1 ring-[color:var(--color-logo)]/25 shadow-[0_14px_40px_-28px_rgba(214,73,64,0.6)] dark:bg-[linear-gradient(180deg,rgba(242,114,109,0.16),rgba(46,42,42,0.92))]"
+              : "bg-card ring-1 ring-border hover:-translate-y-0.5 hover:ring-[color:var(--color-logo)]/20 hover:shadow-[0_14px_34px_-28px_rgba(42,32,29,0.45)]",
             loading && "opacity-50 cursor-not-allowed"
           )}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="mt-0.5 rounded-xl border border-border bg-background p-2">
+              <div className={cn(
+                "mt-0.5 rounded-2xl p-2.5",
+                selected ? "bg-background/80" : "bg-muted"
+              )}>
                 <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-medium text-foreground truncate">{projectTitle}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-foreground truncate">{projectTitle}</div>
+                  {selected ? (
+                    <span className="rounded-full bg-logo/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-logo">
+                      Active
+                    </span>
+                  ) : null}
+                </div>
                 <div className="mt-1 text-xs text-muted-foreground truncate">{localPath}</div>
               </div>
             </div>
@@ -379,26 +436,26 @@ function ProjectCard({
             ) : null}
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full border border-border bg-background px-2 py-0.5">
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full bg-background/80 px-2.5 py-1">
               {source === "saved" ? "Saved" : "Discovered"}
             </span>
-            <span className="rounded-full border border-border bg-background px-2 py-0.5">
+            <span className="rounded-full bg-background/80 px-2.5 py-1">
               {chatCount} {chatCount === 1 ? "chat" : "chats"}
             </span>
-            <span className="rounded-full border border-border bg-background px-2 py-0.5">
+            <span className="rounded-full bg-background/80 px-2.5 py-1">
               {sessions.length} {sessions.length === 1 ? "recent session" : "recent sessions"}
             </span>
           </div>
 
-          <div className="mt-4 rounded-xl border border-border/70 bg-background/70 p-3">
+          <div className="mt-4">
             <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Ready To Resume
+              Why open this now
             </div>
-            <div className="mt-1 truncate text-sm font-medium text-foreground">
+            <div className="mt-1 truncate text-base font-medium text-foreground">
               {sessionLabel}
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">
+            <div className="mt-1 text-sm text-muted-foreground">
               {latestSession
                 ? `Last active ${formatRelativeTime(latestSession.modifiedAt)}`
                 : "Open the project and start a first task from here."}
@@ -416,7 +473,7 @@ function ProjectCard({
               {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectPrimaryAction)}
             >
               <ArrowRight className="mr-1.5 h-4 w-4" />
-              {latestSession ? "Continue" : "Open Project"}
+              {primaryLabel}
             </Button>
             <Button
               size="sm"
@@ -429,7 +486,7 @@ function ProjectCard({
               {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectSecondaryAction)}
             >
               <MessageSquarePlus className="mr-1.5 h-4 w-4" />
-              New Task
+              {secondaryLabel}
             </Button>
             <Button
               size="sm"
@@ -468,79 +525,62 @@ function ProjectOverviewPanel({
 }) {
   const latestSession = sessions[0] ?? null
   const latestSessionTitle = latestSession ? getSessionDisplayTitle(latestSession) : "No previous session"
-  const projectTitle = project.title || getPathBasename(project.localPath)
+  const projectTitle = getProjectTitle(project)
+  const primaryLabel = getProjectPrimaryLabel(latestSession)
+  const secondaryLabel = getProjectSecondaryLabel(latestSession)
+  const summary = getProjectOverviewSummary(project, latestSession)
+  const whyNow = getProjectWhyNow(project, sessions)
 
   return (
-    <InfoCard>
-      <div
-        className="space-y-5"
-        {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectOverview)}
-      >
-        <div className="space-y-2">
-          <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-            Project Overview
+    <div
+      className="overflow-hidden rounded-[1.8rem] bg-[linear-gradient(160deg,rgba(242,114,109,0.14),rgba(249,247,243,0.98)_32%,rgba(255,255,255,0.98)_100%)] ring-1 ring-[color:var(--color-logo)]/18 shadow-[0_28px_80px_-52px_rgba(203,76,64,0.72)] dark:bg-[linear-gradient(160deg,rgba(242,114,109,0.2),rgba(44,39,39,0.95)_32%,rgba(31,28,28,0.95)_100%)]"
+      {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectOverview)}
+    >
+      <div className="space-y-6 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-background/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-logo">
+              <Search className="h-3.5 w-3.5" />
+              Active Project
+            </div>
+            <div>
+              <h3 className="text-[clamp(1.4rem,2vw,2rem)] font-semibold leading-tight text-foreground">{projectTitle}</h3>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{summary}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-semibold text-foreground">{projectTitle}</h3>
-            <p className="mt-1 text-sm text-muted-foreground break-all">{project.localPath}</p>
+          <div className="rounded-2xl bg-background/72 px-3 py-2 text-right backdrop-blur-sm">
+            <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Workspace</div>
+            <div className="mt-1 text-sm font-medium text-foreground">{project.source === "saved" ? "Pinned and ready" : "Discovered from recent activity"}</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border bg-background p-3">
-            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Entry Point</div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {latestSession ? "Resume previous work" : "Start first task"}
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-background p-3">
-            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Discovery</div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {project.source === "saved" ? "Pinned workspace" : "Recently discovered"}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border bg-background p-4">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
-            <Clock3 className="h-3.5 w-3.5" />
-            Latest Session
-          </div>
-          <div className="mt-2 text-sm font-medium text-foreground">{latestSessionTitle}</div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {latestSession
-              ? `Last touched ${formatRelativeTime(latestSession.modifiedAt)}. Use continue to pick up that thread, or start a fresh task while keeping this project as the active context.`
-              : "Use this project as the entry point for orientation, ownership lookup, and impact work. A new task will create the first chat for this workspace."}
-          </p>
+        <div className="rounded-[1.4rem] bg-background/78 p-4 backdrop-blur-sm">
+          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Why now</div>
+          <div className="mt-2 text-lg font-medium leading-7 text-foreground">{whyNow}</div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground break-all">{project.localPath}</p>
           {latestSession ? (
-            <SessionRuntimeBadges session={latestSession} className="mt-3 flex flex-wrap gap-1.5" />
+            <SessionRuntimeBadges session={latestSession} className="mt-4 flex flex-wrap gap-1.5" />
           ) : null}
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-border bg-background p-3">
-            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Chats</div>
-            <div className="mt-1 text-lg font-semibold text-foreground">{project.chatCount}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-background p-3">
-            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Sessions</div>
-            <div className="mt-1 text-lg font-semibold text-foreground">{sessions.length}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-background p-3">
-            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Last Opened</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">
-              {project.lastOpenedAt ? formatRelativeTime(project.lastOpenedAt) : "Not yet"}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-          Homepage preview stays lightweight on purpose. Use this project as the launch point for architecture overview, ownership checks, and impact inspection inside chat.
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="rounded-full bg-background/72 px-2.5 py-1">
+            {project.chatCount} {project.chatCount === 1 ? "chat" : "chats"}
+          </span>
+          <span className="rounded-full bg-background/72 px-2.5 py-1">
+            {sessions.length} {sessions.length === 1 ? "recent session" : "recent sessions"}
+          </span>
+          <span className="rounded-full bg-background/72 px-2.5 py-1">
+            {project.lastOpenedAt ? `Opened ${formatRelativeTime(project.lastOpenedAt)}` : "Not opened recently"}
+          </span>
+          <span className="rounded-full bg-background/72 px-2.5 py-1">
+            {latestSession ? latestSessionTitle : "Fresh workspace"}
+          </span>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Button
-            className="flex-1 min-w-[10rem]"
+            className="flex-1 min-w-[12rem]"
             disabled={loading}
             onClick={() => {
               onContinue()
@@ -548,11 +588,11 @@ function ProjectOverviewPanel({
             {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectPrimaryAction)}
           >
             <ArrowRight className="mr-1.5 h-4 w-4" />
-            {latestSession ? "Continue Latest Session" : "Open Project"}
+            {primaryLabel}
           </Button>
           <Button
             variant="outline"
-            className="flex-1 min-w-[10rem]"
+            className="flex-1 min-w-[12rem] bg-background/72"
             disabled={loading}
             onClick={() => {
               onStartTask()
@@ -560,11 +600,28 @@ function ProjectOverviewPanel({
             {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectSecondaryAction)}
           >
             <BadgePlus className="mr-1.5 h-4 w-4" />
-            Start New Task
+            {secondaryLabel}
           </Button>
         </div>
+
+        <div className="grid gap-3 border-t border-foreground/8 pt-4 text-sm text-muted-foreground sm:grid-cols-[1.1fr_0.9fr]">
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Best next move</div>
+            <p className="mt-2 leading-6">
+              {latestSession
+                ? "Resume the current thread if you already know the context. Start fresh if the next task needs a cleaner frame."
+                : "Open this workspace to establish context first, then use the first task to seed the project's working thread."}
+            </p>
+          </div>
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Orientation</div>
+            <p className="mt-2 leading-6">
+              Use this pane to decide whether the project is active, stale, or worth reviving before you commit a new chat to it.
+            </p>
+          </div>
+        </div>
       </div>
-    </InfoCard>
+    </div>
   )
 }
 
@@ -659,6 +716,7 @@ export function LocalDev({
           <PageHeader
             uiId={LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.header}
             title={snapshot?.machine.displayName ?? "Local Projects"}
+            subtitle="Pick up the right thread, choose the right workspace, and get just enough orientation before you dive back into chat."
           />
 
           <div className="w-full px-6 mb-10">
@@ -706,7 +764,6 @@ export function LocalDev({
                       <ProjectCard
                         key={project.localPath}
                         projectTitle={projectTitle}
-                        title={project.title}
                         localPath={project.localPath}
                         source={project.source}
                         chatCount={project.chatCount}
