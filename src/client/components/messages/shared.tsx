@@ -31,7 +31,8 @@ import {
   Check,
 } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { parseLocalFileLink } from "../../lib/pathUtils"
+import { parseLocalFileLink, stripWorkspacePath } from "../../lib/pathUtils"
+import { formatBashCommandTitle, toTitleCase } from "../../lib/formatters"
 import { RichContentBlock } from "../rich-content/RichContentBlock"
 import { EmbedRenderer, isEmbedLanguage } from "../rich-content/EmbedRenderer"
 import { highlight } from "sugar-high"
@@ -94,6 +95,32 @@ export function getToolIcon(toolName: string): LucideIcon {
     return toolIcons[toolName]
   }
   return defaultToolIcon
+}
+
+// Derive a human-readable label for a tool call message.
+// Shared between ToolCallMessage (detailed view) and WipBlock (compact timeline).
+export function getToolLabel(message: import("./types").ProcessedToolCall, localPath?: string | null): string {
+  if (message.toolKind === "skill") return message.input.skill
+  if (message.toolKind === "glob") {
+    return `Search files ${message.input.pattern === "**/*" ? "in all directories" : `matching ${message.input.pattern}`}`
+  }
+  if (message.toolKind === "grep") {
+    const pattern = message.input.pattern
+    const outputMode = message.input.outputMode
+    if (outputMode === "count") return `Count \`${pattern}\` occurrences`
+    if (outputMode === "content") return `Find \`${pattern}\` in text`
+    return `Find \`${pattern}\` in files`
+  }
+  if (message.toolKind === "bash") {
+    return message.input.description || (message.input.command ? formatBashCommandTitle(message.input.command) : "Bash")
+  }
+  if (message.toolKind === "web_search") return message.input.query || "Web Search"
+  if (message.toolKind === "read_file") return `Read ${stripWorkspacePath(message.input.filePath, localPath)}`
+  if (message.toolKind === "write_file") return `Write ${stripWorkspacePath(message.input.filePath, localPath)}`
+  if (message.toolKind === "edit_file") return `Edit ${stripWorkspacePath(message.input.filePath, localPath)}`
+  if (message.toolKind === "mcp_generic") return `${toTitleCase(message.input.tool)} from ${toTitleCase(message.input.server)}`
+  if (message.toolKind === "subagent_task") return message.input.subagentType || message.toolName
+  return message.toolName
 }
 
 // Container for meta-style messages (system, tool, result)

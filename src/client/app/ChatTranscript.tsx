@@ -22,6 +22,7 @@ const ExitPlanModeMessage = lazy(() => import("../components/messages/ExitPlanMo
 const CompactSummaryMessage = lazy(() => import("../components/messages/CompactSummaryMessage").then(m => ({ default: m.CompactSummaryMessage })))
 import { StatusMessage } from "../components/messages/StatusMessage"
 import { CollapsedToolGroup } from "../components/messages/CollapsedToolGroup"
+import { WipBlock } from "../components/messages/WipBlock"
 import { OpenLocalLinkProvider } from "../components/messages/shared"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
 import { SPECIAL_TOOL_NAMES } from "./derived"
@@ -32,12 +33,56 @@ function isCollapsibleToolCall(message: HydratedTranscriptMessage) {
   return !SPECIAL_TOOL_NAMES.has(toolName)
 }
 
-function groupMessages(messages: HydratedTranscriptMessage[]): RenderItem[] {
+// Find the index of the "answer" assistant_text — the last one NOT followed by any tool call.
+// This message renders as a full TextMessage; everything before it is narration.
+function findAnswerIndex(messages: HydratedTranscriptMessage[], isLoading: boolean): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].kind !== "assistant_text") continue
+    if (!isLoading) return i // turn done: last assistant_text is always the answer
+    // live turn: only if no tool call follows
+    let hasToolAfter = false
+    for (let j = i + 1; j < messages.length; j++) {
+      if (messages[j].kind === "tool") { hasToolAfter = true; break }
+    }
+    if (!hasToolAfter) return i
+    break
+  }
+  return -1
+}
+
+function isWipAbsorbable(message: HydratedTranscriptMessage): boolean {
+  return message.kind === "assistant_text" || isCollapsibleToolCall(message)
+}
+
+export function groupMessages(messages: HydratedTranscriptMessage[], isLoading: boolean): RenderItem[] {
   const result: RenderItem[] = []
+  const answerIndex = findAnswerIndex(messages, isLoading)
   let index = 0
 
   while (index < messages.length) {
     const message = messages[index]
+
+    // Try to start a WIP block: assistant_text that isn't the answer
+    if (message.kind === "assistant_text" && index !== answerIndex) {
+      const steps: HydratedTranscriptMessage[] = [message]
+      const startIndex = index
+      index += 1
+
+      // Absorb consecutive narration + collapsible tools
+      while (index < messages.length && index !== answerIndex && isWipAbsorbable(messages[index])) {
+        steps.push(messages[index])
+        index += 1
+      }
+
+      if (steps.length >= 2) {
+        result.push({ type: "wip-block", steps, startIndex })
+      } else {
+        result.push({ type: "single", message, index: startIndex })
+      }
+      continue
+    }
+
+    // Existing: group consecutive collapsible tool calls (outside narration context)
     if (isCollapsibleToolCall(message)) {
       const group: HydratedTranscriptMessage[] = [message]
       const startIndex = index
@@ -62,11 +107,11 @@ function groupMessages(messages: HydratedTranscriptMessage[]): RenderItem[] {
 }
 
 export function getRenderItemIndexForMessageId(renderItems: RenderItem[], messageId: string): number {
-  return renderItems.findIndex((item) => (
-    item.type === "tool-group"
-      ? item.messages.some((message) => message.id === messageId)
-      : item.message.id === messageId
-  ))
+  return renderItems.findIndex((item) => {
+    if (item.type === "tool-group") return item.messages.some((m) => m.id === messageId)
+    if (item.type === "wip-block") return item.steps.some((m) => m.id === messageId)
+    return item.message.id === messageId
+  })
 }
 
 interface ChatTranscriptProps {
@@ -108,7 +153,7 @@ export function ChatTranscript({
     return { systemInit, accountInfo }
   }, [messages])
 
-  const renderItems = useMemo(() => groupMessages(messages), [messages])
+  const renderItems = useMemo(() => groupMessages(messages, isLoading), [messages, isLoading])
 
   const { estimateSize } = useMessageHeights(renderItems, scrollRef)
 
@@ -228,6 +273,30 @@ export function ChatTranscript({
                   {...{ [CHAT_SELECTION_ZONE_ATTRIBUTE]: "" }}
                 >
                   <CollapsedToolGroup messages={item.messages} isLoading={isLoading} localPath={localPath} />
+                </div>
+              </div>
+            )
+          }
+
+          if (item.type === "wip-block") {
+            return (
+              <div
+                key={virtualRow.key}
+                ref={virtualizer.measureElement}
+                data-index={virtualRow.index}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <div
+                  className="group relative pb-5"
+                  {...{ [CHAT_SELECTION_ZONE_ATTRIBUTE]: "" }}
+                >
+                  <WipBlock steps={item.steps} isLoading={isLoading} localPath={localPath} />
                 </div>
               </div>
             )

@@ -26,6 +26,7 @@ const KIND_FALLBACKS: Partial<Record<HydratedTranscriptMessage["kind"], number>>
 }
 
 const TOOL_GROUP_FALLBACK = 64
+const WIP_BLOCK_FALLBACK = 72
 const MAX_CACHE_SIZE = 500
 
 // LRU cache: Map preserves insertion order, delete+set moves to end
@@ -93,6 +94,7 @@ export function estimateMessageHeight(
 export type RenderItem =
   | { type: "single"; message: HydratedTranscriptMessage; index: number }
   | { type: "tool-group"; messages: HydratedTranscriptMessage[]; startIndex: number }
+  | { type: "wip-block"; steps: HydratedTranscriptMessage[]; startIndex: number }
 
 export function estimateRenderItemHeight(
   item: RenderItem,
@@ -100,6 +102,7 @@ export function estimateRenderItemHeight(
   fontReady: boolean,
 ): number {
   if (item.type === "tool-group") return TOOL_GROUP_FALLBACK
+  if (item.type === "wip-block") return WIP_BLOCK_FALLBACK
   return estimateMessageHeight(item.message, containerWidth, fontReady)
 }
 

@@ -183,4 +183,14 @@ describe("estimateRenderItemHeight", () => {
     const height = estimateRenderItemHeight(item, 800, true)
     expect(height).toBe(140) // 120 + 20 padding
   })
+
+  test("wip-block returns fixed fallback height", () => {
+    const item = {
+      type: "wip-block" as const,
+      steps: [makeText("Narration"), makeToolCall()],
+      startIndex: 0,
+    }
+
+    expect(estimateRenderItemHeight(item, 800, true)).toBe(72)
+  })
 })
