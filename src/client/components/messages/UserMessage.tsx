@@ -56,17 +56,19 @@ export const UserMessage = memo(function UserMessage({ content }: Props) {
           <Button
             type="button"
             variant="ghost"
-            size="sm"
+            size="icon"
             className={cn(
-              "absolute -top-3 right-3 z-10 h-8 min-w-20 rounded-full border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-sm shadow-black/5",
+              "absolute top-2 right-2 z-10 h-7 w-7 rounded-full border border-border/50 bg-background/80 p-0 text-muted-foreground backdrop-blur-sm",
+              "opacity-0 transition-opacity duration-150",
+              "group-hover/user-message:opacity-100",
+              "group-active/user-message:opacity-100",
               !copied && "hover:border-foreground/20 hover:bg-background hover:text-foreground",
-              copied && "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:!bg-emerald-500/10 hover:!border-emerald-500/30"
+              copied && "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 !opacity-100"
             )}
             aria-label={copied ? "Copied prompt" : "Copy prompt"}
             onClick={handleCopy}
           >
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            <span>{copied ? "Copied" : "Copy"}</span>
+            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           </Button>
           <div className="rounded-[20px] py-1.5 px-3.5 bg-muted text-primary border border-border prose prose-sm prose-invert break-normal [overflow-wrap:break-word] [&_p]:whitespace-pre-line [&_p]:break-normal [&_p]:[overflow-wrap:break-word]">
             <Markdown remarkPlugins={[remarkGfm]} components={createMarkdownComponents()}>{parsed.content}</Markdown>

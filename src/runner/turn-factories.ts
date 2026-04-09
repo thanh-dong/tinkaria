@@ -6,7 +6,7 @@
  * importing the full AgentCoordinator.
  */
 
-export { startClaudeTurn } from "../server/agent"
+export { startClaudeTurn } from "../server/claude-harness"
 
 import { CodexAppServerManager } from "../server/codex-app-server"
 import type { HarnessToolRequest, HarnessTurn } from "../shared/harness-types"

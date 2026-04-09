@@ -56,7 +56,8 @@ describe("ChatInput", () => {
     )
 
     expect(html).toContain("Reconnecting")
-    expect(html).toContain("bg-amber-500")
+    expect(html).toContain("text-amber-600")
+    expect(html).toContain("border-amber-400/30")
     expect(html).not.toContain("transcript.message-list")
   })
 })

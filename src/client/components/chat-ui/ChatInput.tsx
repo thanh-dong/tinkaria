@@ -717,32 +717,30 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
           {...getUiIdentityAttributeProps(composerAreaDescriptor)}
           className={cn(
             "max-w-[840px] mx-auto rounded-[29px] border pr-1.5 dark:bg-card/40 backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
-            reconnectVisualState === "reconnecting" && "border-amber-400/80 shadow-[0_0_0_1px_rgba(251,146,60,0.18)]",
-            reconnectVisualState === "reconnected" && "border-emerald-400/80 shadow-[0_0_0_1px_rgba(52,211,153,0.16)]",
+            reconnectVisualState === "reconnecting" && "border-amber-400/30",
+            reconnectVisualState === "reconnected" && "border-emerald-400/30",
             reconnectVisualState === "idle" && "border-border",
           )}
         >
           <div className="flex flex-col gap-1.5">
             {showConnectionBadge ? (
-              <div className="flex justify-end pt-2 pr-2">
+              <div className="flex justify-end pt-1.5 pr-3">
                 <div
                   {...getUiIdentityAttributeProps(connectionBadgeDescriptor)}
                   className={cn(
-                    "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] transition-all duration-300",
+                    "inline-flex items-center gap-1.5 text-[10px] font-medium transition-opacity duration-300",
                     reconnectVisualState === "reconnecting"
-                      && "border-amber-400/60 bg-amber-100/80 text-amber-800 dark:border-amber-300/40 dark:bg-amber-500/15 dark:text-amber-100",
+                      && "text-amber-600 dark:text-amber-300/70",
                     reconnectVisualState === "reconnected"
-                      && "border-emerald-400/60 bg-emerald-100/80 text-emerald-800 dark:border-emerald-300/40 dark:bg-emerald-500/15 dark:text-emerald-100 opacity-70",
+                      && "text-emerald-600 dark:text-emerald-300/60 opacity-60",
                   )}
                 >
                   {reconnectVisualState === "reconnecting" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
-                    <Check className="h-3.5 w-3.5" />
+                    <Check className="h-3 w-3" />
                   )}
-                  <span className={cn(reconnectVisualState === "reconnecting" && "animate-pulse")}>
-                    {connectionBadgeLabel}
-                  </span>
+                  <span>{connectionBadgeLabel}</span>
                 </div>
               </div>
             ) : null}
@@ -777,11 +775,8 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                     size="icon"
                     className={cn(
                       "flex-shrink-0 rounded-full h-10 w-10 md:h-11 md:w-11 touch-manipulation transition-colors",
-                      reconnectVisualState === "reconnecting"
-                        ? "bg-amber-500 text-white animate-pulse disabled:bg-amber-500 disabled:text-white"
-                        : reconnectVisualState === "reconnected"
-                          ? "bg-emerald-500 text-white disabled:bg-emerald-500 disabled:text-white"
-                          : "bg-slate-600 text-white dark:bg-white dark:text-slate-900",
+                      "bg-slate-600 text-white dark:bg-white dark:text-slate-900",
+                      reconnectVisualState === "reconnecting" && "disabled:opacity-60",
                     )}
                   >
                     <div className="w-3 h-3 md:w-4 md:h-4 rounded-xs bg-current" />
@@ -799,11 +794,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                     size="icon"
                     className={cn(
                       "h-10 w-10 rounded-full md:h-11 md:w-11 transition-colors",
-                      reconnectVisualState === "reconnecting"
-                        ? "bg-amber-500 text-white animate-pulse disabled:bg-amber-500 disabled:text-white"
-                        : reconnectVisualState === "reconnected"
-                          ? "bg-emerald-500 text-white disabled:bg-emerald-500 disabled:text-white"
-                          : "",
+                      reconnectVisualState === "reconnecting" && "disabled:opacity-60",
                     )}
                   >
                     <ClockPlus className="h-4 w-4" />
@@ -823,11 +814,8 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                   size="icon"
                   className={cn(
                     "flex-shrink-0 rounded-full h-10 w-10 md:h-11 md:w-11 mb-1 -mr-0.5 md:mr-0 md:mb-1.5 touch-manipulation transition-colors",
-                    reconnectVisualState === "reconnecting"
-                      ? "bg-amber-500 text-white animate-pulse disabled:bg-amber-500 disabled:text-white"
-                      : reconnectVisualState === "reconnected"
-                        ? "bg-emerald-500 text-white disabled:bg-emerald-500 disabled:text-white"
-                        : "bg-slate-600 text-white dark:bg-white dark:text-slate-900 disabled:bg-white/60 disabled:text-slate-700",
+                    "bg-slate-600 text-white dark:bg-white dark:text-slate-900 disabled:bg-white/60 disabled:text-slate-700",
+                    reconnectVisualState === "reconnecting" && "disabled:opacity-60",
                   )}
                 >
                   {reconnectVisualState === "reconnecting" ? (

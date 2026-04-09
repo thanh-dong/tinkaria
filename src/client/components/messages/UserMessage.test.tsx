@@ -14,7 +14,8 @@ describe("UserMessage", () => {
     const html = renderToStaticMarkup(<UserMessage content={"copy me"} />)
 
     expect(html).toContain('aria-label="Copy prompt"')
-    expect(html).toContain(">Copy<")
+    expect(html).toContain("opacity-0")
+    expect(html).toContain("group-hover/user-message:opacity-100")
   })
 
   test("copies the normalized prompt content when clipboard access succeeds", async () => {
