@@ -207,9 +207,7 @@ export async function startServer(options: StartServerOptions = {}) {
     publishMessage(chatId, entry)
     sessionIndex.onMessageAppended(chatId, entry, store.state)
     transcriptSearch.addEntry(chatId, entry)
-    if (entry.kind === "result") {
-      orchestrator.onMessageAppended(chatId, entry)
-    }
+    orchestrator.onMessageAppended(chatId, entry)
   }
 
   // Coordinator: RunnerProxy (split mode) or AgentCoordinator (in-process)

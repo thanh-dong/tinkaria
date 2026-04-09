@@ -35,6 +35,7 @@ describe("getWebContextPrompt", () => {
     for (const provider of ["claude", "codex"] as const) {
       const prompt = getWebContextPrompt(provider)
       expect(prompt).toContain("spawn_agent")
+      expect(prompt).toContain("list_agents")
       expect(prompt).toContain("fork_context")
       expect(prompt).toContain("send_input")
       expect(prompt).toContain("wait_agent")

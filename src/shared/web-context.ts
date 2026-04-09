@@ -26,6 +26,7 @@ export function getWebContextPrompt(
     "Plan mode renders a visual approval UI with approve/reject controls.",
     "Cross-session agent work is explicit orchestration between separate chats in the same project, not hidden shared memory.",
     "spawn_agent creates a child session — its final turn result is what wait_agent returns. Instruct children to end with a structured report.",
+    "list_agents returns the caller's current spawned-agent tree with statuses so you can inspect what is running before steering or waiting.",
     "send_input sends follow-up messages to a child to steer, accumulate incremental results, or request a summary. The child resumes with full context.",
     "wait_agent blocks until the child completes its current turn. Call it after each send_input for iterative exchanges.",
     "close_agent disposes the child session — always close when done.",

@@ -212,6 +212,27 @@ export function normalizeToolCall(args: {
     }
   }
 
+  if (
+    toolName === "spawn_agent"
+    || toolName === "list_agents"
+    || toolName === "send_input"
+    || toolName === "wait_agent"
+    || toolName === "close_agent"
+  ) {
+    return {
+      kind: "tool",
+      toolKind: "mcp_generic",
+      toolName,
+      toolId,
+      input: {
+        server: "session-orchestration",
+        tool: toolName,
+        payload: input,
+      },
+      rawInput: input,
+    }
+  }
+
   if (typeof input.subagent_type === "string") {
     return {
       kind: "tool",

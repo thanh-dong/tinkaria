@@ -479,6 +479,7 @@ export class AgentCoordinator {
       }
       await this.store.setChatProvider(args.chatId, args.provider)
     }
+    await this.store.setChatModel(args.chatId, args.model)
     await this.store.setPlanMode(args.chatId, args.planMode)
 
     const existingMessages = this.store.getMessages(args.chatId)
@@ -548,6 +549,8 @@ export class AgentCoordinator {
           serviceTier: args.serviceTier,
           planMode: args.planMode,
           skills,
+          orchestrator: this.orchestrator,
+          orchestrationChatId: args.chatId,
           onToolRequest,
         })
       } catch (error) {

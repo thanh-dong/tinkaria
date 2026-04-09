@@ -22,6 +22,7 @@ import {
   type CommandExecutionApprovalDecision,
   type CommandExecutionRequestApprovalParams,
   type CommandExecutionRequestApprovalResponse,
+  type DynamicToolDefinition,
   type DynamicToolCallOutputContentItem,
   type DynamicToolCallResponse,
   type FileChangeApprovalDecision,
@@ -88,6 +89,12 @@ interface PendingTurn {
   todoSequence: number
   pendingWebSearchResultToolId: string | null
   resolved: boolean
+  orchestration:
+    | {
+        callerChatId: string
+        tools: CodexOrchestrationToolHost
+      }
+    | null
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   onApprovalRequest?: (
     request:
@@ -102,6 +109,26 @@ interface PendingTurn {
           params: FileChangeRequestApprovalParams
         }
   ) => Promise<CommandExecutionApprovalDecision | FileChangeApprovalDecision>
+}
+
+interface CodexOrchestrationToolHost {
+  spawnAgent(
+    callerChatId: string,
+    args: { instruction: string; provider?: "claude" | "codex"; model?: string; forkContext?: boolean },
+  ): Promise<{ chatId: string }>
+  listAgents(chatId: string): unknown
+  sendInput(
+    callerChatId: string,
+    args: { targetChatId: string; content: string; model?: string },
+  ): Promise<void>
+  waitForResult(
+    callerChatId: string,
+    args: { targetChatId: string; timeoutMs?: number },
+  ): Promise<{ result: string; isError: boolean }>
+  closeAgent(
+    callerChatId: string,
+    args: { targetChatId: string },
+  ): Promise<void>
 }
 
 interface SessionContext {
@@ -132,6 +159,8 @@ export interface StartCodexTurnArgs {
   content: string
   planMode: boolean
   skills?: string[]
+  orchestrator?: CodexOrchestrationToolHost
+  orchestrationChatId?: string
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   onApprovalRequest?: PendingTurn["onApprovalRequest"]
 }
@@ -276,6 +305,98 @@ function dynamicToolPayload(value: Record<string, unknown> | unknown[] | string 
   return { value }
 }
 
+function dynamicToolDefinitions(args: StartCodexTurnArgs): DynamicToolDefinition[] | undefined {
+  if (args.advertiseDynamicTools === false) return undefined
+
+  const tools: DynamicToolDefinition[] = [
+    {
+      name: "present_content",
+      description: "Present a structured content artifact in the transcript.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          kind: { type: "string", enum: ["markdown", "code", "diagram"] },
+          format: { type: "string" },
+          source: { type: "string" },
+          summary: { type: "string" },
+          collapsed: { type: "boolean" },
+        },
+        required: ["title", "kind", "format", "source"],
+        additionalProperties: false,
+      },
+    },
+  ]
+
+  if (args.orchestrator && args.orchestrationChatId) {
+    tools.push(
+      {
+        name: "spawn_agent",
+        description: "Spawn a new agent session in the same project. Returns the new session's chatId.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            instruction: { type: "string" },
+            provider: { type: "string", enum: ["claude", "codex"] },
+            fork_context: { type: "boolean" },
+          },
+          required: ["instruction"],
+          additionalProperties: false,
+        },
+      },
+      {
+        name: "list_agents",
+        description: "List the current caller's spawned agent tree and statuses.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          additionalProperties: false,
+        },
+      },
+      {
+        name: "send_input",
+        description: "Send a follow-up message to an existing steered session.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            targetChatId: { type: "string" },
+            content: { type: "string" },
+          },
+          required: ["targetChatId", "content"],
+          additionalProperties: false,
+        },
+      },
+      {
+        name: "wait_agent",
+        description: "Block until a steered session completes its current turn.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            targetChatId: { type: "string" },
+            timeoutMs: { type: "number" },
+          },
+          required: ["targetChatId"],
+          additionalProperties: false,
+        },
+      },
+      {
+        name: "close_agent",
+        description: "Dispose a steered session and free resources.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            targetChatId: { type: "string" },
+          },
+          required: ["targetChatId"],
+          additionalProperties: false,
+        },
+      },
+    )
+  }
+
+  return tools
+}
+
 const presentContentSchema = z.object({
   title: z.string(),
   kind: z.enum(["markdown", "code", "diagram"]),
@@ -304,6 +425,17 @@ function presentContentToolCall(toolId: string, input: Record<string, unknown>):
     kind: "tool_call",
     tool: normalizeToolCall({
       toolName: "present_content",
+      toolId,
+      input,
+    }),
+  })
+}
+
+function orchestrationToolCall(toolId: string, toolName: string, input: Record<string, unknown>): TranscriptEntry {
+  return timestamped({
+    kind: "tool_call",
+    tool: normalizeToolCall({
+      toolName,
       toolId,
       input,
     }),
@@ -790,13 +922,20 @@ export class CodexAppServerManager {
       todoSequence: 0,
       pendingWebSearchResultToolId: null,
       resolved: false,
+      orchestration: args.orchestrator && args.orchestrationChatId
+        ? {
+            callerChatId: args.orchestrationChatId,
+            tools: args.orchestrator,
+          }
+        : null,
       onToolRequest: args.onToolRequest,
       onApprovalRequest: args.onApprovalRequest,
     }
     context.pendingTurn = pendingTurn
 
     try {
-      const shouldAdvertiseDynamicTools = args.advertiseDynamicTools !== false
+      const dynamicTools = dynamicToolDefinitions(args)
+      const shouldAdvertiseDynamicTools = Boolean(dynamicTools?.length)
       const response = await this.sendRequest<TurnStartResponse>(context, "turn/start", {
         threadId: context.sessionToken ?? "",
         input: [
@@ -810,29 +949,7 @@ export class CodexAppServerManager {
         model: args.model,
         effort: args.effort,
         serviceTier: args.serviceTier,
-        ...(shouldAdvertiseDynamicTools
-          ? {
-              dynamicTools: [
-                {
-                  name: "present_content",
-                  description: "Present a structured content artifact in the transcript.",
-                  inputSchema: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      kind: { type: "string", enum: ["markdown", "code", "diagram"] },
-                      format: { type: "string" },
-                      source: { type: "string" },
-                      summary: { type: "string" },
-                      collapsed: { type: "boolean" },
-                    },
-                    required: ["title", "kind", "format", "source"],
-                    additionalProperties: false,
-                  },
-                },
-              ],
-            }
-          : {}),
+        ...(shouldAdvertiseDynamicTools ? { dynamicTools } : {}),
         collaborationMode: {
           mode: args.planMode ? "plan" : "default",
           settings: {
@@ -1153,6 +1270,10 @@ export class CodexAppServerManager {
         return
       }
 
+      if (await this.handleOrchestrationToolCall(context, pendingTurn, request)) {
+        return
+      }
+
       const payload = dynamicToolPayload(request.params.arguments)
       pendingTurn.queue.push({
         type: "transcript",
@@ -1204,6 +1325,111 @@ export class CodexAppServerManager {
         decision,
       } satisfies FileChangeRequestApprovalResponse,
     })
+  }
+
+  private async handleOrchestrationToolCall(
+    context: SessionContext,
+    pendingTurn: PendingTurn,
+    request: Extract<ServerRequest, { method: "item/tool/call" }>,
+  ): Promise<boolean> {
+    const orchestration = pendingTurn.orchestration
+    if (!orchestration) return false
+
+    const payload = dynamicToolPayload(request.params.arguments)
+    const toolName = request.params.tool
+    if (
+      toolName !== "spawn_agent"
+      && toolName !== "list_agents"
+      && toolName !== "send_input"
+      && toolName !== "wait_agent"
+      && toolName !== "close_agent"
+    ) {
+      return false
+    }
+
+    pendingTurn.queue.push({
+      type: "transcript",
+      entry: orchestrationToolCall(request.params.callId, toolName, payload),
+    })
+
+    try {
+      let result: unknown
+      let isError = false
+
+      switch (toolName) {
+        case "spawn_agent":
+          result = await orchestration.tools.spawnAgent(orchestration.callerChatId, {
+            instruction: typeof payload.instruction === "string" ? payload.instruction : "",
+            provider: payload.provider === "claude" || payload.provider === "codex" ? payload.provider : undefined,
+            model: typeof payload.model === "string" ? payload.model : undefined,
+            forkContext: typeof payload.fork_context === "boolean" ? payload.fork_context : undefined,
+          })
+          break
+        case "list_agents":
+          result = orchestration.tools.listAgents(orchestration.callerChatId)
+          break
+        case "send_input":
+          await orchestration.tools.sendInput(orchestration.callerChatId, {
+            targetChatId: typeof payload.targetChatId === "string" ? payload.targetChatId : "",
+            content: typeof payload.content === "string" ? payload.content : "",
+            model: typeof payload.model === "string" ? payload.model : undefined,
+          })
+          result = "Input sent"
+          break
+        case "wait_agent": {
+          const waitResult = await orchestration.tools.waitForResult(orchestration.callerChatId, {
+            targetChatId: typeof payload.targetChatId === "string" ? payload.targetChatId : "",
+            timeoutMs: typeof payload.timeoutMs === "number" ? payload.timeoutMs : undefined,
+          })
+          result = waitResult
+          isError = waitResult.isError
+          break
+        }
+        case "close_agent":
+          await orchestration.tools.closeAgent(orchestration.callerChatId, {
+            targetChatId: typeof payload.targetChatId === "string" ? payload.targetChatId : "",
+          })
+          result = "Agent closed"
+          break
+      }
+
+      pendingTurn.queue.push({
+        type: "transcript",
+        entry: timestamped({
+          kind: "tool_result",
+          toolId: request.params.callId,
+          content: result,
+          isError,
+        }),
+      })
+      this.writeMessage(context, {
+        id: request.id,
+        result: {
+          contentItems: [{ type: "inputText", text: typeof result === "string" ? result : JSON.stringify(result) }],
+          success: !isError,
+        } satisfies DynamicToolCallResponse,
+      })
+    } catch (error) {
+      const message = errorMessage(error)
+      pendingTurn.queue.push({
+        type: "transcript",
+        entry: timestamped({
+          kind: "tool_result",
+          toolId: request.params.callId,
+          content: message,
+          isError: true,
+        }),
+      })
+      this.writeMessage(context, {
+        id: request.id,
+        result: {
+          contentItems: [{ type: "inputText", text: message }],
+          success: false,
+        } satisfies DynamicToolCallResponse,
+      })
+    }
+
+    return true
   }
 
   private async handleNotification(context: SessionContext, notification: ServerNotification) {

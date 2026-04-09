@@ -338,6 +338,70 @@ describe("CodexAppServerManager", () => {
     await collectStream(turn.stream)
   })
 
+  test("advertises session orchestration tools on turn start when available", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+      } else if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+      } else if (message.method === "turn/start") {
+        expect(message.params.dynamicTools).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: "present_content" }),
+            expect.objectContaining({ name: "spawn_agent" }),
+            expect.objectContaining({ name: "list_agents" }),
+            expect.objectContaining({ name: "send_input" }),
+            expect.objectContaining({ name: "wait_agent" }),
+            expect.objectContaining({ name: "close_agent" }),
+          ]),
+        )
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "completed", error: null } },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "delegate work",
+      planMode: false,
+      orchestrator: {
+        async spawnAgent() { return { chatId: "child-1" } },
+        listAgents() { return { children: [] } },
+        async sendInput() {},
+        async waitForResult() { return { result: "done", isError: false } },
+        async closeAgent() {},
+      },
+      orchestrationChatId: "chat-1",
+      onToolRequest: async () => ({}),
+    })
+
+    await collectStream(turn.stream)
+  })
+
   test("generateStructured returns the final assistant JSON and stops the transient session", async () => {
     const process = new FakeCodexProcess((message, child) => {
       if (message.method === "initialize") {
@@ -1382,6 +1446,173 @@ describe("CodexAppServerManager", () => {
         success: true,
       },
     })
+  })
+
+  test("routes session orchestration dynamic tools through the shared orchestrator", async () => {
+    const spawnCalls: unknown[] = []
+    const sendCalls: unknown[] = []
+    const waitCalls: unknown[] = []
+    const closeCalls: unknown[] = []
+    const listCalls: string[] = []
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+        return
+      }
+      if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+        return
+      }
+      if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          id: "dyn-spawn",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-spawn",
+            tool: "spawn_agent",
+            arguments: { instruction: "say hello", provider: "claude", fork_context: true },
+          },
+        })
+        child.writeServerMessage({
+          id: "dyn-list",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-list",
+            tool: "list_agents",
+            arguments: {},
+          },
+        })
+        child.writeServerMessage({
+          id: "dyn-send",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-send",
+            tool: "send_input",
+            arguments: { targetChatId: "child-1", content: "continue" },
+          },
+        })
+        child.writeServerMessage({
+          id: "dyn-wait",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-wait",
+            tool: "wait_agent",
+            arguments: { targetChatId: "child-1", timeoutMs: 25 },
+          },
+        })
+        child.writeServerMessage({
+          id: "dyn-close",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-close",
+            tool: "close_agent",
+            arguments: { targetChatId: "child-1" },
+          },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "delegate work",
+      planMode: false,
+      orchestrator: {
+        async spawnAgent(callerChatId, args) {
+          spawnCalls.push({ callerChatId, args })
+          return { chatId: "child-1" }
+        },
+        listAgents(chatId) {
+          listCalls.push(chatId)
+          return { children: [{ chatId: "child-1", status: "running" }] }
+        },
+        async sendInput(callerChatId, args) {
+          sendCalls.push({ callerChatId, args })
+        },
+        async waitForResult(callerChatId, args) {
+          waitCalls.push({ callerChatId, args })
+          return { result: "child done", isError: false }
+        },
+        async closeAgent(callerChatId, args) {
+          closeCalls.push({ callerChatId, args })
+        },
+      },
+      orchestrationChatId: "chat-1",
+      onToolRequest: async () => ({}),
+    })
+
+    const events = await collectStream(turn.stream)
+    const toolCalls = events.filter((event) => event.type === "transcript" && event.entry.kind === "tool_call")
+    const toolResults = events.filter((event) => event.type === "transcript" && event.entry.kind === "tool_result")
+
+    expect(toolCalls.map((event) => event.entry.tool.toolKind)).toEqual([
+      "mcp_generic",
+      "mcp_generic",
+      "mcp_generic",
+      "mcp_generic",
+      "mcp_generic",
+    ])
+    expect(toolCalls.map((event) => event.entry.tool.toolName)).toEqual([
+      "spawn_agent",
+      "list_agents",
+      "send_input",
+      "wait_agent",
+      "close_agent",
+    ])
+    expect(spawnCalls).toEqual([{ callerChatId: "chat-1", args: { instruction: "say hello", provider: "claude", forkContext: true, model: undefined } }])
+    expect(listCalls).toEqual(["chat-1"])
+    expect(sendCalls).toEqual([{ callerChatId: "chat-1", args: { targetChatId: "child-1", content: "continue", model: undefined } }])
+    expect(waitCalls).toEqual([{ callerChatId: "chat-1", args: { targetChatId: "child-1", timeoutMs: 25 } }])
+    expect(closeCalls).toEqual([{ callerChatId: "chat-1", args: { targetChatId: "child-1" } }])
+    expect(toolResults.map((event) => event.entry.content)).toEqual([
+      { chatId: "child-1" },
+      { children: [{ chatId: "child-1", status: "running" }] },
+      "Input sent",
+      { result: "child done", isError: false },
+      "Agent closed",
+    ])
+    expect(process.messages.filter((message: any) => typeof message.id === "string" && String(message.id).startsWith("dyn-"))).toEqual([
+      { id: "dyn-spawn", result: { contentItems: [{ type: "inputText", text: "{\"chatId\":\"child-1\"}" }], success: true } },
+      { id: "dyn-list", result: { contentItems: [{ type: "inputText", text: "{\"children\":[{\"chatId\":\"child-1\",\"status\":\"running\"}]}" }], success: true } },
+      { id: "dyn-send", result: { contentItems: [{ type: "inputText", text: "Input sent" }], success: true } },
+      { id: "dyn-wait", result: { contentItems: [{ type: "inputText", text: "{\"result\":\"child done\",\"isError\":false}" }], success: true } },
+      { id: "dyn-close", result: { contentItems: [{ type: "inputText", text: "Agent closed" }], success: true } },
+    ])
   })
 
   test("marks failed MCP tool calls as transcript errors", async () => {

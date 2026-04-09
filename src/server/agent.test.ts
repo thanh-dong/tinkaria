@@ -248,6 +248,77 @@ describe("AgentCoordinator codex integration", () => {
     expect(runtimeTurnContent).toContain("Delegated task:\nWrite the patch")
   })
 
+  test("passes the shared orchestrator context into Codex turns", async () => {
+    let startTurnArgs: Record<string, unknown> | null = null
+    const runtime: CodexRuntime = {
+      async startSession() {},
+      async startTurn(args): Promise<HarnessTurn> {
+        startTurnArgs = args as unknown as Record<string, unknown>
+
+        async function* stream() {
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "system_init",
+              provider: "codex",
+              model: "gpt-5.4",
+              tools: [],
+              agents: [],
+              slashCommands: [],
+              mcpServers: [],
+            }),
+          }
+          yield {
+            type: "transcript" as const,
+            entry: timestamped({
+              kind: "result",
+              subtype: "success",
+              isError: false,
+              durationMs: 0,
+              result: "",
+            }),
+          }
+        }
+
+        return {
+          provider: "codex",
+          stream: stream(),
+          interrupt: async () => {},
+          close: () => {},
+        }
+      },
+      stopSession() {},
+    }
+
+    const store = createFakeStore()
+    const orchestrator = {
+      async spawnAgent() { return { chatId: "child-1" } },
+      listAgents() { return { children: [] } },
+      async sendInput() {},
+      async waitForResult() { return { result: "done", isError: false } },
+      async closeAgent() {},
+    }
+    const coordinator = new AgentCoordinator({
+      store: store as never,
+      onStateChange: () => {},
+      codexRuntime: runtime,
+      orchestrator: orchestrator as never,
+    })
+
+    await coordinator.startTurnForChat({
+      chatId: "chat-1",
+      provider: "codex",
+      content: "delegate this",
+      model: "gpt-5.4",
+      planMode: false,
+      appendUserPrompt: true,
+    })
+
+    await waitFor(() => store.messages.some((entry) => entry.kind === "result"))
+    expect((startTurnArgs as any)?.orchestrator).toBe(orchestrator)
+    expect((startTurnArgs as any)?.orchestrationChatId).toBe("chat-1")
+  })
+
   test("isSpawned injects delegation preamble into provider turn content", async () => {
     let runtimeTurnContent = ""
     const runtime: CodexRuntime = {
@@ -1372,6 +1443,7 @@ function createFakeStore() {
     projectId: "project-1",
     title: "New Chat",
     provider: null as "claude" | "codex" | null,
+    model: null as string | null,
     planMode: false,
     sessionToken: null as string | null,
   }
@@ -1396,6 +1468,9 @@ function createFakeStore() {
     },
     async setChatProvider(_chatId: string, provider: "claude" | "codex") {
       chat.provider = provider
+    },
+    async setChatModel(_chatId: string, model: string) {
+      chat.model = model
     },
     async setPlanMode(_chatId: string, planMode: boolean) {
       chat.planMode = planMode

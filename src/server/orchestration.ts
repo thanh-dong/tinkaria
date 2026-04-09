@@ -54,6 +54,14 @@ interface PendingWaiter {
   timer: ReturnType<typeof setTimeout>
 }
 
+interface ExternalAgentStateRecord {
+  chatId: string
+  status: OrchestrationChildStatus
+  spawnedAt: number
+  lastStatusAt: number
+  instruction: string
+}
+
 const MAX_DELEGATED_CONTEXT_ENTRIES = 24
 const MAX_DELEGATED_CONTEXT_CHARS = 12_000
 const MAX_DELEGATED_CONTEXT_LINE_CHARS = 600
@@ -112,12 +120,13 @@ export class SessionOrchestrator {
   private readonly origins = new Map<string, OriginRecord>()
   private readonly children = new Map<string, Set<string>>()
   private readonly waiters = new Map<string, PendingWaiter>()
+  private readonly externalChildren = new Map<string, Map<string, ExternalAgentStateRecord>>()
 
   constructor(args: SessionOrchestratorArgs) {
     this.store = args.store
     this.coordinator = args.coordinator
-    this.maxDepth = args.maxDepth ?? 1
-    this.maxConcurrency = args.maxConcurrency ?? 3
+    this.maxDepth = args.maxDepth ?? 3
+    this.maxConcurrency = args.maxConcurrency ?? 10
   }
 
   async spawnAgent(
@@ -186,9 +195,10 @@ export class SessionOrchestrator {
   }
 
   async sendInput(
-    _callerChatId: string,
+    callerChatId: string,
     args: { targetChatId: string; content: string; model?: string },
   ): Promise<void> {
+    this.requireOwnedTarget(callerChatId, args.targetChatId)
     const targetChat = this.store.requireChat(args.targetChatId)
     if (this.coordinator.activeTurns.has(args.targetChatId)) {
       throw new Error(`Target chat ${args.targetChatId} is already running (busy)`)
@@ -206,9 +216,10 @@ export class SessionOrchestrator {
   }
 
   async waitForResult(
-    _callerChatId: string,
+    callerChatId: string,
     args: { targetChatId: string; timeoutMs?: number },
   ): Promise<{ result: string; isError: boolean }> {
+    this.requireOwnedTarget(callerChatId, args.targetChatId)
     const timeoutMs = args.timeoutMs ?? 120_000
 
     return new Promise<{ result: string; isError: boolean }>((resolve, reject) => {
@@ -224,16 +235,20 @@ export class SessionOrchestrator {
 
   onMessageAppended(chatId: string, entry: TranscriptEntry): void {
     const waiter = this.waiters.get(chatId)
-    if (!waiter || entry.kind !== "result") return
-    this.waiters.delete(chatId)
-    clearTimeout(waiter.timer)
-    waiter.resolve({ result: entry.result, isError: entry.isError })
+    if (waiter && entry.kind === "result") {
+      this.waiters.delete(chatId)
+      clearTimeout(waiter.timer)
+      waiter.resolve({ result: entry.result, isError: entry.isError })
+    }
+
+    this.updateExternalHierarchy(chatId, entry)
   }
 
   async closeAgent(
-    _callerChatId: string,
+    callerChatId: string,
     args: { targetChatId: string },
   ): Promise<void> {
+    this.requireOwnedTarget(callerChatId, args.targetChatId)
     // Mark as closed tombstone first (visible in hierarchy)
     const origin = this.origins.get(args.targetChatId)
     if (origin) {
@@ -272,18 +287,41 @@ export class SessionOrchestrator {
     this.waiters.clear()
     this.origins.clear()
     this.children.clear()
+    this.externalChildren.clear()
   }
 
   getHierarchy(chatId: string): OrchestrationHierarchySnapshot {
     const childSet = this.children.get(chatId)
-    if (!childSet || childSet.size === 0) {
+    const externalChildren = this.externalChildren.get(chatId)
+    if ((!childSet || childSet.size === 0) && (!externalChildren || externalChildren.size === 0)) {
       return { children: [] }
     }
 
     const statuses = this.coordinator.getActiveStatuses()
+    const internalChildren = childSet
+      ? [...childSet].map((childId) => this.buildChildNode(childId, statuses))
+      : []
+    const seenIds = new Set(internalChildren.map((child) => child.chatId))
+    const externalNodes = externalChildren
+      ? [...externalChildren.values()]
+          .filter((child) => !seenIds.has(child.chatId))
+          .map((child) => ({
+            chatId: child.chatId,
+            status: child.status,
+            spawnedAt: child.spawnedAt,
+            lastStatusAt: child.lastStatusAt,
+            instruction: child.instruction,
+            children: [],
+          }))
+      : []
+
     return {
-      children: [...childSet].map((childId) => this.buildChildNode(childId, statuses)),
+      children: [...internalChildren, ...externalNodes],
     }
+  }
+
+  listAgents(chatId: string): OrchestrationHierarchySnapshot {
+    return this.getHierarchy(chatId)
   }
 
   private buildChildNode(
@@ -360,11 +398,16 @@ export class SessionOrchestrator {
   }
 
   private countActiveSteered(projectId: string): number {
+    const statuses = this.coordinator.getActiveStatuses()
     let count = 0
-    for (const [chatId] of this.origins) {
+    for (const [chatId, origin] of this.origins) {
       try {
         const chat = this.store.requireChat(chatId)
-        if (chat.projectId === projectId) count++
+        if (chat.projectId !== projectId) continue
+        const status = this.resolveChildStatus(chatId, origin, statuses)
+        if (status === "spawning" || status === "running" || status === "waiting") {
+          count += 1
+        }
       } catch {
         // Chat may have been disposed — skip
       }
@@ -385,6 +428,133 @@ export class SessionOrchestrator {
       clearTimeout(waiter.timer)
       this.waiters.delete(chatId)
     }
+  }
+
+  private updateExternalHierarchy(chatId: string, entry: TranscriptEntry): void {
+    const payload = this.extractCollabPayload(entry)
+    if (!payload) return
+
+    const receiverIds = this.extractReceiverThreadIds(payload)
+    if (receiverIds.length === 0) return
+
+    let children = this.externalChildren.get(chatId)
+    if (!children) {
+      children = new Map()
+      this.externalChildren.set(chatId, children)
+    }
+
+    const now = Date.now()
+    const instruction = this.extractExternalInstruction(payload)
+    const entryIsError = entry.kind === "tool_result" ? Boolean(entry.isError) : false
+    for (const receiverId of receiverIds) {
+      const existing = children.get(receiverId)
+      children.set(receiverId, {
+        chatId: receiverId,
+        status: this.resolveExternalStatus(payload, receiverId, entryIsError, existing?.status),
+        spawnedAt: existing?.spawnedAt ?? entry.createdAt ?? now,
+        lastStatusAt: now,
+        instruction: instruction ?? existing?.instruction ?? "Delegated task",
+      })
+    }
+  }
+
+  private extractCollabPayload(entry: TranscriptEntry): Record<string, unknown> | null {
+    if (entry.kind === "tool_call" && entry.tool.toolKind === "subagent_task") {
+      return entry.tool.rawInput ?? null
+    }
+    if (entry.kind === "tool_result" && entry.content && typeof entry.content === "object" && !Array.isArray(entry.content)) {
+      const record = entry.content as Record<string, unknown>
+      if (Array.isArray(record.receiverThreadIds)) {
+        return record
+      }
+    }
+    return null
+  }
+
+  private extractReceiverThreadIds(payload: Record<string, unknown>): string[] {
+    const rawReceiverIds = payload.receiverThreadIds
+    if (!Array.isArray(rawReceiverIds)) return []
+    return rawReceiverIds.filter((value): value is string => typeof value === "string")
+  }
+
+  private extractExternalInstruction(payload: Record<string, unknown>): string | null {
+    const prompt = payload.prompt
+    if (typeof prompt !== "string" || prompt.length === 0) return null
+    return prompt.slice(0, 120)
+  }
+
+  private resolveExternalStatus(
+    payload: Record<string, unknown>,
+    receiverId: string,
+    isError: boolean,
+    previousStatus?: OrchestrationChildStatus,
+  ): OrchestrationChildStatus {
+    if (isError) return "failed"
+
+    const toolName = typeof payload.tool === "string" ? payload.tool : null
+    const agentStates = payload.agentsStates
+    const stateRecord = agentStates && typeof agentStates === "object" && !Array.isArray(agentStates)
+      ? (agentStates as Record<string, unknown>)[receiverId]
+      : null
+    const stateStatus = stateRecord && typeof stateRecord === "object" && !Array.isArray(stateRecord)
+      ? (stateRecord as Record<string, unknown>).status
+      : null
+    const normalizedState = this.normalizeExternalStatus(typeof stateStatus === "string" ? stateStatus : null)
+    if (normalizedState) return normalizedState
+
+    if (toolName === "closeAgent") return "closed"
+    if (toolName === "wait") return previousStatus === "failed" ? "failed" : "completed"
+    if (toolName === "spawnAgent") {
+      return this.normalizeExternalStatus(typeof payload.status === "string" ? payload.status : null) ?? "spawning"
+    }
+    if (toolName === "sendInput" || toolName === "resumeAgent") return "running"
+
+    return this.normalizeExternalStatus(typeof payload.status === "string" ? payload.status : null) ?? previousStatus ?? "running"
+  }
+
+  private normalizeExternalStatus(status: string | null): OrchestrationChildStatus | null {
+    if (!status) return null
+    switch (status.toLowerCase()) {
+      case "pending":
+      case "queued":
+      case "created":
+      case "starting":
+      case "spawning":
+        return "spawning"
+      case "running":
+      case "inprogress":
+      case "in_progress":
+      case "working":
+        return "running"
+      case "waiting":
+      case "waiting_for_user":
+      case "paused":
+        return "waiting"
+      case "completed":
+      case "done":
+      case "success":
+        return "completed"
+      case "failed":
+      case "error":
+        return "failed"
+      case "closed":
+      case "cancelled":
+      case "interrupted":
+        return "closed"
+      default:
+        return null
+    }
+  }
+
+  private requireOwnedTarget(callerChatId: string, targetChatId: string): OriginRecord {
+    const origin = this.origins.get(targetChatId)
+    if (!origin) {
+      throw new Error(`Target chat ${targetChatId} is not a spawned agent`)
+    }
+    if (origin.originChatId !== callerChatId) {
+      throw new Error(`Caller ${callerChatId} does not own spawned agent ${targetChatId}`)
+    }
+    return origin
   }
 }
 
@@ -415,6 +585,15 @@ export function createOrchestrationMcpServer(
             provider: args.provider as AgentProvider | undefined,
             forkContext: args.fork_context,
           })
+          return { content: [{ type: "text" as const, text: JSON.stringify(result) }] }
+        },
+      ),
+      tool(
+        "list_agents",
+        "List the current caller's spawned agent tree and statuses.",
+        {},
+        async () => {
+          const result = orchestrator.listAgents(callerChatId)
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] }
         },
       ),

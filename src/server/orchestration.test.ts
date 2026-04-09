@@ -1,5 +1,5 @@
 import { describe, expect, test, afterEach } from "bun:test"
-import { SessionOrchestrator } from "./orchestration"
+import { createOrchestrationMcpServer, SessionOrchestrator } from "./orchestration"
 import type { TranscriptEntry } from "../shared/types"
 
 // ---------------------------------------------------------------------------
@@ -276,6 +276,18 @@ describe("SessionOrchestrator", () => {
       ).rejects.toThrow(/concurrency/i)
     })
 
+    test("completed children no longer count toward concurrency", async () => {
+      ctx = createOrchestrator({ maxConcurrency: 1 })
+      const caller = await seedCallerChat(ctx.store)
+
+      const child = await ctx.orchestrator.spawnAgent(caller.id, { instruction: "task-1" })
+      ctx.coordinator.activeTurns.delete(child.chatId)
+
+      await expect(
+        ctx.orchestrator.spawnAgent(caller.id, { instruction: "task-2" }),
+      ).resolves.toEqual({ chatId: expect.any(String) })
+    })
+
     test("rejects when max depth (3) exceeded", async () => {
       ctx = createOrchestrator({ maxDepth: 3 })
       const caller = await seedCallerChat(ctx.store)
@@ -328,7 +340,7 @@ describe("SessionOrchestrator", () => {
           targetChatId: "nonexistent-chat",
           content: "hello",
         }),
-      ).rejects.toThrow(/not found/i)
+      ).rejects.toThrow(/not found|spawned agent/i)
     })
 
     test("rejects if target is already running", async () => {
@@ -345,6 +357,24 @@ describe("SessionOrchestrator", () => {
           content: "more input",
         }),
       ).rejects.toThrow(/already running|busy/i)
+    })
+
+    test("rejects when caller does not own the target child", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const otherCaller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "initial",
+      })
+
+      ctx.coordinator.activeTurns.delete(targetId)
+
+      await expect(
+        ctx.orchestrator.sendInput(otherCaller.id, {
+          targetChatId: targetId,
+          content: "unauthorized follow-up",
+        }),
+      ).rejects.toThrow(/does not own/i)
     })
   })
 
@@ -425,6 +455,22 @@ describe("SessionOrchestrator", () => {
 
       expect(ctx.coordinator.cancelledChats).toContain(targetId)
     })
+
+    test("rejects when caller does not own the waited child", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const otherCaller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "child work",
+      })
+
+      await expect(
+        ctx.orchestrator.waitForResult(otherCaller.id, {
+          targetChatId: targetId,
+          timeoutMs: 50,
+        }),
+      ).rejects.toThrow(/does not own/i)
+    })
   })
 
   // =========================================================================
@@ -476,6 +522,19 @@ describe("SessionOrchestrator", () => {
       expect(hierarchy.children[0]!.status).toBe("closed")
     })
 
+    test("rejects when caller does not own the child being closed", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+      const otherCaller = await seedCallerChat(ctx.store)
+      const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "close me",
+      })
+
+      await expect(
+        ctx.orchestrator.closeAgent(otherCaller.id, { targetChatId: targetId }),
+      ).rejects.toThrow(/does not own/i)
+    })
+
     test("pruneTombstones removes closed children", async () => {
       ctx = createOrchestrator()
       const caller = await seedCallerChat(ctx.store)
@@ -499,20 +558,19 @@ describe("SessionOrchestrator", () => {
   // =========================================================================
 
   describe("circular detection", () => {
-    test("rejects A->B->A cycle", async () => {
-      ctx = createOrchestrator()
+    test("rejects nested spawn when max depth is explicitly 1", async () => {
+      ctx = createOrchestrator({ maxDepth: 1 })
       const chatA = await seedCallerChat(ctx.store)
 
       const { chatId: chatBId } = await ctx.orchestrator.spawnAgent(chatA.id, {
         instruction: "B's task",
       })
 
-      // B trying to spawn A (the original caller) should be detected as a cycle
       await expect(
         ctx.orchestrator.spawnAgent(chatBId, {
-          instruction: "cycle back to A",
+          instruction: "nested child",
         }),
-      ).rejects.toThrow(/cycle|circular/i)
+      ).rejects.toThrow(/depth|circular/i)
     })
 
     test("allows A->B, A->C (fan-out, no cycle)", async () => {
@@ -703,6 +761,102 @@ describe("SessionOrchestrator", () => {
       expect(hierarchy.children[0]!.chatId).toBe(child1.chatId)
       expect(hierarchy.children[0]!.children).toHaveLength(1)
       expect(hierarchy.children[0]!.children[0]!.chatId).toBe(child2.chatId)
+    })
+
+    test("tracks codex-native subagent task entries in the hierarchy tree", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store, "codex")
+
+      ctx.orchestrator.onMessageAppended(caller.id, timestamped({
+        kind: "tool_call",
+        tool: {
+          kind: "tool",
+          toolKind: "subagent_task",
+          toolName: "Task",
+          toolId: "agent-1",
+          input: { subagentType: "spawnAgent" },
+          rawInput: {
+            type: "collabAgentToolCall",
+            tool: "spawnAgent",
+            status: "completed",
+            receiverThreadIds: ["thread-2"],
+            prompt: "Inspect tests",
+            agentsStates: {
+              "thread-2": { status: "running", message: "Inspecting" },
+            },
+          },
+        },
+      } as unknown as TranscriptEntry))
+
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+
+      expect(hierarchy.children).toHaveLength(1)
+      expect(hierarchy.children[0]!.chatId).toBe("thread-2")
+      expect(hierarchy.children[0]!.instruction).toBe("Inspect tests")
+      expect(hierarchy.children[0]!.status).toBe("running")
+    })
+
+    test("updates codex-native subagent status from tool results", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store, "codex")
+
+      ctx.orchestrator.onMessageAppended(caller.id, timestamped({
+        kind: "tool_call",
+        tool: {
+          kind: "tool",
+          toolKind: "subagent_task",
+          toolName: "Task",
+          toolId: "agent-1",
+          input: { subagentType: "spawnAgent" },
+          rawInput: {
+            type: "collabAgentToolCall",
+            tool: "spawnAgent",
+            status: "completed",
+            receiverThreadIds: ["thread-2"],
+            prompt: "Inspect tests",
+            agentsStates: {
+              "thread-2": { status: "running", message: "Inspecting" },
+            },
+          },
+        },
+      } as unknown as TranscriptEntry))
+
+      ctx.orchestrator.onMessageAppended(caller.id, timestamped({
+        kind: "tool_result",
+        toolId: "agent-1",
+        isError: true,
+        content: {
+          type: "collabAgentToolCall",
+          tool: "spawnAgent",
+          status: "failed",
+          receiverThreadIds: ["thread-2"],
+          prompt: "Inspect tests",
+          agentsStates: {
+            "thread-2": { status: "failed", message: "Crashed" },
+          },
+        },
+      }))
+
+      const hierarchy = ctx.orchestrator.getHierarchy(caller.id)
+      expect(hierarchy.children[0]!.status).toBe("failed")
+    })
+  })
+
+  describe("createOrchestrationMcpServer", () => {
+    test("registers spawn, list, send, wait, and close tools", async () => {
+      ctx = createOrchestrator()
+      const caller = await seedCallerChat(ctx.store)
+
+      const server = createOrchestrationMcpServer(ctx.orchestrator, caller.id)
+      const tools = Object.keys((server.instance as unknown as { _registeredTools: Record<string, unknown> })._registeredTools)
+
+      expect(tools).toEqual([
+        "spawn_agent",
+        "list_agents",
+        "send_input",
+        "wait_agent",
+        "close_agent",
+      ])
     })
   })
 })
