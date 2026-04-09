@@ -13,7 +13,7 @@ import type {
   SessionStatus,
   TranscriptEntry,
 } from "../shared/types"
-import { timestamped, discardedToolResult } from "../server/agent"
+import { timestamped, discardedToolResult } from "../shared/transcript-entries"
 
 const encoder = new TextEncoder()
 

@@ -12,7 +12,7 @@ const encoder = new TextEncoder()
 // ── Store interface (subset of EventStore) ──────────────────────────
 
 export interface TranscriptConsumerStore {
-  appendMessage(chatId: string, entry: TranscriptEntry): Promise<void>
+  appendMessage(chatId: string, entry: TranscriptEntry): void
   recordTurnFinished(chatId: string): Promise<void>
   recordTurnFailed(chatId: string, error: string): Promise<void>
   recordTurnCancelled(chatId: string): Promise<void>
@@ -110,7 +110,7 @@ export class TranscriptConsumer {
 
     switch (event.type) {
       case "transcript":
-        await this.store.appendMessage(event.chatId, event.entry)
+        this.store.appendMessage(event.chatId, event.entry)
         this.onMessageAppended?.(event.chatId, event.entry)
         break
       case "turn_finished":

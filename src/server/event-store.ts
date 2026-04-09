@@ -1,5 +1,4 @@
 import { appendFile, mkdir, rename, writeFile } from "node:fs/promises"
-import { existsSync, readFileSync as readFileSyncImmediate } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 import { getDataDir, LOG_PREFIX } from "../shared/branding"
@@ -40,7 +39,8 @@ export class EventStore {
   private readonly transcriptsDir: string
   private legacyMessagesByChatId = new Map<string, TranscriptEntry[]>()
   private snapshotHasLegacyMessages = false
-  private cachedTranscript: { chatId: string; entries: TranscriptEntry[] } | null = null
+  private transcriptCache = new Map<string, TranscriptEntry[]>()
+  private static readonly TRANSCRIPT_CACHE_MAX = 5
 
   constructor(dataDir = getDataDir(homedir())) {
     this.dataDir = dataDir
@@ -123,7 +123,7 @@ export class EventStore {
     this.state.projectsById.clear()
     this.state.projectIdsByPath.clear()
     this.state.chatsById.clear()
-    this.cachedTranscript = null
+    this.transcriptCache.clear()
   }
 
   private clearLegacyTranscriptState() {
@@ -330,13 +330,14 @@ export class EventStore {
     return path.join(this.transcriptsDir, `${chatId}.jsonl`)
   }
 
-  private loadTranscriptFromDisk(chatId: string) {
+  private async loadTranscriptFromDisk(chatId: string): Promise<TranscriptEntry[]> {
     const transcriptPath = this.transcriptPath(chatId)
-    if (!existsSync(transcriptPath)) {
+    const file = Bun.file(transcriptPath)
+    if (!await file.exists()) {
       return []
     }
 
-    const text = readFileSyncImmediate(transcriptPath, "utf8")
+    const text = await file.text()
     if (!text.trim()) return []
 
     const entries: TranscriptEntry[] = []
@@ -350,6 +351,15 @@ export class EventStore {
       }
     }
     return entries
+  }
+
+  private setTranscriptCache(chatId: string, entries: TranscriptEntry[]) {
+    this.transcriptCache.delete(chatId) // Remove to refresh insertion order
+    this.transcriptCache.set(chatId, entries)
+    if (this.transcriptCache.size > EventStore.TRANSCRIPT_CACHE_MAX) {
+      const oldest = this.transcriptCache.keys().next().value
+      if (oldest) this.transcriptCache.delete(oldest)
+    }
   }
 
   async openProject(localPath: string, title?: string) {
@@ -486,19 +496,17 @@ export class EventStore {
     await this.append(this.chatsLogPath, event)
   }
 
-  async appendMessage(chatId: string, entry: TranscriptEntry) {
+  appendMessage(chatId: string, entry: TranscriptEntry) {
     this.requireChat(chatId)
+    // In-memory first so NATS publish fires without waiting for disk I/O
+    this.applyMessageMetadata(chatId, entry)
+    const cached = this.transcriptCache.get(chatId)
+    if (cached) {
+      cached.push({ ...entry })
+    }
     const payload = `${JSON.stringify(entry)}\n`
     const transcriptPath = this.transcriptPath(chatId)
-    this.writeChain = this.writeChain.then(async () => {
-      await mkdir(this.transcriptsDir, { recursive: true })
-      await appendFile(transcriptPath, payload, "utf8")
-      this.applyMessageMetadata(chatId, entry)
-      if (this.cachedTranscript?.chatId === chatId) {
-        this.cachedTranscript.entries.push({ ...entry })
-      }
-    })
-    return this.writeChain
+    this.writeChain = this.writeChain.then(() => appendFile(transcriptPath, payload, "utf8"))
   }
 
   async recordTurnStarted(chatId: string) {
@@ -579,19 +587,21 @@ export class EventStore {
     return chat
   }
 
-  getMessages(chatId: string, options?: { offset?: number; limit?: number }) {
+  async getMessages(chatId: string, options?: { offset?: number; limit?: number }) {
     let entries: TranscriptEntry[]
 
-    if (this.cachedTranscript?.chatId === chatId) {
-      entries = this.cachedTranscript.entries
+    if (this.transcriptCache.has(chatId)) {
+      entries = this.transcriptCache.get(chatId)!
     } else {
       const legacyEntries = this.legacyMessagesByChatId.get(chatId)
       if (legacyEntries) {
-        this.cachedTranscript = { chatId, entries: cloneTranscriptEntries(legacyEntries) }
-        entries = this.cachedTranscript.entries
+        this.setTranscriptCache(chatId, cloneTranscriptEntries(legacyEntries))
+        entries = this.transcriptCache.get(chatId)!
       } else {
-        entries = this.loadTranscriptFromDisk(chatId)
-        this.cachedTranscript = { chatId, entries }
+        // Drain pending writes before reading from disk to ensure consistency
+        await this.writeChain
+        entries = await this.loadTranscriptFromDisk(chatId)
+        this.setTranscriptCache(chatId, entries)
       }
     }
 
@@ -604,15 +614,18 @@ export class EventStore {
     return cloneTranscriptEntries(entries)
   }
 
-  getMessageCount(chatId: string): number {
-    if (this.cachedTranscript?.chatId === chatId) {
-      return this.cachedTranscript.entries.length
+  async getMessageCount(chatId: string): Promise<number> {
+    if (this.transcriptCache.has(chatId)) {
+      return this.transcriptCache.get(chatId)!.length
     }
     const legacyEntries = this.legacyMessagesByChatId.get(chatId)
     if (legacyEntries) {
       return legacyEntries.length
     }
-    return this.loadTranscriptFromDisk(chatId).length
+    await this.writeChain
+    const entries = await this.loadTranscriptFromDisk(chatId)
+    this.setTranscriptCache(chatId, entries)
+    return entries.length
   }
 
   listProjects() {
@@ -704,7 +717,7 @@ export class EventStore {
 
     this.clearLegacyTranscriptState()
     await this.compact()
-    this.cachedTranscript = null
+    this.transcriptCache.clear()
     onProgress?.(`${LOG_PREFIX} transcript migration complete`)
     return true
   }

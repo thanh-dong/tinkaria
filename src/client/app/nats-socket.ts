@@ -90,7 +90,7 @@ export class NatsSocket implements AppTransport {
         const directUrl = auth.natsWsUrl
         console.warn(LOG_PREFIX, `Trying direct NATS WS: ${directUrl}`)
         this.resolvedWsUrl = directUrl
-        const directOk = await this.probeConnection(directUrl, 2000)
+        const directOk = await this.probeConnection(directUrl, 500)
         if (directOk) {
           console.warn(LOG_PREFIX, `Direct NATS WS connected: ${directUrl}`)
           return // connect() already succeeded in probeConnection

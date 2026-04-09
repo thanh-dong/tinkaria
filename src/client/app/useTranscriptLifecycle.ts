@@ -126,6 +126,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
     let initialFetchDone = false
     let fetchTriggered = false
     const buffer: TranscriptEntry[] = []
+    let pendingRaf: number | null = null
     const chatId = activeChatId
 
     function flushTail(entries: TranscriptEntry[], source: "fetched" | "fallback_empty") {
@@ -242,7 +243,14 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
         if (event.chatId !== activeChatId) return
         if (initialFetchDone) {
           hydrator.hydrate(event.entry)
-          setMessages(hydrator.getMessages())
+          if (pendingRaf === null) {
+            pendingRaf = requestAnimationFrame(() => {
+              pendingRaf = null
+              if (!cancelled) {
+                setMessages(hydrator.getMessages())
+              }
+            })
+          }
         } else {
           buffer.push(event.entry)
         }
@@ -259,6 +267,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
 
     return () => {
       cancelled = true
+      if (pendingRaf !== null) cancelAnimationFrame(pendingRaf)
       unsub()
       orchestrationUnsub()
       // Save departing chat to cache — use sidebar's lastMessageAt as the source of truth

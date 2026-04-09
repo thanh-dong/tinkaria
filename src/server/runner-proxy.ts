@@ -55,7 +55,7 @@ export class RunnerProxy {
     return response.result
   }
 
-  /** Same signature as AgentCoordinator.send() */
+  /** Send a chat message — creates chat if needed, delegates turn to runner */
   async send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }> {
     let chatId = command.chatId
     if (!chatId) {
@@ -84,7 +84,7 @@ export class RunnerProxy {
     const project = this.store.getProject(chat.projectId)
     if (!project) throw new Error("Project not found")
 
-    const existingMessages = this.store.getMessages(chatId)
+    const existingMessages = await this.store.getMessages(chatId)
 
     const startCmd: StartTurnCommand = {
       chatId,
@@ -100,11 +100,20 @@ export class RunnerProxy {
       projectId: chat.projectId,
     }
 
+    if (chat.provider !== provider) {
+      if (chat.sessionToken) {
+        await this.store.setSessionToken(chatId, null)
+      }
+      await this.store.setChatProvider(chatId, provider)
+    }
+    await this.store.setChatModel(chatId, model)
+    await this.store.setPlanMode(chatId, planMode)
+
     await this.sendCommand("start_turn", startCmd)
     return { chatId }
   }
 
-  /** Same signature as AgentCoordinator.startTurnForChat() — used by orchestration */
+  /** Start a turn for a specific chat — used by orchestration */
   async startTurnForChat(args: {
     chatId: string
     provider: AgentProvider
@@ -121,6 +130,15 @@ export class RunnerProxy {
     const project = this.store.getProject(chat.projectId)
     if (!project) throw new Error("Project not found")
 
+    if (chat.provider !== args.provider) {
+      if (chat.sessionToken) {
+        await this.store.setSessionToken(args.chatId, null)
+      }
+      await this.store.setChatProvider(args.chatId, args.provider)
+    }
+    await this.store.setChatModel(args.chatId, args.model)
+    await this.store.setPlanMode(args.chatId, args.planMode)
+
     const startCmd: StartTurnCommand = {
       chatId: args.chatId,
       provider: args.provider,
@@ -131,7 +149,7 @@ export class RunnerProxy {
       projectLocalPath: project.localPath,
       sessionToken: chat.sessionToken,
       chatTitle: chat.title,
-      existingMessageCount: this.store.getMessages(args.chatId).length,
+      existingMessageCount: (await this.store.getMessages(args.chatId)).length,
       projectId: chat.projectId,
     }
     await this.sendCommand("start_turn", startCmd)

@@ -1,23 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { startServer } from "./server"
 import { TranscriptConsumer } from "./transcript-consumer"
 
-const originalSplit = process.env.TINKARIA_SPLIT
-
 describe("startServer healthcheck", () => {
-  beforeEach(() => {
-    delete process.env.TINKARIA_SPLIT
-  })
-
-  afterEach(() => {
-    if (originalSplit === undefined) {
-      delete process.env.TINKARIA_SPLIT
-    } else {
-      process.env.TINKARIA_SPLIT = originalSplit
-    }
-  })
-
-  test("reports liveness in default mode", async () => {
+  test("reports liveness with runner", async () => {
     const started = await startServer({ port: 4321, host: "127.0.0.1", strictPort: true })
     try {
       const response = await fetch(`http://127.0.0.1:${started.port}/health`)
@@ -26,28 +12,6 @@ describe("startServer healthcheck", () => {
       expect(body).toMatchObject({
         ok: true,
         status: "ok",
-        splitMode: false,
-        natsDaemon: { ok: true },
-        natsConnection: { ok: true },
-        runner: null,
-      })
-      expect(body.codexKit).toBeDefined()
-    } finally {
-      await started.stop()
-    }
-  }, 30_000)
-
-  test("reports runner readiness in split mode", async () => {
-    process.env.TINKARIA_SPLIT = "true"
-    const started = await startServer({ port: 4322, host: "127.0.0.1", strictPort: true })
-    try {
-      const response = await fetch(`http://127.0.0.1:${started.port}/health`)
-      expect(response.ok).toBe(true)
-      const body = await response.json()
-      expect(body).toMatchObject({
-        ok: true,
-        status: "ok",
-        splitMode: true,
         natsDaemon: { ok: true },
         natsConnection: { ok: true },
         runner: {
@@ -63,9 +27,7 @@ describe("startServer healthcheck", () => {
     }
   }, 30_000)
 
-  test("waits for transcript consumer startup before split-mode server resolves", async () => {
-    process.env.TINKARIA_SPLIT = "true"
-
+  test("waits for transcript consumer startup before server resolves", async () => {
     const originalStart = TranscriptConsumer.prototype.start
     let releaseStart!: () => void
     const startEntered = new Promise<void>((resolve) => {

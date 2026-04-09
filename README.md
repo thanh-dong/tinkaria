@@ -55,15 +55,14 @@ Default URL: `http://localhost:3210`
 The current runtime is multi-process and partially ephemeral:
 
 - the server starts a dedicated embedded NATS daemon process on boot
-- Codex work uses a background local kit daemon over NATS
-- optional split mode (`TINKARIA_SPLIT=true`) starts a separate runner process for turn execution
+- a separate runner process handles all turn execution (Claude and Codex)
 
 For RC upgrades or machine handoff, do not assume live turns survive restart. Quiesce or cancel active work first, then verify a fresh Claude/Codex send after the upgraded instance starts.
 
 For proxied deployments, prefer side-by-side cutover over in-place restart:
 
 - keep the old backend running on its current port
-- start the new release on a new port, ideally in split mode for the new deployment model
+- start the new release on a new port
 - verify `/health`, `/auth/token`, `/`, and `/nats-ws` against the new backend directly
 - switch the reverse proxy upstream to the new port
 - retire the old backend only after the public route reports the new backend healthy
@@ -74,16 +73,14 @@ For proxied deployments, prefer side-by-side cutover over in-place restart:
 
 - `natsDaemon`: embedded NATS subprocess pid/ports/aliveness
 - `natsConnection`: hub connection readiness from the Bun server
-- `runner`: split-mode runner registration and heartbeat freshness
-- `codexKit`: background Codex kit registration and heartbeat freshness
+- `runner`: runner registration and heartbeat freshness
 
 HTTP `503` is reserved for required-component failure:
 
 - embedded NATS daemon is down
 - server NATS connection is closed
-- split mode is enabled and the runner is not registered or heartbeat-fresh
+- runner is not registered or heartbeat-fresh
 
-Codex kit failure is reported as degraded component state in the payload without taking the whole server down.
 
 ## Install
 
@@ -130,10 +127,9 @@ Embedded terminal support currently targets macOS and Linux through Bun PTY APIs
 
 The browser connects to an embedded NATS server over WebSocket. The runtime currently includes:
 
-- the main Bun HTTP/WebSocket server
+- the main Bun HTTP/WebSocket server (thin API gateway)
 - an embedded NATS daemon process
-- a background local Codex kit daemon
-- an optional split runner process for turn execution
+- a runner process that handles all turn execution (Claude and Codex)
 
 Tinkaria uses these internal transport families:
 
@@ -142,8 +138,7 @@ Tinkaria uses these internal transport families:
 | Snapshots | `runtime.snap.*` | Push state for sidebar, chat, settings, terminals |
 | Events | `runtime.evt.*` | JetStream-backed terminal and chat event streams |
 | Commands | `runtime.cmd.*` | Request/reply mutations from browser to server |
-| Kits | `runtime.kit.*` | Codex kit registration, session lifecycle, turns, interrupts, tool replies |
-| Runner | `runtime.runner.*` | Optional split-mode runner registration, commands, heartbeats, turn events |
+| Runner | `runtime.runner.*` | Runner registration, commands, heartbeats, turn events |
 
 The `runtime.*` subject prefix keeps the internal transport namespace generic and separate from product branding.
 

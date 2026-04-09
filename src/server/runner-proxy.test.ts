@@ -25,7 +25,8 @@ function createMockRunner(nc: NatsConnection, runnerId: string) {
 }
 
 function createMockStore() {
-  return {
+  const calls: Array<{ method: string; args: unknown[] }> = []
+  const store = {
     requireChat: (chatId: string) => ({
       id: chatId,
       projectId: "p1",
@@ -48,7 +49,21 @@ function createMockStore() {
       sessionToken: null,
       planMode: false,
     }),
-  } as unknown as RunnerProxyOptions["store"]
+    setChatProvider: async (chatId: string, provider: string) => {
+      calls.push({ method: "setChatProvider", args: [chatId, provider] })
+    },
+    setChatModel: async (chatId: string, model: string | null) => {
+      calls.push({ method: "setChatModel", args: [chatId, model] })
+    },
+    setPlanMode: async (chatId: string, planMode: boolean) => {
+      calls.push({ method: "setPlanMode", args: [chatId, planMode] })
+    },
+    setSessionToken: async (chatId: string, token: string | null) => {
+      calls.push({ method: "setSessionToken", args: [chatId, token] })
+    },
+    _calls: calls,
+  } as unknown as RunnerProxyOptions["store"] & { _calls: typeof calls }
+  return store
 }
 
 describe("RunnerProxy", () => {
@@ -78,20 +93,21 @@ describe("RunnerProxy", () => {
     mockRunner = createMockRunner(runnerNc, RUNNER_ID)
 
     const activeStatuses = new Map<string, SessionStatus>()
+    const store = createMockStore()
 
     proxy = new RunnerProxy({
       nc: clientNc,
-      store: createMockStore(),
+      store,
       runnerId: RUNNER_ID,
       getActiveStatuses: () => activeStatuses,
       ...overrides,
     })
 
-    return { activeStatuses }
+    return { activeStatuses, store }
   }
 
-  test("send() with existing chatId forwards StartTurnCommand", async () => {
-    await setup()
+  test("send() with existing chatId forwards StartTurnCommand and persists model", async () => {
+    const { store } = await setup()
 
     await proxy!.send({
       type: "chat.send",
@@ -111,6 +127,9 @@ describe("RunnerProxy", () => {
       projectLocalPath: "/tmp/test-project",
       appendUserPrompt: true,
     })
+
+    const modelCall = store._calls.find((c) => c.method === "setChatModel")
+    expect(modelCall).toEqual({ method: "setChatModel", args: ["chat-123", "sonnet"] })
   })
 
   test("send() without chatId creates chat first", async () => {
@@ -194,8 +213,8 @@ describe("RunnerProxy", () => {
     expect(proxy!.activeTurns.has("inactive-chat")).toBe(false)
   })
 
-  test("startTurnForChat() forwards StartTurnCommand for orchestration", async () => {
-    await setup()
+  test("startTurnForChat() forwards StartTurnCommand and persists model", async () => {
+    const { store } = await setup()
 
     await proxy!.startTurnForChat({
       chatId: "orch-chat",
@@ -218,6 +237,9 @@ describe("RunnerProxy", () => {
       appendUserPrompt: true,
       projectLocalPath: "/tmp/test-project",
     })
+
+    const modelCall = store._calls.find((c) => c.method === "setChatModel")
+    expect(modelCall).toEqual({ method: "setChatModel", args: ["orch-chat", "sonnet"] })
   })
 
   test("disposeChat() calls cancel and does not throw if cancel fails", async () => {

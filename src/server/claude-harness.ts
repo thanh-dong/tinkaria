@@ -148,7 +148,7 @@ function createClaudeOptions(args: {
 }
 
 export function normalizeClaudeStreamMessage(message: any): TranscriptEntry[] {
-  const debugRaw = JSON.stringify(message)
+  const debugRaw = process.env.KANNA_DEBUG_RAW ? JSON.stringify(message) : undefined
   const messageId = typeof message.uuid === "string" ? message.uuid : undefined
 
   if (message.type === "system" && message.subtype === "init") {

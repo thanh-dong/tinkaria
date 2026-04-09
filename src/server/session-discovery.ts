@@ -634,7 +634,7 @@ export async function importCliTranscript(
   limit = 50
 ): Promise<number> {
   // Idempotent: skip if chat already has messages
-  const existing = store.getMessages(chatId)
+  const existing = await store.getMessages(chatId)
   if (existing.length > 0) return 0
 
   const content = await readFile(sessionFilePath, "utf-8")

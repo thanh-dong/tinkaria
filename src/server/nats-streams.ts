@@ -1,12 +1,11 @@
 import { jetstreamManager, RetentionPolicy, StorageType } from "@nats-io/jetstream"
 import type { NatsConnection } from "@nats-io/transport-node"
-import { ALL_TERMINAL_EVENTS, ALL_CHAT_MESSAGE_EVENTS, ALL_KIT_TURN_EVENTS, CHAT_MESSAGE_EVENTS_STREAM_NAME } from "../shared/nats-subjects"
+import { ALL_TERMINAL_EVENTS, ALL_CHAT_MESSAGE_EVENTS, CHAT_MESSAGE_EVENTS_STREAM_NAME } from "../shared/nats-subjects"
 import { RUNNER_EVENTS_STREAM, ALL_RUNNER_EVENTS } from "../shared/runner-protocol"
 import { LOG_PREFIX } from "../shared/branding"
 
 export const TERMINAL_EVENTS_STREAM = "KANNA_TERMINAL_EVENTS"
 export const CHAT_MESSAGE_EVENTS_STREAM = CHAT_MESSAGE_EVENTS_STREAM_NAME
-export const KIT_TURN_EVENTS_STREAM = "KANNA_KIT_TURN_EVENTS"
 
 interface StreamConfig {
   name: string
@@ -52,17 +51,6 @@ export function ensureTerminalEventsStream(nc: NatsConnection): Promise<void> {
     subjects: [ALL_TERMINAL_EVENTS],
     max_age_ns: FIVE_MINUTES_NS,
     max_msgs: 10_000,
-    max_bytes: 64 * 1024 * 1024,
-  })
-}
-
-/** Creates or updates the JetStream stream for kit turn events (memory-backed, 5 min / 20K msg retention). */
-export function ensureKitTurnEventsStream(nc: NatsConnection): Promise<void> {
-  return ensureStream(nc, {
-    name: KIT_TURN_EVENTS_STREAM,
-    subjects: [ALL_KIT_TURN_EVENTS],
-    max_age_ns: FIVE_MINUTES_NS,
-    max_msgs: 20_000,
     max_bytes: 64 * 1024 * 1024,
   })
 }

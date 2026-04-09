@@ -1,7 +1,6 @@
 import path from "node:path"
 import { APP_NAME, getRuntimeProfile, LOG_PREFIX } from "../shared/branding"
 import { EventStore } from "./event-store"
-import { AgentCoordinator } from "./agent"
 import { discoverProjects, type DiscoveredProject } from "./discovery"
 import { getMachineDisplayName } from "./machine-name"
 import { TerminalManager } from "./terminal-manager"
@@ -13,7 +12,7 @@ import { generateAuthToken } from "./nats-auth"
 import { readToken } from "../nats/nats-token"
 import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
-import { ensureTerminalEventsStream, ensureChatMessageStream, ensureKitTurnEventsStream, ensureRunnerEventsStream } from "./nats-streams"
+import { ensureTerminalEventsStream, ensureChatMessageStream, ensureRunnerEventsStream } from "./nats-streams"
 import { RunnerManager, type RunnerReadiness } from "./runner-manager"
 import { RunnerProxy } from "./runner-proxy"
 import { TranscriptConsumer } from "./transcript-consumer"
@@ -25,7 +24,6 @@ import { TaskLedger } from "./task-ledger"
 import { TranscriptSearchIndex } from "./transcript-search"
 import { ProjectAgent } from "./project-agent"
 import { createProjectAgentRouter } from "./project-agent-routes"
-import { LocalCodexKitDaemon, ProjectKitRegistry, RemoteCodexRuntime } from "./local-codex-kit"
 import { SkillCache } from "./skill-discovery"
 
 export interface StartServerOptions {
@@ -45,14 +43,12 @@ export interface ServerHealthcheck {
   status: "ok" | "degraded" | "fail"
   port: number
   natsWsPort: number
-  splitMode: boolean
   natsDaemon: NatsDaemonReadiness | null
   natsConnection: ReturnType<NatsConnector["getReadiness"]>
-  runner: RunnerReadiness | null
-  codexKit: ReturnType<ProjectKitRegistry["getReadiness"]>
+  runner: RunnerReadiness
 }
 
-/** Duck-typed coordinator — satisfied by both AgentCoordinator (in-process) and RunnerProxy (split mode). */
+/** Session coordinator interface — satisfied by RunnerProxy which delegates turn execution to the runner process. */
 interface SessionCoordinator {
   send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }>
   cancel(chatId: string): Promise<void>
@@ -130,34 +126,22 @@ export async function startServer(options: StartServerOptions = {}) {
   await Promise.all([
     ensureTerminalEventsStream(natsConnector.nc),
     ensureChatMessageStream(natsConnector.nc),
-    ensureKitTurnEventsStream(natsConnector.nc),
+    ensureRunnerEventsStream(natsConnector.nc),
   ])
 
-  const splitMode = process.env.TINKARIA_SPLIT === "true"
   const getHealthcheck = (): ServerHealthcheck => {
     const natsDaemon = daemonManager.getReadiness()
     const natsConnection = natsConnector.getReadiness()
-    const codexKit = projectKitRegistry.getReadiness()
-    const runner = splitMode ? runnerManager?.getReadiness() ?? {
-      ok: false,
-      runnerId: null,
-      pid: null,
-      registered: false,
-      heartbeatFresh: false,
-      lastHeartbeatAt: null,
-    } : null
-    const hardFailure = !natsDaemon?.ok || !natsConnection.ok || (splitMode && !runner?.ok)
-    const degraded = !hardFailure && !codexKit.ok
+    const runner = runnerManager.getReadiness()
+    const hardFailure = !natsDaemon?.ok || !natsConnection.ok || !runner.ok
     return {
       ok: !hardFailure,
-      status: hardFailure ? "fail" : degraded ? "degraded" : "ok",
+      status: hardFailure ? "fail" : "ok",
       port: actualPort,
       natsWsPort: natsConnector.natsWsPort,
-      splitMode,
       natsDaemon,
       natsConnection,
       runner,
-      codexKit,
     }
   }
 
@@ -210,72 +194,39 @@ export async function startServer(options: StartServerOptions = {}) {
     orchestrator.onMessageAppended(chatId, entry)
   }
 
-  // Coordinator: RunnerProxy (split mode) or AgentCoordinator (in-process)
-  let coordinator: SessionCoordinator
-
-  let runnerManager: RunnerManager | null = null
-  let transcriptConsumer: TranscriptConsumer | null = null
-
   const skillCache = new SkillCache()
-  const projectKitRegistry = new ProjectKitRegistry(natsConnector.nc)
 
-  if (splitMode) {
-    // ── Split mode: separate runner process ──
-    await ensureRunnerEventsStream(natsConnector.nc)
+  // ── Runner process handles all turn execution ──
+  const runnerManager = new RunnerManager({
+    nc: natsConnector.nc,
+    natsUrl: daemonInfo.url,
+    authToken,
+    mode: runnerMode as "spawn" | "discover",
+  })
+  const runnerId = await runnerManager.ensureRunner()
 
-    runnerManager = new RunnerManager({
-      nc: natsConnector.nc,
-      natsUrl: daemonInfo.url,
-      authToken,
-      mode: runnerMode as "spawn" | "discover",
-    })
-    const runnerId = await runnerManager.ensureRunner()
+  const chatSidebarTypes = new Set(["chat", "sidebar", "orchestration"])
+  const transcriptConsumer = new TranscriptConsumer({
+    nc: natsConnector.nc,
+    store,
+    onStateChange: () => broadcast(chatSidebarTypes),
+    onMessageAppended,
+  })
+  await transcriptConsumer.start()
 
-    const chatSidebarTypes = new Set(["chat", "sidebar", "orchestration"])
-    transcriptConsumer = new TranscriptConsumer({
-      nc: natsConnector.nc,
-      store,
-      onStateChange: () => broadcast(chatSidebarTypes),
-      onMessageAppended,
-    })
-    await transcriptConsumer.start()
+  const coordinator: SessionCoordinator = new RunnerProxy({
+    nc: natsConnector.nc,
+    store,
+    runnerId,
+    getActiveStatuses: () => transcriptConsumer.getActiveStatuses(),
+  })
 
-    const proxy = new RunnerProxy({
-      nc: natsConnector.nc,
-      store,
-      runnerId,
-      getActiveStatuses: () => transcriptConsumer!.getActiveStatuses(),
-    })
-    coordinator = proxy
-
-    console.warn(LOG_PREFIX, "Split mode enabled — runner process handles turn execution")
-  } else {
-    // ── In-process mode: AgentCoordinator (default) ──
-    const codexRuntime = new RemoteCodexRuntime({
-      nc: natsConnector.nc,
-      registry: projectKitRegistry,
-    })
-
-    const inProcessChatTypes = new Set(["chat", "sidebar", "orchestration"])
-    const agent = new AgentCoordinator({
-      store,
-      onStateChange: () => broadcast(inProcessChatTypes),
-      codexRuntime,
-      skillCache,
-      onMessageAppended,
-    })
-    coordinator = agent
-  }
+  console.warn(LOG_PREFIX, "Runner process handles turn execution")
 
   const orchestrator = new SessionOrchestrator({
     store,
     coordinator,
   })
-
-  // Wire orchestrator into coordinator (breaks circular init dependency)
-  if (!splitMode && "orchestrator" in coordinator) {
-    (coordinator as AgentCoordinator).orchestrator = orchestrator
-  }
 
   const publisher = await createNatsPublisher({
     nc: natsConnector.nc,
@@ -387,39 +338,16 @@ export async function startServer(options: StartServerOptions = {}) {
     }
   }
 
-  // Start Codex kit daemon in background — not on the critical path for HTTP
-  let localCodexKit: LocalCodexKitDaemon | null = null
-  void LocalCodexKitDaemon.start({
-    nc: natsConnector.nc,
-    natsUrl: natsConnector.natsUrl,
-    authToken,
-  }).then((daemon) => {
-    localCodexKit = daemon
-    projectKitRegistry.setError(null)
-  }).catch((error) => {
-    const message = error instanceof Error ? error.message : String(error)
-    projectKitRegistry.setError(message)
-    console.warn(LOG_PREFIX, `Codex kit daemon failed to start: ${message}`)
-  })
-
-  console.warn(LOG_PREFIX, `Operational health initialized — status: ${getHealthcheck().status}, splitMode: ${splitMode}`)
+  console.warn(LOG_PREFIX, `Operational health initialized — status: ${getHealthcheck().status}`)
 
   const shutdown = async () => {
     clearInterval(abandonInterval)
-    // Cancel active turns (in-process mode only — split mode turns live in runner)
-    if (!splitMode) {
-      for (const [chatId] of coordinator.getActiveStatuses()) {
-        await coordinator.cancel(chatId)
-      }
-    }
     orchestrator.destroy()
     responders.dispose()
     publisher.dispose()
     terminals.closeAll()
-    projectKitRegistry.dispose()
-    transcriptConsumer?.stop()
-    await localCodexKit?.dispose()
-    await runnerManager?.dispose()
+    transcriptConsumer.stop()
+    await runnerManager.dispose()
     await natsConnector.dispose()
     await daemonManager.dispose()
     await store.compact()

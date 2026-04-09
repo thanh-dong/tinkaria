@@ -1,9 +1,8 @@
 /**
  * Turn factory wrappers for the runner process.
  *
- * Re-exports startClaudeTurn from agent.ts and provides startCodexTurn
- * so the runner can create harness turns for both providers without
- * importing the full AgentCoordinator.
+ * Re-exports startClaudeTurn from claude-harness.ts and provides startCodexTurn
+ * so the runner can create harness turns for both providers.
  */
 
 export { startClaudeTurn } from "../server/claude-harness"

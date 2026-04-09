@@ -106,7 +106,7 @@ describe("EventStore", () => {
     expect(migrated).toBe(true)
     expect(progress.some((message) => message.includes("transcript migration detected"))).toBe(true)
     expect(progress.at(-1)).toContain("transcript migration complete")
-    expect(store.getMessages(chatId)).toEqual([
+    expect(await store.getMessages(chatId)).toEqual([
       entry("user_prompt", 100, { content: "hello" }),
       entry("assistant_text", 101, { text: "world" }),
     ])
@@ -134,7 +134,7 @@ describe("EventStore", () => {
     test("returns first 50 messages with offset 0 limit 50", async () => {
       const { store, chatId } = await createStoreWithMessages(100)
 
-      const page = store.getMessages(chatId, { offset: 0, limit: 50 })
+      const page = await store.getMessages(chatId, { offset: 0, limit: 50 })
 
       expect(page).toHaveLength(50)
       expect((page[0] as { content: string }).content).toBe("msg-0")
@@ -144,7 +144,7 @@ describe("EventStore", () => {
     test("returns next 50 messages with offset 50 limit 50", async () => {
       const { store, chatId } = await createStoreWithMessages(100)
 
-      const page = store.getMessages(chatId, { offset: 50, limit: 50 })
+      const page = await store.getMessages(chatId, { offset: 50, limit: 50 })
 
       expect(page).toHaveLength(50)
       expect((page[0] as { content: string }).content).toBe("msg-50")
@@ -154,7 +154,7 @@ describe("EventStore", () => {
     test("returns remaining items when requesting beyond length", async () => {
       const { store, chatId } = await createStoreWithMessages(75)
 
-      const page = store.getMessages(chatId, { offset: 50, limit: 50 })
+      const page = await store.getMessages(chatId, { offset: 50, limit: 50 })
 
       expect(page).toHaveLength(25)
       expect((page[0] as { content: string }).content).toBe("msg-50")
@@ -164,7 +164,7 @@ describe("EventStore", () => {
     test("returns all messages when no pagination options provided (backward compat)", async () => {
       const { store, chatId } = await createStoreWithMessages(100)
 
-      const all = store.getMessages(chatId)
+      const all = await store.getMessages(chatId)
 
       expect(all).toHaveLength(100)
       expect((all[0] as { content: string }).content).toBe("msg-0")
@@ -174,7 +174,7 @@ describe("EventStore", () => {
     test("returns all messages when options is empty object", async () => {
       const { store, chatId } = await createStoreWithMessages(10)
 
-      const all = store.getMessages(chatId, {})
+      const all = await store.getMessages(chatId, {})
 
       expect(all).toHaveLength(10)
     })
@@ -182,7 +182,7 @@ describe("EventStore", () => {
     test("returns from offset to end when only offset is provided", async () => {
       const { store, chatId } = await createStoreWithMessages(10)
 
-      const page = store.getMessages(chatId, { offset: 7 })
+      const page = await store.getMessages(chatId, { offset: 7 })
 
       expect(page).toHaveLength(3)
       expect((page[0] as { content: string }).content).toBe("msg-7")
@@ -191,7 +191,7 @@ describe("EventStore", () => {
     test("returns first N messages when only limit is provided", async () => {
       const { store, chatId } = await createStoreWithMessages(10)
 
-      const page = store.getMessages(chatId, { limit: 3 })
+      const page = await store.getMessages(chatId, { limit: 3 })
 
       expect(page).toHaveLength(3)
       expect((page[0] as { content: string }).content).toBe("msg-0")
@@ -210,7 +210,7 @@ describe("EventStore", () => {
     await store.appendMessage(chat.id, entry("assistant_text", 201, { content: "world" }))
     await store.compact()
 
-    expect(store.getMessages(chat.id)).toEqual([
+    expect(await store.getMessages(chat.id)).toEqual([
       entry("user_prompt", 200, { content: "hello" }),
       entry("assistant_text", 201, { text: "world" }),
     ])

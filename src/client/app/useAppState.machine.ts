@@ -195,6 +195,39 @@ export function markPostFlushBusyObserved(state: SubmitPipelineState, chatId: st
   }
 }
 
+export function startDirectSubmit(
+  state: SubmitPipelineState,
+  args: { chatId: string; content: string }
+): SubmitPipelineState {
+  return {
+    ...state,
+    awaitingBusyByChat: { ...state.awaitingBusyByChat, [args.chatId]: false },
+    inFlightTextByChat: { ...state.inFlightTextByChat, [args.chatId]: args.content.trim() },
+  }
+}
+
+export function completeDirectSubmit(state: SubmitPipelineState, chatId: string): SubmitPipelineState {
+  const nextInFlight = { ...state.inFlightTextByChat }
+  delete nextInFlight[chatId]
+
+  return {
+    ...state,
+    awaitingBusyByChat: { ...state.awaitingBusyByChat, [chatId]: true },
+    inFlightTextByChat: nextInFlight,
+  }
+}
+
+export function failDirectSubmit(state: SubmitPipelineState, chatId: string): SubmitPipelineState {
+  const nextInFlight = { ...state.inFlightTextByChat }
+  delete nextInFlight[chatId]
+
+  return {
+    ...state,
+    awaitingBusyByChat: { ...state.awaitingBusyByChat, [chatId]: false },
+    inFlightTextByChat: nextInFlight,
+  }
+}
+
 export function completeQueuedFlush(state: SubmitPipelineState, chatId: string): SubmitPipelineState {
   const nextInFlight = { ...state.inFlightTextByChat }
   delete nextInFlight[chatId]

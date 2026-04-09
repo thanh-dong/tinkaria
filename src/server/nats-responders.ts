@@ -18,7 +18,7 @@ import { generateForkPromptForChat } from "./generate-fork-context"
 import { generateMergePromptForChats as defaultGenerateMergePrompt } from "./generate-merge-context"
 import type { TranscriptEntry } from "../shared/types"
 
-/** Duck-typed coordinator — accepts AgentCoordinator or RunnerProxy */
+/** Session coordinator interface — RunnerProxy delegates turn execution to the runner process */
 interface Coordinator {
   send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }>
   cancel(chatId: string): Promise<void>
@@ -249,7 +249,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
           throw new Error("Project not found")
         }
         return {
-          prompt: await generateForkPrompt(command.intent, store.getMessages(command.chatId), project.localPath, command.preset),
+          prompt: await generateForkPrompt(command.intent, await store.getMessages(command.chatId), project.localPath, command.preset),
         }
       }
 
@@ -265,13 +265,13 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (!mergeProject) {
           throw new Error("Project not found")
         }
-        const sessions = command.chatIds.map((chatId) => {
+        const sessions = await Promise.all(command.chatIds.map(async (chatId) => {
           const chat = store.getChat(chatId)
           if (!chat) {
             throw new Error(`Chat not found: ${chatId}`)
           }
-          return { chatId, entries: store.getMessages(chatId) }
-        })
+          return { chatId, entries: await store.getMessages(chatId) }
+        }))
         return {
           prompt: await generateMergePrompt(command.intent, sessions, mergeProject.localPath, command.preset),
         }
@@ -307,7 +307,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       }
 
       case "chat.getMessages": {
-        return store.getMessages(command.chatId, {
+        return await store.getMessages(command.chatId, {
           offset: command.offset,
           limit: command.limit,
         })

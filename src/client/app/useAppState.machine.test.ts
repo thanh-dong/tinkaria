@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test"
 import {
   canStartQueuedFlush,
   clearQueuedSubmit,
+  completeDirectSubmit,
   completeQueuedFlush,
   createProjectSelectionState,
   createSubmitPipelineState,
+  failDirectSubmit,
   failQueuedFlush,
   getQueuedFlushKey,
   getQueuedText,
@@ -12,6 +14,7 @@ import {
   markPostFlushBusyObserved,
   queueSubmit,
   resolveProjectSelection,
+  startDirectSubmit,
   startQueuedFlush,
   transitionProjectSelection,
 } from "./useAppState.machine"
@@ -106,6 +109,30 @@ describe("submitPipeline machine", () => {
 
     const busyObserved = markPostFlushBusyObserved(succeeded, "chat-1")
     expect(getSubmitPipelineMode(busyObserved, "chat-1")).toBe("idle")
+  })
+
+  test("treats a direct submit as locally busy until runtime busy is observed", () => {
+    const started = startDirectSubmit(createSubmitPipelineState(), {
+      chatId: "chat-1",
+      content: "Check layout",
+    })
+    expect(getSubmitPipelineMode(started, "chat-1")).toBe("flushing")
+
+    const succeeded = completeDirectSubmit(started, "chat-1")
+    expect(getSubmitPipelineMode(succeeded, "chat-1")).toBe("awaiting_busy_ack")
+
+    const busyObserved = markPostFlushBusyObserved(succeeded, "chat-1")
+    expect(getSubmitPipelineMode(busyObserved, "chat-1")).toBe("idle")
+  })
+
+  test("clears local busy state when a direct submit fails", () => {
+    const started = startDirectSubmit(createSubmitPipelineState(), {
+      chatId: "chat-1",
+      content: "Check layout",
+    })
+
+    const failed = failDirectSubmit(started, "chat-1")
+    expect(getSubmitPipelineMode(failed, "chat-1")).toBe("idle")
   })
 
   test("restores the failed flush text and blocks immediate retry until the queue changes", () => {

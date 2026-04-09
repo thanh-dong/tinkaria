@@ -138,7 +138,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
           store.state,
           agent.getActiveStatuses(),
           topic.chatId,
-          store.getMessageCount(topic.chatId),
+          await store.getMessageCount(topic.chatId),
           skills,
         )
       }

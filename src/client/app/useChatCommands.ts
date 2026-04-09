@@ -46,10 +46,13 @@ import {
 import type { AppTransport } from "./socket-interface"
 import type { SubmitPipelineState } from "./useAppState.machine"
 import {
+  completeDirectSubmit,
   completeQueuedFlush,
+  failDirectSubmit,
   failQueuedFlush,
   getSubmitPipelineMode,
   markPostFlushBusyObserved,
+  startDirectSubmit,
   startQueuedFlush,
   transitionProjectSelection,
   queueSubmit as queueSubmitTransition,
@@ -440,8 +443,19 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       return "queued" as const
     }
 
-    await handleSend(content, options)
-    return "sent" as const
+    updateSubmitPipeline((current) => startDirectSubmit(current, {
+      chatId: activeChatId,
+      content,
+    }))
+
+    try {
+      await handleSend(content, options)
+      updateSubmitPipeline((current) => completeDirectSubmit(current, activeChatId))
+      return "sent" as const
+    } catch (error) {
+      updateSubmitPipeline((current) => failDirectSubmit(current, activeChatId))
+      throw error
+    }
   }
 
   async function handleCancel() {

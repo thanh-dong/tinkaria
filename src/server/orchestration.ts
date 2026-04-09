@@ -37,7 +37,7 @@ interface OrchestratorStore {
   requireChat(chatId: string): { id: string; projectId: string; provider: AgentProvider | null }
   getProject(projectId: string): { id: string; localPath: string } | null
   listChatsByProject(projectId: string): Array<{ id: string }>
-  getMessages(chatId: string): TranscriptEntry[]
+  getMessages(chatId: string): Promise<TranscriptEntry[]>
 }
 
 export interface SessionOrchestratorArgs {
@@ -176,7 +176,7 @@ export class SessionOrchestrator {
 
     const model = args.model ?? normalizeServerModel(provider)
     const delegatedContext = args.forkContext
-      ? buildDelegatedContext(this.store.getMessages(callerChatId))
+      ? buildDelegatedContext(await this.store.getMessages(callerChatId))
       : undefined
     console.warn(`${LOG_PREFIX} spawnAgent: ${callerChatId} -> ${newChat.id} (depth=${newDepth}, provider=${provider})`)
 
