@@ -329,6 +329,10 @@ export function ChatPage() {
     if (!group) return []
     return group.chats.filter((chat) => chat.chatId !== state.activeChatId)
   }, [mergeSourceProjectId, state.sidebarData.projectGroups, state.activeChatId])
+  const knownChatIds = useMemo(
+    () => new Set(state.sidebarData.projectGroups.flatMap((group) => group.chats.map((chat) => chat.chatId))),
+    [state.sidebarData.projectGroups],
+  )
 
   useEffect(() => {
     if (state.pendingMergeProjectId) {
@@ -713,7 +717,16 @@ export function ChatPage() {
         <div className="bg-gradient-to-t from-background via-background pointer-events-auto" ref={state.inputRef}>
           <div className="px-3">
             <div className="max-w-[840px] mx-auto flex justify-end">
-              <SubagentIndicator hierarchy={state.orchestrationHierarchy} />
+              <SubagentIndicator
+                hierarchy={state.orchestrationHierarchy}
+                socket={state.socket}
+                localPath={state.runtime?.localPath ?? undefined}
+                knownChatIds={knownChatIds}
+                onOpenLocalLink={(target) => {
+                  void state.handleOpenLocalLink(target)
+                }}
+                onOpenExternalLink={state.handleOpenExternalLink}
+              />
             </div>
           </div>
           <ChatInput
