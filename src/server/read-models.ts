@@ -39,6 +39,7 @@ export function deriveSidebarData(
         unread: chat.unread,
         localPath: project.localPath,
         provider: chat.provider,
+        model: chat.model ?? null,
         lastMessageAt: chat.lastMessageAt,
         hasAutomation: false,
       }))

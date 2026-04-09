@@ -176,6 +176,7 @@ export interface SidebarChatRow {
   unread: boolean
   localPath: string
   provider: AgentProvider | null
+  model?: string | null
   lastMessageAt?: number
   hasAutomation: boolean
 }

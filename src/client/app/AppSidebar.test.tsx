@@ -81,7 +81,7 @@ describe("AppSidebar", () => {
     expect(html).toContain("tinkaria-mark-fine.svg")
   })
 
-  test("renders the chat provider glyph next to the sidebar row menu", () => {
+  test("renders the chat model indicator and provider glyph next to the sidebar row menu", () => {
     const html = renderSidebar({
       data: {
         projectGroups: [
@@ -96,6 +96,7 @@ describe("AppSidebar", () => {
               status: "idle",
               localPath: "/tmp/demo",
               provider: "codex",
+              model: "gpt-5.4",
               unread: false,
               lastMessageAt: 1,
               hasAutomation: false,
@@ -105,6 +106,7 @@ describe("AppSidebar", () => {
       },
     })
 
+    expect(html).toContain("gpt-5.4")
     expect(html).toContain('title="Codex"')
     expect(html).toContain('title="Chat actions"')
   })

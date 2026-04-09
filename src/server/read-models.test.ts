@@ -3,7 +3,7 @@ import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSidebarData } fr
 import { createEmptyState } from "./events"
 
 describe("read models", () => {
-  test("include provider data in sidebar rows", () => {
+  test("include provider and model data in sidebar rows", () => {
     const state = createEmptyState()
     state.projectsById.set("project-1", {
       id: "project-1",
@@ -21,6 +21,7 @@ describe("read models", () => {
       updatedAt: 1,
       unread: false,
       provider: "codex",
+      model: "gpt-5.4",
       planMode: false,
       sessionToken: "thread-1",
       lastTurnOutcome: null,
@@ -28,6 +29,7 @@ describe("read models", () => {
 
     const sidebar = deriveSidebarData(state, new Map())
     expect(sidebar.projectGroups[0]?.chats[0]?.provider).toBe("codex")
+    expect(sidebar.projectGroups[0]?.chats[0]?.model).toBe("gpt-5.4")
   })
 
   test("includes available providers in chat snapshots", () => {

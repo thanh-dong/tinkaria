@@ -105,7 +105,7 @@ export class EventStore {
         this.state.projectIdsByPath.set(project.localPath, project.id)
       }
       for (const chat of parsed.chats) {
-        this.state.chatsById.set(chat.id, { ...chat, unread: chat.unread ?? false })
+        this.state.chatsById.set(chat.id, { ...chat, unread: chat.unread ?? false, model: chat.model ?? null })
       }
       if (parsed.messages?.length) {
         this.snapshotHasLegacyMessages = true
@@ -212,6 +212,7 @@ export class EventStore {
           updatedAt: event.timestamp,
           unread: false,
           provider: null,
+          model: null,
           planMode: false,
           sessionToken: null,
           lastTurnOutcome: null,
@@ -237,6 +238,13 @@ export class EventStore {
         const chat = this.state.chatsById.get(event.chatId)
         if (!chat) break
         chat.provider = event.provider
+        chat.updatedAt = event.timestamp
+        break
+      }
+      case "chat_model_set": {
+        const chat = this.state.chatsById.get(event.chatId)
+        if (!chat) break
+        chat.model = event.model
         chat.updatedAt = event.timestamp
         break
       }
@@ -448,6 +456,19 @@ export class EventStore {
       timestamp: Date.now(),
       chatId,
       planMode,
+    }
+    await this.append(this.chatsLogPath, event)
+  }
+
+  async setChatModel(chatId: string, model: string | null) {
+    const chat = this.requireChat(chatId)
+    if ((chat.model ?? null) === model) return
+    const event: ChatEvent = {
+      v: STORE_VERSION,
+      type: "chat_model_set",
+      timestamp: Date.now(),
+      chatId,
+      model,
     }
     await this.append(this.chatsLogPath, event)
   }

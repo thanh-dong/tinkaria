@@ -51,6 +51,7 @@ export function ChatRow({
   const inputRef = useRef<HTMLInputElement>(null)
   const ProviderIcon = chat.provider ? PROVIDER_ICONS[chat.provider] : null
   const providerLabel = chat.provider ? PROVIDER_LABELS[chat.provider] : null
+  const modelLabel = typeof chat.model === "string" && chat.model.trim() ? chat.model.trim() : null
 
   useEffect(() => {
     if (isEditing) {
@@ -149,6 +150,20 @@ export function ChatRow({
           </span>
         )}
         <div className="mr-[2px] flex shrink-0 items-center gap-0.5">
+          {modelLabel ? (
+            <span
+              className={cn(
+                "max-w-24 truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground/70 transition-colors",
+                activeChatId === normalizeChatId(chat.chatId)
+                  ? "bg-primary/[0.08] text-foreground/70 dark:bg-primary/[0.14]"
+                  : "bg-muted/60 group-hover:bg-muted group-hover:text-muted-foreground"
+              )}
+              title={modelLabel}
+              aria-label={modelLabel}
+            >
+              {modelLabel}
+            </span>
+          ) : null}
           {ProviderIcon && providerLabel ? (
             <span
               className={cn(

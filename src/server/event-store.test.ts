@@ -220,4 +220,21 @@ describe("EventStore", () => {
     expect(snapshot.messages).toBeUndefined()
     expect(existsSync(join(dataDir, "transcripts", `${chat.id}.jsonl`))).toBe(true)
   })
+
+  test("persists chat model selections across reloads", async () => {
+    const dataDir = await createTempDataDir()
+    const store = new EventStore(dataDir)
+    await store.initialize()
+
+    const project = await store.openProject("/tmp/project")
+    const chat = await store.createChat(project.id)
+    await store.setChatProvider(chat.id, "codex")
+    await store.setChatModel(chat.id, "gpt-5.4")
+
+    const reloadedStore = new EventStore(dataDir)
+    await reloadedStore.initialize()
+
+    expect(reloadedStore.getChat(chat.id)?.provider).toBe("codex")
+    expect(reloadedStore.getChat(chat.id)?.model).toBe("gpt-5.4")
+  })
 })

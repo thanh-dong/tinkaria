@@ -13,6 +13,7 @@ export interface ChatRecord {
   deletedAt?: number
   unread: boolean
   provider: AgentProvider | null
+  model?: string | null
   planMode: boolean
   sessionToken: string | null
   lastMessageAt?: number
@@ -75,6 +76,13 @@ export type ChatEvent =
       timestamp: number
       chatId: string
       provider: AgentProvider
+    }
+  | {
+      v: 2
+      type: "chat_model_set"
+      timestamp: number
+      chatId: string
+      model: string | null
     }
   | {
       v: 2
