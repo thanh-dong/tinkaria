@@ -23,6 +23,7 @@ describe("ChatInput", () => {
         onSubmit={async () => "sent"}
         disabled={false}
         canCancel={false}
+        connectionStatus="connected"
         activeProvider={null}
         availableProviders={PROVIDERS}
         availableSkills={["c3"]}
@@ -40,5 +41,22 @@ describe("ChatInput", () => {
     expect(skillsToggleIndex).toBeGreaterThan(-1)
     expect(skillChipIndex).toBeLessThan(placeholderIndex)
     expect(skillsToggleIndex).toBeGreaterThan(modelIndex)
+  })
+
+  test("renders reconnect feedback inside the composer area instead of the transcript surface", () => {
+    const html = renderToStaticMarkup(
+      <ChatInput
+        onSubmit={async () => "sent"}
+        disabled={false}
+        canCancel={false}
+        connectionStatus="connecting"
+        activeProvider={null}
+        availableProviders={PROVIDERS}
+      />
+    )
+
+    expect(html).toContain("Reconnecting")
+    expect(html).toContain("bg-amber-500")
+    expect(html).not.toContain("transcript.message-list")
   })
 })

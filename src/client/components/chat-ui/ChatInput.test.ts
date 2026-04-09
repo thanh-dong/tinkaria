@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import {
+  getComposerActionDisabledState,
+  getComposerConnectionBadgeLabel,
   getQueueActionDisabledState,
   getComposerControlsKey,
   getRestoredQueuedTextOnArrowUp,
@@ -168,6 +170,7 @@ describe("queue action", () => {
         disabled: false,
         canCancel: true,
         chatId: "chat-1",
+        connectionStatus: "connected",
         activeProvider: null,
         availableProviders: PROVIDERS,
       })
@@ -185,6 +188,7 @@ describe("queue action", () => {
         canCancel: false,
         chatId: "chat-1",
         queuedText: "Queued follow-up",
+        connectionStatus: "connected",
         activeProvider: null,
         availableProviders: PROVIDERS,
       })
@@ -222,6 +226,21 @@ describe("queue action", () => {
       canCancel: true,
       isTouchDevice: false,
     })).toBe(false)
+  })
+})
+
+describe("composer reconnect feedback", () => {
+  test("labels non-idle connection states for the composer badge", () => {
+    expect(getComposerConnectionBadgeLabel("idle")).toBe("")
+    expect(getComposerConnectionBadgeLabel("reconnecting")).toBe("Reconnecting")
+    expect(getComposerConnectionBadgeLabel("reconnected")).toBe("Reconnected")
+  })
+
+  test("disables composer actions while reconnecting or fading back from success", () => {
+    expect(getComposerActionDisabledState({ disabled: false, reconnectVisualState: "idle" })).toBe(false)
+    expect(getComposerActionDisabledState({ disabled: false, reconnectVisualState: "reconnecting" })).toBe(true)
+    expect(getComposerActionDisabledState({ disabled: false, reconnectVisualState: "reconnected" })).toBe(true)
+    expect(getComposerActionDisabledState({ disabled: true, reconnectVisualState: "idle" })).toBe(true)
   })
 })
 

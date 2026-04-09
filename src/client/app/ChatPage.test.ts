@@ -14,6 +14,7 @@ import {
   getComposerLiftPx,
   getEmptyStateTypingDurationMs,
   getScrollButtonBottomPx,
+  shouldRenderTranscriptCommandError,
   shouldDismissMobileKeyboardOnFirstMessage,
   shouldIgnoreMobileSidebarSwipeStart,
   shouldOpenMobileSidebarFromSwipe,
@@ -269,6 +270,34 @@ describe("shouldDismissMobileKeyboardOnFirstMessage", () => {
 
   test("returns false when current count is still 0", () => {
     expect(shouldDismissMobileKeyboardOnFirstMessage(0, 0, true)).toBe(false)
+  })
+})
+
+describe("shouldRenderTranscriptCommandError", () => {
+  test("suppresses connection recovery copy in the transcript while the socket is offline", () => {
+    expect(shouldRenderTranscriptCommandError({
+      commandError: "Can't reach your local Tinkaria server yet. Wait a moment, or start Tinkaria in a terminal on this machine and try again.",
+      connectionStatus: "connecting",
+    })).toBe(false)
+
+    expect(shouldRenderTranscriptCommandError({
+      commandError: "The connection to your local Tinkaria server dropped. Tinkaria will keep trying to reconnect.",
+      connectionStatus: "disconnected",
+    })).toBe(false)
+  })
+
+  test("keeps non-connection errors visible in the transcript", () => {
+    expect(shouldRenderTranscriptCommandError({
+      commandError: "Unexpected failure",
+      connectionStatus: "disconnected",
+    })).toBe(true)
+  })
+
+  test("keeps connection-related errors visible again once the socket is back", () => {
+    expect(shouldRenderTranscriptCommandError({
+      commandError: "Can't reach your local Tinkaria server yet. Wait a moment, or start Tinkaria in a terminal on this machine and try again.",
+      connectionStatus: "connected",
+    })).toBe(true)
   })
 })
 

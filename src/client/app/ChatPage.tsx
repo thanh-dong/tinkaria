@@ -229,6 +229,21 @@ export function shouldDismissMobileKeyboardOnFirstMessage(
   return isTouchDevice && previousMessageCount === 0 && currentMessageCount > 0
 }
 
+export function shouldRenderTranscriptCommandError(args: {
+  commandError: string | null
+  connectionStatus: AppState["connectionStatus"]
+}): boolean {
+  if (!args.commandError) return false
+  if (args.connectionStatus === "connected") return true
+
+  const normalizedError = args.commandError.toLowerCase()
+  if (normalizedError.includes("can't reach your local") || normalizedError.includes("will keep trying to reconnect")) {
+    return false
+  }
+
+  return true
+}
+
 export function getChatPageUiIdentities() {
   return CHAT_PAGE_UI_IDENTITIES
 }
@@ -511,7 +526,10 @@ export function ChatPage() {
                     onExitPlanModeConfirm={state.handleExitPlanMode}
                   />
                   {state.isProcessing ? <ProcessingMessage status={state.runtime?.status} /> : null}
-                  {state.commandError ? (
+                  {shouldRenderTranscriptCommandError({
+                    commandError: state.commandError,
+                    connectionStatus: state.connectionStatus,
+                  }) ? (
                     <div className="text-sm text-destructive border border-destructive/20 bg-destructive/5 rounded-xl px-4 py-3">
                       {state.commandError}
                     </div>
@@ -659,6 +677,7 @@ export function ChatPage() {
             disabled={!state.hasSelectedProject || state.runtime?.status === "waiting_for_user" || state.pendingSessionBootstrap?.chatId === state.activeChatId}
             canCancel={state.canCancel}
             chatId={state.activeChatId}
+            connectionStatus={state.connectionStatus}
             activeProvider={state.runtime?.provider ?? null}
             availableProviders={state.availableProviders}
             availableSkills={availableSkills}

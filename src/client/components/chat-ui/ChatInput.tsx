@@ -1,5 +1,5 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react"
-import { ArrowUp, ClockPlus } from "lucide-react"
+import { ArrowUp, Check, ClockPlus, Loader2 } from "lucide-react"
 import {
   type AgentProvider,
   type ClaudeModelOptions,
@@ -20,6 +20,11 @@ import { useSkillCompositionStore, computeSkillInsertion, formatSkillCommand } f
 import { CHAT_INPUT_ATTRIBUTE, focusNextChatInput } from "../../app/chatFocusPolicy"
 import { ChatPreferenceControls, type ModelOptionChange } from "./ChatPreferenceControls"
 import { SkillRibbon } from "./SkillRibbon"
+import type { SocketStatus } from "../../app/socket-interface"
+
+const RECONNECT_SUCCESS_FADE_MS = 1200
+
+type ComposerReconnectVisualState = "idle" | "reconnecting" | "reconnected"
 
 interface Props {
   onSubmit: (
@@ -33,6 +38,7 @@ interface Props {
   disabled: boolean
   canCancel?: boolean
   chatId?: string | null
+  connectionStatus: SocketStatus
   activeProvider: AgentProvider | null
   availableProviders: ProviderCatalogEntry[]
   availableSkills?: string[]
@@ -139,6 +145,24 @@ export function shouldShowQueueAction(canCancel: boolean): boolean {
 
 export function getQueueActionDisabledState(args: { disabled: boolean; value: string }): boolean {
   return args.disabled || !args.value.trim()
+}
+
+export function getComposerConnectionBadgeLabel(reconnectVisualState: ComposerReconnectVisualState): string {
+  switch (reconnectVisualState) {
+    case "reconnecting":
+      return "Reconnecting"
+    case "reconnected":
+      return "Reconnected"
+    default:
+      return ""
+  }
+}
+
+export function getComposerActionDisabledState(args: {
+  disabled: boolean
+  reconnectVisualState: ComposerReconnectVisualState
+}): boolean {
+  return args.disabled || args.reconnectVisualState !== "idle"
 }
 
 export function shouldQueueOnSubmitKeystroke(args: {
@@ -363,6 +387,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   disabled,
   canCancel,
   chatId,
+  connectionStatus,
   activeProvider,
   availableProviders,
   availableSkills = [],
@@ -409,6 +434,16 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     c3ComponentId: "c3-112",
     c3ComponentLabel: "chat-input",
   })
+  const connectionBadgeId = createUiIdentity("chat.composer.connection", "section")
+  const connectionBadgeDescriptor = createUiIdentityDescriptor({
+    id: connectionBadgeId,
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  })
+  const [reconnectVisualState, setReconnectVisualState] = useState<ComposerReconnectVisualState>(() => (
+    connectionStatus === "connected" ? "idle" : "reconnecting"
+  ))
+  const hasConnectedRef = useRef(connectionStatus === "connected")
 
   function getComposerSnapshot() {
     return composerPreferencesRef.current?.getSnapshot() ?? resolveComposerPreferences({
@@ -458,6 +493,33 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   useEffect(() => {
     if (!isTouchDevice) textareaRef.current?.focus()
   }, [chatId, isTouchDevice])
+
+  useEffect(() => {
+    if (connectionStatus !== "connected") {
+      setReconnectVisualState("reconnecting")
+      return
+    }
+
+    if (!hasConnectedRef.current) {
+      hasConnectedRef.current = true
+      setReconnectVisualState("idle")
+      return
+    }
+
+    if (reconnectVisualState !== "reconnecting") {
+      setReconnectVisualState("idle")
+      return
+    }
+
+    setReconnectVisualState("reconnected")
+    const timeoutId = window.setTimeout(() => {
+      setReconnectVisualState("idle")
+    }, RECONNECT_SUCCESS_FADE_MS)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [connectionStatus, reconnectVisualState])
 
   const resolvedProvider = activeProvider ?? composerState.provider
 
@@ -601,7 +663,14 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     }
   }
   const showQueueAction = shouldShowQueueAction(Boolean(canCancel))
-  const queueActionDisabled = getQueueActionDisabledState({ disabled, value })
+  const composerActionsDisabled = getComposerActionDisabledState({
+    disabled: disabled || connectionStatus !== "connected",
+    reconnectVisualState,
+  })
+  const queueActionDisabled = getQueueActionDisabledState({ disabled: composerActionsDisabled, value })
+  const submitActionDisabled = composerActionsDisabled || !value.trim()
+  const showConnectionBadge = reconnectVisualState !== "idle"
+  const connectionBadgeLabel = getComposerConnectionBadgeLabel(reconnectVisualState)
   return (
     <div>
       {shouldShowQueuedBlock(queuedText) ? (
@@ -638,72 +707,132 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       <div className={cn("px-3 pt-0", isStandalone && "px-5")}>
         <div
           {...getUiIdentityAttributeProps(composerAreaDescriptor)}
-          className="flex items-end gap-2 max-w-[840px] mx-auto border dark:bg-card/40 backdrop-blur-lg border-border rounded-[29px] pr-1.5"
-        >
-          <Textarea
-            ref={setTextareaRefs}
-            placeholder="Build something..."
-            value={value}
-            autoFocus={!isTouchDevice}
-            {...{ [CHAT_INPUT_ATTRIBUTE]: "" }}
-            rows={1}
-            onChange={(event) => {
-              setValue(event.target.value)
-              if (chatId) setDraft(chatId, event.target.value)
-              autoResize()
-            }}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-            className="flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
-          />
-          {showQueueAction ? (
-            <div className="mb-1 flex items-center gap-2 md:mb-1.5">
-              <Button
-                {...getUiIdentityAttributeProps(cancelActionDescriptor)}
-                type="button"
-                aria-label="Stop"
-                onPointerDown={(event) => {
-                  event.preventDefault()
-                  onCancel?.()
-                }}
-                size="icon"
-                className="flex-shrink-0 bg-slate-600 text-white dark:bg-white dark:text-slate-900 rounded-full cursor-pointer h-10 w-10 md:h-11 md:w-11 touch-manipulation"
-              >
-                <div className="w-3 h-3 md:w-4 md:h-4 rounded-xs bg-current" />
-              </Button>
-              <Button
-                {...getUiIdentityAttributeProps(queueActionDescriptor)}
-                type="button"
-                aria-label="Queue"
-                title="Queue"
-                onPointerDown={(event) => {
-                  event.preventDefault()
-                  handleQueueAction()
-                }}
-                disabled={queueActionDisabled}
-                size="icon"
-                className="h-10 w-10 rounded-full md:h-11 md:w-11"
-              >
-                <ClockPlus className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <Button
-              {...getUiIdentityAttributeProps(submitActionDescriptor)}
-              type="button"
-              onPointerDown={(event) => {
-                event.preventDefault()
-                if (!disabled && value.trim()) {
-                  void handleSubmit()
-                }
-              }}
-              disabled={disabled || !value.trim()}
-              size="icon"
-              className="flex-shrink-0 bg-slate-600 text-white dark:bg-white dark:text-slate-900 rounded-full cursor-pointer h-10 w-10 md:h-11 md:w-11 mb-1 -mr-0.5 md:mr-0 md:mb-1.5 touch-manipulation disabled:bg-white/60 disabled:text-slate-700"
-            >
-              <ArrowUp className="h-5 w-5 md:h-6 md:w-6" />
-            </Button>
+          className={cn(
+            "max-w-[840px] mx-auto rounded-[29px] border pr-1.5 dark:bg-card/40 backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
+            reconnectVisualState === "reconnecting" && "border-amber-400/80 shadow-[0_0_0_1px_rgba(251,146,60,0.18)]",
+            reconnectVisualState === "reconnected" && "border-emerald-400/80 shadow-[0_0_0_1px_rgba(52,211,153,0.16)]",
+            reconnectVisualState === "idle" && "border-border",
           )}
+        >
+          <div className="flex flex-col gap-1.5">
+            {showConnectionBadge ? (
+              <div className="flex justify-end pt-2 pr-2">
+                <div
+                  {...getUiIdentityAttributeProps(connectionBadgeDescriptor)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] transition-all duration-300",
+                    reconnectVisualState === "reconnecting"
+                      && "border-amber-400/60 bg-amber-100/80 text-amber-800 dark:border-amber-300/40 dark:bg-amber-500/15 dark:text-amber-100",
+                    reconnectVisualState === "reconnected"
+                      && "border-emerald-400/60 bg-emerald-100/80 text-emerald-800 dark:border-emerald-300/40 dark:bg-emerald-500/15 dark:text-emerald-100 opacity-70",
+                  )}
+                >
+                  {reconnectVisualState === "reconnecting" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
+                  <span className={cn(reconnectVisualState === "reconnecting" && "animate-pulse")}>
+                    {connectionBadgeLabel}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            <div className="flex items-end gap-2">
+              <Textarea
+                ref={setTextareaRefs}
+                placeholder="Build something..."
+                value={value}
+                autoFocus={!isTouchDevice}
+                {...{ [CHAT_INPUT_ATTRIBUTE]: "" }}
+                rows={1}
+                onChange={(event) => {
+                  setValue(event.target.value)
+                  if (chatId) setDraft(chatId, event.target.value)
+                  autoResize()
+                }}
+                onKeyDown={handleKeyDown}
+                disabled={disabled}
+                className="flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
+              />
+              {showQueueAction ? (
+                <div className="mb-1 flex items-center gap-2 md:mb-1.5">
+                  <Button
+                    {...getUiIdentityAttributeProps(cancelActionDescriptor)}
+                    type="button"
+                    aria-label="Stop"
+                    onPointerDown={(event) => {
+                      event.preventDefault()
+                      onCancel?.()
+                    }}
+                    disabled={composerActionsDisabled}
+                    size="icon"
+                    className={cn(
+                      "flex-shrink-0 rounded-full h-10 w-10 md:h-11 md:w-11 touch-manipulation transition-colors",
+                      reconnectVisualState === "reconnecting"
+                        ? "bg-amber-500 text-white animate-pulse disabled:bg-amber-500 disabled:text-white"
+                        : reconnectVisualState === "reconnected"
+                          ? "bg-emerald-500 text-white disabled:bg-emerald-500 disabled:text-white"
+                          : "bg-slate-600 text-white dark:bg-white dark:text-slate-900",
+                    )}
+                  >
+                    <div className="w-3 h-3 md:w-4 md:h-4 rounded-xs bg-current" />
+                  </Button>
+                  <Button
+                    {...getUiIdentityAttributeProps(queueActionDescriptor)}
+                    type="button"
+                    aria-label="Queue"
+                    title="Queue"
+                    onPointerDown={(event) => {
+                      event.preventDefault()
+                      handleQueueAction()
+                    }}
+                    disabled={queueActionDisabled}
+                    size="icon"
+                    className={cn(
+                      "h-10 w-10 rounded-full md:h-11 md:w-11 transition-colors",
+                      reconnectVisualState === "reconnecting"
+                        ? "bg-amber-500 text-white animate-pulse disabled:bg-amber-500 disabled:text-white"
+                        : reconnectVisualState === "reconnected"
+                          ? "bg-emerald-500 text-white disabled:bg-emerald-500 disabled:text-white"
+                          : "",
+                    )}
+                  >
+                    <ClockPlus className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  {...getUiIdentityAttributeProps(submitActionDescriptor)}
+                  type="button"
+                  onPointerDown={(event) => {
+                    event.preventDefault()
+                    if (!submitActionDisabled && value.trim()) {
+                      void handleSubmit()
+                    }
+                  }}
+                  disabled={submitActionDisabled}
+                  size="icon"
+                  className={cn(
+                    "flex-shrink-0 rounded-full h-10 w-10 md:h-11 md:w-11 mb-1 -mr-0.5 md:mr-0 md:mb-1.5 touch-manipulation transition-colors",
+                    reconnectVisualState === "reconnecting"
+                      ? "bg-amber-500 text-white animate-pulse disabled:bg-amber-500 disabled:text-white"
+                      : reconnectVisualState === "reconnected"
+                        ? "bg-emerald-500 text-white disabled:bg-emerald-500 disabled:text-white"
+                        : "bg-slate-600 text-white dark:bg-white dark:text-slate-900 disabled:bg-white/60 disabled:text-slate-700",
+                  )}
+                >
+                  {reconnectVisualState === "reconnecting" ? (
+                    <Loader2 className="h-5 w-5 animate-spin md:h-6 md:w-6" />
+                  ) : reconnectVisualState === "reconnected" ? (
+                    <Check className="h-5 w-5 md:h-6 md:w-6" />
+                  ) : (
+                    <ArrowUp className="h-5 w-5 md:h-6 md:w-6" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       <div className={cn("overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-3 flex flex-row", isStandalone && "p-5 pt-3")}>
