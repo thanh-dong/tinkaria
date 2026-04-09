@@ -633,6 +633,7 @@ export interface ChatRuntime {
   title: string
   status: SessionStatus
   provider: AgentProvider | null
+  model: string | null
   planMode: boolean
   sessionToken: string | null
 }

@@ -13,6 +13,7 @@ import {
   getChatPageUiIdentities,
   getComposerLiftPx,
   getEmptyStateTypingDurationMs,
+  getPendingSessionBootstrapStatusLabel,
   getScrollButtonBottomPx,
   shouldRenderTranscriptCommandError,
   shouldDismissMobileKeyboardOnFirstMessage,
@@ -122,6 +123,34 @@ describe("getScrollButtonBottomPx", () => {
       hasAvailableSkills: true,
       skillsRibbonVisible: true,
     })).toBe(172)
+  })
+})
+
+describe("getPendingSessionBootstrapStatusLabel", () => {
+  test("describes fork compaction as preparing the opening brief", () => {
+    expect(getPendingSessionBootstrapStatusLabel({
+      pendingSessionBootstrap: {
+        chatId: "chat-1",
+        kind: "fork",
+        phase: "compacting",
+        sourceLabels: ["Source"],
+        previewTitle: "Fork: Source",
+        previewIntent: "Investigate the timeout.",
+      },
+    } as never)).toBe("Preparing the opening brief from the current chat...")
+  })
+
+  test("describes merge startup with merged-session wording", () => {
+    expect(getPendingSessionBootstrapStatusLabel({
+      pendingSessionBootstrap: {
+        chatId: "chat-2",
+        kind: "merge",
+        phase: "starting",
+        sourceLabels: ["A", "B"],
+        previewTitle: "Merge: A + B",
+        previewIntent: "Combine the verified findings.",
+      },
+    } as never)).toBe("Starting the merged session...")
   })
 })
 

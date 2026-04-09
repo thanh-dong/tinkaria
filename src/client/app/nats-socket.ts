@@ -198,14 +198,14 @@ export class NatsSocket implements AppTransport {
     )
   }
 
-  async command<TResult = unknown>(command: ClientCommand): Promise<TResult> {
+  async command<TResult = unknown>(command: ClientCommand, options?: { timeoutMs?: number }): Promise<TResult> {
     if (!this.nc) {
       throw new Error("Not connected")
     }
 
     const subject = commandSubject(command.type)
     const payload = encoder.encode(JSON.stringify(command))
-    const reply = await this.nc.request(subject, payload, { timeout: 30_000 })
+    const reply = await this.nc.request(subject, payload, { timeout: options?.timeoutMs ?? 30_000 })
     const decoded = await decompressPayload(reply.data)
     let response: NatsCommandResponse
     try {

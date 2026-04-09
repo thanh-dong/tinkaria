@@ -137,6 +137,20 @@ describe("NatsSocket JetStream integration", () => {
   })
 })
 
+describe("NatsSocket command", () => {
+  test("uses the provided timeout override for long-running commands", async () => {
+    const request = mock(async (_subject: string, _payload: Uint8Array, options: { timeout: number }) => {
+      expect(options.timeout).toBe(120_000)
+      return { data: new TextEncoder().encode(JSON.stringify({ ok: true, result: { ok: true } })) }
+    })
+
+    const socket = new NatsSocket() as any
+    socket.nc = { request }
+
+    await expect(socket.command({ type: "system.ping" }, { timeoutMs: 120_000 })).resolves.toEqual({ ok: true })
+  })
+})
+
 describe("resetSubscriptionEntryForReconnect", () => {
   test("closes stale subscription handles and clears the entry", () => {
     const unsubscribeSnapshot = mock(() => {})

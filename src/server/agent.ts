@@ -518,20 +518,20 @@ export class AgentCoordinator {
     }
 
     let turn: HarnessTurn
-    if (args.provider === "claude") {
-      turn = await startClaudeTurn({
-        content: buildTurnPrompt(args.content, { delegatedContext: args.delegatedContext, isSpawned: args.isSpawned, chatId: args.chatId }),
-        localPath: project.localPath,
-        model: args.model,
-        effort: args.effort,
-        planMode: args.planMode,
-        sessionToken: chat.sessionToken,
-        onToolRequest,
-        orchestrator: this.orchestrator,
-        chatId: args.chatId,
-      })
-    } else {
-      try {
+    try {
+      if (args.provider === "claude") {
+        turn = await startClaudeTurn({
+          content: buildTurnPrompt(args.content, { delegatedContext: args.delegatedContext, isSpawned: args.isSpawned, chatId: args.chatId }),
+          localPath: project.localPath,
+          model: args.model,
+          effort: args.effort,
+          planMode: args.planMode,
+          sessionToken: chat.sessionToken,
+          onToolRequest,
+          orchestrator: this.orchestrator,
+          chatId: args.chatId,
+        })
+      } else {
         await this.codexRuntime.startSession({
           chatId: args.chatId,
           projectId: project.id,
@@ -553,16 +553,16 @@ export class AgentCoordinator {
           orchestrationChatId: args.chatId,
           onToolRequest,
         })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        await this.appendAndPublish(
-          args.chatId,
-          timestamped({ kind: "result", subtype: "error", isError: true, durationMs: 0, result: message })
-        )
-        await this.store.recordTurnFailed(args.chatId, message)
-        this.onStateChange()
-        return
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      await this.appendAndPublish(
+        args.chatId,
+        timestamped({ kind: "result", subtype: "error", isError: true, durationMs: 0, result: message })
+      )
+      await this.store.recordTurnFailed(args.chatId, message)
+      this.onStateChange()
+      return
     }
 
     const active: ActiveTurn = {

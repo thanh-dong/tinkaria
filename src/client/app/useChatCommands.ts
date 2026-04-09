@@ -5,10 +5,18 @@ import type {
   AgentProvider,
   AskUserQuestionAnswerMap,
   AskUserQuestionItem,
+  ChatRuntime,
+  ClaudeModelOptions,
+  CodexModelOptions,
   ModelOptions,
   SessionsSnapshot,
   UpdateInstallResult,
   UpdateSnapshot,
+} from "../../shared/types"
+import {
+  getProviderCatalog,
+  normalizeClaudeContextWindow,
+  resolveClaudeApiModelId,
 } from "../../shared/types"
 import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
 import { useChatInputStore } from "../stores/chatInputStore"
@@ -20,12 +28,16 @@ import type { useAppDialog } from "../components/ui/app-dialog"
 import { deleteCachedChat } from "./chatCache"
 import {
   clearPendingSessionBootstrapAfterAttempt,
+  deriveForkSessionPreviewTitle,
+  deriveMergeSessionPreviewTitle,
   getNewestRemainingChatId,
   getSidebarChatLabels,
   getSidebarChatRow,
   normalizeLocalFilePreviewErrorMessage,
+  normalizeSessionBootstrapErrorMessage,
   resolveComposeIntent,
   shouldQueueChatSubmit,
+  summarizeSessionBootstrapIntent,
   transitionPendingSessionBootstrapToError,
   type PendingSessionBootstrap,
   type ProjectRequest,
@@ -59,6 +71,51 @@ function clearUiUpdateRestartPhase() {
 }
 
 export { getUiUpdateRestartPhase, setUiUpdateRestartPhase, clearUiUpdateRestartPhase, UI_UPDATE_RESTART_STORAGE_KEY }
+
+export interface SubmitOptions {
+  provider?: AgentProvider
+  model?: string
+  modelOptions?: ModelOptions
+  planMode?: boolean
+}
+
+function resolveRequestedProvider(runtime: ChatRuntime | null, options?: SubmitOptions): AgentProvider | null {
+  return runtime?.provider ?? options?.provider ?? null
+}
+
+export function resolveRequestedSessionModel(runtime: ChatRuntime | null, options?: SubmitOptions): string | null {
+  const provider = resolveRequestedProvider(runtime, options)
+  if (!provider) return null
+
+  if (!options?.model) {
+    return runtime?.provider === provider ? runtime.model : null
+  }
+
+  if (provider === "claude") {
+    const baseModel = options.model ?? getProviderCatalog("claude").defaultModel
+    const contextWindow = normalizeClaudeContextWindow(
+      baseModel,
+      options?.modelOptions?.claude?.contextWindow,
+    )
+    return resolveClaudeApiModelId(baseModel, contextWindow)
+  }
+
+  return options?.model ?? getProviderCatalog("codex").defaultModel
+}
+
+export function shouldForkForIncompatibleSessionTarget(runtime: ChatRuntime | null, options?: SubmitOptions): boolean {
+  if (!runtime?.sessionToken || !runtime.provider) return false
+
+  const requestedProvider = resolveRequestedProvider(runtime, options)
+  if (!requestedProvider) return false
+  if (requestedProvider !== runtime.provider) return true
+
+  const requestedModel = resolveRequestedSessionModel(runtime, options)
+  if (!requestedModel) return false
+  if (!runtime.model) return true
+
+  return requestedModel !== runtime.model
+}
 
 export interface ChatCommandsArgs {
   socket: AppTransport
@@ -102,10 +159,10 @@ export interface ChatCommandsReturn {
   handleCreateProject: (project: ProjectRequest) => Promise<void>
   handleCheckForUpdates: (options?: { force?: boolean }) => Promise<void>
   handleInstallUpdate: () => Promise<void>
-  handleSend: (content: string, options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }) => Promise<void>
+  handleSend: (content: string, options?: SubmitOptions) => Promise<void>
   handleSubmitFromComposer: (
     content: string,
-    options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
+    options?: SubmitOptions
   ) => Promise<"queued" | "sent">
   handleCancel: () => Promise<void>
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
@@ -301,10 +358,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
   // --- Chat lifecycle commands ---
 
-  async function handleSend(
-    content: string,
-    options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
-  ) {
+  async function handleSend(content: string, options?: SubmitOptions) {
     try {
       let projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
       if (!activeChatId && !projectId && fallbackLocalProjectPath) {
@@ -321,6 +375,17 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
       if (!activeChatId && !projectId) {
         throw new Error("Open a project first")
+      }
+
+      if (activeChatId && shouldForkForIncompatibleSessionTarget(runtime, options)) {
+        const forkProvider = resolveRequestedProvider(runtime, options) ?? "claude"
+        const forkModel = resolveRequestedSessionModel(runtime, options) ?? getProviderCatalog(forkProvider).defaultModel
+        await handleForkSession(content, forkProvider, forkModel, undefined, {
+          modelOptions: options?.modelOptions,
+          planMode: options?.planMode,
+        })
+        setCommandError(null)
+        return
       }
 
       scrollFollowToBottom("auto")
@@ -350,7 +415,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
   async function handleSubmitFromComposer(
     content: string,
-    options?: { provider?: AgentProvider; model?: string; modelOptions?: ModelOptions; planMode?: boolean }
+    options?: SubmitOptions
   ) {
     keepComposerSubmitAnchored()
 
@@ -604,7 +669,13 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
   // --- Fork/merge commands ---
 
-  async function handleForkSession(intent: string, provider: AgentProvider, model: string, preset?: string) {
+  async function handleForkSession(
+    intent: string,
+    provider: AgentProvider,
+    model: string,
+    preset?: string,
+    overrides?: { modelOptions?: ModelOptions; planMode?: boolean }
+  ) {
     if (!activeChatId) {
       throw new Error("Open a chat first")
     }
@@ -613,13 +684,26 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       throw new Error("Open a project first")
     }
 
+    const sourceTitle = getSidebarChatRow(sidebarData.projectGroups, activeChatId)?.title?.trim() || chatSnapshot?.runtime?.title || activeChatId
+    const previewTitle = deriveForkSessionPreviewTitle({
+      sourceTitle,
+      intent,
+    })
+    const previewIntent = summarizeSessionBootstrapIntent(intent)
     const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
+    await socket.command({
+      type: "chat.rename",
+      chatId,
+      title: previewTitle,
+    })
     setPendingChatId(chatId)
     setPendingSessionBootstrap({
       chatId,
       kind: "fork",
       phase: "compacting",
-      sourceLabels: [getSidebarChatRow(sidebarData.projectGroups, activeChatId)?.title?.trim() || activeChatId],
+      sourceLabels: [sourceTitle],
+      previewTitle,
+      previewIntent,
     })
     navigate(`/chat/${chatId}`)
     setSidebarOpen(false)
@@ -632,18 +716,30 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
           chatId: activeChatId,
           intent,
           preset,
-        })
+        }, { timeoutMs: 120_000 })
         setPendingSessionBootstrap((current) => current?.chatId === chatId
           ? { ...current, phase: "starting" }
           : current)
         const defaults = useChatPreferencesStore.getState().providerDefaults[provider]
-        const modelOptions: ModelOptions = provider === "claude"
-          ? { claude: { ...defaults.modelOptions as import("../../shared/types").ClaudeModelOptions } }
-          : { codex: { ...defaults.modelOptions as import("../../shared/types").CodexModelOptions } }
+        const modelOptions: ModelOptions = overrides?.modelOptions
+          ? provider === "claude"
+            ? { claude: { ...(overrides.modelOptions.claude as ClaudeModelOptions | undefined ?? defaults.modelOptions as ClaudeModelOptions) } }
+            : { codex: { ...(overrides.modelOptions.codex as CodexModelOptions | undefined ?? defaults.modelOptions as CodexModelOptions) } }
+          : provider === "claude"
+            ? { claude: { ...defaults.modelOptions as ClaudeModelOptions } }
+            : { codex: { ...defaults.modelOptions as CodexModelOptions } }
 
-        await socket.command({ type: "chat.send", chatId, provider, content: prompt, model, modelOptions })
+        await socket.command({
+          type: "chat.send",
+          chatId,
+          provider,
+          content: prompt,
+          model,
+          modelOptions,
+          planMode: overrides?.planMode ?? defaults.planMode,
+        })
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
+        const message = normalizeSessionBootstrapErrorMessage("fork", error)
         console.warn("[fork] background fork failed:", message)
         setPendingSessionBootstrap((current) => transitionPendingSessionBootstrapToError(current, chatId, message))
       } finally {
@@ -662,14 +758,27 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       throw new Error("Open a project first")
     }
 
+    const sourceLabels = getSidebarChatLabels(sidebarData.projectGroups, chatIds)
+    const previewTitle = deriveMergeSessionPreviewTitle({
+      sourceLabels,
+      intent,
+    })
+    const previewIntent = summarizeSessionBootstrapIntent(intent)
     // Step 1: Create chat + navigate instantly
     const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
+    await socket.command({
+      type: "chat.rename",
+      chatId,
+      title: previewTitle,
+    })
     setPendingChatId(chatId)
     setPendingSessionBootstrap({
       chatId,
       kind: "merge",
       phase: "compacting",
-      sourceLabels: getSidebarChatLabels(sidebarData.projectGroups, chatIds),
+      sourceLabels,
+      previewTitle,
+      previewIntent,
     })
     navigate(`/chat/${chatId}`)
     setSidebarOpen(false)
@@ -680,7 +789,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       try {
         const { prompt } = await socket.command<{ prompt: string }>({
           type: "chat.generateMergePrompt", chatIds, intent, preset,
-        })
+        }, { timeoutMs: 120_000 })
         setPendingSessionBootstrap((current) => current?.chatId === chatId
           ? { ...current, phase: "starting" }
           : current)
@@ -701,7 +810,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
           }
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
+        const message = normalizeSessionBootstrapErrorMessage("merge", error)
         console.warn("[merge] background merge failed:", message)
         setPendingSessionBootstrap((current) => transitionPendingSessionBootstrapToError(current, chatId, message))
       } finally {

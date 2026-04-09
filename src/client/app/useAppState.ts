@@ -253,9 +253,9 @@ export function useAppState(activeChatId: string | null): AppState {
       return
     }
 
-    if (reconnectAction === "navigate_changelog") {
+    if (reconnectAction === "navigate_home") {
       clearUiUpdateRestartPhase()
-      navigate("/settings/changelog", { replace: true })
+      navigate("/", { replace: true })
     }
   }, [connectionStatus, navigate])
 

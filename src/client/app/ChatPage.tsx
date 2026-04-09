@@ -136,6 +136,22 @@ export function getAvailableSkillsFromMessages(messages: HydratedTranscriptMessa
   return []
 }
 
+export function getPendingSessionBootstrapStatusLabel(state: Pick<AppState, "pendingSessionBootstrap">): string {
+  if (state.pendingSessionBootstrap?.phase === "compacting") {
+    return state.pendingSessionBootstrap.kind === "fork"
+      ? "Preparing the opening brief from the current chat..."
+      : "Preparing the combined opening brief..."
+  }
+
+  if (state.pendingSessionBootstrap?.phase === "starting") {
+    return state.pendingSessionBootstrap.kind === "fork"
+      ? "Starting the forked session..."
+      : "Starting the merged session..."
+  }
+
+  return ""
+}
+
 export function getScrollButtonBottomPx(args: {
   hasAvailableSkills: boolean
   skillsRibbonVisible: boolean
@@ -481,6 +497,7 @@ export function ChatPage() {
         <ForkSessionDialog
           open={forkDialogOpen}
           onOpenChange={setForkDialogOpen}
+          sourceTitle={state.runtime?.title ?? null}
           defaultProvider={state.runtime?.provider ?? "claude"}
           defaultModel={state.availableProviders.find(
             (p) => p.id === (state.runtime?.provider ?? "claude")
@@ -576,10 +593,26 @@ export function ChatPage() {
                   ) : (
                     <>
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+                      <div className="pointer-events-auto flex w-full max-w-xl flex-col gap-3 rounded-[24px] border border-border/70 bg-background/92 p-4 text-left shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
+                            {state.pendingSessionBootstrap.kind === "fork" ? "Fork draft" : "Merge draft"}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground/70">
+                            {state.pendingSessionBootstrap.phase === "compacting" ? "Preparing" : "Starting"}
+                          </span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="text-sm font-medium text-foreground">
+                            {state.pendingSessionBootstrap.previewTitle}
+                          </div>
+                          <p className="text-sm leading-6 text-muted-foreground">
+                            {state.pendingSessionBootstrap.previewIntent}
+                          </p>
+                        </div>
+                      </div>
                       <span className="text-sm text-muted-foreground">
-                        {state.pendingSessionBootstrap.phase === "compacting"
-                          ? `Compacting ${state.pendingSessionBootstrap.sourceLabels.length} context${state.pendingSessionBootstrap.sourceLabels.length === 1 ? "" : "s"}...`
-                          : "Starting dedicated session..."}
+                        {getPendingSessionBootstrapStatusLabel(state)}
                       </span>
                       {state.pendingSessionBootstrap.phase === "compacting" ? (
                         <div className="flex max-w-md flex-wrap items-center justify-center gap-2">

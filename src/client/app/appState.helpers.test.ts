@@ -11,6 +11,8 @@ function pendingBootstrap(kind: PendingSessionBootstrap["kind"], phase: PendingS
     kind,
     phase,
     sourceLabels: kind === "fork" ? ["Source"] : ["Source A", "Source B"],
+    previewTitle: kind === "fork" ? "Fork: Source" : "Merge: Source A + Source B",
+    previewIntent: kind === "fork" ? "Investigate the timeout." : "Combine the verified findings.",
   }
 }
 
@@ -25,6 +27,8 @@ describe("transitionPendingSessionBootstrapToError", () => {
       kind: "fork",
       phase: "error",
       sourceLabels: ["Source"],
+      previewTitle: "Fork: Source",
+      previewIntent: "Investigate the timeout.",
       errorMessage: "Fork failed upstream",
     })
   })
@@ -39,6 +43,8 @@ describe("transitionPendingSessionBootstrapToError", () => {
       kind: "merge",
       phase: "error",
       sourceLabels: ["Source A", "Source B"],
+      previewTitle: "Merge: Source A + Source B",
+      previewIntent: "Combine the verified findings.",
       errorMessage: "Merge failed upstream",
     })
   })
@@ -72,6 +78,8 @@ describe("clearPendingSessionBootstrapAfterAttempt", () => {
       kind: "merge",
       phase: "error",
       sourceLabels: ["Source A", "Source B"],
+      previewTitle: "Merge: Source A + Source B",
+      previewIntent: "Combine the verified findings.",
       errorMessage: "Merge failed upstream",
     })
   })

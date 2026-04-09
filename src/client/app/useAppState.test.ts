@@ -9,14 +9,18 @@ import {
 } from "./chatCache"
 import {
   computeTailOffset,
+  deriveForkSessionPreviewTitle,
+  deriveMergeSessionPreviewTitle,
   getActiveChatSnapshot,
   getNewestRemainingChatId,
   getResumeRefreshSessionProjectIds,
   normalizeLocalFilePreviewErrorMessage,
   normalizeCommandErrorMessage,
+  normalizeSessionBootstrapErrorMessage,
   getUiUpdateRestartReconnectAction,
   resolveComposeIntent,
   hasRenderableTranscriptHistory,
+  summarizeSessionBootstrapIntent,
   summarizeTranscriptWindow,
   shouldBackfillTranscriptWindow,
   shouldRefreshStaleSessionOnResume,
@@ -179,8 +183,8 @@ describe("getUiUpdateRestartReconnectAction", () => {
     expect(getUiUpdateRestartReconnectAction("awaiting_disconnect", "disconnected")).toBe("awaiting_reconnect")
   })
 
-  test("navigates to changelog after reconnect", () => {
-    expect(getUiUpdateRestartReconnectAction("awaiting_reconnect", "connected")).toBe("navigate_changelog")
+  test("navigates home after reconnect", () => {
+    expect(getUiUpdateRestartReconnectAction("awaiting_reconnect", "connected")).toBe("navigate_home")
   })
 
   test("does nothing for unrelated phase and connection combinations", () => {
@@ -217,6 +221,44 @@ describe("normalizeCommandErrorMessage", () => {
 
   test("passes through unrelated command errors", () => {
     expect(normalizeCommandErrorMessage(new Error("Permission denied"))).toBe("Permission denied")
+  })
+})
+
+describe("session bootstrap helpers", () => {
+  test("uses the source title when the fork intent is just the generic preset scaffold", () => {
+    expect(deriveForkSessionPreviewTitle({
+      sourceTitle: "Auth race repair",
+      intent: "Continue this work as an implementation branch. Carry forward the essential technical context.",
+    })).toBe("Fork: Auth race repair")
+  })
+
+  test("uses a compact intent summary when the fork instruction is specific", () => {
+    expect(deriveForkSessionPreviewTitle({
+      sourceTitle: "Auth race repair",
+      intent: "Investigate why compaction times out on long chats and harden the bootstrap path.",
+    })).toBe("Investigate why compaction times out on long chats and harden the boots…")
+  })
+
+  test("derives a merge preview title from the summarized intent", () => {
+    expect(deriveMergeSessionPreviewTitle({
+      sourceLabels: ["Chat A", "Chat B"],
+      intent: "Combine the verified findings into one ship-ready session.",
+    })).toBe("Combine the verified findings into one ship-ready session.")
+  })
+
+  test("summarizes bootstrap intent to the first sentence", () => {
+    expect(summarizeSessionBootstrapIntent(
+      "Investigate the timeout. Then document the fallback plan.",
+    )).toBe("Investigate the timeout.")
+  })
+
+  test("rewrites timeout bootstrap failures into focused recovery guidance", () => {
+    expect(normalizeSessionBootstrapErrorMessage("fork", new Error("timeout"))).toBe(
+      "Preparing the fork brief took too long. Try again with a tighter focus or a smaller source context."
+    )
+    expect(normalizeSessionBootstrapErrorMessage("merge", new Error("Timed out waiting for response"))).toBe(
+      "Preparing the merged session brief took too long. Try again with fewer sessions or a tighter goal."
+    )
   })
 })
 
@@ -272,6 +314,7 @@ describe("getActiveChatSnapshot", () => {
         title: "Chat 1",
         status: "idle",
         provider: "codex",
+        model: "gpt-5.4",
         planMode: false,
         sessionToken: null,
       },
@@ -292,6 +335,7 @@ describe("getActiveChatSnapshot", () => {
         title: "Old chat",
         status: "idle",
         provider: "claude",
+        model: "sonnet",
         planMode: false,
         sessionToken: null,
       },
@@ -757,5 +801,3 @@ describe("chatCache", () => {
     expect(getCachedChat("chat-1")?.stale).toBe(true)
   })
 })
-
-

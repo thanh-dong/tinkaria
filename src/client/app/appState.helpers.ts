@@ -7,7 +7,66 @@ export interface PendingSessionBootstrap {
   kind: "fork" | "merge"
   phase: "compacting" | "starting" | "error"
   sourceLabels: string[]
+  previewTitle: string
+  previewIntent: string
   errorMessage?: string
+}
+
+const SESSION_BOOTSTRAP_PREVIEW_LIMIT = 180
+const GENERIC_FORK_INTENT_PREFIXES = [
+  "continue this work",
+  "fork this into",
+  "continue with",
+]
+
+function normalizeBootstrapText(value: string): string {
+  return value.replace(/\s+/g, " ").trim()
+}
+
+function truncateBootstrapText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value
+  const truncated = value.slice(0, Math.max(0, maxLength - 1)).trimEnd()
+  return `${truncated}\u2026`
+}
+
+export function summarizeSessionBootstrapIntent(intent: string, maxLength = SESSION_BOOTSTRAP_PREVIEW_LIMIT): string {
+  const normalized = normalizeBootstrapText(intent)
+  if (!normalized) return ""
+  const firstSentence = normalized.match(/^(.+?[.!?])(?:\s|$)/)?.[1] ?? normalized
+  return truncateBootstrapText(firstSentence, maxLength)
+}
+
+function normalizeBootstrapTitleFragment(value: string | null | undefined): string | null {
+  const normalized = value ? normalizeBootstrapText(value) : ""
+  return normalized.length > 0 ? normalized : null
+}
+
+export function deriveForkSessionPreviewTitle(args: {
+  sourceTitle?: string | null
+  intent: string
+}): string {
+  const intentSummary = summarizeSessionBootstrapIntent(args.intent, 72)
+  const sourceTitle = normalizeBootstrapTitleFragment(args.sourceTitle)
+  const lowerIntent = intentSummary.toLowerCase()
+  if (sourceTitle && GENERIC_FORK_INTENT_PREFIXES.some((prefix) => lowerIntent.startsWith(prefix))) {
+    return `Fork: ${sourceTitle}`
+  }
+  if (intentSummary) return intentSummary
+  if (sourceTitle) return `Fork: ${sourceTitle}`
+  return "Forked session"
+}
+
+export function deriveMergeSessionPreviewTitle(args: {
+  sourceLabels: string[]
+  intent: string
+}): string {
+  const intentSummary = summarizeSessionBootstrapIntent(args.intent, 72)
+  if (intentSummary) return intentSummary
+  const labels = args.sourceLabels.map((label) => normalizeBootstrapText(label)).filter(Boolean)
+  if (labels.length === 1) return `Merge: ${labels[0]}`
+  if (labels.length === 2) return `Merge: ${labels[0]} + ${labels[1]}`
+  if (labels.length > 2) return `Merge ${labels.length} sessions`
+  return "Merged session"
 }
 
 export function transitionPendingSessionBootstrapToError(
@@ -88,13 +147,13 @@ export function shouldStickToBottomOnComposerSubmit(distanceFromBottom: number, 
 export function getUiUpdateRestartReconnectAction(
   phase: string | null,
   connectionStatus: SocketStatus
-): "none" | "awaiting_reconnect" | "navigate_changelog" {
+): "none" | "awaiting_reconnect" | "navigate_home" {
   if (phase === "awaiting_disconnect" && connectionStatus === "disconnected") {
     return "awaiting_reconnect"
   }
 
   if (phase === "awaiting_reconnect" && connectionStatus === "connected") {
-    return "navigate_changelog"
+    return "navigate_home"
   }
 
   return "none"
@@ -202,6 +261,23 @@ export function normalizeCommandErrorMessage(error: unknown): string {
 
   if (lower.includes("connection closed") || lower.includes("socket closed")) {
     return `The connection to your local ${APP_NAME} server dropped. ${APP_NAME} will keep trying to reconnect.`
+  }
+
+  return normalized
+}
+
+export function normalizeSessionBootstrapErrorMessage(
+  kind: PendingSessionBootstrap["kind"],
+  error: unknown,
+): string {
+  const normalized = normalizeCommandErrorMessage(error)
+  const lower = normalized.toLowerCase()
+
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    if (kind === "fork") {
+      return "Preparing the fork brief took too long. Try again with a tighter focus or a smaller source context."
+    }
+    return "Preparing the merged session brief took too long. Try again with fewer sessions or a tighter goal."
   }
 
   return normalized

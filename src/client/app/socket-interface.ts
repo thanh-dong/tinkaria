@@ -21,6 +21,6 @@ export interface AppTransport {
       onEvent?: EventListener<TerminalEvent>
     }
   ): () => void
-  command<TResult = unknown>(command: ClientCommand): Promise<TResult>
+  command<TResult = unknown>(command: ClientCommand, options?: { timeoutMs?: number }): Promise<TResult>
   ensureHealthyConnection(): Promise<void>
 }

@@ -116,6 +116,7 @@ export function deriveChatSnapshot(
     title: chat.title,
     status: deriveStatus(chat, activeStatuses.get(chat.id)),
     provider: chat.provider,
+    model: chat.model ?? null,
     planMode: chat.planMode,
     sessionToken: chat.sessionToken,
   }

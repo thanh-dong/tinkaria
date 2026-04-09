@@ -57,6 +57,7 @@ describe("read models", () => {
 
     const chat = deriveChatSnapshot(state, new Map(), "chat-1", 0)
     expect(chat?.runtime.provider).toBe("claude")
+    expect(chat?.runtime.model).toBeNull()
     expect(chat?.availableProviders.length).toBeGreaterThan(1)
     expect(chat?.availableProviders.find((provider) => provider.id === "codex")?.models.map((model) => model.id)).toEqual([
       "gpt-5.4",
@@ -90,6 +91,34 @@ describe("read models", () => {
 
     const chat = deriveChatSnapshot(state, new Map(), "chat-1", 0, ["skill-a", "skill-b"])
     expect(chat?.availableSkills).toEqual(["skill-a", "skill-b"])
+  })
+
+  test("includes the persisted chat model in chat runtime", () => {
+    const state = createEmptyState()
+    state.projectsById.set("project-1", {
+      id: "project-1",
+      localPath: "/tmp/project",
+      title: "Project",
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.chatsById.set("chat-1", {
+      id: "chat-1",
+      projectId: "project-1",
+      title: "Chat",
+      createdAt: 1,
+      updatedAt: 1,
+      unread: false,
+      provider: "claude",
+      model: "sonnet[1m]",
+      planMode: false,
+      sessionToken: "session-1",
+      lastTurnOutcome: null,
+    })
+
+    const chat = deriveChatSnapshot(state, new Map(), "chat-1", 0)
+    expect(chat?.runtime.model).toBe("sonnet[1m]")
   })
 
   test("defaults availableSkills to empty array when not provided", () => {

@@ -104,7 +104,10 @@ describe("LocalDev homepage", () => {
       recentSessions: "home.recent-sessions",
       workspaceGrid: "home.workspace-grid",
       addProjectAction: "home.add-project.action",
+      projectOverview: "home.project-overview",
       projectCard: "home.project-card",
+      projectPrimaryAction: "home.project-primary.action",
+      projectSecondaryAction: "home.project-secondary.action",
       recentSessionCard: "home.recent-session-card",
       newProjectDialog: "home.add-project.dialog",
     })
@@ -112,7 +115,7 @@ describe("LocalDev homepage", () => {
     expect(identities).not.toHaveProperty("stats")
   })
 
-  test("renders session-centric homepage with compact session rows and no stats", () => {
+  test("renders session-centric homepage with action-first project cards and overview panel", () => {
     const html = renderToStaticMarkup(
       <TooltipProvider>
         <LocalDev
@@ -180,12 +183,21 @@ describe("LocalDev homepage", () => {
     expect(html).toContain("Fix homepage copy")
     expect(html).toContain("Investigate desktop shell")
 
-    // Workspaces still present
+    // Workspaces remain, but now as action-first cards with overview support
     expect(html).toContain('data-ui-id="home.workspace-grid"')
     expect(html).toContain('data-ui-id="home.add-project.action"')
     expect(html).toContain('data-ui-id="home.project-card"')
+    expect(html).toContain('data-ui-id="home.project-overview"')
+    expect(html).toContain('data-ui-id="home.project-primary.action"')
+    expect(html).toContain('data-ui-id="home.project-secondary.action"')
     expect(html).toContain("Alpha")
     expect(html).toContain("/workspace/alpha")
+    expect(html).toContain("Project Overview")
+    expect(html).toContain("Continue")
+    expect(html).toContain("New Task")
+    expect(html).toContain("Overview")
+    expect(html).toContain("Resume previous work")
+    expect(html).toContain("Pinned workspace")
 
     // Stats section is gone
     expect(html).not.toContain('data-ui-id="home.project-stats"')

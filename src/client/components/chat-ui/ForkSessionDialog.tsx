@@ -25,6 +25,7 @@ import { InputPopover, PopoverMenuItem, PROVIDER_ICONS } from "./ChatPreferenceC
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  sourceTitle?: string | null
   defaultProvider: AgentProvider
   defaultModel: string
   availableProviders: ProviderCatalogEntry[]
@@ -96,6 +97,7 @@ export function getForkSessionUiIdentityDescriptors() {
 export function ForkSessionDialog({
   open,
   onOpenChange,
+  sourceTitle,
   defaultProvider,
   defaultModel,
   availableProviders,
@@ -120,6 +122,7 @@ export function ForkSessionDialog({
         {open ? (
           <ForkSessionDialogBody
             key={openVersion}
+            sourceTitle={sourceTitle}
             defaultProvider={defaultProvider}
             defaultModel={defaultModel}
             availableProviders={availableProviders}
@@ -133,12 +136,14 @@ export function ForkSessionDialog({
 }
 
 function ForkSessionDialogBody({
+  sourceTitle,
   defaultProvider,
   defaultModel,
   availableProviders,
   onFork,
   onClose,
 }: {
+  sourceTitle?: string | null
   defaultProvider: AgentProvider
   defaultModel: string
   availableProviders: ProviderCatalogEntry[]
@@ -189,7 +194,9 @@ function ForkSessionDialogBody({
       </DialogHeader>
       <div className="px-4 pb-4 pt-3.5 space-y-3 flex flex-col flex-1 min-h-0">
         <p className="text-sm text-muted-foreground">
-          Describe what this fork should focus on. Tinkaria will compact the selected context first, then start a dedicated session with that brief.
+          {sourceTitle?.trim()
+            ? `Start a parallel session from “${sourceTitle.trim()}”. Edit the focus below and Tinkaria will turn it into the opening brief.`
+            : "Start a parallel session from the current chat. Edit the focus below and Tinkaria will turn it into the opening brief."}
         </p>
         <InputPopover
           triggerUiId={FORK_SESSION_UI_DESCRIPTORS.presetAction}
@@ -219,7 +226,9 @@ function ForkSessionDialogBody({
         </InputPopover>
         <Textarea
           {...getUiIdentityAttributeProps(FORK_SESSION_UI_DESCRIPTORS.contextInput)}
-          placeholder="What should this fork focus on?"
+          placeholder={sourceTitle?.trim()
+            ? `What should the fork from “${sourceTitle.trim()}” focus on?`
+            : "What should this fork focus on?"}
           value={intent}
           onChange={(e) => setIntent(e.target.value)}
           autoFocus

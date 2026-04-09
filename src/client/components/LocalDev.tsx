@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { formatRelativeTime } from "../lib/formatters"
 import {
+  BadgePlus,
   Check,
   CodeXml,
   Copy,
@@ -8,9 +9,11 @@ import {
   Folder,
   Loader2,
   Plus,
+  Search,
   Sparkles,
-  SquarePen,
   ArrowRight,
+  MessageSquarePlus,
+  Clock3,
 } from "lucide-react"
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
 import type {
@@ -85,8 +88,23 @@ const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
     c3ComponentId: "c3-117",
     c3ComponentLabel: "projects",
   }),
+  projectOverview: createC3UiIdentityDescriptor({
+    id: "home.project-overview",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
   projectCard: createC3UiIdentityDescriptor({
     id: "home.project-card",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  projectPrimaryAction: createC3UiIdentityDescriptor({
+    id: "home.project-primary.action",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  projectSecondaryAction: createC3UiIdentityDescriptor({
+    id: "home.project-secondary.action",
     c3ComponentId: "c3-117",
     c3ComponentLabel: "projects",
   }),
@@ -148,6 +166,17 @@ export function getSortedHomepageProjects(snapshot: LocalProjectsSnapshot | null
 
     return left.title.localeCompare(right.title)
   })
+}
+
+function getProjectSessions(
+  projectLocalPath: string,
+  sessionsForProject?: (projectId: string) => DiscoveredSession[],
+) {
+  if (!sessionsForProject) {
+    return []
+  }
+
+  return [...sessionsForProject(projectLocalPath)].sort((left, right) => right.modifiedAt - left.modifiedAt)
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -293,64 +322,249 @@ function RecentSessionRow({
 }
 
 function ProjectCard({
+  projectTitle,
   title,
   localPath,
   source,
   chatCount,
+  sessions,
   loading,
-  onClick,
+  selected,
+  onSelect,
+  onContinue,
+  onStartTask,
 }: {
+  projectTitle: string
   title: string
   localPath: string
   source: "saved" | "discovered"
   chatCount: number
+  sessions: DiscoveredSession[]
   loading: boolean
-  onClick: () => void
+  selected: boolean
+  onSelect: () => void
+  onContinue: () => void
+  onStartTask: () => void
 }) {
+  const latestSession = sessions[0] ?? null
+  const sessionLabel = latestSession
+    ? getSessionDisplayTitle(latestSession)
+    : "No previous session yet"
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
+        <div
           {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectCard)}
           className={cn(
-            "border border-border hover:border-primary/30 group rounded-2xl bg-card px-4 py-4 w-full text-left hover:bg-muted/50 transition-colors",
+            "border group rounded-2xl bg-card p-4 text-left transition-colors",
+            selected
+              ? "border-primary/40 bg-primary/[0.04]"
+              : "border-border hover:border-primary/30 hover:bg-muted/40",
             loading && "opacity-50 cursor-not-allowed"
           )}
-          disabled={loading}
-          onClick={onClick}
         >
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-xl border border-border bg-background p-2">
-              <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="mt-0.5 rounded-xl border border-border bg-background p-2">
+                <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-foreground truncate">{projectTitle}</div>
+                <div className="mt-1 text-xs text-muted-foreground truncate">{localPath}</div>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-medium text-foreground truncate">{title || getPathBasename(localPath)}</div>
-                  <div className="mt-1 text-xs text-muted-foreground truncate">{localPath}</div>
-                </div>
-                {loading ? (
-                  <Loader2 className="h-4 w-4 text-muted-foreground group-hover:text-primary animate-spin flex-shrink-0" />
-                ) : (
-                  <SquarePen className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                )}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full border border-border bg-background px-2 py-0.5">
-                  {source === "saved" ? "Saved" : "Discovered"}
-                </span>
-                <span className="rounded-full border border-border bg-background px-2 py-0.5">
-                  {chatCount} {chatCount === 1 ? "chat" : "chats"}
-                </span>
-              </div>
+            {loading ? (
+              <Loader2 className="h-4 w-4 text-muted-foreground animate-spin flex-shrink-0" />
+            ) : null}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full border border-border bg-background px-2 py-0.5">
+              {source === "saved" ? "Saved" : "Discovered"}
+            </span>
+            <span className="rounded-full border border-border bg-background px-2 py-0.5">
+              {chatCount} {chatCount === 1 ? "chat" : "chats"}
+            </span>
+            <span className="rounded-full border border-border bg-background px-2 py-0.5">
+              {sessions.length} {sessions.length === 1 ? "recent session" : "recent sessions"}
+            </span>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-border/70 bg-background/70 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              Ready To Resume
+            </div>
+            <div className="mt-1 truncate text-sm font-medium text-foreground">
+              {sessionLabel}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {latestSession
+                ? `Last active ${formatRelativeTime(latestSession.modifiedAt)}`
+                : "Open the project and start a first task from here."}
             </div>
           </div>
-        </button>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              className="flex-1 min-w-[8rem]"
+              disabled={loading}
+              onClick={() => {
+                onContinue()
+              }}
+              {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectPrimaryAction)}
+            >
+              <ArrowRight className="mr-1.5 h-4 w-4" />
+              {latestSession ? "Continue" : "Open Project"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 min-w-[8rem]"
+              disabled={loading}
+              onClick={() => {
+                onStartTask()
+              }}
+              {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectSecondaryAction)}
+            >
+              <MessageSquarePlus className="mr-1.5 h-4 w-4" />
+              New Task
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="min-w-[8rem]"
+              disabled={loading}
+              onClick={() => {
+                onSelect()
+              }}
+            >
+              <Search className="mr-1.5 h-4 w-4" />
+              Overview
+            </Button>
+          </div>
+        </div>
       </TooltipTrigger>
       <TooltipContent>
         <p>{localPath}</p>
       </TooltipContent>
     </Tooltip>
+  )
+}
+
+function ProjectOverviewPanel({
+  project,
+  sessions,
+  loading,
+  onContinue,
+  onStartTask,
+}: {
+  project: LocalProjectsSnapshot["projects"][number]
+  sessions: DiscoveredSession[]
+  loading: boolean
+  onContinue: () => void
+  onStartTask: () => void
+}) {
+  const latestSession = sessions[0] ?? null
+  const latestSessionTitle = latestSession ? getSessionDisplayTitle(latestSession) : "No previous session"
+  const projectTitle = project.title || getPathBasename(project.localPath)
+
+  return (
+    <InfoCard>
+      <div
+        className="space-y-5"
+        {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectOverview)}
+      >
+        <div className="space-y-2">
+          <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
+            Project Overview
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-foreground">{projectTitle}</h3>
+            <p className="mt-1 text-sm text-muted-foreground break-all">{project.localPath}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-border bg-background p-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Entry Point</div>
+            <div className="mt-1 text-sm font-medium text-foreground">
+              {latestSession ? "Resume previous work" : "Start first task"}
+            </div>
+          </div>
+          <div className="rounded-xl border border-border bg-background p-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Discovery</div>
+            <div className="mt-1 text-sm font-medium text-foreground">
+              {project.source === "saved" ? "Pinned workspace" : "Recently discovered"}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-background p-4">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            <Clock3 className="h-3.5 w-3.5" />
+            Latest Session
+          </div>
+          <div className="mt-2 text-sm font-medium text-foreground">{latestSessionTitle}</div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {latestSession
+              ? `Last touched ${formatRelativeTime(latestSession.modifiedAt)}. Use continue to pick up that thread, or start a fresh task while keeping this project as the active context.`
+              : "Use this project as the entry point for orientation, ownership lookup, and impact work. A new task will create the first chat for this workspace."}
+          </p>
+          {latestSession ? (
+            <SessionRuntimeBadges session={latestSession} className="mt-3 flex flex-wrap gap-1.5" />
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-border bg-background p-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Chats</div>
+            <div className="mt-1 text-lg font-semibold text-foreground">{project.chatCount}</div>
+          </div>
+          <div className="rounded-xl border border-border bg-background p-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Sessions</div>
+            <div className="mt-1 text-lg font-semibold text-foreground">{sessions.length}</div>
+          </div>
+          <div className="rounded-xl border border-border bg-background p-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Last Opened</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">
+              {project.lastOpenedAt ? formatRelativeTime(project.lastOpenedAt) : "Not yet"}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+          Homepage preview stays lightweight on purpose. Use this project as the launch point for architecture overview, ownership checks, and impact inspection inside chat.
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            className="flex-1 min-w-[10rem]"
+            disabled={loading}
+            onClick={() => {
+              onContinue()
+            }}
+            {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectPrimaryAction)}
+          >
+            <ArrowRight className="mr-1.5 h-4 w-4" />
+            {latestSession ? "Continue Latest Session" : "Open Project"}
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 min-w-[10rem]"
+            disabled={loading}
+            onClick={() => {
+              onStartTask()
+            }}
+            {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectSecondaryAction)}
+          >
+            <BadgePlus className="mr-1.5 h-4 w-4" />
+            Start New Task
+          </Button>
+        </div>
+      </div>
+    </InfoCard>
   )
 }
 
@@ -366,11 +580,17 @@ export function LocalDev({
   onResumeSession,
 }: LocalDevProps) {
   const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null)
 
   const projects = useMemo(() => getSortedHomepageProjects(snapshot), [snapshot])
   const recentSessions = useMemo(
     () => getHomepageRecentSessions(snapshot, sessionsForProject),
     [snapshot, sessionsForProject]
+  )
+  const selectedProject = projects.find((project) => project.localPath === selectedProjectPath) ?? projects[0] ?? null
+  const selectedProjectSessions = useMemo(
+    () => selectedProject ? getProjectSessions(selectedProject.localPath, sessionsForProject) : [],
+    [selectedProject, sessionsForProject]
   )
   const isConnecting = connectionStatus === "connecting" || (connectionStatus === "connected" && !ready)
   const isConnected = connectionStatus === "connected" && ready
@@ -472,23 +692,64 @@ export function LocalDev({
               </Button>
             </div>
             {projects.length > 0 ? (
-              <div
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 3xl:grid-cols-5 gap-3"
-                {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.workspaceGrid)}
-              >
-                {projects.map((project) => (
-                  <ProjectCard
-                    key={project.localPath}
-                    title={project.title}
-                    localPath={project.localPath}
-                    source={project.source}
-                    chatCount={project.chatCount}
-                    loading={startingLocalPath === project.localPath}
-                    onClick={() => {
-                      void onOpenProject(project.localPath)
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.9fr)] lg:items-start">
+                <div
+                  className="grid grid-cols-1 gap-3 xl:grid-cols-2"
+                  {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.workspaceGrid)}
+                >
+                  {projects.map((project) => {
+                    const projectSessions = getProjectSessions(project.localPath, sessionsForProject)
+                    const latestSession = projectSessions[0] ?? null
+                    const projectTitle = project.title || getPathBasename(project.localPath)
+
+                    return (
+                      <ProjectCard
+                        key={project.localPath}
+                        projectTitle={projectTitle}
+                        title={project.title}
+                        localPath={project.localPath}
+                        source={project.source}
+                        chatCount={project.chatCount}
+                        sessions={projectSessions}
+                        loading={startingLocalPath === project.localPath}
+                        selected={selectedProject?.localPath === project.localPath}
+                        onSelect={() => {
+                          setSelectedProjectPath(project.localPath)
+                        }}
+                        onContinue={() => {
+                          if (latestSession) {
+                            void onResumeSession?.(project.localPath, latestSession)
+                            return
+                          }
+
+                          void onOpenProject(project.localPath)
+                        }}
+                        onStartTask={() => {
+                          void onOpenProject(project.localPath)
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+                {selectedProject ? (
+                  <ProjectOverviewPanel
+                    project={selectedProject}
+                    sessions={selectedProjectSessions}
+                    loading={startingLocalPath === selectedProject.localPath}
+                    onContinue={() => {
+                      const latestSession = selectedProjectSessions[0] ?? null
+                      if (latestSession) {
+                        void onResumeSession?.(selectedProject.localPath, latestSession)
+                        return
+                      }
+
+                      void onOpenProject(selectedProject.localPath)
+                    }}
+                    onStartTask={() => {
+                      void onOpenProject(selectedProject.localPath)
                     }}
                   />
-                ))}
+                ) : null}
               </div>
             ) : (
               <InfoCard>
