@@ -45,6 +45,57 @@ interface Props {
   availableSkills?: string[]
 }
 
+function areProviderCatalogEntriesEqual(previous: ProviderCatalogEntry[], next: ProviderCatalogEntry[]): boolean {
+  if (previous.length !== next.length) return false
+  for (let index = 0; index < previous.length; index += 1) {
+    const previousEntry = previous[index]
+    const nextEntry = next[index]
+    if (
+      previousEntry.id !== nextEntry.id
+      || previousEntry.label !== nextEntry.label
+      || previousEntry.supportsPlanMode !== nextEntry.supportsPlanMode
+      || previousEntry.models.length !== nextEntry.models.length
+    ) {
+      return false
+    }
+
+    for (let modelIndex = 0; modelIndex < previousEntry.models.length; modelIndex += 1) {
+      const previousModel = previousEntry.models[modelIndex]
+      const nextModel = nextEntry.models[modelIndex]
+      if (
+        previousModel.id !== nextModel.id
+        || previousModel.label !== nextModel.label
+        || previousModel.contextWindowOptions?.join(",") !== nextModel.contextWindowOptions?.join(",")
+      ) {
+        return false
+      }
+    }
+  }
+  return true
+}
+
+function areStringsEqual(previous: string[] | undefined, next: string[] | undefined): boolean {
+  const previousValue = previous ?? []
+  const nextValue = next ?? []
+  if (previousValue.length !== nextValue.length) return false
+  for (let index = 0; index < previousValue.length; index += 1) {
+    if (previousValue[index] !== nextValue[index]) return false
+  }
+  return true
+}
+
+export function areChatInputPropsEqual(previous: Props, next: Props): boolean {
+  return previous.queuedText === next.queuedText
+    && previous.disabled === next.disabled
+    && previous.canCancel === next.canCancel
+    && previous.chatId === next.chatId
+    && previous.connectionStatus === next.connectionStatus
+    && previous.activeProvider === next.activeProvider
+    && previous.runtimeModel === next.runtimeModel
+    && areProviderCatalogEntriesEqual(previous.availableProviders, next.availableProviders)
+    && areStringsEqual(previous.availableSkills, next.availableSkills)
+}
+
 function withNormalizedContextWindow(
   state: ComposerState,
   model: string
@@ -855,4 +906,4 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   )
 })
 
-export const ChatInput = memo(ChatInputInner)
+export const ChatInput = memo(ChatInputInner, areChatInputPropsEqual)

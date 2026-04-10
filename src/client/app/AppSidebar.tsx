@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
+import { lazy, Suspense, memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { Home, Loader2, Menu, PanelLeft, X } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
@@ -39,6 +39,64 @@ interface AppSidebarProps {
   onMergeSession?: (projectId: string) => void
 }
 
+function areDiscoveredSessionsEqual(
+  previous: ReturnType<AppSidebarProps["sessionsForProject"]>,
+  next: ReturnType<AppSidebarProps["sessionsForProject"]>,
+): boolean {
+  if (previous.length !== next.length) return false
+  for (let index = 0; index < previous.length; index += 1) {
+    const previousSession = previous[index]
+    const nextSession = next[index]
+    if (
+      previousSession.sessionId !== nextSession.sessionId
+      || previousSession.chatId !== nextSession.chatId
+      || previousSession.provider !== nextSession.provider
+      || previousSession.source !== nextSession.source
+      || previousSession.title !== nextSession.title
+      || previousSession.modifiedAt !== nextSession.modifiedAt
+      || previousSession.lastExchange?.question !== nextSession.lastExchange?.question
+      || previousSession.lastExchange?.answer !== nextSession.lastExchange?.answer
+      || previousSession.runtime?.model !== nextSession.runtime?.model
+      || previousSession.runtime?.tokenUsage?.totalTokens !== nextSession.runtime?.tokenUsage?.totalTokens
+      || previousSession.runtime?.tokenUsage?.contextWindow !== nextSession.runtime?.tokenUsage?.contextWindow
+      || previousSession.runtime?.tokenUsage?.contextLeft !== nextSession.runtime?.tokenUsage?.contextLeft
+      || previousSession.runtime?.tokenUsage?.estimatedContextPercent !== nextSession.runtime?.tokenUsage?.estimatedContextPercent
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+export function areAppSidebarPropsEqual(previous: AppSidebarProps, next: AppSidebarProps): boolean {
+  if (
+    previous.data !== next.data
+    || previous.activeChatId !== next.activeChatId
+    || previous.connectionStatus !== next.connectionStatus
+    || previous.ready !== next.ready
+    || previous.open !== next.open
+    || previous.collapsed !== next.collapsed
+    || previous.showMobileOpenButton !== next.showMobileOpenButton
+    || previous.updateSnapshot !== next.updateSnapshot
+  ) {
+    return false
+  }
+
+  for (const group of next.data.projectGroups) {
+    if (
+      previous.sessionsWindowDaysForProject(group.groupKey) !== next.sessionsWindowDaysForProject(group.groupKey)
+      || !areDiscoveredSessionsEqual(
+        previous.sessionsForProject(group.groupKey),
+        next.sessionsForProject(group.groupKey),
+      )
+    ) {
+      return false
+    }
+  }
+
+  return true
+}
+
 const SIDEBAR_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
   id: "chat.sidebar",
   c3ComponentId: "c3-113",
@@ -49,7 +107,7 @@ export function getSidebarUiIdentityDescriptor() {
   return SIDEBAR_UI_DESCRIPTOR
 }
 
-export function AppSidebar({
+function AppSidebarInner({
   data,
   activeChatId,
   connectionStatus,
@@ -421,3 +479,5 @@ export function AppSidebar({
     </>
   )
 }
+
+export const AppSidebar = memo(AppSidebarInner, areAppSidebarPropsEqual)

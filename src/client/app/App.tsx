@@ -22,6 +22,7 @@ import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalProjectsPage"
 import { AppStateContext } from "./AppStateContext"
 import { useAppState } from "./useAppState"
+import { useEventCallback } from "../hooks/useEventCallback"
 
 const UI_IDENTITY_OVERLAY_COPY_DURATION_MS = 1200
 const UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS = 320
@@ -323,6 +324,46 @@ function AppLayout() {
     throw new Error("App layout requires state context")
   }
   const showMobileOpenButton = location.pathname === "/"
+  const openSidebar = useEventCallback(() => state.openSidebar())
+  const closeSidebar = useEventCallback(() => state.closeSidebar())
+  const collapseSidebar = useEventCallback(() => state.collapseSidebar())
+  const expandSidebar = useEventCallback(() => state.expandSidebar())
+  const handleCreateChat = useEventCallback((projectId: string) => {
+    void state.handleCreateChat(projectId)
+  })
+  const handleDeleteChat = useEventCallback((chat: Parameters<typeof state.handleDeleteChat>[0]) => {
+    void state.handleDeleteChat(chat)
+  })
+  const handleRenameChat = useEventCallback((chatId: string, title: string) => {
+    void state.handleRenameChat(chatId, title)
+  })
+  const handleRemoveProject = useEventCallback((projectId: string) => {
+    void state.handleRemoveProject(projectId)
+  })
+  const handleInstallUpdate = useEventCallback(() => {
+    void state.handleInstallUpdate()
+  })
+  const sessionsForProject = useEventCallback((projectId: string) =>
+    state.sessionsSnapshots.get(projectId)?.sessions ?? []
+  )
+  const sessionsWindowDaysForProject = useEventCallback((projectId: string) =>
+    state.sessionsWindowDays.get(projectId) ?? 7
+  )
+  const handleResumeSession = useEventCallback((projectId: string, sessionId: string, provider: Parameters<typeof state.handleResumeSession>[2]) => {
+    void state.handleResumeSession(projectId, sessionId, provider)
+  })
+  const handleMergeSession = useEventCallback((projectId: string) => {
+    state.requestMerge(projectId)
+  })
+  const handleOpenSessionPicker = useEventCallback((projectId: string, open: boolean) => {
+    state.handleOpenSessionPicker(projectId, open)
+  })
+  const handleRefreshSessions = useEventCallback((projectId: string) => {
+    state.handleRefreshSessions(projectId)
+  })
+  const handleShowMoreSessions = useEventCallback((projectId: string) => {
+    state.handleShowMoreSessions(projectId)
+  })
 
   return (
     <div
@@ -338,41 +379,23 @@ function AppLayout() {
           open={state.sidebarOpen}
           collapsed={state.sidebarCollapsed}
           showMobileOpenButton={showMobileOpenButton}
-          onOpen={state.openSidebar}
-          onClose={state.closeSidebar}
-          onCollapse={state.collapseSidebar}
-          onExpand={state.expandSidebar}
-          onCreateChat={(projectId) => {
-            void state.handleCreateChat(projectId)
-          }}
-          onDeleteChat={(chat) => {
-            void state.handleDeleteChat(chat)
-          }}
-          onRenameChat={(chatId, title) => {
-            void state.handleRenameChat(chatId, title)
-          }}
-          onRemoveProject={(projectId) => {
-            void state.handleRemoveProject(projectId)
-          }}
+          onOpen={openSidebar}
+          onClose={closeSidebar}
+          onCollapse={collapseSidebar}
+          onExpand={expandSidebar}
+          onCreateChat={handleCreateChat}
+          onDeleteChat={handleDeleteChat}
+          onRenameChat={handleRenameChat}
+          onRemoveProject={handleRemoveProject}
           updateSnapshot={state.updateSnapshot}
-          onInstallUpdate={() => {
-            void state.handleInstallUpdate()
-          }}
-          sessionsForProject={(projectId) =>
-            state.sessionsSnapshots.get(projectId)?.sessions ?? []
-          }
-          sessionsWindowDaysForProject={(projectId) =>
-            state.sessionsWindowDays.get(projectId) ?? 7
-          }
-          onOpenSessionPicker={state.handleOpenSessionPicker}
-          onResumeSession={(projectId, sessionId, provider) => {
-            void state.handleResumeSession(projectId, sessionId, provider)
-          }}
-          onRefreshSessions={state.handleRefreshSessions}
-          onShowMoreSessions={state.handleShowMoreSessions}
-          onMergeSession={(projectId) => {
-            state.requestMerge(projectId)
-          }}
+          onInstallUpdate={handleInstallUpdate}
+          sessionsForProject={sessionsForProject}
+          sessionsWindowDaysForProject={sessionsWindowDaysForProject}
+          onOpenSessionPicker={handleOpenSessionPicker}
+          onResumeSession={handleResumeSession}
+          onRefreshSessions={handleRefreshSessions}
+          onShowMoreSessions={handleShowMoreSessions}
+          onMergeSession={handleMergeSession}
         />
         <Outlet context={state} />
       </div>

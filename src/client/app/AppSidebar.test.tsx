@@ -3,7 +3,7 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { MemoryRouter } from "react-router-dom"
 import { TooltipProvider } from "../components/ui/tooltip"
-import { getSidebarUiIdentityDescriptor, AppSidebar } from "./AppSidebar"
+import { areAppSidebarPropsEqual, getSidebarUiIdentityDescriptor, AppSidebar } from "./AppSidebar"
 import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import type { SidebarData, UpdateSnapshot } from "../../shared/types"
 
@@ -47,6 +47,35 @@ function renderSidebar(overrides: Partial<Parameters<typeof AppSidebar>[0]> = {}
   )
 }
 
+function createSidebarProps(overrides: Partial<Parameters<typeof AppSidebar>[0]> = {}): Parameters<typeof AppSidebar>[0] {
+  return {
+    data: createSidebarData(),
+    activeChatId: null,
+    connectionStatus: "connected",
+    ready: true,
+    open: true,
+    collapsed: false,
+    showMobileOpenButton: false,
+    onOpen: () => {},
+    onClose: () => {},
+    onCollapse: () => {},
+    onExpand: () => {},
+    onCreateChat: () => {},
+    onDeleteChat: () => {},
+    onRenameChat: () => {},
+    onRemoveProject: () => {},
+    updateSnapshot: null as UpdateSnapshot | null,
+    onInstallUpdate: () => {},
+    sessionsForProject: () => [],
+    sessionsWindowDaysForProject: () => 7,
+    onOpenSessionPicker: () => {},
+    onResumeSession: () => {},
+    onRefreshSessions: () => {},
+    onShowMoreSessions: () => {},
+    ...overrides,
+  }
+}
+
 describe("AppSidebar", () => {
   test("exposes a C3-owned sidebar shell descriptor", () => {
     expect(getUiIdentityAttributeProps(getSidebarUiIdentityDescriptor())).toEqual({
@@ -63,8 +92,6 @@ describe("AppSidebar", () => {
     expect(html).toContain("tinkaria-mark-fine.svg")
     expect(html).toContain("title=\"Home\"")
     expect(html).toContain("aria-label=\"Go to homepage\"")
-    expect(html).toContain("title=\"Add project\"")
-    expect(html).toContain("aria-label=\"Add project\"")
     expect(html).toContain('data-ui-id="chat.sidebar"')
     expect(html).toContain('data-ui-c3="c3-113"')
     expect(html).toContain('data-ui-c3-label="sidebar"')
@@ -109,5 +136,56 @@ describe("AppSidebar", () => {
     expect(html).toContain("gpt-5.4")
     expect(html).toContain('title="Codex"')
     expect(html).toContain('title="Chat actions"')
+  })
+
+  test("ignores handler identity churn when sidebar data is unchanged", () => {
+    const previous = createSidebarProps({
+      data: {
+        projectGroups: [
+          {
+            groupKey: "project-1",
+            localPath: "/tmp/demo",
+            chats: [],
+          },
+        ],
+      },
+      sessionsForProject: () => [{
+        sessionId: "session-1",
+        provider: "codex",
+        source: "cli",
+        title: "Demo session",
+        lastExchange: null,
+        modifiedAt: 1,
+        chatId: null,
+        runtime: { model: "gpt-5.4" },
+      }],
+    })
+    const next = createSidebarProps({
+      ...previous,
+      onOpen: () => {},
+      onClose: () => {},
+      onCreateChat: () => {},
+      onDeleteChat: () => {},
+      onRenameChat: () => {},
+      onRemoveProject: () => {},
+      onInstallUpdate: () => {},
+      onOpenSessionPicker: () => {},
+      onResumeSession: () => {},
+      onRefreshSessions: () => {},
+      onShowMoreSessions: () => {},
+      onMergeSession: () => {},
+      sessionsForProject: () => [{
+        sessionId: "session-1",
+        provider: "codex",
+        source: "cli",
+        title: "Demo session",
+        lastExchange: null,
+        modifiedAt: 1,
+        chatId: null,
+        runtime: { model: "gpt-5.4" },
+      }],
+    })
+
+    expect(areAppSidebarPropsEqual(previous, next)).toBe(true)
   })
 })

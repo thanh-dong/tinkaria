@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import { PROVIDERS } from "../../../shared/types"
 import { useSkillCompositionStore } from "../../stores/skillCompositionStore"
-import { ChatInput } from "./ChatInput"
+import { areChatInputPropsEqual, ChatInput } from "./ChatInput"
 
 describe("ChatInput", () => {
   afterEach(() => {
@@ -59,5 +59,43 @@ describe("ChatInput", () => {
     expect(html).toContain("text-amber-600")
     expect(html).toContain("border-amber-400/30")
     expect(html).not.toContain("transcript.message-list")
+  })
+
+  test("ignores callback identity churn when composer inputs are otherwise unchanged", () => {
+    expect(areChatInputPropsEqual({
+      onSubmit: async () => "sent",
+      onCancel: () => {},
+      queuedText: "",
+      onClearQueuedText: () => {},
+      onRestoreQueuedText: () => "",
+      disabled: false,
+      canCancel: false,
+      chatId: "chat-1",
+      connectionStatus: "connected",
+      activeProvider: "codex",
+      runtimeModel: "gpt-5.4",
+      availableProviders: PROVIDERS,
+      availableSkills: ["c3", "adapt"],
+    }, {
+      onSubmit: async () => "queued",
+      onCancel: () => {},
+      queuedText: "",
+      onClearQueuedText: () => {},
+      onRestoreQueuedText: () => "",
+      disabled: false,
+      canCancel: false,
+      chatId: "chat-1",
+      connectionStatus: "connected",
+      activeProvider: "codex",
+      runtimeModel: "gpt-5.4",
+      availableProviders: PROVIDERS.map((provider) => ({
+        ...provider,
+        models: provider.models.map((model) => ({
+          ...model,
+          contextWindowOptions: model.contextWindowOptions ? [...model.contextWindowOptions] : undefined,
+        })),
+      })),
+      availableSkills: ["c3", "adapt"],
+    })).toBe(true)
   })
 })

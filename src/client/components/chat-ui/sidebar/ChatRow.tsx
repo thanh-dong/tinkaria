@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 import { EllipsisVertical, Loader2, Pencil, Trash2 } from "lucide-react"
 import type { SidebarChatRow } from "../../../../shared/types"
 import { AnimatedShinyText } from "../../ui/animated-shiny-text"
@@ -9,6 +9,7 @@ import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../.
 import { cn, normalizeChatId } from "../../../lib/utils"
 import { PROVIDER_ICONS } from "../ChatPreferenceControls"
 import { ChatRowMenu } from "./Menus"
+import { useEventCallback } from "../../../hooks/useEventCallback"
 
 const loadingStatuses = new Set(["starting", "running"])
 const CHAT_ROW_UI_ID = "sidebar.chat-row"
@@ -37,7 +38,28 @@ interface Props {
   onRenameChat: (chatId: string, title: string) => void
 }
 
-export function ChatRow({
+export function areChatRowPropsEqual(previous: Props, next: Props): boolean {
+  const previousNormalizedChatId = normalizeChatId(previous.chat.chatId)
+  const nextNormalizedChatId = normalizeChatId(next.chat.chatId)
+  const previousActive = previous.activeChatId === previousNormalizedChatId
+  const nextActive = next.activeChatId === nextNormalizedChatId
+
+  return previous.nowMs === next.nowMs
+    && previousActive === nextActive
+    && previous.chat._id === next.chat._id
+    && previous.chat._creationTime === next.chat._creationTime
+    && previous.chat.chatId === next.chat.chatId
+    && previous.chat.title === next.chat.title
+    && previous.chat.status === next.chat.status
+    && previous.chat.unread === next.chat.unread
+    && previous.chat.localPath === next.chat.localPath
+    && previous.chat.provider === next.chat.provider
+    && previous.chat.model === next.chat.model
+    && previous.chat.lastMessageAt === next.chat.lastMessageAt
+    && previous.chat.hasAutomation === next.chat.hasAutomation
+}
+
+function ChatRowInner({
   chat,
   activeChatId,
   nowMs,
@@ -45,6 +67,8 @@ export function ChatRow({
   onDeleteChat,
   onRenameChat,
 }: Props) {
+  const normalizedChatId = normalizeChatId(chat.chatId)
+  const isActive = activeChatId === normalizedChatId
   const ageLabel = formatSidebarAgeLabel(chat.lastMessageAt, nowMs)
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(chat.title)
@@ -52,6 +76,15 @@ export function ChatRow({
   const ProviderIcon = chat.provider ? PROVIDER_ICONS[chat.provider] : null
   const providerLabel = chat.provider ? PROVIDER_LABELS[chat.provider] : null
   const modelLabel = typeof chat.model === "string" && chat.model.trim() ? chat.model.trim() : null
+  const handleSelectChat = useEventCallback(() => {
+    if (!isEditing) onSelectChat(chat.chatId)
+  })
+  const handleDelete = useEventCallback(() => {
+    onDeleteChat(chat.chatId)
+  })
+  const handleRename = useEventCallback((title: string) => {
+    onRenameChat(chat.chatId, title)
+  })
 
   useEffect(() => {
     if (isEditing) {
@@ -64,7 +97,7 @@ export function ChatRow({
     const trimmed = editValue.trim()
     setIsEditing(false)
     if (trimmed && trimmed !== chat.title) {
-      onRenameChat(chat.chatId, trimmed)
+      handleRename(trimmed)
     } else {
       setEditValue(chat.title)
     }
@@ -76,19 +109,17 @@ export function ChatRow({
   }
 
   return (
-    <ChatRowMenu onRename={startEditing} onDelete={() => onDeleteChat(chat.chatId)}>
+    <ChatRowMenu onRename={startEditing} onDelete={handleDelete}>
       <div
-        data-chat-id={normalizeChatId(chat.chatId)}
+        data-chat-id={normalizedChatId}
         {...getUiIdentityAttributeProps(CHAT_ROW_DESCRIPTOR)}
         className={cn(
           "group flex items-center gap-2 pl-2.5 pr-0.5 py-0.5 rounded-lg cursor-pointer border hover:bg-muted/20 active:scale-[0.985] transition-all",
-          activeChatId === normalizeChatId(chat.chatId)
+          isActive
             ? "bg-primary/[0.07] hover:bg-primary/[0.1] border-primary/20 dark:bg-primary/[0.12] dark:hover:bg-primary/[0.16] dark:border-primary/15"
             : "border-border/0 hover:border-border dark:hover:border-slate-400/10"
         )}
-        onClick={() => {
-          if (!isEditing) onSelectChat(chat.chatId)
-        }}
+        onClick={handleSelectChat}
       >
         {loadingStatuses.has(chat.status) ? (
           <Loader2 className="size-3.5 flex-shrink-0 animate-spin text-muted-foreground" />
@@ -130,7 +161,7 @@ export function ChatRow({
           <span
             className={cn(
               "text-sm truncate flex-1 translate-y-[-0.5px]",
-              activeChatId === normalizeChatId(chat.chatId) && "font-medium",
+              isActive && "font-medium",
             )}
             onDoubleClick={(event) => {
               event.stopPropagation()
@@ -154,7 +185,7 @@ export function ChatRow({
             <span
               className={cn(
                 "max-w-24 truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground/70 transition-colors",
-                activeChatId === normalizeChatId(chat.chatId)
+                isActive
                   ? "bg-primary/[0.08] text-foreground/70 dark:bg-primary/[0.14]"
                   : "bg-muted/60 group-hover:bg-muted group-hover:text-muted-foreground"
               )}
@@ -168,7 +199,7 @@ export function ChatRow({
             <span
               className={cn(
                 "flex h-7 w-4 items-center justify-center text-muted-foreground/55 transition-colors",
-                activeChatId === normalizeChatId(chat.chatId) ? "text-foreground/60" : "group-hover:text-muted-foreground/80",
+                isActive ? "text-foreground/60" : "group-hover:text-muted-foreground/80",
               )}
               title={providerLabel}
               aria-label={providerLabel}
@@ -205,7 +236,7 @@ export function ChatRow({
                   <span className="text-xs font-medium">Rename</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => onDeleteChat(chat.chatId)}
+                  onSelect={handleDelete}
                   className="text-destructive dark:text-red-400 hover:bg-destructive/10 focus:bg-destructive/10 dark:hover:bg-red-500/20 dark:focus:bg-red-500/20"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -219,3 +250,5 @@ export function ChatRow({
     </ChatRowMenu>
   )
 }
+
+export const ChatRow = memo(ChatRowInner, areChatRowPropsEqual)
