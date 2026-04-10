@@ -57,3 +57,58 @@ export interface CliError {
   code: number
   detail?: string
 }
+
+// --- Coordination types ---
+
+export type TodoPriority = "high" | "normal" | "low"
+export type CoordinationTodoStatus = "open" | "claimed" | "complete" | "abandoned"
+export type ClaimStatus = "active" | "released" | "conflict"
+export type WorktreeStatus = "ready" | "assigned" | "removed"
+
+export interface ProjectTodo {
+  id: string
+  description: string
+  priority: TodoPriority
+  status: CoordinationTodoStatus
+  claimedBy: string | null
+  outputs: string[]
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProjectClaim {
+  id: string
+  intent: string
+  files: string[]
+  sessionId: string
+  status: ClaimStatus
+  conflictsWith: string | null
+  createdAt: string
+}
+
+export interface ProjectWorktree {
+  id: string
+  branch: string
+  baseBranch: string
+  path: string
+  assignedTo: string | null
+  status: WorktreeStatus
+  createdAt: string
+}
+
+export interface ProjectRule {
+  id: string
+  content: string
+  setBy: string
+  updatedAt: string
+}
+
+export interface ProjectCoordinationSnapshot {
+  projectId: string
+  todos: ProjectTodo[]
+  claims: ProjectClaim[]
+  worktrees: ProjectWorktree[]
+  rules: ProjectRule[]
+  lastUpdated: string
+}
