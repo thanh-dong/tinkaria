@@ -99,6 +99,17 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "snapshot.unsubscribe",
   "sessions.resume",
   "sessions.refresh",
+  "project.todo.add",
+  "project.todo.claim",
+  "project.todo.complete",
+  "project.todo.abandon",
+  "project.claim.create",
+  "project.claim.release",
+  "project.worktree.create",
+  "project.worktree.assign",
+  "project.worktree.remove",
+  "project.rule.set",
+  "project.rule.remove",
 ]
 
 export function registerCommandResponders(args: RegisterRespondersArgs): { dispose: () => void } {
@@ -382,6 +393,51 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         }
 
         return { chatId: chat.id }
+      }
+
+      case "project.todo.add": {
+        await store.addTodo(command.projectId, command.todoId, command.description, command.priority ?? "normal", "user")
+        return { ok: true }
+      }
+      case "project.todo.claim": {
+        await store.claimTodo(command.projectId, command.todoId, command.sessionId)
+        return { ok: true }
+      }
+      case "project.todo.complete": {
+        await store.completeTodo(command.projectId, command.todoId, command.outputs)
+        return { ok: true }
+      }
+      case "project.todo.abandon": {
+        await store.abandonTodo(command.projectId, command.todoId)
+        return { ok: true }
+      }
+      case "project.claim.create": {
+        await store.createClaim(command.projectId, command.claimId, command.intent, command.files, command.sessionId)
+        return { ok: true }
+      }
+      case "project.claim.release": {
+        await store.releaseClaim(command.projectId, command.claimId)
+        return { ok: true }
+      }
+      case "project.worktree.create": {
+        await store.createWorktree(command.projectId, command.worktreeId, command.branch, command.baseBranch ?? "main", "")
+        return { ok: true }
+      }
+      case "project.worktree.assign": {
+        await store.assignWorktree(command.projectId, command.worktreeId, command.sessionId)
+        return { ok: true }
+      }
+      case "project.worktree.remove": {
+        await store.removeWorktree(command.projectId, command.worktreeId)
+        return { ok: true }
+      }
+      case "project.rule.set": {
+        await store.setRule(command.projectId, command.ruleId, command.content, command.setBy)
+        return { ok: true }
+      }
+      case "project.rule.remove": {
+        await store.removeRule(command.projectId, command.ruleId)
+        return { ok: true }
       }
 
       default: {
