@@ -11,7 +11,7 @@ import type { ChatMessageEvent, SessionsSnapshot, TranscriptEntry } from "../sha
 import type { SessionStatus } from "../shared/types"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
-import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSessionsSnapshot, deriveSidebarData } from "./read-models"
+import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveProjectCoordinationSnapshot, deriveSessionsSnapshot, deriveSidebarData } from "./read-models"
 import { discoverSessions } from "./session-discovery"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
@@ -149,7 +149,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
       case "orchestration":
         return orchestrator?.getHierarchy(topic.chatId) ?? { children: [] }
       case "project":
-        return null
+        return deriveProjectCoordinationSnapshot(store.state, topic.projectId)
       default: {
         const _exhaustive: never = topic
         throw new Error(`Unknown topic type: ${(_exhaustive as SubscriptionTopic).type}`)
