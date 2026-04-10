@@ -6,6 +6,7 @@ import type { AgentProvider, TranscriptEntry } from "../shared/types"
 import { STORE_VERSION } from "../shared/types"
 import {
   type ChatEvent,
+  type CoordinationEvent,
   type MessageEvent,
   type ProjectEvent,
   type SnapshotFile,
@@ -13,6 +14,7 @@ import {
   type StoreState,
   type TurnEvent,
   cloneTranscriptEntries,
+  createEmptyCoordinationState,
   createEmptyState,
 } from "./events"
 import { resolveLocalPath } from "./paths"
@@ -41,6 +43,7 @@ export class EventStore {
   private snapshotHasLegacyMessages = false
   private transcriptCache = new Map<string, TranscriptEntry[]>()
   private static readonly TRANSCRIPT_CACHE_MAX = 5
+  private readonly coordinationLogPath: string
 
   constructor(dataDir = getDataDir(homedir())) {
     this.dataDir = dataDir
@@ -50,6 +53,7 @@ export class EventStore {
     this.messagesLogPath = path.join(this.dataDir, "messages.jsonl")
     this.turnsLogPath = path.join(this.dataDir, "turns.jsonl")
     this.transcriptsDir = path.join(this.dataDir, "transcripts")
+    this.coordinationLogPath = path.join(this.dataDir, "coordination.jsonl")
   }
 
   async initialize() {
@@ -59,6 +63,7 @@ export class EventStore {
     await this.ensureFile(this.chatsLogPath)
     await this.ensureFile(this.messagesLogPath)
     await this.ensureFile(this.turnsLogPath)
+    await this.ensureFile(this.coordinationLogPath)
     await this.loadSnapshot()
     await this.replayLogs()
     if (!(await this.hasLegacyTranscriptData()) && await this.shouldCompact()) {
@@ -84,6 +89,7 @@ export class EventStore {
       Bun.write(this.chatsLogPath, ""),
       Bun.write(this.messagesLogPath, ""),
       Bun.write(this.turnsLogPath, ""),
+      Bun.write(this.coordinationLogPath, ""),
     ])
   }
 
@@ -107,6 +113,16 @@ export class EventStore {
       for (const chat of parsed.chats) {
         this.state.chatsById.set(chat.id, { ...chat, unread: chat.unread ?? false, model: chat.model ?? null })
       }
+      if (parsed.coordination?.length) {
+        for (const entry of parsed.coordination) {
+          const coord = createEmptyCoordinationState()
+          for (const todo of entry.todos) coord.todos.set(todo.id, todo)
+          for (const claim of entry.claims) coord.claims.set(claim.id, claim)
+          for (const wt of entry.worktrees) coord.worktrees.set(wt.id, wt)
+          for (const rule of entry.rules) coord.rules.set(rule.id, rule)
+          this.state.coordinationByProject.set(entry.projectId, coord)
+        }
+      }
       if (parsed.messages?.length) {
         this.snapshotHasLegacyMessages = true
         for (const messageSet of parsed.messages) {
@@ -123,6 +139,7 @@ export class EventStore {
     this.state.projectsById.clear()
     this.state.projectIdsByPath.clear()
     this.state.chatsById.clear()
+    this.state.coordinationByProject.clear()
     this.transcriptCache.clear()
   }
 
@@ -140,6 +157,8 @@ export class EventStore {
     await this.replayLog<MessageEvent>(this.messagesLogPath)
     if (this.storageReset) return
     await this.replayLog<TurnEvent>(this.turnsLogPath)
+    if (this.storageReset) return
+    await this.replayLog<CoordinationEvent>(this.coordinationLogPath)
   }
 
   private async replayLog<TEvent extends StoreEvent>(filePath: string) {
@@ -305,7 +324,141 @@ export class EventStore {
         chat.updatedAt = event.timestamp
         break
       }
+      case "todo_added": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        coord.todos.set(event.todoId, {
+          id: event.todoId,
+          description: event.description,
+          priority: event.priority,
+          status: "open",
+          claimedBy: null,
+          outputs: [],
+          createdBy: event.createdBy,
+          createdAt: new Date(event.timestamp).toISOString(),
+          updatedAt: new Date(event.timestamp).toISOString(),
+        })
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "todo_claimed": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        const todo = coord.todos.get(event.todoId)
+        if (!todo) break
+        todo.status = "claimed"
+        todo.claimedBy = event.claimedBy
+        todo.updatedAt = new Date(event.timestamp).toISOString()
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "todo_completed": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        const todo = coord.todos.get(event.todoId)
+        if (!todo) break
+        todo.status = "complete"
+        todo.outputs = event.outputs
+        todo.updatedAt = new Date(event.timestamp).toISOString()
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "todo_abandoned": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        const todo = coord.todos.get(event.todoId)
+        if (!todo) break
+        todo.status = "abandoned"
+        todo.updatedAt = new Date(event.timestamp).toISOString()
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "claim_created": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        coord.claims.set(event.claimId, {
+          id: event.claimId,
+          intent: event.intent,
+          files: event.files,
+          sessionId: event.sessionId,
+          status: "active",
+          conflictsWith: null,
+          createdAt: new Date(event.timestamp).toISOString(),
+        })
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "claim_released": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        const claim = coord.claims.get(event.claimId)
+        if (!claim) break
+        claim.status = "released"
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "claim_conflict_detected": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        const claim = coord.claims.get(event.claimId)
+        if (!claim) break
+        claim.status = "conflict"
+        claim.conflictsWith = event.conflictsWith
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "worktree_created": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        coord.worktrees.set(event.worktreeId, {
+          id: event.worktreeId,
+          branch: event.branch,
+          baseBranch: event.baseBranch,
+          path: event.path,
+          assignedTo: null,
+          status: "ready",
+          createdAt: new Date(event.timestamp).toISOString(),
+        })
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "worktree_assigned": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        const wt = coord.worktrees.get(event.worktreeId)
+        if (!wt) break
+        wt.assignedTo = event.sessionId
+        wt.status = "assigned"
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "worktree_removed": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        const wt = coord.worktrees.get(event.worktreeId)
+        if (!wt) break
+        wt.status = "removed"
+        wt.assignedTo = null
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "rule_set": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        coord.rules.set(event.ruleId, {
+          id: event.ruleId,
+          content: event.content,
+          setBy: event.setBy,
+          updatedAt: new Date(event.timestamp).toISOString(),
+        })
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
+      case "rule_removed": {
+        const coord = this.getOrCreateCoordination(event.projectId)
+        coord.rules.delete(event.ruleId)
+        coord.lastUpdated = new Date(event.timestamp).toISOString()
+        break
+      }
     }
+  }
+
+  private getOrCreateCoordination(projectId: string) {
+    let coord = this.state.coordinationByProject.get(projectId)
+    if (!coord) {
+      coord = createEmptyCoordinationState()
+      this.state.coordinationByProject.set(projectId, coord)
+    }
+    return coord
   }
 
   private applyMessageMetadata(chatId: string, entry: TranscriptEntry) {
@@ -567,6 +720,81 @@ export class EventStore {
     await this.append(this.turnsLogPath, event)
   }
 
+  // --- Coordination mutation methods ---
+
+  async addTodo(projectId: string, todoId: string, description: string, priority: "high" | "normal" | "low", createdBy: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_added", timestamp: Date.now(), projectId, todoId, description, priority, createdBy }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async claimTodo(projectId: string, todoId: string, claimedBy: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_claimed", timestamp: Date.now(), projectId, todoId, claimedBy }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async completeTodo(projectId: string, todoId: string, outputs: string[]) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_completed", timestamp: Date.now(), projectId, todoId, outputs }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async abandonTodo(projectId: string, todoId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_abandoned", timestamp: Date.now(), projectId, todoId }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async createClaim(projectId: string, claimId: string, intent: string, files: string[], sessionId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "claim_created", timestamp: Date.now(), projectId, claimId, intent, files, sessionId }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+
+    // Auto-detect file overlap with existing active claims
+    const coord = this.state.coordinationByProject.get(projectId)
+    if (coord) {
+      const fileSet = new Set(files)
+      for (const [existingId, existing] of coord.claims) {
+        if (existingId === claimId || existing.status !== "active") continue
+        const overlapping = existing.files.filter((f) => fileSet.has(f))
+        if (overlapping.length > 0) {
+          const conflictEvent: CoordinationEvent = {
+            v: STORE_VERSION, type: "claim_conflict_detected", timestamp: Date.now(),
+            projectId, claimId, conflictsWith: existingId, overlappingFiles: overlapping,
+          }
+          await this.append<CoordinationEvent>(this.coordinationLogPath, conflictEvent)
+          break
+        }
+      }
+    }
+  }
+
+  async releaseClaim(projectId: string, claimId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "claim_released", timestamp: Date.now(), projectId, claimId }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async createWorktree(projectId: string, worktreeId: string, branch: string, baseBranch: string, wtPath: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_created", timestamp: Date.now(), projectId, worktreeId, branch, baseBranch, path: wtPath }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async assignWorktree(projectId: string, worktreeId: string, sessionId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_assigned", timestamp: Date.now(), projectId, worktreeId, sessionId }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async removeWorktree(projectId: string, worktreeId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_removed", timestamp: Date.now(), projectId, worktreeId }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async setRule(projectId: string, ruleId: string, content: string, setBy: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "rule_set", timestamp: Date.now(), projectId, ruleId, content, setBy }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
+  async removeRule(projectId: string, ruleId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "rule_removed", timestamp: Date.now(), projectId, ruleId }
+    await this.append<CoordinationEvent>(this.coordinationLogPath, event)
+  }
+
   getProject(projectId: string) {
     const project = this.state.projectsById.get(projectId)
     if (!project || project.deletedAt) return null
@@ -670,6 +898,16 @@ export class EventStore {
   }
 
   private createSnapshot(): SnapshotFile {
+    const coordination: SnapshotFile["coordination"] = []
+    for (const [projectId, coord] of this.state.coordinationByProject) {
+      coordination.push({
+        projectId,
+        todos: [...coord.todos.values()],
+        claims: [...coord.claims.values()],
+        worktrees: [...coord.worktrees.values()],
+        rules: [...coord.rules.values()],
+      })
+    }
     return {
       v: STORE_VERSION,
       generatedAt: Date.now(),
@@ -677,6 +915,7 @@ export class EventStore {
       chats: [...this.state.chatsById.values()]
         .filter((chat) => !chat.deletedAt)
         .map((chat) => ({ ...chat })),
+      ...(coordination.length > 0 ? { coordination } : {}),
     }
   }
 
@@ -688,6 +927,7 @@ export class EventStore {
       Bun.write(this.chatsLogPath, ""),
       Bun.write(this.messagesLogPath, ""),
       Bun.write(this.turnsLogPath, ""),
+      Bun.write(this.coordinationLogPath, ""),
     ])
   }
 
@@ -728,6 +968,7 @@ export class EventStore {
       Bun.file(this.chatsLogPath).size,
       Bun.file(this.messagesLogPath).size,
       Bun.file(this.turnsLogPath).size,
+      Bun.file(this.coordinationLogPath).size,
     ])
     return sizes.reduce((total, size) => total + size, 0) >= COMPACTION_THRESHOLD_BYTES
   }

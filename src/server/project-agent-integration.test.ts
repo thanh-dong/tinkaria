@@ -26,7 +26,7 @@ function makeState(): StoreState {
       unread: false, provider: "codex", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
   ])
-  return { projectsById, projectIdsByPath, chatsById }
+  return { projectsById, projectIdsByPath, chatsById, coordinationByProject: new Map() }
 }
 
 describe("project agent integration", () => {

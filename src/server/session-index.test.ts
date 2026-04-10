@@ -23,7 +23,7 @@ function createState(chats: ChatRecord[]): StoreState {
   for (const chat of chats) {
     chatsById.set(chat.id, chat)
   }
-  return { projectsById, projectIdsByPath, chatsById }
+  return { projectsById, projectIdsByPath, chatsById, coordinationByProject: new Map() }
 }
 
 function makeChat(id: string, projectId = "p1", provider: "claude" | "codex" | null = "claude"): ChatRecord {
