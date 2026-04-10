@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   clearPendingSessionBootstrapAfterAttempt,
   removeChatFromSidebar,
+  shouldTriggerSnapshotRecovery,
   transitionPendingSessionBootstrapToError,
   type PendingSessionBootstrap,
 } from "./appState.helpers"
@@ -149,5 +150,39 @@ describe("removeChatFromSidebar", () => {
     const result = removeChatFromSidebar(data, "c")
     expect(result.projectGroups[0].chats.map((c) => c.chatId)).toEqual(["a", "b"])
     expect(result.projectGroups[1].chats.map((c) => c.chatId)).toEqual(["d"])
+  })
+})
+
+describe("shouldTriggerSnapshotRecovery", () => {
+  test("triggers recovery when snapshot never arrived and fetch never started", () => {
+    expect(shouldTriggerSnapshotRecovery({
+      cancelled: false,
+      initialFetchDone: false,
+      fetchTriggered: false,
+    })).toBe(true)
+  })
+
+  test("does not trigger if cancelled", () => {
+    expect(shouldTriggerSnapshotRecovery({
+      cancelled: true,
+      initialFetchDone: false,
+      fetchTriggered: false,
+    })).toBe(false)
+  })
+
+  test("does not trigger if initial fetch already completed", () => {
+    expect(shouldTriggerSnapshotRecovery({
+      cancelled: false,
+      initialFetchDone: true,
+      fetchTriggered: false,
+    })).toBe(false)
+  })
+
+  test("does not trigger if fetch was already triggered", () => {
+    expect(shouldTriggerSnapshotRecovery({
+      cancelled: false,
+      initialFetchDone: false,
+      fetchTriggered: true,
+    })).toBe(false)
   })
 })

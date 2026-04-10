@@ -32,6 +32,7 @@ import type { AppState } from "./useAppState"
 import { ChatTranscript } from "./ChatTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
 import type { HydratedTranscriptMessage } from "../../shared/types"
+import { useEventCallback } from "../hooks/useEventCallback"
 
 const EMPTY_STATE_TEXT = "What are we building?"
 const EMPTY_STATE_TYPING_INTERVAL_MS = 19
@@ -252,6 +253,14 @@ export function shouldCloseMobileSidebarFromSwipe(args: MobileSidebarSwipeDecisi
   return deltaX > deltaY
 }
 
+export function getTranscriptAreaVisibility(args: {
+  messageCount: number
+  chatHasKnownMessages: boolean
+}): "transcript" | "loading" | "empty" {
+  if (args.messageCount > 0) return "transcript"
+  return args.chatHasKnownMessages ? "loading" : "empty"
+}
+
 export function getEmptyStateTypingDurationMs(text: string): number {
   return text.length * EMPTY_STATE_TYPING_INTERVAL_MS
 }
@@ -318,6 +327,14 @@ export function ChatPage() {
     hasAvailableSkills: availableSkills.length > 0,
     skillsRibbonVisible,
   })
+  const handleComposerSubmit = useEventCallback(state.handleSubmitFromComposer)
+  const handleComposerCancel = useEventCallback(() => {
+    void state.handleCancel()
+  })
+  const handleClearQueuedText = useEventCallback(() => {
+    state.clearQueuedText()
+  })
+  const handleRestoreQueuedText = useEventCallback(() => state.restoreQueuedText())
   const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
   const [forkDialogOpen, setForkDialogOpen] = useState(false)
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
@@ -333,6 +350,10 @@ export function ChatPage() {
     () => new Set(state.sidebarData.projectGroups.flatMap((group) => group.chats.map((chat) => chat.chatId))),
     [state.sidebarData.projectGroups],
   )
+  const transcriptVisibility = getTranscriptAreaVisibility({
+    messageCount: state.messages.length,
+    chatHasKnownMessages: state.chatHasKnownMessages,
+  })
 
   useEffect(() => {
     if (state.pendingMergeProjectId) {
@@ -552,8 +573,8 @@ export function ChatPage() {
             ref={state.scrollRef}
             className="h-full px-4 scroll-pt-[72px]"
           >
-            {state.messages.length === 0 ? <div style={{ height: effectiveTranscriptPaddingBottom }} aria-hidden="true" /> : null}
-            {state.messages.length > 0 ? (
+            {transcriptVisibility !== "transcript" ? <div style={{ height: effectiveTranscriptPaddingBottom }} aria-hidden="true" /> : null}
+            {transcriptVisibility === "transcript" ? (
               <>
                 <div className="animate-fade-in space-y-5 pt-[72px] max-w-[800px] mx-auto">
                   <ChatTranscript
@@ -580,11 +601,25 @@ export function ChatPage() {
                 <TranscriptTailBoundary hasMessages={true} sentinelRef={state.sentinelRef} />
               </>
             ) : null}
-            {state.messages.length === 0 ? <TranscriptTailBoundary hasMessages={false} sentinelRef={state.sentinelRef} /> : null}
+            {transcriptVisibility !== "transcript" ? <TranscriptTailBoundary hasMessages={false} sentinelRef={state.sentinelRef} /> : null}
           </ScrollArea>
         </div>
 
-        {state.messages.length === 0 && !state.chatHasKnownMessages ? (
+        {transcriptVisibility === "loading" ? (
+          <div
+            className="pointer-events-none absolute inset-x-4 animate-fade-in"
+            style={{
+              top: CHAT_NAVBAR_OFFSET_PX,
+              bottom: effectiveTranscriptPaddingBottom,
+            }}
+          >
+            <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
+            </div>
+          </div>
+        ) : null}
+
+        {transcriptVisibility === "empty" ? (
           <div
             key={state.activeChatId ?? "new-chat"}
             className="pointer-events-none absolute inset-x-4 animate-fade-in"
@@ -734,13 +769,11 @@ export function ChatPage() {
           <ChatInput
             ref={chatInputRef}
             key={state.activeChatId ?? "new-chat"}
-            onSubmit={state.handleSubmitFromComposer}
-            onCancel={() => {
-              void state.handleCancel()
-            }}
+            onSubmit={handleComposerSubmit}
+            onCancel={handleComposerCancel}
             queuedText={state.queuedText}
-            onClearQueuedText={state.clearQueuedText}
-            onRestoreQueuedText={state.restoreQueuedText}
+            onClearQueuedText={handleClearQueuedText}
+            onRestoreQueuedText={handleRestoreQueuedText}
             disabled={!state.hasSelectedProject || state.runtime?.status === "waiting_for_user" || state.pendingSessionBootstrap?.chatId === state.activeChatId}
             canCancel={state.canCancel}
             chatId={state.activeChatId}

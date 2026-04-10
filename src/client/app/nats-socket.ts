@@ -324,8 +324,8 @@ export class NatsSocket implements AppTransport {
       if (this.subscriptions.has(id)) {
         entry.snapshotListener(data)
       }
-    }).catch(() => {
-      // Will receive snapshot on next server publish
+    }).catch((error) => {
+      console.warn(LOG_PREFIX, `snapshot.subscribe failed for ${snapshotSubject(entry.topic)}:`, error instanceof Error ? error.message : String(error))
     })
   }
 

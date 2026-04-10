@@ -15,6 +15,7 @@ import {
   getEmptyStateTypingDurationMs,
   getPendingSessionBootstrapStatusLabel,
   getScrollButtonBottomPx,
+  getTranscriptAreaVisibility,
   TranscriptTailBoundary,
   shouldRenderTranscriptCommandError,
   shouldDismissMobileKeyboardOnFirstMessage,
@@ -471,5 +472,20 @@ describe("getChatPageUiIdentities", () => {
 
     expect(html).toMatch(new RegExp(`<div[^>]*data-ui-id="${navbarAreaId}"`))
     expect(html).toMatch(new RegExp(`<button[^>]*data-ui-id="${forkSessionActionId}"`))
+  })
+})
+
+describe("getTranscriptAreaVisibility", () => {
+  test("shows transcript when messages exist", () => {
+    expect(getTranscriptAreaVisibility({ messageCount: 5, chatHasKnownMessages: true })).toBe("transcript")
+    expect(getTranscriptAreaVisibility({ messageCount: 5, chatHasKnownMessages: false })).toBe("transcript")
+  })
+
+  test("shows loading when no messages but chat has known messages", () => {
+    expect(getTranscriptAreaVisibility({ messageCount: 0, chatHasKnownMessages: true })).toBe("loading")
+  })
+
+  test("shows empty state when no messages and chat has no known messages", () => {
+    expect(getTranscriptAreaVisibility({ messageCount: 0, chatHasKnownMessages: false })).toBe("empty")
   })
 })

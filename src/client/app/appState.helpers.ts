@@ -111,6 +111,7 @@ export type StartChatIntent =
 
 export const TRANSCRIPT_TAIL_SIZE = 200
 export const PWA_RESUME_STALE_AFTER_MS = 15_000
+export const SNAPSHOT_RECOVERY_TIMEOUT_MS = 5_000
 
 export function removeChatFromSidebar(data: SidebarData, chatId: string): SidebarData {
   const filtered = data.projectGroups
@@ -349,6 +350,14 @@ export function appendQueuedText(currentQueuedText: string, nextContent: string)
   if (!next) return current
 
   return `${current}\n\n${next}`
+}
+
+export function shouldTriggerSnapshotRecovery(args: {
+  cancelled: boolean
+  initialFetchDone: boolean
+  fetchTriggered: boolean
+}): boolean {
+  return !args.cancelled && !args.initialFetchDone && !args.fetchTriggered
 }
 
 export function shouldQueueChatSubmit(isProcessing: boolean, queuedText: string): boolean {

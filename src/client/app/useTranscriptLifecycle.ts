@@ -13,6 +13,8 @@ import { getCachedChat, setCachedChat } from "./chatCache"
 import {
   computeTailOffset,
   shouldBackfillTranscriptWindow,
+  shouldTriggerSnapshotRecovery,
+  SNAPSHOT_RECOVERY_TIMEOUT_MS,
   summarizeTranscriptWindow,
   TRANSCRIPT_TAIL_SIZE,
 } from "./appState.helpers"
@@ -152,6 +154,28 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       })
     }
 
+    async function fetchTailFallback() {
+      if (fetchTriggered) return
+      fetchTriggered = true
+      try {
+        const entries = await socket.command<TranscriptEntry[]>({
+          type: "chat.getMessages", chatId, offset: 0, limit: TRANSCRIPT_TAIL_SIZE,
+        })
+        log("snapshot recovery: fetched messages without snapshot", {
+          chatId, entryCount: entries.length,
+        })
+        messageCountRef.current = entries.length
+        flushTail(entries, "fetched")
+        setChatReady(true)
+      } catch (error) {
+        log("snapshot recovery fetch failed", {
+          chatId, error: error instanceof Error ? error.message : String(error),
+        })
+        flushTail([], "fallback_empty")
+        setChatReady(true)
+      }
+    }
+
     async function fetchTail(messageCount: number) {
       if (fetchTriggered) return
       fetchTriggered = true
@@ -265,8 +289,18 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       },
     )
 
+    // Safety net: if the snapshot never arrives (e.g. subscribe command failed silently),
+    // fall back to fetching messages directly after a timeout.
+    const recoveryTimer = restoredFromCache ? undefined : setTimeout(() => {
+      if (shouldTriggerSnapshotRecovery({ cancelled, initialFetchDone, fetchTriggered })) {
+        log("snapshot recovery: no snapshot received, fetching directly", { chatId })
+        void fetchTailFallback()
+      }
+    }, SNAPSHOT_RECOVERY_TIMEOUT_MS)
+
     return () => {
       cancelled = true
+      clearTimeout(recoveryTimer)
       if (pendingRaf !== null) cancelAnimationFrame(pendingRaf)
       unsub()
       orchestrationUnsub()
