@@ -36,28 +36,13 @@ export const WipBlock = memo(function WipBlock({ steps, isLoading, localPath }: 
   const [expanded, setExpanded] = useState(false)
   const toggleExpanded = useCallback(() => setExpanded((prev) => !prev), [])
 
-  // Derive collapsed state from steps
-  const { latestNarration, latestTool, stepCount } = useMemo(() => {
-    let narration: string | null = null
-    let tool: ProcessedToolCall | null = null
+  const stepCount = useMemo(() => {
     let count = 0
-
     for (const step of steps) {
-      if (step.kind === "assistant_text") {
-        narration = step.text
-      } else if (step.kind === "tool") {
-        tool = step as ProcessedToolCall
-        count++
-      }
+      if (step.kind === "tool") count++
     }
-
-    return { latestNarration: narration, latestTool: tool, stepCount: count }
+    return count
   }, [steps])
-
-  const toolLabel = useMemo(
-    () => latestTool ? getToolLabel(latestTool, localPath) : null,
-    [latestTool, localPath],
-  )
 
   return (
     <div {...getUiIdentityAttributeProps(WIP_BLOCK_DESCRIPTOR)}>
@@ -81,17 +66,6 @@ export const WipBlock = memo(function WipBlock({ steps, isLoading, localPath }: 
               </MetaLabel>
             </div>
           </button>
-
-          {/* Sub-line: single preview — narration preferred, tool as fallback */}
-          {!expanded && latestNarration ? (
-            <div className="ml-[26px] mt-1 text-xs text-muted-foreground/50 truncate italic">
-              {latestNarration.length > 120 ? `${latestNarration.slice(0, 120)}...` : latestNarration}
-            </div>
-          ) : !expanded && latestTool && toolLabel ? (
-            <div className="ml-[26px] mt-1">
-              <ToolStepRow toolName={latestTool.toolName} label={toolLabel} isError={latestTool.isError} />
-            </div>
-          ) : null}
 
           {/* Expanded: timeline using VerticalLineContainer */}
           {expanded ? (
