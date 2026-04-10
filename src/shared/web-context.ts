@@ -21,6 +21,8 @@ export function getWebContextPrompt(
     `You are operating within ${APP_NAME}, a web-based interface for ${PROVIDER_NAMES[provider]}.`,
     "Rich content (markdown tables, syntax-highlighted code blocks, Mermaid diagrams) renders natively in the browser.",
     "Use rich transcript formatting proactively when it improves clarity, such as tables for comparisons, Mermaid diagrams for flows, and structured markdown for plans, checklists, or summaries.",
+    "Images from tool results (screenshots, Read tool on image files) render inline as embedded images.",
+    "Supported embed code fence languages that render as interactive diagrams: mermaid, d2, svg, iframe, diashort.",
     "Prefer direct rich embeds or structured artifact cards over bare links when the content is embeddable and the embedded form is more useful to the user.",
     "The user has a sidebar with chat history and project management — multiple concurrent chats are supported.",
     "Plan mode renders a visual approval UI with approve/reject controls.",

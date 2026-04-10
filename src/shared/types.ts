@@ -577,8 +577,27 @@ export interface ReadFileToolResult {
   content: string
 }
 
+export interface ImageContentBlock {
+  mediaType: string
+  data: string
+}
+
+export interface ReadFileImageResult {
+  images: ImageContentBlock[]
+  text?: string
+}
+
+export function isReadFileImageResult(result: unknown): result is ReadFileImageResult {
+  return (
+    result !== null
+    && typeof result === "object"
+    && "images" in result
+    && Array.isArray(result.images)
+  )
+}
+
 export type HydratedReadFileToolCall =
-  HydratedToolCallBase<"read_file", ReadFileToolCall["input"], ReadFileToolResult | string>
+  HydratedToolCallBase<"read_file", ReadFileToolCall["input"], ReadFileToolResult | ReadFileImageResult | string>
 
 export type HydratedWriteFileToolCall =
   HydratedToolCallBase<"write_file", WriteFileToolCall["input"], unknown>

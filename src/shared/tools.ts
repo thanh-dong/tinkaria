@@ -4,12 +4,14 @@ import type {
   AskUserQuestionToolResult,
   ExitPlanModeToolResult,
   HydratedToolCall,
+  ImageContentBlock,
   NormalizedToolCall,
   PresentContentInput,
   PresentContentErrorToolResult,
   PresentContentSchemaValidationError,
   PresentContentValidationIssue,
   PresentContentToolResult,
+  ReadFileImageResult,
   ReadFileToolResult,
   TodoItem,
 } from "./types"
@@ -258,6 +260,45 @@ export function normalizeToolCall(args: {
   }
 }
 
+const MAX_IMAGE_BASE64_LENGTH = 10 * 1024 * 1024 // ~7.5MB decoded
+
+const ALLOWED_IMAGE_MEDIA_TYPES = new Set([
+  "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml", "image/bmp",
+])
+
+function extractImageBlocks(parsed: unknown): ReadFileImageResult | null {
+  if (!Array.isArray(parsed)) return null
+
+  const images: ImageContentBlock[] = []
+  let text: string | undefined
+
+  for (const block of parsed) {
+    const record = asRecord(block)
+    if (!record) continue
+
+    if (record.type === "image") {
+      const source = asRecord(record.source)
+      if (
+        source &&
+        source.type === "base64" &&
+        typeof source.media_type === "string" &&
+        ALLOWED_IMAGE_MEDIA_TYPES.has(source.media_type) &&
+        typeof source.data === "string" &&
+        source.data.length <= MAX_IMAGE_BASE64_LENGTH
+      ) {
+        images.push({ mediaType: source.media_type, data: source.data })
+      }
+    }
+
+    if (record.type === "text" && typeof record.text === "string") {
+      text = text ? `${text}\n${record.text}` : record.text
+    }
+  }
+
+  if (images.length === 0) return null
+  return { images, text }
+}
+
 function parseJsonValue(value: unknown): unknown {
   if (typeof value !== "string") return value
   try {
@@ -301,14 +342,17 @@ export function hydrateToolResult(tool: NormalizedToolCall, raw: unknown): Hydra
         ...(record?.discarded === true ? { discarded: true } : {}),
       } satisfies ExitPlanModeToolResult
     }
-    case "read_file":
+    case "read_file": {
       if (typeof parsed === "string") {
         return parsed
       }
+      const imageResult = extractImageBlocks(parsed)
+      if (imageResult) return imageResult
       const record = asRecord(parsed)
       return {
         content: typeof record?.content === "string" ? record.content : JSON.stringify(parsed, null, 2),
       } satisfies ReadFileToolResult
+    }
     case "present_content": {
       const record = asRecord(parsed)
       if (isPresentContentSchemaValidationError(record?.error)) {
@@ -341,7 +385,10 @@ export function hydrateToolResult(tool: NormalizedToolCall, raw: unknown): Hydra
         collapsed: typeof record?.collapsed === "boolean" ? record.collapsed : tool.input.collapsed,
       } satisfies PresentContentToolResult
     }
-    default:
+    default: {
+      const imageResult = extractImageBlocks(parsed)
+      if (imageResult) return imageResult
       return parsed
+    }
   }
 }

@@ -4,7 +4,9 @@ import { MetaRow, MetaLabel, MetaCodeBlock, ExpandableRow, VerticalLineContainer
 import { memo, useMemo } from "react"
 import { AnimatedShinyText } from "../ui/animated-shiny-text"
 import { FileContentView } from "./FileContentView"
+import { ImageContentView } from "./ImageContentView"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { isReadFileImageResult } from "../../../shared/types"
 
 const TOOL_CALL_ITEM_DESCRIPTOR = createUiIdentityDescriptor({
   id: "message.tool-call.item",
@@ -39,6 +41,7 @@ export const ToolCallMessage = memo(function ToolCallMessage({ message, isLoadin
   const resultText = useMemo(() => {
     if (typeof message.result === "string") return message.result
     if (!message.result) return ""
+    if (isReadFileImageResult(message.result)) return message.result.text ?? ""
     if (typeof message.result === "object" && message.result !== null && "content" in message.result) {
       const content = (message.result as { content?: unknown }).content
       if (typeof content === "string") return content
@@ -56,6 +59,9 @@ export const ToolCallMessage = memo(function ToolCallMessage({ message, isLoadin
         return JSON.stringify(message.input, null, 2)
     }
   }, [message])
+
+  const imageResult = isReadFileImageResult(message.result) ? message.result : null
+  const showGenericResult = hasResult && !isReadTool && !(!message.isError && (isWriteTool || isEditTool))
 
   return (
     <div {...getUiIdentityAttributeProps(TOOL_CALL_ITEM_DESCRIPTOR)}>
@@ -83,25 +89,36 @@ export const ToolCallMessage = memo(function ToolCallMessage({ message, isLoadin
                         <span className="text-muted-foreground">background</span>
                       )}
                     </span>
-                  ) : isWriteTool ? "Contents" : "Input"
+                  ) : "Input"
                 } copyText={inputText}>
                   {inputText}
                 </MetaCodeBlock>
               )}
               {hasResult && isReadTool && !message.isError && (
-                <FileContentView
-                  content={resultText}
-                />
+                imageResult ? (
+                  <ImageContentView
+                    images={imageResult.images}
+                    text={imageResult.text}
+                    title={message.input.filePath}
+                  />
+                ) : (
+                  <FileContentView content={resultText} />
+                )
               )}
               {isWriteTool && !message.isError && (
-                <FileContentView
-                  content={message.input.content}
-                />
+                <FileContentView content={message.input.content} />
               )}
-              {hasResult && !isReadTool && !(isWriteTool && !message.isError) && !(isEditTool && !message.isError) && (
-                <MetaCodeBlock label={message.isError ? "Error" : "Result"} copyText={resultText}>
-                  {resultText}
-                </MetaCodeBlock>
+              {showGenericResult && (
+                imageResult ? (
+                  <ImageContentView
+                    images={imageResult.images}
+                    text={imageResult.text}
+                  />
+                ) : (
+                  <MetaCodeBlock label={message.isError ? "Error" : "Result"} copyText={resultText}>
+                    {resultText}
+                  </MetaCodeBlock>
+                )
               )}
             </div>
           </VerticalLineContainer>

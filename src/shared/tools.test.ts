@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { hydrateToolResult, normalizeToolCall } from "./tools"
+import { isReadFileImageResult } from "./types"
 
 describe("normalizeToolCall", () => {
   test("maps AskUserQuestion input to typed questions", () => {
@@ -149,6 +150,146 @@ describe("hydrateToolResult", () => {
     })
   })
 
+  test("hydrates read_file image content blocks into ReadFileImageResult", () => {
+    const tool = normalizeToolCall({
+      toolName: "Read",
+      toolId: "tool-img-1",
+      input: { file_path: "/tmp/screenshot.png" },
+    })
+
+    const raw = [
+      { type: "image", source: { type: "base64", media_type: "image/png", data: "iVBORw0KGgo=" } },
+    ]
+
+    const result = hydrateToolResult(tool, raw)
+    expect(isReadFileImageResult(result)).toBe(true)
+    if (!isReadFileImageResult(result)) throw new Error("expected image result")
+    expect(result.images).toHaveLength(1)
+    expect(result.images[0].mediaType).toBe("image/png")
+    expect(result.images[0].data).toBe("iVBORw0KGgo=")
+    expect(result.text).toBeUndefined()
+  })
+
+  test("hydrates read_file mixed image+text blocks", () => {
+    const tool = normalizeToolCall({
+      toolName: "Read",
+      toolId: "tool-img-2",
+      input: { file_path: "/tmp/diagram.png" },
+    })
+
+    const raw = [
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "/9j/4AAQ=" } },
+      { type: "text", text: "A photo of a diagram" },
+    ]
+
+    const result = hydrateToolResult(tool, raw)
+    expect(isReadFileImageResult(result)).toBe(true)
+    if (!isReadFileImageResult(result)) throw new Error("expected image result")
+    expect(result.images).toHaveLength(1)
+    expect(result.images[0].mediaType).toBe("image/jpeg")
+    expect(result.text).toBe("A photo of a diagram")
+  })
+
+  test("hydrates read_file text-only array as text fallback", () => {
+    const tool = normalizeToolCall({
+      toolName: "Read",
+      toolId: "tool-img-3",
+      input: { file_path: "/tmp/file.ts" },
+    })
+
+    const raw = [
+      { type: "text", text: "const x = 1" },
+    ]
+
+    const result = hydrateToolResult(tool, raw)
+    // No images → falls through to existing JSON stringify behavior
+    expect(isReadFileImageResult(result)).toBe(false)
+  })
+
+  test("hydrates read_file string result unchanged (regression)", () => {
+    const tool = normalizeToolCall({
+      toolName: "Read",
+      toolId: "tool-img-4",
+      input: { file_path: "/tmp/file.ts" },
+    })
+
+    expect(hydrateToolResult(tool, "line 1\nline 2")).toBe("line 1\nline 2")
+  })
+
+  test("hydrates default tool with image content blocks", () => {
+    const tool = normalizeToolCall({
+      toolName: "mcp__browser__screenshot",
+      toolId: "tool-img-5",
+      input: { url: "https://example.com" },
+    })
+
+    const raw = [
+      { type: "image", source: { type: "base64", media_type: "image/png", data: "iVBORw0KGgo=" } },
+    ]
+
+    const result = hydrateToolResult(tool, raw)
+    expect(result).not.toBeNull()
+    const imageResult = result as { images: Array<{ mediaType: string; data: string }>; text?: string }
+    expect(imageResult.images).toHaveLength(1)
+    expect(imageResult.images[0].mediaType).toBe("image/png")
+  })
+
+  test("skips oversized base64 images in read_file", () => {
+    const tool = normalizeToolCall({
+      toolName: "Read",
+      toolId: "tool-img-6",
+      input: { file_path: "/tmp/huge.png" },
+    })
+
+    const hugeData = "A".repeat(11 * 1024 * 1024) // > 10MB
+    const raw = [
+      { type: "image", source: { type: "base64", media_type: "image/png", data: hugeData } },
+    ]
+
+    const result = hydrateToolResult(tool, raw)
+    // Oversized image skipped → no images → not an image result
+    expect(isReadFileImageResult(result)).toBe(false)
+  })
+
+  test("rejects disallowed media types in image blocks", () => {
+    const tool = normalizeToolCall({
+      toolName: "Read",
+      toolId: "tool-img-7",
+      input: { file_path: "/tmp/payload.html" },
+    })
+
+    const raw = [
+      { type: "image", source: { type: "base64", media_type: "text/html", data: "PHNjcmlwdD4=" } },
+    ]
+
+    const result = hydrateToolResult(tool, raw)
+    expect(isReadFileImageResult(result)).toBe(false)
+  })
+})
+
+describe("isReadFileImageResult", () => {
+  test("returns false for null", () => {
+    expect(isReadFileImageResult(null)).toBe(false)
+  })
+
+  test("returns false for string", () => {
+    expect(isReadFileImageResult("some text")).toBe(false)
+  })
+
+  test("returns false for object with non-array images", () => {
+    expect(isReadFileImageResult({ images: "not-array" })).toBe(false)
+  })
+
+  test("returns true for object with empty images array", () => {
+    expect(isReadFileImageResult({ images: [] })).toBe(true)
+  })
+
+  test("returns true for valid ReadFileImageResult", () => {
+    expect(isReadFileImageResult({ images: [{ mediaType: "image/png", data: "abc" }], text: "caption" })).toBe(true)
+  })
+})
+
+describe("hydrateToolResult (continued)", () => {
   test("preserves present_content error payloads", () => {
     const tool = normalizeToolCall({
       toolName: "present_content",
