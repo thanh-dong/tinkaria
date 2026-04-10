@@ -12,7 +12,7 @@ import { generateAuthToken } from "./nats-auth"
 import { readToken } from "../nats/nats-token"
 import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
-import { ensureTerminalEventsStream, ensureChatMessageStream, ensureRunnerEventsStream } from "./nats-streams"
+import { ensureTerminalEventsStream, ensureChatMessageStream, ensureRunnerEventsStream, ensureProjectCoordinationStream } from "./nats-streams"
 import { RunnerManager, type RunnerReadiness } from "./runner-manager"
 import { RunnerProxy } from "./runner-proxy"
 import { TranscriptConsumer } from "./transcript-consumer"
@@ -266,6 +266,7 @@ export async function startServer(options: StartServerOptions = {}) {
     ensureTerminalEventsStream(natsConnector.nc),
     ensureChatMessageStream(natsConnector.nc),
     ensureRunnerEventsStream(natsConnector.nc),
+    ensureProjectCoordinationStream(natsConnector.nc),
   ])
 
   const getHealthcheck = (): ServerHealthcheck => {
