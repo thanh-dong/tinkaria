@@ -148,6 +148,8 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         return deriveSessionsSnapshot(await getOrRefreshSessionsSnapshot(topic.projectId))
       case "orchestration":
         return orchestrator?.getHierarchy(topic.chatId) ?? { children: [] }
+      case "project":
+        return null
       default: {
         const _exhaustive: never = topic
         throw new Error(`Unknown topic type: ${(_exhaustive as SubscriptionTopic).type}`)

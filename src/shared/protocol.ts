@@ -11,6 +11,7 @@ export type SubscriptionTopic =
   | { type: "terminal"; terminalId: string }
   | { type: "sessions"; projectId: string }
   | { type: "orchestration"; chatId: string }
+  | { type: "project"; projectId: string }
 
 export interface TerminalSnapshot {
   terminalId: string
@@ -76,3 +77,14 @@ export type ClientCommand =
   | { type: "snapshot.unsubscribe"; subscriptionId: string }
   | { type: "sessions.resume"; projectId: string; sessionId: string; provider: AgentProvider }
   | { type: "sessions.refresh"; projectId: string }
+  | { type: "project.todo.add"; projectId: string; todoId: string; description: string; priority?: "high" | "normal" | "low" }
+  | { type: "project.todo.claim"; projectId: string; todoId: string; sessionId: string }
+  | { type: "project.todo.complete"; projectId: string; todoId: string; outputs: string[] }
+  | { type: "project.todo.abandon"; projectId: string; todoId: string }
+  | { type: "project.claim.create"; projectId: string; claimId: string; intent: string; files: string[]; sessionId: string }
+  | { type: "project.claim.release"; projectId: string; claimId: string }
+  | { type: "project.worktree.create"; projectId: string; worktreeId: string; branch: string; baseBranch?: string }
+  | { type: "project.worktree.assign"; projectId: string; worktreeId: string; sessionId: string }
+  | { type: "project.worktree.remove"; projectId: string; worktreeId: string }
+  | { type: "project.rule.set"; projectId: string; ruleId: string; content: string; setBy: string }
+  | { type: "project.rule.remove"; projectId: string; ruleId: string }
