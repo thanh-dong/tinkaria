@@ -64,7 +64,7 @@ export function createProjectAgentRouter(agent: ProjectAgent): (req: Request) =>
       const session = body.session as string | undefined
       if (!description || !session) return errorResponse("Missing 'description' or 'session'", 400)
       const branch = (body.branch as string) ?? null
-      return jsonResponse(agent.claimTask(description, session, branch))
+      return jsonResponse(await agent.claimTask(description, session, branch))
     }
 
     if (req.method === "POST" && path === "/complete") {
@@ -72,16 +72,15 @@ export function createProjectAgentRouter(agent: ProjectAgent): (req: Request) =>
       const taskId = body.taskId as string | undefined
       if (!taskId) return errorResponse("Missing 'taskId'", 400)
       const outputs = Array.isArray(body.outputs) ? (body.outputs as string[]) : []
-      const task = agent.completeTask(taskId, outputs)
+      const task = await agent.completeTask(taskId, outputs)
       return task ? jsonResponse(task) : errorResponse("Task not found", 404)
     }
 
     if (req.method === "POST" && path === "/delegate") {
       const body = await readBody(req)
       const request = body.request as string | undefined
-      const projectId = (body.projectId as string) ?? ""
       if (!request) return errorResponse("Missing 'request'", 400)
-      const result = await agent.delegate(request, projectId)
+      const result = await agent.delegate(request)
       return jsonResponse(result)
     }
 

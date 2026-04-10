@@ -20,7 +20,6 @@ import type { AgentProvider, TranscriptEntry, SessionStatus } from "../shared/ty
 import type { ClientCommand } from "../shared/protocol"
 import { SessionOrchestrator } from "./orchestration"
 import { SessionIndex } from "./session-index"
-import { TaskLedger } from "./task-ledger"
 import { TranscriptSearchIndex } from "./transcript-search"
 import { ProjectAgent } from "./project-agent"
 import { createProjectAgentRouter } from "./project-agent-routes"
@@ -287,19 +286,14 @@ export async function startServer(options: StartServerOptions = {}) {
 
   // Project agent: cross-session awareness and coordination
   const sessionIndex = new SessionIndex()
-  const taskLedger = new TaskLedger()
   const transcriptSearch = new TranscriptSearchIndex()
   const projectAgent = new ProjectAgent({
     sessions: sessionIndex,
-    tasks: taskLedger,
+    store,
     search: transcriptSearch,
+    projectId: "",
   })
   const projectAgentRouter = createProjectAgentRouter(projectAgent)
-
-  // Periodic task abandonment detection (every 60s)
-  const abandonInterval = setInterval(() => {
-    taskLedger.detectAbandoned()
-  }, 60_000)
 
   // Use indirection to break the circular dependency:
   // coordinator -> onStateChange -> publisher.broadcastSnapshots
@@ -475,7 +469,6 @@ export async function startServer(options: StartServerOptions = {}) {
   console.warn(LOG_PREFIX, `Operational health initialized — status: ${getHealthcheck().status}`)
 
   const shutdown = async () => {
-    clearInterval(abandonInterval)
     clearInterval(natsWsCounterInterval)
     orchestrator.destroy()
     responders.dispose()

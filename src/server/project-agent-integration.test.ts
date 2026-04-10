@@ -1,11 +1,16 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test, afterEach } from "bun:test"
 import { SessionIndex } from "./session-index"
-import { TaskLedger } from "./task-ledger"
+import { EventStore } from "./event-store"
 import { TranscriptSearchIndex } from "./transcript-search"
 import { ProjectAgent } from "./project-agent"
 import { createProjectAgentRouter } from "./project-agent-routes"
 import type { TranscriptEntry } from "../shared/types"
 import type { StoreState, ChatRecord } from "./events"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
+
+let tempDirs: string[] = []
 
 function timestamped<T extends Omit<TranscriptEntry, "_id" | "createdAt">>(
   entry: T,
@@ -13,16 +18,35 @@ function timestamped<T extends Omit<TranscriptEntry, "_id" | "createdAt">>(
   return { _id: crypto.randomUUID(), createdAt: Date.now(), ...entry } as TranscriptEntry
 }
 
-function makeState(): StoreState {
-  const projectsById = new Map([["p1", { id: "p1", localPath: "/tmp/p", title: "Test", createdAt: 0, updatedAt: 0 }]])
+async function createIntegration() {
+  const dir = await mkdtemp(path.join(tmpdir(), "pa-integration-test-"))
+  tempDirs.push(dir)
+  const store = new EventStore(dir)
+  await store.initialize()
+  const sessions = new SessionIndex()
+  const search = new TranscriptSearchIndex()
+  const project = await store.openProject("/tmp/test-integration", "Integration Test")
+  const projectId = project.id
+  const agent = new ProjectAgent({ sessions, store, search, projectId })
+  const router = createProjectAgentRouter(agent)
+  return { store, sessions, search, agent, router, projectId }
+}
+
+afterEach(async () => {
+  for (const d of tempDirs) await rm(d, { recursive: true, force: true })
+  tempDirs = []
+})
+
+function makeState(projectId: string): StoreState {
+  const projectsById = new Map([[projectId, { id: projectId, localPath: "/tmp/p", title: "Test", createdAt: 0, updatedAt: 0 }]])
   const projectIdsByPath = new Map<string, string>()
   const chatsById = new Map<string, ChatRecord>([
     ["c1", {
-      id: "c1", projectId: "p1", title: "Chat 1", createdAt: Date.now(), updatedAt: Date.now(),
+      id: "c1", projectId, title: "Chat 1", createdAt: Date.now(), updatedAt: Date.now(),
       unread: false, provider: "claude", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
     ["c2", {
-      id: "c2", projectId: "p1", title: "Chat 2", createdAt: Date.now(), updatedAt: Date.now(),
+      id: "c2", projectId, title: "Chat 2", createdAt: Date.now(), updatedAt: Date.now(),
       unread: false, provider: "codex", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
   ])
@@ -31,12 +55,8 @@ function makeState(): StoreState {
 
 describe("project agent integration", () => {
   test("end-to-end: messages → indexes → query via HTTP routes", async () => {
-    const sessions = new SessionIndex()
-    const tasks = new TaskLedger()
-    const search = new TranscriptSearchIndex()
-    const agent = new ProjectAgent({ sessions, tasks, search })
-    const router = createProjectAgentRouter(agent)
-    const state = makeState()
+    const { sessions, search, router, projectId } = await createIntegration()
+    const state = makeState(projectId)
 
     // Simulate two sessions sending messages
     const e1 = timestamped({ kind: "user_prompt", content: "implement auth middleware with JWT" })
@@ -47,7 +67,7 @@ describe("project agent integration", () => {
     search.addEntry("c2", e2)
 
     // Query sessions via HTTP
-    const sessionsRes = await router(new Request("http://localhost/api/project/sessions?projectId=p1"))
+    const sessionsRes = await router(new Request(`http://localhost/api/project/sessions?projectId=${projectId}`))
     const sessionsBody = await sessionsRes.json() as Array<Record<string, unknown>>
     expect(sessionsRes.status).toBe(200)
     expect(sessionsBody.length).toBe(2)
@@ -82,7 +102,7 @@ describe("project agent integration", () => {
     const delegateRes = await router(new Request("http://localhost/api/project/delegate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ request: "who is working on auth?", projectId: "p1" }),
+      body: JSON.stringify({ request: "who is working on auth?" }),
     }))
     const delegateBody = await delegateRes.json() as Record<string, unknown>
     expect(delegateBody.status).toBe("ok")
@@ -90,11 +110,7 @@ describe("project agent integration", () => {
   })
 
   test("complete task lifecycle via HTTP", async () => {
-    const sessions = new SessionIndex()
-    const tasks = new TaskLedger()
-    const search = new TranscriptSearchIndex()
-    const agent = new ProjectAgent({ sessions, tasks, search })
-    const router = createProjectAgentRouter(agent)
+    const { router } = await createIntegration()
 
     // Claim
     const claimRes = await router(new Request("http://localhost/api/project/claim", {

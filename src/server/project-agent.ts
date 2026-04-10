@@ -1,7 +1,8 @@
 // src/server/project-agent.ts
-import type { SessionRecord, TaskEntry, SearchResult, DelegationResult } from "../shared/project-agent-types"
+import { randomUUID } from "node:crypto"
+import type { ProjectTodo, SessionRecord, SearchResult, DelegationResult } from "../shared/project-agent-types"
 import type { SessionIndex } from "./session-index"
-import type { TaskLedger } from "./task-ledger"
+import type { EventStore } from "./event-store"
 import type { TranscriptSearchIndex } from "./transcript-search"
 
 const TASK_KEYWORDS = ["task", "working on", "who", "claimed"]
@@ -9,19 +10,22 @@ const SEARCH_KEYWORDS = ["search", "find", "implemented", "where"]
 
 interface ProjectAgentArgs {
   sessions: SessionIndex
-  tasks: TaskLedger
+  store: EventStore
   search: TranscriptSearchIndex
+  projectId: string
 }
 
 export class ProjectAgent {
   private readonly sessions: SessionIndex
-  private readonly tasks: TaskLedger
+  private readonly store: EventStore
   private readonly search: TranscriptSearchIndex
+  private readonly projectId: string
 
   constructor(args: ProjectAgentArgs) {
     this.sessions = args.sessions
-    this.tasks = args.tasks
+    this.store = args.store
     this.search = args.search
+    this.projectId = args.projectId
   }
 
   querySessions(projectId: string): SessionRecord[] {
@@ -36,24 +40,39 @@ export class ProjectAgent {
     return this.search.search(query, limit)
   }
 
-  listTasks(): TaskEntry[] {
-    return this.tasks.list()
+  listTasks(): ProjectTodo[] {
+    const coord = this.store.state.coordinationByProject.get(this.projectId)
+    if (!coord) return []
+    return Array.from(coord.todos.values())
   }
 
-  getTask(taskId: string): TaskEntry | null {
-    return this.tasks.get(taskId)
+  getTask(taskId: string): ProjectTodo | null {
+    const coord = this.store.state.coordinationByProject.get(this.projectId)
+    if (!coord) return null
+    return coord.todos.get(taskId) ?? null
   }
 
-  claimTask(description: string, ownedBy: string, branch: string | null): TaskEntry {
-    return this.tasks.claim(description, ownedBy, branch)
+  async claimTask(description: string, claimedBy: string, _branch: string | null): Promise<ProjectTodo> {
+    const todoId = randomUUID()
+    await this.store.addTodo(this.projectId, todoId, description, "normal", claimedBy)
+    await this.store.claimTodo(this.projectId, todoId, claimedBy)
+    const todo = this.getTask(todoId)
+    if (!todo) throw new Error(`Todo ${todoId} not found after creation`)
+    return todo
   }
 
-  completeTask(taskId: string, outputs: string[]): TaskEntry | null {
-    return this.tasks.complete(taskId, outputs)
+  async completeTask(taskId: string, outputs: string[]): Promise<ProjectTodo | null> {
+    await this.store.completeTodo(this.projectId, taskId, outputs)
+    return this.getTask(taskId)
   }
 
-  async delegate(request: string, projectId: string): Promise<DelegationResult> {
-    const sessions = this.querySessions(projectId)
+  async abandonTask(taskId: string): Promise<ProjectTodo | null> {
+    await this.store.abandonTodo(this.projectId, taskId)
+    return this.getTask(taskId)
+  }
+
+  async delegate(request: string): Promise<DelegationResult> {
+    const sessions = this.querySessions(this.projectId)
     const tasks = this.listTasks()
     const lower = request.toLowerCase()
 
@@ -61,7 +80,7 @@ export class ProjectAgent {
       if (tasks.length === 0) {
         return { status: "ok", message: "No tasks claimed." }
       }
-      const summary = tasks.map((t) => `[${t.status}] "${t.description}" owned by ${t.ownedBy}`).join("; ")
+      const summary = tasks.map((t) => `[${t.status}] "${t.description}" owned by ${t.claimedBy ?? t.createdBy}`).join("; ")
       return { status: "ok", message: summary, data: { tasks } }
     }
 
