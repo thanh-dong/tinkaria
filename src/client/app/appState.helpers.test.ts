@@ -1,12 +1,38 @@
 import { describe, expect, test } from "bun:test"
 import {
   clearPendingSessionBootstrapAfterAttempt,
+  fetchTranscriptRange,
+  MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
   removeChatFromSidebar,
   shouldTriggerSnapshotRecovery,
   transitionPendingSessionBootstrapToError,
   type PendingSessionBootstrap,
 } from "./appState.helpers"
 import type { SidebarData, SidebarChatRow } from "../../shared/types"
+import type { AppTransport } from "./socket-interface"
+
+function createTransportWithCommand(command: AppTransport["command"]): AppTransport {
+  return {
+    start() {},
+    dispose() {},
+    onStatus() { return () => {} },
+    subscribe() { return () => {} },
+    subscribeTerminal() { return () => {} },
+    command,
+    ensureHealthyConnection: async () => {},
+  }
+}
+
+function createMockGetMessagesCommand(
+  handler: (command: Extract<Parameters<AppTransport["command"]>[0], { type: "chat.getMessages" }>) => Promise<unknown>
+): AppTransport["command"] {
+  return async <TResult = unknown>(command: Parameters<AppTransport["command"]>[0]) => {
+    if (command.type !== "chat.getMessages") {
+      throw new Error(`Unexpected command ${command.type}`)
+    }
+    return await handler(command) as TResult
+  }
+}
 
 function pendingBootstrap(kind: PendingSessionBootstrap["kind"], phase: PendingSessionBootstrap["phase"]): PendingSessionBootstrap {
   return {
@@ -184,5 +210,69 @@ describe("shouldTriggerSnapshotRecovery", () => {
       initialFetchDone: false,
       fetchTriggered: true,
     })).toBe(false)
+  })
+})
+
+describe("fetchTranscriptRange", () => {
+  test("returns the requested range in one request when payload fits", async () => {
+    const commandCalls: Array<{ offset?: number; limit?: number }> = []
+    const socket = createTransportWithCommand(createMockGetMessagesCommand(async (command) => {
+        commandCalls.push({ offset: command.offset, limit: command.limit })
+        return [{ kind: "assistant_text", createdAt: 1, messageId: "m1", text: "ok" }]
+      }))
+
+    const result = await fetchTranscriptRange({
+      socket,
+      chatId: "chat-1",
+      offset: 5,
+      limit: 1,
+    })
+
+    expect(result).toHaveLength(1)
+    expect(commandCalls).toEqual([{ offset: 5, limit: 1 }])
+  })
+
+  test("halves chunk size and retries when a range exceeds payload limits", async () => {
+    const commandCalls: Array<{ offset?: number; limit?: number }> = []
+    const socket = createTransportWithCommand(createMockGetMessagesCommand(async (command) => {
+        commandCalls.push({ offset: command.offset, limit: command.limit })
+        if ((command.limit ?? 0) > 2) {
+          throw new Error("'payload' max_payload size exceeded")
+        }
+        return Array.from({ length: command.limit ?? 0 }, (_, index) => ({
+          kind: "assistant_text" as const,
+          createdAt: (command.offset ?? 0) + index,
+          messageId: `m-${(command.offset ?? 0) + index}`,
+          text: `chunk-${(command.offset ?? 0) + index}`,
+        }))
+      }))
+
+    const result = await fetchTranscriptRange({
+      socket,
+      chatId: "chat-1",
+      offset: 0,
+      limit: 5,
+    })
+
+    expect(result).toHaveLength(5)
+    expect(commandCalls).toEqual([
+      { offset: 0, limit: 5 },
+      { offset: 0, limit: 2 },
+      { offset: 2, limit: 2 },
+      { offset: 4, limit: 1 },
+    ])
+  })
+
+  test("rethrows payload errors once the request is already at the minimum chunk size", async () => {
+    const socket = createTransportWithCommand(createMockGetMessagesCommand(async () => {
+      throw new Error("'payload' max_payload size exceeded")
+    }))
+
+    await expect(fetchTranscriptRange({
+      socket,
+      chatId: "chat-1",
+      offset: 0,
+      limit: MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
+    })).rejects.toThrow(/max_payload/i)
   })
 })

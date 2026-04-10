@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react"
 import { ChatTranscript } from "../../app/ChatTranscript"
+import { fetchTranscriptRange } from "../../app/appState.helpers"
 import { getLatestToolIds } from "../../app/derived"
 import type { AppTransport } from "../../app/socket-interface"
 import { createIncrementalHydrator } from "../../lib/parseTranscript"
@@ -341,22 +342,23 @@ export const SubagentIndicator = memo(function SubagentIndicator({
     const hydrator = createIncrementalHydrator()
     let cancelled = false
     let initialFetchDone = false
+    let pendingRaf: number | null = null
     const bufferedEntries: TranscriptEntry[] = []
 
     async function fetchAllMessages(messageCount: number) {
       try {
-        const entries = await socket.command<TranscriptEntry[]>({
-          type: "chat.getMessages",
+        const entries = await fetchTranscriptRange({
+          socket,
           chatId,
           offset: 0,
           limit: Math.max(messageCount, 1),
-        }, { timeoutMs: 120_000 })
+          timeoutMs: 120_000,
+        })
         if (cancelled) return
         initialFetchDone = true
         hydrator.reset()
-        for (const entry of [...entries, ...bufferedEntries]) {
-          hydrator.hydrate(entry)
-        }
+        for (const entry of entries) hydrator.hydrate(entry)
+        for (const entry of bufferedEntries) hydrator.hydrate(entry)
         bufferedEntries.length = 0
         setSession((current) => ({
           ...current,
@@ -391,15 +393,23 @@ export const SubagentIndicator = memo(function SubagentIndicator({
           return
         }
         hydrator.hydrate(event.entry)
-        setSession((current) => ({
-          ...current,
-          messages: hydrator.getMessages(),
-        }))
+        if (pendingRaf === null) {
+          pendingRaf = requestAnimationFrame(() => {
+            pendingRaf = null
+            if (!cancelled) {
+              setSession((current) => ({
+                ...current,
+                messages: hydrator.getMessages(),
+              }))
+            }
+          })
+        }
       },
     )
 
     return () => {
       cancelled = true
+      if (pendingRaf !== null) cancelAnimationFrame(pendingRaf)
       unsubscribe()
     }
   }, [open, selectedChatId, socket])

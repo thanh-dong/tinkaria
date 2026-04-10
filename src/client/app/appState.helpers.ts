@@ -1,6 +1,6 @@
 import { APP_NAME } from "../../shared/branding"
-import type { ChatSnapshot, HydratedTranscriptMessage, SidebarChatRow, SidebarData } from "../../shared/types"
-import type { SocketStatus } from "./socket-interface"
+import type { ChatSnapshot, HydratedTranscriptMessage, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
+import type { AppTransport, SocketStatus } from "./socket-interface"
 
 export interface PendingSessionBootstrap {
   chatId: string
@@ -112,6 +112,50 @@ export type StartChatIntent =
 export const TRANSCRIPT_TAIL_SIZE = 200
 export const PWA_RESUME_STALE_AFTER_MS = 15_000
 export const SNAPSHOT_RECOVERY_TIMEOUT_MS = 5_000
+export const MIN_TRANSCRIPT_FETCH_CHUNK_SIZE = 1
+
+function isTranscriptPayloadLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.toLowerCase().includes("max_payload")
+}
+
+export async function fetchTranscriptRange(args: {
+  socket: AppTransport
+  chatId: string
+  offset: number
+  limit: number
+  timeoutMs?: number
+}): Promise<TranscriptEntry[]> {
+  if (args.limit <= 0) return []
+
+  const entries: TranscriptEntry[] = []
+  const end = args.offset + args.limit
+  let cursor = args.offset
+  let chunkSize = args.limit
+
+  while (cursor < end) {
+    const remaining = end - cursor
+    const requestLimit = Math.min(chunkSize, remaining)
+    try {
+      const chunk = await args.socket.command<TranscriptEntry[]>({
+        type: "chat.getMessages",
+        chatId: args.chatId,
+        offset: cursor,
+        limit: requestLimit,
+      }, args.timeoutMs ? { timeoutMs: args.timeoutMs } : undefined)
+      if (chunk.length === 0) break
+      for (const entry of chunk) entries.push(entry)
+      cursor += chunk.length
+    } catch (error) {
+      if (!isTranscriptPayloadLimitError(error) || requestLimit <= MIN_TRANSCRIPT_FETCH_CHUNK_SIZE) {
+        throw error
+      }
+      chunkSize = Math.max(MIN_TRANSCRIPT_FETCH_CHUNK_SIZE, Math.floor(requestLimit / 2))
+    }
+  }
+
+  return entries
+}
 
 export function removeChatFromSidebar(data: SidebarData, chatId: string): SidebarData {
   const filtered = data.projectGroups

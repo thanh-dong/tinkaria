@@ -12,6 +12,7 @@ import type { IncrementalHydrator } from "../lib/parseTranscript"
 import { getCachedChat, setCachedChat } from "./chatCache"
 import {
   computeTailOffset,
+  fetchTranscriptRange,
   shouldBackfillTranscriptWindow,
   shouldTriggerSnapshotRecovery,
   SNAPSHOT_RECOVERY_TIMEOUT_MS,
@@ -158,8 +159,11 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       if (fetchTriggered) return
       fetchTriggered = true
       try {
-        const entries = await socket.command<TranscriptEntry[]>({
-          type: "chat.getMessages", chatId, offset: 0, limit: TRANSCRIPT_TAIL_SIZE,
+        const entries = await fetchTranscriptRange({
+          socket,
+          chatId,
+          offset: 0,
+          limit: TRANSCRIPT_TAIL_SIZE,
         })
         log("snapshot recovery: fetched messages without snapshot", {
           chatId, entryCount: entries.length,
@@ -181,8 +185,11 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       fetchTriggered = true
       try {
         let offset = computeTailOffset(messageCount)
-        let entries = await socket.command<TranscriptEntry[]>({
-          type: "chat.getMessages", chatId, offset, limit: TRANSCRIPT_TAIL_SIZE,
+        let entries = await fetchTranscriptRange({
+          socket,
+          chatId,
+          offset,
+          limit: TRANSCRIPT_TAIL_SIZE,
         })
         let hydratedPreview = processTranscriptMessages(entries)
 
@@ -206,14 +213,18 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
             offset,
             hydratedDiagnostics: summarizeTranscriptWindow(hydratedPreview),
           })
-          const olderEntries = await socket.command<TranscriptEntry[]>({
-            type: "chat.getMessages",
+          const olderEntries = await fetchTranscriptRange({
+            socket,
             chatId,
             offset: nextOffset,
             limit: offset - nextOffset,
           })
           if (olderEntries.length === 0) break
-          entries = [...olderEntries, ...entries]
+          // Prepend older entries and re-hydrate the combined window
+          const combined = new Array(olderEntries.length + entries.length)
+          for (let i = 0; i < olderEntries.length; i++) combined[i] = olderEntries[i]
+          for (let i = 0; i < entries.length; i++) combined[olderEntries.length + i] = entries[i]
+          entries = combined
           offset = nextOffset
           hydratedPreview = processTranscriptMessages(entries)
           log("backfilling transcript window", {
