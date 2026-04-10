@@ -38,6 +38,211 @@ export interface StartServerOptions {
   }
 }
 
+// ── /nats-ws proxy: bounded inbound buffer so client frames that arrive
+// before the upstream WebSocket finishes its handshake are flushed once the
+// upstream is OPEN instead of throwing InvalidStateError.
+// See adr-20260410-nats-reliability-sweep (P0-0 + P1-A).
+export const NATS_WS_PROXY_BUFFER_LIMIT = 256
+
+export type NatsWsProxyCounters = {
+  upgrades: number
+  upstreamOpen: number
+  upstreamError: number
+  upstreamClose: number
+  sendOnConnecting: number
+  bufferedFrames: number
+  bufferDrops: number
+}
+
+function makeWsProxyCounters(): NatsWsProxyCounters {
+  return {
+    upgrades: 0,
+    upstreamOpen: 0,
+    upstreamError: 0,
+    upstreamClose: 0,
+    sendOnConnecting: 0,
+    bufferedFrames: 0,
+    bufferDrops: 0,
+  }
+}
+
+// Buffered frames are either strings or owned ArrayBuffers. We never retain
+// Bun's Buffer recv slices directly — `toBufferedFrame` copies into a fresh
+// ArrayBuffer so the reference survives the next recv without aliasing.
+type NatsWsBufferedFrame = string | ArrayBuffer
+
+export type NatsWsProxyData = {
+  wsPort: number
+  upstream: WebSocket | null
+  ready: boolean
+  closed: boolean
+  buffer: NatsWsBufferedFrame[]
+  droppedSinceLastLog: number
+  openedAt: number
+}
+
+type IncomingWsMessage = string | Buffer<ArrayBuffer>
+
+function toBufferedFrame(message: IncomingWsMessage): NatsWsBufferedFrame {
+  if (typeof message === "string") return message
+  // Allocate a fresh, non-shared ArrayBuffer and copy into it so the frame
+  // survives Bun's recv buffer reuse and has a concrete ArrayBuffer type.
+  const copy = new ArrayBuffer(message.byteLength)
+  new Uint8Array(copy).set(message)
+  return copy
+}
+
+function sendFrameToUpstream(upstream: WebSocket, frame: NatsWsBufferedFrame): void {
+  upstream.send(frame)
+}
+
+/**
+ * Build the `/nats-ws` proxy websocket handlers. Extracted as a factory so
+ * `server.test.ts` can wire them into a dedicated `Bun.serve` instance and
+ * exercise the upstream-race path without needing to spin up the full app.
+ *
+ * Fixes the P0 bug where `message(ws)` synchronously called
+ * `ws.data.upstream?.send(message)` while the upstream socket was still
+ * `CONNECTING`, throwing `InvalidStateError`. Client frames are now buffered
+ * inside `ws.data.buffer` until `upstream.onopen` fires, then drained
+ * synchronously so message order is preserved. See
+ * `adr-20260410-nats-reliability-sweep` (P0-0 + P1-A).
+ */
+export function createNatsWsProxyHandlers(counters: NatsWsProxyCounters = makeWsProxyCounters()) {
+  const handlers = {
+    open(ws: import("bun").ServerWebSocket<NatsWsProxyData>) {
+      counters.upgrades += 1
+      ws.data.openedAt = Date.now()
+      ws.data.ready = false
+      ws.data.closed = false
+      ws.data.buffer = []
+      ws.data.droppedSinceLastLog = 0
+      console.warn(LOG_PREFIX, "nats-ws proxy upgrade accepted")
+
+      const upstream = new WebSocket(`ws://127.0.0.1:${ws.data.wsPort}`)
+      upstream.binaryType = "arraybuffer"
+      ws.data.upstream = upstream
+
+      upstream.onopen = () => {
+        // Client may have disconnected during the upstream handshake. If so,
+        // close upstream instead of leaking an orphan connection.
+        if (ws.data.closed) {
+          try {
+            upstream.close()
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error)
+            console.warn(
+              LOG_PREFIX,
+              "nats-ws proxy upstream close after orphan open failed:",
+              message
+            )
+          }
+          return
+        }
+        const elapsed = Date.now() - ws.data.openedAt
+        ws.data.ready = true
+        counters.upstreamOpen += 1
+        console.warn(LOG_PREFIX, `nats-ws proxy upstream open t=${elapsed}ms`)
+
+        // Drain buffered frames synchronously, in arrival order, before
+        // returning from onopen. This preserves message order even if the
+        // client sends more frames while we're draining.
+        const pending = ws.data.buffer
+        ws.data.buffer = []
+        for (const frame of pending) {
+          try {
+            sendFrameToUpstream(upstream, frame)
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error)
+            console.warn(LOG_PREFIX, "nats-ws proxy flush failed:", message)
+          }
+        }
+      }
+
+      upstream.onmessage = (event) => {
+        if (ws.readyState !== WebSocket.OPEN) return
+        if (typeof event.data === "string") {
+          ws.sendText(event.data)
+        } else {
+          ws.sendBinary(new Uint8Array(event.data as ArrayBuffer))
+        }
+      }
+
+      upstream.onclose = (event) => {
+        counters.upstreamClose += 1
+        const duration = Date.now() - ws.data.openedAt
+        const code = typeof event?.code === "number" ? event.code : 0
+        console.warn(
+          LOG_PREFIX,
+          `nats-ws proxy upstream close code=${code} duration=${duration}ms`
+        )
+        if (ws.readyState === WebSocket.OPEN) ws.close()
+      }
+
+      upstream.onerror = (event) => {
+        counters.upstreamError += 1
+        const raw =
+          (event as Event & { error?: unknown; message?: unknown }).error
+          ?? (event as Event & { message?: unknown }).message
+        const message =
+          raw instanceof Error ? raw.message : raw !== undefined ? String(raw) : "unknown"
+        console.warn(LOG_PREFIX, "nats-ws proxy upstream error:", message)
+        if (ws.readyState === WebSocket.OPEN) ws.close()
+      }
+    },
+    message(ws: import("bun").ServerWebSocket<NatsWsProxyData>, message: IncomingWsMessage) {
+      const upstream = ws.data.upstream
+      if (ws.data.ready && upstream && upstream.readyState === WebSocket.OPEN) {
+        try {
+          upstream.send(message)
+          ws.data.droppedSinceLastLog = 0
+        } catch (error: unknown) {
+          const extracted = error instanceof Error ? error.message : String(error)
+          console.warn(LOG_PREFIX, "nats-ws proxy upstream send failed:", extracted)
+        }
+        return
+      }
+
+      // Upstream not ready yet — buffer the frame. Copy Buffers out so the
+      // frame survives Bun's recv reuse, then enforce the bounded buffer.
+      counters.sendOnConnecting += 1
+      counters.bufferedFrames += 1
+      ws.data.buffer.push(toBufferedFrame(message))
+
+      if (ws.data.buffer.length > NATS_WS_PROXY_BUFFER_LIMIT) {
+        ws.data.buffer.shift()
+        counters.bufferDrops += 1
+        ws.data.droppedSinceLastLog += 1
+        // Log once per drop event (first overflow after the last drain).
+        if (ws.data.droppedSinceLastLog === 1) {
+          console.warn(
+            LOG_PREFIX,
+            `nats-ws proxy buffer overflow — dropping oldest frame (limit=${NATS_WS_PROXY_BUFFER_LIMIT})`
+          )
+        }
+      }
+    },
+    close(ws: import("bun").ServerWebSocket<NatsWsProxyData>) {
+      ws.data.closed = true
+      const duration = Date.now() - ws.data.openedAt
+      console.warn(LOG_PREFIX, `nats-ws proxy client close duration=${duration}ms`)
+      ws.data.buffer = []
+      const upstream = ws.data.upstream
+      if (upstream) {
+        try {
+          upstream.close()
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error)
+          console.warn(LOG_PREFIX, "nats-ws proxy upstream close failed:", message)
+        }
+      }
+      ws.data.upstream = null
+      ws.data.ready = false
+    },
+  }
+  return { handlers, counters }
+}
+
 export interface ServerHealthcheck {
   ok: boolean
   status: "ok" | "degraded" | "fail"
@@ -257,21 +462,34 @@ export async function startServer(options: StartServerOptions = {}) {
 
   const distDir = path.join(import.meta.dir, "..", "..", "dist", "client")
 
-  type NatsWsData = { wsPort: number; upstream: WebSocket | null }
+  const { handlers: natsWsHandlers, counters: natsWsCounters } = createNatsWsProxyHandlers()
+  const natsWsCounterInterval = setInterval(() => {
+    console.warn(LOG_PREFIX, "nats-ws proxy counters:", JSON.stringify(natsWsCounters))
+  }, 60_000)
 
   const MAX_PORT_ATTEMPTS = 20
   let actualPort = port
 
   for (let attempt = 0; attempt < MAX_PORT_ATTEMPTS; attempt++) {
     try {
-      server = Bun.serve<NatsWsData>({
+      server = Bun.serve<NatsWsProxyData>({
         port: actualPort,
         hostname,
         fetch(req, srv) {
           const url = new URL(req.url)
 
           if (url.pathname === "/nats-ws") {
-            const upgraded = srv.upgrade(req, { data: { wsPort: natsConnector.natsWsPort, upstream: null } })
+            const upgraded = srv.upgrade(req, {
+              data: {
+                wsPort: natsConnector.natsWsPort,
+                upstream: null,
+                ready: false,
+                closed: false,
+                buffer: [],
+                droppedSinceLastLog: 0,
+                openedAt: 0,
+              },
+            })
             if (upgraded) return undefined
             return new Response("WebSocket upgrade failed", { status: 426 })
           }
@@ -300,31 +518,7 @@ export async function startServer(options: StartServerOptions = {}) {
 
           return serveStatic(distDir, url.pathname)
         },
-        websocket: {
-          open(ws) {
-            const upstream = new WebSocket(`ws://127.0.0.1:${ws.data.wsPort}`)
-            upstream.binaryType = "arraybuffer"
-            upstream.onmessage = (event) => {
-              if (ws.readyState === WebSocket.OPEN) {
-                if (typeof event.data === "string") {
-                  ws.sendText(event.data)
-                } else {
-                  ws.sendBinary(new Uint8Array(event.data as ArrayBuffer))
-                }
-              }
-            }
-            upstream.onclose = () => { if (ws.readyState === WebSocket.OPEN) ws.close() }
-            upstream.onerror = () => { if (ws.readyState === WebSocket.OPEN) ws.close() }
-            ws.data.upstream = upstream
-          },
-          message(ws, message) {
-            ws.data.upstream?.send(message)
-          },
-          close(ws) {
-            ws.data.upstream?.close()
-            ws.data.upstream = null
-          },
-        },
+        websocket: natsWsHandlers,
       })
       break
     } catch (err: unknown) {
@@ -342,6 +536,7 @@ export async function startServer(options: StartServerOptions = {}) {
 
   const shutdown = async () => {
     clearInterval(abandonInterval)
+    clearInterval(natsWsCounterInterval)
     orchestrator.destroy()
     responders.dispose()
     publisher.dispose()

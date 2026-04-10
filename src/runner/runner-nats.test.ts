@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach, beforeEach } from "bun:test"
+import { describe, test, expect, afterEach, beforeEach, mock, spyOn } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -6,7 +6,7 @@ import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect, type NatsConnection } from "@nats-io/transport-node"
 import { jetstreamManager, RetentionPolicy, StorageType } from "@nats-io/jetstream"
 import { Kvm } from "@nats-io/kv"
-import { RunnerNatsHandler } from "./runner-nats"
+import { RunnerNatsHandler, connectRunner, shutdownConnection } from "./runner-nats"
 import { RunnerAgent, type TurnFactory } from "./runner-agent"
 import {
   runnerCmdSubject,
@@ -191,5 +191,141 @@ describe("RunnerNatsHandler", () => {
     expect(registration.pid).toBe(process.pid)
 
     handler.dispose()
+  })
+})
+
+describe("runner NATS reconnect resilience", () => {
+  test("connectRunner is called with explicit reconnect options", async () => {
+    const capturedOpts: Array<Record<string, unknown>> = []
+    const fakeNc = { isFakeNc: true } as unknown as NatsConnection
+    const fakeConnect = mock(async (opts: Record<string, unknown>) => {
+      capturedOpts.push(opts)
+      return fakeNc
+    })
+
+    const result = await connectRunner({
+      natsUrl: "nats://test:4222",
+      token: "test-token",
+      connectFn: fakeConnect as unknown as typeof connect,
+    })
+
+    expect(result).toBe(fakeNc)
+    expect(fakeConnect).toHaveBeenCalledTimes(1)
+    expect(capturedOpts.length).toBe(1)
+    const opts = capturedOpts[0]!
+    expect(opts.servers).toBe("nats://test:4222")
+    expect(opts.token).toBe("test-token")
+    expect(opts.maxReconnectAttempts).toBe(-1)
+    expect(opts.reconnectTimeWait).toBe(750)
+    expect(opts.pingInterval).toBe(15_000)
+    expect(opts.maxPingOut).toBe(3)
+  })
+
+  test("connectRunner omits token when undefined but still passes reconnect options", async () => {
+    const capturedOpts: Array<Record<string, unknown>> = []
+    const fakeNc = {} as unknown as NatsConnection
+    const fakeConnect = mock(async (opts: Record<string, unknown>) => {
+      capturedOpts.push(opts)
+      return fakeNc
+    })
+
+    await connectRunner({
+      natsUrl: "nats://test:4222",
+      token: undefined,
+      connectFn: fakeConnect as unknown as typeof connect,
+    })
+
+    const opts = capturedOpts[0]!
+    expect(opts.token).toBeUndefined()
+    expect(opts.maxReconnectAttempts).toBe(-1)
+    expect(opts.reconnectTimeWait).toBe(750)
+    expect(opts.pingInterval).toBe(15_000)
+    expect(opts.maxPingOut).toBe(3)
+  })
+
+  test("shutdownConnection times out drain and falls back to close", async () => {
+    let closeCalled = false
+    const fakeNc = {
+      drain: mock(() => new Promise<void>(() => { /* never resolves */ })),
+      close: mock(async () => { closeCalled = true }),
+    } as unknown as NatsConnection
+
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      const started = Date.now()
+      await shutdownConnection(fakeNc, { drainTimeoutMs: 200 })
+      const elapsed = Date.now() - started
+      expect(closeCalled).toBe(true)
+      expect(elapsed).toBeLessThan(1_000)
+      expect(warnSpy).toHaveBeenCalled()
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  test("shutdownConnection completes normally when drain resolves fast", async () => {
+    let drainCalled = false
+    let closeCalled = false
+    const fakeNc = {
+      drain: mock(async () => { drainCalled = true }),
+      close: mock(async () => { closeCalled = true }),
+    } as unknown as NatsConnection
+
+    await shutdownConnection(fakeNc, { drainTimeoutMs: 500 })
+    expect(drainCalled).toBe(true)
+    expect(closeCalled).toBe(false)
+  })
+
+  test("shutdownConnection warns if close() also fails after drain timeout", async () => {
+    const fakeNc = {
+      drain: mock(() => new Promise<void>(() => { /* never resolves */ })),
+      close: mock(async () => { throw new Error("close exploded") }),
+    } as unknown as NatsConnection
+
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      // Should not throw even though close() errors.
+      await shutdownConnection(fakeNc, { drainTimeoutMs: 100 })
+      expect(warnSpy).toHaveBeenCalled()
+      const warnCalls = warnSpy.mock.calls.map((c) => c.join(" "))
+      const mentionsCloseFailure = warnCalls.some((line) => line.includes("close() also failed"))
+      expect(mentionsCloseFailure).toBe(true)
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  test("publishHeartbeat swallows and logs publish errors", async () => {
+    const fakeNc = {
+      publish: mock(() => { throw new Error("nats closed") }),
+      flush: mock(async () => {}),
+      subscribe: mock(() => ({
+        unsubscribe: () => {},
+        [Symbol.asyncIterator]: async function* () { /* no-op */ },
+      })),
+    } as unknown as NatsConnection
+
+    const agent = {
+      activeTurns: new Map<string, unknown>(),
+    } as unknown as RunnerAgent
+
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      const handler = new RunnerNatsHandler({ nc: fakeNc, agent, runnerId: "r-fake" })
+      // Call the (now public-for-test) publishHeartbeat directly via a type-safe shim.
+      const publishAccessor = (handler as unknown as {
+        publishHeartbeatForTest: () => void
+      }).publishHeartbeatForTest
+      expect(typeof publishAccessor).toBe("function")
+      expect(() => publishAccessor.call(handler)).not.toThrow()
+
+      const warnCalls = warnSpy.mock.calls.map((c) => c.join(" "))
+      const mentionsHeartbeatFailure = warnCalls.some((line) =>
+        line.includes("heartbeat publish failed")
+      )
+      expect(mentionsHeartbeatFailure).toBe(true)
+    } finally {
+      warnSpy.mockRestore()
+    }
   })
 })

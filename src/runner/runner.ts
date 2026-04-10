@@ -1,9 +1,8 @@
-import { connect } from "@nats-io/transport-node"
 import { LOG_PREFIX } from "../shared/branding"
 import { readToken } from "../nats/nats-token"
 import { generateTitleForChat } from "../server/generate-title"
 import { RunnerAgent, type TurnFactory } from "./runner-agent"
-import { RunnerNatsHandler } from "./runner-nats"
+import { RunnerNatsHandler, connectRunner, shutdownConnection } from "./runner-nats"
 import { startClaudeTurn, startCodexTurn, stopAllCodexSessions } from "./turn-factories"
 
 const natsUrl = process.env.NATS_URL
@@ -24,8 +23,7 @@ process.on("unhandledRejection", (reason) => {
 
 // Resolve NATS auth token: env var takes precedence, then file-based via NATS_DATA_DIR
 const resolvedToken = natsToken ?? (natsDataDir ? await readToken(natsDataDir) : undefined)
-const tokenOpt = resolvedToken ? { token: resolvedToken } : undefined
-const nc = await connect({ servers: natsUrl, ...tokenOpt })
+const nc = await connectRunner({ natsUrl, token: resolvedToken })
 
 console.warn(LOG_PREFIX, `Runner ${runnerId} connected to NATS at ${natsUrl}`)
 
@@ -61,7 +59,7 @@ async function shutdown() {
 
   stopAllCodexSessions()
 
-  await nc.drain()
+  await shutdownConnection(nc)
   console.warn(LOG_PREFIX, `Runner ${runnerId} stopped`)
   process.exit(0)
 }

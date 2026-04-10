@@ -85,46 +85,37 @@ export class NatsSocket implements AppTransport {
       const proxyProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
       const proxyWsUrl = `${proxyProtocol}//${window.location.host}/nats-ws`
 
-      // Try direct NATS WS if available and not blocked by mixed-content
-      if (auth.natsWsUrl && window.location.protocol !== "https:") {
+      // HTTP only: try direct NATS WS first. If it throws (connection refused,
+      // DNS failure, etc.) we sequentially fall through to the proxy URL.
+      // No probe timer — the nats-core library's own failure path is our signal.
+      // Note: HTTPS path never uses direct NATS WS (mixed-content blocked).
+      if (
+        auth.natsWsUrl
+        && window.location.protocol !== "https:"
+        && auth.natsWsUrl.startsWith("ws://")
+      ) {
         const directUrl = auth.natsWsUrl
         console.warn(LOG_PREFIX, `Trying direct NATS WS: ${directUrl}`)
         this.resolvedWsUrl = directUrl
-        const directOk = await this.probeConnection(directUrl, 500)
-        if (directOk) {
-          console.warn(LOG_PREFIX, `Direct NATS WS connected: ${directUrl}`)
-          return // connect() already succeeded in probeConnection
+        try {
+          await this.connect()
+          if (this.currentStatus === "connected") {
+            console.warn(LOG_PREFIX, `Direct NATS WS connected: ${directUrl}`)
+            return
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          console.warn(LOG_PREFIX, `Direct NATS WS failed, falling back to proxy: ${message}`)
         }
-        console.warn(LOG_PREFIX, `Direct NATS WS failed, falling back to proxy: ${proxyWsUrl}`)
       }
 
       this.resolvedWsUrl = proxyWsUrl
-      void this.connect()
+      await this.connect()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.warn(LOG_PREFIX, `NATS discovery failed: ${message}`)
       this.emitStatus("disconnected")
       this.scheduleReconnect()
-    }
-  }
-
-  /** Probe a direct NATS WS URL with a timeout. Returns true if connect() succeeds. */
-  private async probeConnection(wsUrl: string, timeoutMs: number): Promise<boolean> {
-    this.resolvedWsUrl = wsUrl
-    try {
-      await Promise.race([
-        this.connect(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
-      ])
-      return this.currentStatus === "connected"
-    } catch {
-      // Dispose failed connection attempt
-      if (this.nc) {
-        await this.nc.close().catch(() => {})
-        this.nc = null
-        this.js = null
-      }
-      return false
     }
   }
 
@@ -166,7 +157,7 @@ export class NatsSocket implements AppTransport {
     this.subscriptions.set(id, entry)
 
     if (this.nc) {
-      this.activateSubscription(id, entry)
+      this.activateSubscription(this.nc, this.js, id, entry)
     }
 
     return () => {
@@ -249,7 +240,7 @@ export class NatsSocket implements AppTransport {
 
       // Activate all pending subscriptions
       for (const [id, entry] of this.subscriptions.entries()) {
-        this.activateSubscription(id, entry)
+        this.activateSubscription(this.nc, this.js, id, entry)
       }
 
       // Monitor connection status
@@ -264,10 +255,16 @@ export class NatsSocket implements AppTransport {
   }
 
   private async monitorStatus(): Promise<void> {
-    if (!this.nc) return
+    // Capture the connection we were started with. All work below operates on
+    // THIS nc/js — never `this.nc`/`this.js` — so a concurrent connect that
+    // reassigns the instance fields cannot bind subscriptions to the wrong
+    // transport or confuse disconnect/reconnect scheduling.
+    const nc = this.nc
+    const js = this.js
+    if (!nc) return
 
     try {
-      for await (const status of this.nc.status()) {
+      for await (const status of nc.status()) {
         if (!this.started) break
 
         switch (status.type) {
@@ -277,42 +274,52 @@ export class NatsSocket implements AppTransport {
           case "reconnect":
             this.emitStatus("connected")
             // js holds a reference to nc — no need to recreate on reconnect.
-            // Always rebuild snapshot/event subscriptions so the server sends a fresh
-            // snapshot even when the transport dropped while the chat state changed.
+            // Rebuild subscriptions against the CAPTURED nc/js so the reactivation
+            // cannot leak onto a successor connection via `this.nc`.
             reactivateSubscriptionsAfterReconnect(this.subscriptions, (id, entry) => {
-              this.activateSubscription(id, entry as SubscriptionEntry)
+              this.activateSubscription(nc, js, id, entry as SubscriptionEntry)
             })
             break
           case "reconnecting":
             this.emitStatus("connecting")
             break
         }
+
+        // Connection has been replaced by a successor — exit the old loop.
+        // The successor's own monitor is already running against the new nc.
+        if (this.nc !== nc) break
       }
     } catch {
       // Connection closed
     }
 
-    if (this.started && !this.reconnecting) {
+    // Only the monitor whose nc still matches this.nc is responsible for
+    // transitioning to disconnected + scheduling reconnect. A successor monitor
+    // has its own lifecycle.
+    if (this.started && !this.reconnecting && this.nc === nc) {
       this.emitStatus("disconnected")
       this.scheduleReconnect()
     }
   }
 
-  private activateSubscription(id: string, entry: SubscriptionEntry): void {
-    if (!this.nc) return
-
+  private activateSubscription(
+    nc: NatsConnection,
+    js: JetStreamClient | null,
+    id: string,
+    entry: SubscriptionEntry,
+  ): void {
     // Subscribe to NATS subject for live updates
     const subject = snapshotSubject(entry.topic)
-    entry.natsSubscription = this.nc.subscribe(subject)
+    entry.natsSubscription = nc.subscribe(subject)
     void this.consumeMessages(id, entry.natsSubscription, entry.snapshotListener)
 
     // Event subscription
     if (entry.topic.type === "terminal" && entry.eventListener) {
       const evtSubject = terminalEventSubject(entry.topic.terminalId)
-      entry.eventSubscription = this.nc.subscribe(evtSubject)
+      entry.eventSubscription = nc.subscribe(evtSubject)
       void this.consumeMessages(id, entry.eventSubscription, entry.eventListener)
-    } else if (entry.topic.type === "chat" && entry.eventListener && this.js) {
-      void this.activateJetStreamConsumer(id, entry)
+    } else if (entry.topic.type === "chat" && entry.eventListener && js) {
+      void this.activateJetStreamConsumer(nc, js, id, entry)
     }
 
     // Register with server + fetch initial snapshot
@@ -329,11 +336,16 @@ export class NatsSocket implements AppTransport {
     })
   }
 
-  private async activateJetStreamConsumer(id: string, entry: SubscriptionEntry): Promise<void> {
-    if (!this.js || entry.topic.type !== "chat" || !entry.eventListener) return
+  private async activateJetStreamConsumer(
+    nc: NatsConnection,
+    js: JetStreamClient,
+    id: string,
+    entry: SubscriptionEntry,
+  ): Promise<void> {
+    if (entry.topic.type !== "chat" || !entry.eventListener) return
 
     try {
-      const consumer = await this.js.consumers.get(CHAT_MESSAGE_EVENTS_STREAM_NAME, {
+      const consumer = await js.consumers.get(CHAT_MESSAGE_EVENTS_STREAM_NAME, {
         filter_subjects: chatMessageSubject(entry.topic.chatId),
         deliver_policy: DeliverPolicy.New,
       })
@@ -343,12 +355,10 @@ export class NatsSocket implements AppTransport {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.warn(LOG_PREFIX, `JetStream consumer failed for chat ${entry.topic.chatId}: ${message}`)
-      // Fallback to plain subscription
+      // Fallback to plain subscription on the captured nc
       const evtSubject = chatMessageSubject(entry.topic.chatId)
-      if (this.nc) {
-        entry.eventSubscription = this.nc.subscribe(evtSubject)
-        void this.consumeMessages(id, entry.eventSubscription, entry.eventListener)
-      }
+      entry.eventSubscription = nc.subscribe(evtSubject)
+      void this.consumeMessages(id, entry.eventSubscription, entry.eventListener)
     }
   }
 
@@ -384,29 +394,49 @@ export class NatsSocket implements AppTransport {
     }
   }
 
-  private resetConnection(): void {
-    if (this.reconnectTimer !== null) {
-      window.clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = null
+  private resetting = false
+
+  private async resetConnection(): Promise<void> {
+    if (this.resetting) return
+    this.resetting = true
+    try {
+      if (this.reconnectTimer !== null) {
+        window.clearTimeout(this.reconnectTimer)
+        this.reconnectTimer = null
+      }
+      this.reconnecting = false
+      this.unsubscribeAll()
+      // Force-close the underlying WebSocket. We use close() not drain() because
+      // this path is invoked from failure states where in-flight ops may never
+      // settle. Swallow errors — the connection is already being torn down.
+      const nc = this.nc
+      this.nc = null
+      this.js = null
+      if (nc) {
+        await nc.close().catch((error) => {
+          const message = error instanceof Error ? error.message : String(error)
+          console.warn(LOG_PREFIX, `nc.close() during reset failed: ${message}`)
+        })
+      }
+    } finally {
+      this.resetting = false
     }
-    this.reconnecting = false
-    this.unsubscribeAll()
-    this.nc = null
-    this.js = null
   }
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer !== null || !this.started) return
     this.reconnecting = true
     this.reconnectTimer = window.setTimeout(() => {
-      this.resetConnection()
-      void this.discoverAndConnect()
-      this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 3_000)
+      void (async () => {
+        await this.resetConnection()
+        void this.discoverAndConnect()
+        this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 3_000)
+      })()
     }, this.reconnectDelayMs)
   }
 
-  private reconnectNow(): void {
-    this.resetConnection()
+  private async reconnectNow(): Promise<void> {
+    await this.resetConnection()
     void this.connect()
   }
 

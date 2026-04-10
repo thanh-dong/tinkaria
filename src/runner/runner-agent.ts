@@ -1,5 +1,6 @@
 import { jetstream, type JetStream } from "@nats-io/jetstream"
 import type { NatsConnection } from "@nats-io/transport-node"
+import { LOG_PREFIX } from "../shared/branding"
 import type { HarnessToolRequest, HarnessTurn } from "../shared/harness-types"
 import {
   runnerEventsSubject,
