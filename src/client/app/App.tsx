@@ -20,6 +20,7 @@ import { TooltipProvider } from "../components/ui/tooltip"
 import { AppSidebar } from "./AppSidebar"
 import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalProjectsPage"
+import { ProjectPage } from "./ProjectPage"
 import { AppStateContext } from "./AppStateContext"
 import { useAppState } from "./useAppState"
 import { useEventCallback } from "../hooks/useEventCallback"
@@ -417,6 +418,7 @@ function AppInner() {
           <Route path="/" element={<LocalProjectsPage />} />
           <Route path="/settings/*" element={<Navigate to="/" replace />} />
           <Route path="/chat/:chatId" element={<ChatPage />} />
+          <Route path="/project/:id" element={<ProjectPage />} />
         </Route>
       </Routes>
     </AppStateContext.Provider>
