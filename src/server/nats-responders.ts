@@ -17,6 +17,7 @@ import { readRepoStatus } from "./repo-status"
 import { generateForkPromptForChat } from "./generate-fork-context"
 import { generateMergePromptForChats as defaultGenerateMergePrompt } from "./generate-merge-context"
 import type { TranscriptEntry } from "../shared/types"
+import { deriveCoordinationSnapshot } from "./read-models"
 
 /** Session coordinator interface — RunnerProxy delegates turn execution to the runner process */
 interface Coordinator {
@@ -110,6 +111,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "project.worktree.remove",
   "project.rule.set",
   "project.rule.remove",
+  "project.coordination.snapshot",
 ]
 
 export function registerCommandResponders(args: RegisterRespondersArgs): { dispose: () => void } {
@@ -438,6 +440,10 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       case "project.rule.remove": {
         await store.removeRule(command.projectId, command.ruleId)
         return { ok: true }
+      }
+
+      case "project.coordination.snapshot": {
+        return deriveCoordinationSnapshot(store.state, command.projectId)
       }
 
       default: {

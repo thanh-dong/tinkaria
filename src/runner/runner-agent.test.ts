@@ -302,4 +302,35 @@ describe("RunnerAgent", () => {
     const finalStatuses = agent.getActiveStatuses()
     expect(finalStatuses.has("chat-1")).toBe(false)
   })
+
+  test("passes coordinationStore to createTurn when provided", async () => {
+    const mockStore = {
+      state: { coordinationByProject: new Map() },
+      addTodo: async () => {},
+      claimTodo: async () => {},
+      completeTodo: async () => {},
+      abandonTodo: async () => {},
+      createClaim: async () => {},
+      releaseClaim: async () => {},
+      createWorktree: async () => {},
+      assignWorktree: async () => {},
+      removeWorktree: async () => {},
+      setRule: async () => {},
+      removeRule: async () => {},
+    }
+
+    let capturedStore: unknown
+    const createTurn: TurnFactory = async (args) => {
+      capturedStore = args.store
+      return createMockTurn([
+        { type: "transcript", entry: ts({ kind: "result", subtype: "success", isError: false, durationMs: 10, result: "done" }) },
+      ])
+    }
+
+    const agent = new RunnerAgent({ nc, createTurn, coordinationStore: mockStore })
+    await agent.startTurn(makeCmd())
+    await new Promise((r) => setTimeout(r, 200))
+
+    expect(capturedStore).toBe(mockStore)
+  })
 })

@@ -2,6 +2,7 @@ import { LOG_PREFIX } from "../shared/branding"
 import { readToken } from "../nats/nats-token"
 import { generateTitleForChat } from "../server/generate-title"
 import { RunnerAgent, type TurnFactory } from "./runner-agent"
+import { NatsCoordinationClient } from "./nats-coordination-client"
 import { RunnerNatsHandler, connectRunner, shutdownConnection } from "./runner-nats"
 import { startClaudeTurn, startCodexTurn, stopAllCodexSessions } from "./turn-factories"
 
@@ -37,7 +38,8 @@ const createTurn: TurnFactory = async (args) => {
   throw new Error(`Provider ${args.provider} not supported in runner`)
 }
 
-const agent = new RunnerAgent({ nc, createTurn, generateTitle: generateTitleForChat })
+const coordinationStore = new NatsCoordinationClient(nc)
+const agent = new RunnerAgent({ nc, createTurn, generateTitle: generateTitleForChat, coordinationStore })
 const handler = new RunnerNatsHandler({ nc, agent, runnerId })
 await handler.start()
 

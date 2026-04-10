@@ -88,3 +88,4 @@ export type ClientCommand =
   | { type: "project.worktree.remove"; projectId: string; worktreeId: string }
   | { type: "project.rule.set"; projectId: string; ruleId: string; content: string; setBy: string }
   | { type: "project.rule.remove"; projectId: string; ruleId: string }
+  | { type: "project.coordination.snapshot"; projectId: string }

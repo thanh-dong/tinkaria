@@ -7,7 +7,7 @@ import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-ty
 import type { SessionOrchestrator } from "./orchestration"
 import { createOrchestrationMcpServer } from "./orchestration"
 import { createCoordinationMcpServer } from "./coordination-mcp"
-import type { EventStore } from "./event-store"
+import type { CoordinationStore } from "../shared/coordination-store"
 
 const CLAUDE_TOOLSET = [
   "Skill",
@@ -121,7 +121,7 @@ function createClaudeOptions(args: {
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   orchestrator?: SessionOrchestrator
   chatId?: string
-  store?: EventStore
+  store?: CoordinationStore
 }): ClaudeOptions {
   const mcpServers: Record<string, McpServerConfig> = {}
 
@@ -293,7 +293,7 @@ export async function startClaudeTurn(args: {
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   orchestrator?: SessionOrchestrator
   chatId?: string
-  store?: EventStore
+  store?: CoordinationStore
   sdk?: ClaudeSdkBinding
 }): Promise<HarnessTurn> {
   const options = createClaudeOptions(args)

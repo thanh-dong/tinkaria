@@ -8,7 +8,7 @@ import type {
   SidebarData,
   SidebarProjectGroup,
 } from "../shared/types"
-import type { ChatRecord, StoreState } from "./events"
+import type { ChatRecord, StoreState, ProjectCoordinationState } from "./events"
 import { createEmptyCoordinationState } from "./events"
 import type { ProjectCoordinationSnapshot } from "../shared/project-agent-types"
 import { resolveLocalPath } from "./paths"
@@ -135,6 +135,34 @@ export function deriveSessionsSnapshot(
   cachedSnapshot: SessionsSnapshot | null
 ): SessionsSnapshot | null {
   return cachedSnapshot
+}
+
+/** Derive a coordination snapshot from any state with coordinationByProject. */
+export function deriveCoordinationSnapshot(
+  state: { coordinationByProject: Map<string, ProjectCoordinationState> },
+  projectId: string,
+): ProjectCoordinationSnapshot {
+  const coord = state.coordinationByProject.get(projectId) ?? createEmptyCoordinationState()
+
+  const todos = [...coord.todos.values()]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+
+  const claims = [...coord.claims.values()]
+    .filter((c) => c.status !== "released")
+
+  const worktrees = [...coord.worktrees.values()]
+    .filter((w) => w.status !== "removed")
+
+  const rules = [...coord.rules.values()]
+
+  return {
+    projectId,
+    todos,
+    claims,
+    worktrees,
+    rules,
+    lastUpdated: coord.lastUpdated,
+  }
 }
 
 export function deriveProjectCoordinationSnapshot(

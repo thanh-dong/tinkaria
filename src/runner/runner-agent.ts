@@ -15,6 +15,7 @@ import type {
   TranscriptEntry,
 } from "../shared/types"
 import { timestamped, discardedToolResult } from "../shared/transcript-entries"
+import type { CoordinationStore } from "../shared/coordination-store"
 
 const encoder = new TextEncoder()
 
@@ -31,6 +32,7 @@ export type TurnFactory = (args: {
   sessionToken: string | null
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   chatId: string
+  store?: CoordinationStore
 }) => Promise<HarnessTurn>
 
 interface PendingToolRequest {
@@ -61,6 +63,7 @@ export interface RunnerAgentOptions {
   nc: NatsConnection
   createTurn: TurnFactory
   generateTitle?: (content: string, cwd: string) => Promise<string | null>
+  coordinationStore?: CoordinationStore
 }
 
 // ── RunnerAgent ─────────────────────────────────────────────────────
@@ -70,6 +73,7 @@ export class RunnerAgent {
   private readonly nc: NatsConnection
   private readonly createTurn: TurnFactory
   private readonly generateTitle: ((content: string, cwd: string) => Promise<string | null>) | undefined
+  private readonly coordinationStore: CoordinationStore | undefined
   readonly activeTurns = new Map<string, ActiveTurn>()
 
   constructor(options: RunnerAgentOptions) {
@@ -77,6 +81,7 @@ export class RunnerAgent {
     this.js = jetstream(options.nc)
     this.createTurn = options.createTurn
     this.generateTitle = options.generateTitle
+    this.coordinationStore = options.coordinationStore
   }
 
   // ── Publishing ──────────────────────────────────────────────────
@@ -163,6 +168,7 @@ export class RunnerAgent {
       sessionToken: cmd.sessionToken,
       onToolRequest,
       chatId: cmd.chatId,
+      store: this.coordinationStore,
     })
 
     const active: ActiveTurn = {

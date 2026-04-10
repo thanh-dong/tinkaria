@@ -1,14 +1,23 @@
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk"
 import { z } from "zod/v4"
 import { randomUUID } from "node:crypto"
-import type { EventStore } from "./event-store"
-import { deriveProjectCoordinationSnapshot } from "./read-models"
+import type { CoordinationStore } from "../shared/coordination-store"
+import type { ProjectCoordinationSnapshot } from "../shared/project-agent-types"
+import { deriveCoordinationSnapshot } from "./read-models"
 
 function json(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data) }] }
 }
 
-export function createCoordinationMcpServer(store: EventStore) {
+/** Fetch the full snapshot, using remote getSnapshot when state is not in-process. */
+async function getProjectSnapshot(store: CoordinationStore, projectId: string): Promise<ProjectCoordinationSnapshot> {
+  if (store.getSnapshot) {
+    return store.getSnapshot(projectId)
+  }
+  return deriveCoordinationSnapshot(store.state, projectId)
+}
+
+export function createCoordinationMcpServer(store: CoordinationStore) {
   return createSdkMcpServer({
     name: "project-coordination",
     tools: [
@@ -25,7 +34,9 @@ export function createCoordinationMcpServer(store: EventStore) {
           const todoId = randomUUID()
           await store.addTodo(args.projectId, todoId, args.description, args.priority ?? "normal", args.createdBy ?? "unknown")
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.todos.get(todoId) ?? { id: todoId })
+          if (coord) return json(coord.todos.get(todoId) ?? { id: todoId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.todos.find((t) => t.id === todoId) ?? { id: todoId })
         },
       ),
       tool(
@@ -39,7 +50,9 @@ export function createCoordinationMcpServer(store: EventStore) {
         async (args) => {
           await store.claimTodo(args.projectId, args.todoId, args.sessionId)
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.todos.get(args.todoId) ?? { id: args.todoId })
+          if (coord) return json(coord.todos.get(args.todoId) ?? { id: args.todoId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.todos.find((t) => t.id === args.todoId) ?? { id: args.todoId })
         },
       ),
       tool(
@@ -53,7 +66,9 @@ export function createCoordinationMcpServer(store: EventStore) {
         async (args) => {
           await store.completeTodo(args.projectId, args.todoId, args.outputs ?? [])
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.todos.get(args.todoId) ?? { id: args.todoId })
+          if (coord) return json(coord.todos.get(args.todoId) ?? { id: args.todoId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.todos.find((t) => t.id === args.todoId) ?? { id: args.todoId })
         },
       ),
       tool(
@@ -66,7 +81,9 @@ export function createCoordinationMcpServer(store: EventStore) {
         async (args) => {
           await store.abandonTodo(args.projectId, args.todoId)
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.todos.get(args.todoId) ?? { id: args.todoId })
+          if (coord) return json(coord.todos.get(args.todoId) ?? { id: args.todoId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.todos.find((t) => t.id === args.todoId) ?? { id: args.todoId })
         },
       ),
       tool(
@@ -82,7 +99,9 @@ export function createCoordinationMcpServer(store: EventStore) {
           const claimId = randomUUID()
           await store.createClaim(args.projectId, claimId, args.intent, args.files, args.sessionId)
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.claims.get(claimId) ?? { id: claimId })
+          if (coord) return json(coord.claims.get(claimId) ?? { id: claimId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.claims.find((c) => c.id === claimId) ?? { id: claimId })
         },
       ),
       tool(
@@ -95,7 +114,9 @@ export function createCoordinationMcpServer(store: EventStore) {
         async (args) => {
           await store.releaseClaim(args.projectId, args.claimId)
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.claims.get(args.claimId) ?? { id: args.claimId })
+          if (coord) return json(coord.claims.get(args.claimId) ?? { id: args.claimId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.claims.find((c) => c.id === args.claimId) ?? { id: args.claimId })
         },
       ),
       tool(
@@ -110,7 +131,9 @@ export function createCoordinationMcpServer(store: EventStore) {
           const worktreeId = randomUUID()
           await store.createWorktree(args.projectId, worktreeId, args.branch, args.baseBranch ?? "main", "")
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.worktrees.get(worktreeId) ?? { id: worktreeId })
+          if (coord) return json(coord.worktrees.get(worktreeId) ?? { id: worktreeId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.worktrees.find((w) => w.id === worktreeId) ?? { id: worktreeId })
         },
       ),
       tool(
@@ -124,7 +147,9 @@ export function createCoordinationMcpServer(store: EventStore) {
         async (args) => {
           await store.assignWorktree(args.projectId, args.worktreeId, args.sessionId)
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.worktrees.get(args.worktreeId) ?? { id: args.worktreeId })
+          if (coord) return json(coord.worktrees.get(args.worktreeId) ?? { id: args.worktreeId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.worktrees.find((w) => w.id === args.worktreeId) ?? { id: args.worktreeId })
         },
       ),
       tool(
@@ -152,7 +177,9 @@ export function createCoordinationMcpServer(store: EventStore) {
           const ruleId = args.ruleId ?? randomUUID()
           await store.setRule(args.projectId, ruleId, args.content, args.setBy ?? "unknown")
           const coord = store.state.coordinationByProject.get(args.projectId)
-          return json(coord?.rules.get(ruleId) ?? { id: ruleId })
+          if (coord) return json(coord.rules.get(ruleId) ?? { id: ruleId })
+          const snapshot = await getProjectSnapshot(store, args.projectId)
+          return json(snapshot.rules.find((r) => r.id === ruleId) ?? { id: ruleId })
         },
       ),
       tool(
@@ -174,7 +201,7 @@ export function createCoordinationMcpServer(store: EventStore) {
           projectId: z.string().describe("The project ID"),
         },
         async (args) => {
-          const snapshot = deriveProjectCoordinationSnapshot(store.state, args.projectId)
+          const snapshot = await getProjectSnapshot(store, args.projectId)
           return json(snapshot)
         },
       ),
