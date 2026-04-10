@@ -6,6 +6,8 @@ import { normalizeToolCall } from "../shared/tools"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
 import type { SessionOrchestrator } from "./orchestration"
 import { createOrchestrationMcpServer } from "./orchestration"
+import { createCoordinationMcpServer } from "./coordination-mcp"
+import type { EventStore } from "./event-store"
 
 const CLAUDE_TOOLSET = [
   "Skill",
@@ -119,11 +121,17 @@ function createClaudeOptions(args: {
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   orchestrator?: SessionOrchestrator
   chatId?: string
+  store?: EventStore
 }): ClaudeOptions {
-  const mcpServers: Record<string, McpServerConfig> | undefined =
-    args.orchestrator && args.chatId
-      ? { "session-orchestration": createOrchestrationMcpServer(args.orchestrator, args.chatId) }
-      : undefined
+  const mcpServers: Record<string, McpServerConfig> = {}
+
+  if (args.orchestrator && args.chatId) {
+    mcpServers["session-orchestration"] = createOrchestrationMcpServer(args.orchestrator, args.chatId)
+  }
+
+  if (args.store) {
+    mcpServers["project-coordination"] = createCoordinationMcpServer(args.store)
+  }
 
   return {
     cwd: args.localPath,
@@ -133,7 +141,7 @@ function createClaudeOptions(args: {
     permissionMode: (args.planMode ? "plan" : "acceptEdits") as ClaudeOptions["permissionMode"],
     canUseTool: createClaudeCanUseTool(args.onToolRequest),
     tools: [...CLAUDE_TOOLSET],
-    mcpServers,
+    mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
     systemPrompt: {
       type: "preset",
       preset: "claude_code",
@@ -285,6 +293,7 @@ export async function startClaudeTurn(args: {
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   orchestrator?: SessionOrchestrator
   chatId?: string
+  store?: EventStore
   sdk?: ClaudeSdkBinding
 }): Promise<HarnessTurn> {
   const options = createClaudeOptions(args)
