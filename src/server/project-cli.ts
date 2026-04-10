@@ -81,7 +81,7 @@ Commands:
   sessions                    List active/recent sessions with summaries
   sessions <chat-id>          Detailed summary of a specific session
   search <query>              Lexical search over project transcripts
-  tasks                       List all tasks in the TaskLedger
+  tasks                       List all project tasks
   tasks <task-id>             Get task details
   claim <description>         Claim a new task for the current session
   complete <task-id>          Mark a task as complete

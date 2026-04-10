@@ -109,6 +109,39 @@ describe("project agent integration", () => {
     expect((delegateBody.message as string).toLowerCase()).toContain("auth")
   })
 
+  test("tasks survive EventStore reload (durability)", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "durable-"))
+    tempDirs.push(dir)
+
+    // First store instance: create a task
+    const store1 = new EventStore(dir)
+    await store1.initialize()
+    const project1 = await store1.openProject("/tmp/durable", "Durable Test")
+    const agent1 = new ProjectAgent({
+      sessions: new SessionIndex(),
+      store: store1,
+      search: new TranscriptSearchIndex(),
+      projectId: project1.id,
+    })
+    const task = await agent1.claimTask("durable task", "session-1", null)
+
+    // Second store instance: reload from same directory
+    const store2 = new EventStore(dir)
+    await store2.initialize()
+    const agent2 = new ProjectAgent({
+      sessions: new SessionIndex(),
+      store: store2,
+      search: new TranscriptSearchIndex(),
+      projectId: project1.id,
+    })
+
+    const tasks = agent2.listTasks()
+    expect(tasks.length).toBe(1)
+    expect(tasks[0].description).toBe("durable task")
+    expect(tasks[0].status).toBe("claimed")
+    expect(tasks[0].id).toBe(task.id)
+  })
+
   test("complete task lifecycle via HTTP", async () => {
     const { router } = await createIntegration()
 

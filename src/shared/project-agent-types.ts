@@ -15,20 +15,6 @@ export interface SessionRecord {
   lastActivity: string
 }
 
-// --- TaskLedger types ---
-
-export type TaskStatus = "claimed" | "complete" | "abandoned"
-
-export interface TaskEntry {
-  id: string
-  description: string
-  ownedBy: string
-  status: TaskStatus
-  branch: string | null
-  outputs: string[]
-  claimedAt: string
-  updatedAt: string
-}
 
 // --- TranscriptSearch types ---
 
