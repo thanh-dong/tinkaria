@@ -82,24 +82,21 @@ export const WipBlock = memo(function WipBlock({ steps, isLoading, localPath }: 
             </div>
           </button>
 
-          {/* Sub-lines: narration and latest tool (collapsed preview) */}
-          {!expanded && (latestNarration || (latestTool && toolLabel)) ? (
-            <div className="ml-[26px] flex flex-col gap-0.5 mt-0.5">
-              {latestNarration ? (
-                <div className="text-xs text-muted-foreground/60 truncate italic">
-                  {latestNarration.length > 120 ? `${latestNarration.slice(0, 120)}...` : latestNarration}
-                </div>
-              ) : null}
-              {latestTool && toolLabel ? (
-                <ToolStepRow toolName={latestTool.toolName} label={toolLabel} isError={latestTool.isError} />
-              ) : null}
+          {/* Sub-line: single preview — narration preferred, tool as fallback */}
+          {!expanded && latestNarration ? (
+            <div className="ml-[26px] mt-1 text-xs text-muted-foreground/50 truncate italic">
+              {latestNarration.length > 120 ? `${latestNarration.slice(0, 120)}...` : latestNarration}
+            </div>
+          ) : !expanded && latestTool && toolLabel ? (
+            <div className="ml-[26px] mt-1">
+              <ToolStepRow toolName={latestTool.toolName} label={toolLabel} isError={latestTool.isError} />
             </div>
           ) : null}
 
           {/* Expanded: timeline using VerticalLineContainer */}
           {expanded ? (
-            <VerticalLineContainer className="my-2">
-              <div className="flex flex-col gap-1 py-1">
+            <VerticalLineContainer className="mt-2">
+              <div className="flex flex-col gap-1.5 py-1">
                 {steps.map((step) => {
                   if (step.kind === "assistant_text") {
                     return (
