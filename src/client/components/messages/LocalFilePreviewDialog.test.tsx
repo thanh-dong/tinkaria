@@ -54,8 +54,7 @@ describe("LocalFilePreviewContent", () => {
       />
     )
 
-    expect(html).toContain("Render")
-    expect(html).toContain("Source")
+    // SVG renders as content only — controls are in the overlay toolbar, not inline
     expect(html).toContain("data-svg-render")
     expect(html).not.toContain("sh__token--")
     expect(html).not.toContain("group/rich-content")

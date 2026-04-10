@@ -96,6 +96,14 @@ function specialTool(): HydratedTranscriptMessage {
   } as HydratedTranscriptMessage
 }
 
+function erroredTool(name = "Skill"): HydratedTranscriptMessage {
+  return {
+    kind: "tool", toolKind: "skill", toolName: name, toolId: nextId(),
+    id: nextId(), timestamp: "2026-04-06T00:00:00Z", input: { skill: "missing-skill" },
+    isError: true, result: "Skill not found: missing-skill",
+  } as HydratedTranscriptMessage
+}
+
 function userPrompt(): HydratedTranscriptMessage {
   return { kind: "user_prompt", content: "Hello", id: nextId(), timestamp: "2026-04-06T00:00:00Z" }
 }
@@ -150,13 +158,27 @@ describe("groupMessages", () => {
     }
   })
 
-  test("live turn: last text without following tool is the answer", () => {
+  test("live turn: trailing text after tools is absorbed during loading to prevent flash", () => {
     const msgs = [text("Checking"), tool(), text("Here is the answer")]
     const items = groupMessages(msgs, true)
 
-    expect(items).toHaveLength(2)
+    // During loading, trailing text after tools stays in the wip-block
+    // to prevent the flash where text briefly renders as TextMessage
+    // then gets absorbed when a tool follows
+    expect(items).toHaveLength(1)
     expect(items[0].type).toBe("wip-block")
-    expect(items[1].type).toBe("single") // answer
+    if (items[0].type === "wip-block") {
+      expect(items[0].steps).toHaveLength(3)
+    }
+  })
+
+  test("live turn: trailing text without prior tools IS the answer", () => {
+    // No tools before the text — this is a simple Q&A, show as TextMessage
+    const msgs = [text("Here is the answer")]
+    const items = groupMessages(msgs, true)
+
+    expect(items).toHaveLength(1)
+    expect(items[0].type).toBe("single") // genuine answer
   })
 
   test("special tool breaks wip-block boundary", () => {
@@ -182,7 +204,7 @@ describe("groupMessages", () => {
     expect(items[1].type).toBe("tool-group")
   })
 
-  test("single orphan narration text stays as single (threshold)", () => {
+  test("single orphan narration text stays as single (threshold) when not loading", () => {
     // Only one narration, no tools after it, then answer
     const msgs = [text("Just one thought"), text("The actual answer")]
     const items = groupMessages(msgs, false)
@@ -191,6 +213,17 @@ describe("groupMessages", () => {
     expect(items).toHaveLength(2)
     expect(items[0].type).toBe("single")
     expect(items[1].type).toBe("single")
+  })
+
+  test("single narration text becomes wip-block during loading", () => {
+    // During loading, even a single narration text should be a wip-block
+    // to prevent flash if a tool arrives shortly after
+    const msgs = [text("Let me check"), tool(), text("Answer")]
+    const items = groupMessages(msgs, true)
+
+    // narration absorbed into wip-block during loading
+    expect(items).toHaveLength(1)
+    expect(items[0].type).toBe("wip-block")
   })
 
   test("two narration texts (no tools) form wip-block", () => {
@@ -223,6 +256,65 @@ describe("groupMessages", () => {
 
     expect(items).toHaveLength(1)
     expect(items[0].type).toBe("tool-group")
+  })
+
+  test("errored tool breaks out of wip-block", () => {
+    // narration → errored tool → answer
+    const msgs = [text("Let me try this skill"), erroredTool(), text("The skill failed")]
+    const items = groupMessages(msgs, false)
+
+    // narration stays single (only 1 step, below threshold), errored tool → single, answer → single
+    expect(items).toHaveLength(3)
+    expect(items[0].type).toBe("single") // narration (alone, below wip threshold)
+    expect(items[1].type).toBe("single") // errored tool — must NOT be absorbed
+    expect(items[2].type).toBe("single") // answer
+  })
+
+  test("errored tool breaks out of tool-group", () => {
+    // 3 tools where middle one errored
+    const msgs = [tool(), erroredTool(), tool()]
+    const items = groupMessages(msgs, false)
+
+    // first tool → single (alone), errored → single, last tool → single (alone)
+    expect(items).toHaveLength(3)
+    expect(items[0].type).toBe("single")
+    expect(items[1].type).toBe("single") // errored — must be standalone
+    expect(items[2].type).toBe("single")
+  })
+
+  test("errored tool breaks wip-block but preceding narration+tools still group", () => {
+    // narration → tool → narration → errored tool → answer
+    const msgs = [text("Checking"), tool(), text("Now trying skill"), erroredTool(), text("It failed")]
+    const items = groupMessages(msgs, false)
+
+    // narration+tool+narration → wip-block (3 steps), errored → single, answer → single
+    expect(items).toHaveLength(3)
+    expect(items[0].type).toBe("wip-block")
+    if (items[0].type === "wip-block") {
+      expect(items[0].steps).toHaveLength(3) // "Checking" + tool + "Now trying skill"
+    }
+    expect(items[1].type).toBe("single") // errored tool standalone
+    expect(items[2].type).toBe("single") // answer
+  })
+
+  test("tool with explicit isError: false is still collapsible", () => {
+    const explicitlyOk = { ...tool(), isError: false } as HydratedTranscriptMessage
+    const msgs = [tool(), explicitlyOk, tool()]
+    const items = groupMessages(msgs, false)
+
+    expect(items).toHaveLength(1)
+    expect(items[0].type).toBe("tool-group")
+  })
+
+  test("non-errored tools still group normally alongside errored one", () => {
+    // 2 good tools, then errored, then 2 more good tools
+    const msgs = [tool(), tool(), erroredTool(), tool(), tool()]
+    const items = groupMessages(msgs, false)
+
+    expect(items).toHaveLength(3)
+    expect(items[0].type).toBe("tool-group") // first 2
+    expect(items[1].type).toBe("single")     // errored
+    expect(items[2].type).toBe("tool-group") // last 2
   })
 })
 

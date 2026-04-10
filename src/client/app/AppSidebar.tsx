@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
-import { Loader2, Menu, PanelLeft, Plus, X } from "lucide-react"
+import { Home, Loader2, Menu, PanelLeft, X } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import { Button } from "../components/ui/button"
@@ -312,10 +312,10 @@ export function AppSidebar({
                 onClose()
               }}
               className="size-10 rounded-lg"
-              title="Add project"
-              aria-label="Add project"
+              title="Home"
+              aria-label="Home"
             >
-              <Plus className="size-4" />
+              <Home className="size-4" />
             </Button>
             <Button
               variant="ghost"

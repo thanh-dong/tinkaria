@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tinkaria Logo Variations</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui; background: #f5f5f5; padding: 40px; }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 24px; }
+  .subtitle { text-align: center; margin-bottom: 40px; color: #666; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; max-width: 1200px; margin: 0 auto; }
+  .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .card p { font-size: 13px; color: #666; margin-bottom: 16px; line-height: 1.4; }
+  .preview { display: flex; gap: 16px; align-items: center; justify-content: center; }
+  .preview-light, .preview-dark { border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: center; }
+  .preview-light { background: #f8f8f8; }
+  .preview-dark { background: #1c1917; }
+  .preview img { width: 96px; height: 96px; }
+  .original { border: 2px dashed #ccc; }
+  hr { border: none; border-top: 1px solid #eee; margin: 40px 0; }
+  .colors { display: flex; gap: 8px; margin-top: 12px; }
+  .swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+<h1>Tinkaria Mark Variations</h1>
+<p class="subtitle">Exploring dark orange/red integration into the logo mark</p>
+
+<div class="grid">
+  <div class="card original">
+    <h2>Current (fine)</h2>
+    <p>Dark green strokes, small salmon center dot. Minimal color presence.</p>
+    <div class="preview">
+      <div class="preview-light"><img src="../tinkaria-mark-fine.svg" alt="current"></div>
+      <div class="preview-dark"><img src="../tinkaria-mark-fine.svg" alt="current dark"></div>
+    </div>
+    <div class="colors">
+      <div class="swatch" style="background:#17322C" title="#17322C dark green"></div>
+      <div class="swatch" style="background:#FF8A5B" title="#FF8A5B salmon"></div>
+      <div class="swatch" style="background:#FFF8EE" title="#FFF8EE cream"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>V1 — Ember Ring</h2>
+    <p>Circle stroke becomes warm red. Spokes stay dark. Bolder center dot. Subtle brand presence.</p>
+    <div class="preview">
+      <div class="preview-light"><img src="v1-ember-ring.svg" alt="v1"></div>
+      <div class="preview-dark"><img src="v1-ember-ring.svg" alt="v1 dark"></div>
+    </div>
+    <div class="colors">
+      <div class="swatch" style="background:#17322C"></div>
+      <div class="swatch" style="background:#D14A3D"></div>
+      <div class="swatch" style="background:#FFF8EE"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>V2 — Full Blaze</h2>
+    <p>All strokes in deep warm red. Bold, monochromatic warmth on cream.</p>
+    <div class="preview">
+      <div class="preview-light"><img src="v2-full-blaze.svg" alt="v2"></div>
+      <div class="preview-dark"><img src="v2-full-blaze.svg" alt="v2 dark"></div>
+    </div>
+    <div class="colors">
+      <div class="swatch" style="background:#C44230"></div>
+      <div class="swatch" style="background:#FFF8EE"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>V3 — Dark Ember</h2>
+    <p>Dark background with warm red strokes. Reversed treatment, glowing feel. Good for dark mode.</p>
+    <div class="preview">
+      <div class="preview-light"><img src="v3-dark-ember.svg" alt="v3"></div>
+      <div class="preview-dark"><img src="v3-dark-ember.svg" alt="v3 dark"></div>
+    </div>
+    <div class="colors">
+      <div class="swatch" style="background:#1C1917"></div>
+      <div class="swatch" style="background:#E05A3A"></div>
+      <div class="swatch" style="background:#FF8A5B"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>V4 — Gradient Core</h2>
+    <p>Radial gradient: warm red at center fading to dark at tips. Organic depth.</p>
+    <div class="preview">
+      <div class="preview-light"><img src="v4-gradient-core.svg" alt="v4"></div>
+      <div class="preview-dark"><img src="v4-gradient-core.svg" alt="v4 dark"></div>
+    </div>
+    <div class="colors">
+      <div class="swatch" style="background:#D14A3D"></div>
+      <div class="swatch" style="background:#17322C"></div>
+      <div class="swatch" style="background:#FFF8EE"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>V5 — Warm Duo</h2>
+    <p>Two-layer spokes: outer tips in red, inner segments dark. Ring in red. Layered depth effect.</p>
+    <div class="preview">
+      <div class="preview-light"><img src="v5-warm-duo.svg" alt="v5"></div>
+      <div class="preview-dark"><img src="v5-warm-duo.svg" alt="v5 dark"></div>
+    </div>
+    <div class="colors">
+      <div class="swatch" style="background:#D14A3D"></div>
+      <div class="swatch" style="background:#17322C"></div>
+      <div class="swatch" style="background:#FFF8EE"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>V6 — Cardinal Accent</h2>
+    <p>Cardinal spokes (N/S/E/W) in red, diagonals in dark. Ring stays dark. Directional emphasis.</p>
+    <div class="preview">
+      <div class="preview-light"><img src="v6-cardinal-accent.svg" alt="v6"></div>
+      <div class="preview-dark"><img src="v6-cardinal-accent.svg" alt="v6 dark"></div>
+    </div>
+    <div class="colors">
+      <div class="swatch" style="background:#D14A3D"></div>
+      <div class="swatch" style="background:#17322C"></div>
+      <div class="swatch" style="background:#FFF8EE"></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

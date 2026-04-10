@@ -151,7 +151,10 @@ export function canStartQueuedFlush(
   args: { chatId: string | null; isProcessing: boolean }
 ): boolean {
   if (args.chatId === null || args.isProcessing) return false
-  return getSubmitPipelineMode(state, args.chatId) === "queued"
+  const mode = getSubmitPipelineMode(state, args.chatId)
+  if (mode === "queued") return true
+
+  return mode === "awaiting_busy_ack" && getQueuedText(state, args.chatId).trim().length > 0
 }
 
 export function startQueuedFlush(

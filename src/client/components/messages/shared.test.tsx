@@ -98,8 +98,8 @@ describe("markdownComponents", () => {
 
     expect(html).toContain("group/rich-content")
     expect(html).toContain("svg")
+    // Embed block uses Image icon as type indicator
     expect(html).toContain("lucide-image")
-    expect(html).not.toContain("lucide-code")
     expect(html).not.toContain("sh__token--")
   })
 

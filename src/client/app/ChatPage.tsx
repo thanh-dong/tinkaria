@@ -717,7 +717,7 @@ export function ChatPage() {
           {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.composer)}
         >
         <div className="bg-gradient-to-t from-background via-background pointer-events-auto" ref={state.inputRef}>
-          <div className="px-3">
+          <div className="px-3 pb-2">
             <div className="max-w-[840px] mx-auto flex justify-end">
               <SubagentIndicator
                 hierarchy={state.orchestrationHierarchy}

@@ -9,7 +9,6 @@ import {
   type ComponentPropsWithoutRef,
   type ReactNode,
 } from "react"
-import { Button } from "../ui/button"
 import {
   ArrowDownToLine,
   CheckLine,
@@ -191,31 +190,35 @@ export function MetaCodeBlock({ label, children, copyText }: { label: ReactNode;
   const textContent = copyText ?? extractText(children)
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(textContent)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(textContent)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.warn("[tinkaria] clipboard write failed:", err instanceof Error ? err.message : String(err))
+    }
   }, [textContent])
 
   return (
-    <div>
-      <span className="font-medium text-muted-foreground">{label}</span>
-      <div className="relative group/codeblock">
-        <pre className="my-1 text-xs font-mono whitespace-no-wrap break-all bg-muted border border-border  rounded-lg p-2 max-h-64 overflow-auto w-full">
-          {children}
-        </pre>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "absolute top-[4px] right-[4px] z-10 h-6.5 w-6.5 rounded-sm text-muted-foreground opacity-0 group-hover/codeblock:opacity-100 transition-opacity",
-            !copied && "hover:text-foreground",
-            copied && "hover:!bg-transparent hover:!border-transparent"
-          )}
+    <div className="group/codeblock">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className="font-medium text-muted-foreground">{label}</span>
+        <button
+          type="button"
+          aria-label={copied ? "Copied" : "Copy content"}
           onClick={handleCopy}
+          className={cn(
+            "ml-auto flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-0 group-hover/codeblock:opacity-100 transition-opacity",
+            !copied && "hover:bg-accent hover:text-foreground",
+            copied && "pointer-events-none"
+          )}
         >
-          {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-4 w-4" />}
-        </Button>
+          {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+        </button>
       </div>
+      <pre className="text-xs font-mono whitespace-no-wrap break-all bg-muted border border-border rounded-lg p-2 max-h-64 overflow-auto w-full">
+        {children}
+      </pre>
     </div>
   )
 }

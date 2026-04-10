@@ -458,8 +458,8 @@ export const SubagentIndicator = memo(function SubagentIndicator({
           </DialogDescription>
         </DialogHeader>
 
-        <DialogBody className="p-0">
-          <div className="flex min-h-0 flex-col md:grid md:grid-cols-[18rem_minmax(0,1fr)]">
+        <DialogBody className="p-0 overflow-hidden">
+          <div className="flex min-h-0 h-full flex-col md:grid md:grid-cols-[18rem_minmax(0,1fr)]">
             <div
               {...getUiIdentityAttributeProps(INDICATOR_DESCRIPTORS.list)}
               className="flex gap-2 overflow-x-auto border-b border-border/70 p-3 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r"

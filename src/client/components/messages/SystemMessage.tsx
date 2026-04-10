@@ -1,8 +1,8 @@
-import { useState, useMemo, memo, type ReactNode } from "react"
-import { Asterisk, ChevronRight, Slash, UserRound } from "lucide-react"
+import { useState, useMemo, useCallback, memo, type ReactNode } from "react"
+import { ChevronRight, Slash, UserRound } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { ProcessedSystemMessage } from "./types"
-import { MetaRow, MetaLabel, MetaText, MetaPill, ExpandableRow, VerticalLineContainer, toolIcons, defaultToolIcon, getToolIcon } from "./shared"
+import { MetaRow, MetaLabel, MetaText, MetaPill, VerticalLineContainer, toolIcons, defaultToolIcon, getToolIcon } from "./shared"
 import { toTitleCase } from "../../lib/formatters"
 import { cn } from "../../lib/utils"
 
@@ -164,6 +164,9 @@ function RawMessageSection({ rawJson }: { rawJson: string }) {
 }
 
 export const SystemMessage = memo(function SystemMessage({ message, rawJson }: Props) {
+  const [expanded, setExpanded] = useState(false)
+  const toggleExpanded = useCallback(() => setExpanded((prev) => !prev), [])
+
   const { coreTools, mcpServersWithTools } = useMemo(() => {
     const mcpToolsByServer = new Map<string, string[]>()
     const core: string[] = []
@@ -190,10 +193,23 @@ export const SystemMessage = memo(function SystemMessage({ message, rawJson }: P
   }, [message.tools, message.mcpServers])
 
   return (
-    <MetaRow>
-      <ExpandableRow
-        expandedContent={
-          <VerticalLineContainer className="my-4 text-xs">
+    <MetaRow className="w-full">
+      <div className="flex flex-col w-full">
+        <button
+          onClick={toggleExpanded}
+          className={`group cursor-pointer grid grid-cols-[auto_1fr] items-center gap-1 text-sm ${!expanded ? "hover:opacity-60 transition-opacity" : ""}`}
+        >
+          <div className="grid grid-cols-[auto_1fr] items-center gap-1.5">
+            <div className="w-5 h-5 relative flex items-center justify-center">
+              <ChevronRight
+                className={`h-4.5 w-4.5 text-muted-icon transition-all duration-200 ${expanded ? "rotate-90" : ""}`}
+              />
+            </div>
+            <MetaLabel className="text-left">Session Started</MetaLabel>
+          </div>
+        </button>
+        {expanded && (
+          <VerticalLineContainer className="my-2 text-xs">
             <div className="flex flex-col gap-3">
               <MetaText>{message.model}</MetaText>
               <PillSection title="Tools" items={coreTools} getIcon={(tool) => toolIcons[tool] ?? defaultToolIcon} />
@@ -203,11 +219,8 @@ export const SystemMessage = memo(function SystemMessage({ message, rawJson }: P
               {rawJson && <RawMessageSection rawJson={rawJson} />}
             </div>
           </VerticalLineContainer>
-        }
-      >
-        <Asterisk className="h-5 w-5 text-logo" />
-        <MetaLabel>Session Started</MetaLabel>
-      </ExpandableRow>
+        )}
+      </div>
     </MetaRow>
   )
 })

@@ -414,6 +414,7 @@ export function useAppState(activeChatId: string | null): AppState {
     messages,
     localProjects,
     setProjectSelection,
+    setSidebarData,
     setPendingChatId,
     setSidebarOpen,
     setCommandError,

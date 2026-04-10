@@ -39,7 +39,6 @@ describe("EmbedRenderer", () => {
       <EmbedRenderer format="mermaid" source="graph TD\n  A --> B" />
     )
 
-    // Should render a container div (mermaid renders client-side via useEffect)
     expect(html).toContain("data-mermaid-source")
   })
 
@@ -51,7 +50,7 @@ describe("EmbedRenderer", () => {
     expect(html).toContain("x -&gt; y") // HTML-encoded
   })
 
-  test("renders svg as an image-first surface with render and source views", () => {
+  test("renders svg content without inline controls", () => {
     const html = renderToStaticMarkup(
       <EmbedRenderer
         format="svg"
@@ -59,10 +58,13 @@ describe("EmbedRenderer", () => {
       />
     )
 
-    expect(html).toContain("Render")
-    expect(html).toContain("Source")
+    // Should render svg content
     expect(html).toContain("data-svg-render")
     expect(html).toContain("<rect")
+    // Should NOT render inline controls (hoisted to RichContentBlock)
+    expect(html).not.toContain('aria-label="SVG display mode"')
+    expect(html).not.toContain(">Render<")
+    expect(html).not.toContain(">Source<")
   })
 
   test("shows svg render error fallback with escaped source visibility", () => {
@@ -93,15 +95,16 @@ describe("EmbedRenderer", () => {
     expect(html).not.toContain("SVG render error")
   })
 
-  test("renders iframe embeds directly", () => {
+  test("renders iframe embeds as pure content without inline controls", () => {
     const html = renderToStaticMarkup(
       <EmbedRenderer format="iframe" source="https://example.com/embed/widget" />
     )
 
-    expect(html).toContain("Zoom in")
-    expect(html).toContain("100%")
     expect(html).toContain('data-remote-embed="true"')
     expect(html).toContain('src="https://example.com/embed/widget"')
+    // No inline zoom/render controls
+    expect(html).not.toContain(">Render<")
+    expect(html).not.toContain(">Source<")
   })
 
   test("normalizes diashort links to the zoomable document view", () => {
@@ -124,22 +127,7 @@ describe("EmbedRenderer", () => {
 })
 
 describe("EmbedRenderer with ContentViewerContext", () => {
-  test("svg keeps inline controls when viewer context is present", () => {
-    const ctx: ContentViewerContextValue = {
-      state: { type: "embed", renderMode: "render", zoom: 1 },
-      dispatch: () => {},
-    }
-    const html = renderToStaticMarkup(
-      <ContentViewerContext.Provider value={ctx}>
-        <EmbedRenderer format="svg" source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'} />
-      </ContentViewerContext.Provider>
-    )
-    expect(html).toContain('aria-label="SVG display mode"')
-    expect(html).toContain("Zoom in")
-    expect(html).toContain("data-svg-render")
-  })
-
-  test("svg uses context renderMode instead of local state", () => {
+  test("svg uses context renderMode", () => {
     const ctx: ContentViewerContextValue = {
       state: { type: "embed", renderMode: "source", zoom: 1 },
       dispatch: () => {},
@@ -166,12 +154,10 @@ describe("EmbedRenderer with ContentViewerContext", () => {
     expect(html).toContain("scale(1.5)")
   })
 
-  test("svg falls back to local state when no context", () => {
+  test("svg falls back to render mode when no context", () => {
     const html = renderToStaticMarkup(
       <EmbedRenderer format="svg" source={'<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>'} />
     )
-    expect(html).toContain('aria-label="SVG display mode"')
-    expect(html).toContain("Zoom out")
     expect(html).toContain("data-svg-render")
   })
 

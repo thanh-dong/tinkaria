@@ -29,8 +29,9 @@ import { SPECIAL_TOOL_NAMES } from "./derived"
 
 function isCollapsibleToolCall(message: HydratedTranscriptMessage) {
   if (message.kind !== "tool") return false
-  const toolName = (message as ProcessedToolCall).toolName
-  return !SPECIAL_TOOL_NAMES.has(toolName)
+  const toolCall = message as ProcessedToolCall
+  if (toolCall.isError) return false
+  return !SPECIAL_TOOL_NAMES.has(toolCall.toolName)
 }
 
 // Find the index of the "answer" assistant_text — the last one NOT followed by any tool call.
@@ -44,8 +45,17 @@ function findAnswerIndex(messages: HydratedTranscriptMessage[], isLoading: boole
     for (let j = i + 1; j < messages.length; j++) {
       if (messages[j].kind === "tool") { hasToolAfter = true; break }
     }
-    if (!hasToolAfter) return i
-    break
+    if (hasToolAfter) break
+    // During loading: if this is the tail message and tools came before it,
+    // suppress the answer — it's likely mid-turn narration that will be
+    // followed by more tools. Prevents the flash where text briefly renders
+    // as a TextMessage then gets absorbed into a WipBlock.
+    if (i === messages.length - 1) {
+      for (let j = 0; j < i; j++) {
+        if (messages[j].kind === "tool") return -1
+      }
+    }
+    return i
   }
   return -1
 }
@@ -74,7 +84,7 @@ export function groupMessages(messages: HydratedTranscriptMessage[], isLoading: 
         index += 1
       }
 
-      if (steps.length >= 2) {
+      if (steps.length >= 2 || isLoading) {
         result.push({ type: "wip-block", steps, startIndex })
       } else {
         result.push({ type: "single", message, index: startIndex })
@@ -320,7 +330,7 @@ export function ChatTranscript({
               {rendered ? (
                 <div
                   id={`msg-${item.message.id}`}
-                  className="group relative pb-5"
+                  className={`group relative pb-5${isLoading && item.message.kind === "assistant_text" ? " animate-narration-guard" : ""}`}
                   {...{ [CHAT_SELECTION_ZONE_ATTRIBUTE]: "" }}
                 >
                   {rendered}

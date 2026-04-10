@@ -10,11 +10,11 @@ import {
   DIALOG_BODY_INSET_CLASS_NAME,
   RESPONSIVE_MODAL_HEADER_CLASS_NAME,
 } from "../ui/dialog"
-import { Button } from "../ui/button"
 import { cn } from "../../lib/utils"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps, type UiIdentityDescriptor } from "../../lib/uiIdentityOverlay"
 import { useIsMobile } from "../../hooks/useIsMobile"
 import { ContentViewerContext, viewerReducer, createInitialState } from "./ContentViewerContext"
+import { IconButton } from "./IconButton"
 import { ViewerToolbar } from "./ViewerToolbar"
 import { TocPanel } from "./TocPanel"
 import type { RichContentType } from "./types"
@@ -75,6 +75,27 @@ export function ContentOverlay({
     }
   }, [rawContent])
 
+  const controls = (
+    <div className="flex items-center gap-0.5" data-controls="true">
+      <ViewerToolbar state={viewerState} dispatch={dispatch} />
+      {rawContent ? (
+        <>
+          <div className="mx-0.5 h-3 w-px bg-border" aria-hidden="true" />
+          <IconButton
+            ariaLabel={copied ? "Copied" : "Copy content"}
+            onClick={handleCopy}
+          >
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-green-400" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </IconButton>
+        </>
+      ) : null}
+    </div>
+  )
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -95,30 +116,9 @@ export function ContentOverlay({
                 <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
               )}
               <DialogTitle className="truncate text-sm">{title ?? type}</DialogTitle>
-              {rawContent ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "ml-auto shrink-0 text-muted-foreground",
-                    isMobile ? "h-11 w-11" : "h-7 w-7",
-                    !copied && "hover:text-foreground",
-                    copied && "hover:!bg-transparent"
-                  )}
-                  onClick={handleCopy}
-                  aria-label={copied ? "Copied" : "Copy content"}
-                >
-                  {copied ? (
-                    <Check className={cn(isMobile ? "h-5 w-5" : "h-3.5 w-3.5", "text-green-400")} />
-                  ) : (
-                    <Copy className={cn(isMobile ? "h-5 w-5" : "h-3.5 w-3.5")} />
-                  )}
-                </Button>
-              ) : null}
+              {!isMobile ? <div className="ml-auto">{controls}</div> : null}
             </div>
           </DialogHeader>
-
-          {isMobile ? <ViewerToolbar state={viewerState} dispatch={dispatch} /> : null}
 
           {isMobile && viewerState.type === "markdown" && viewerState.tocOpen ? (
             <TocPanel
@@ -130,9 +130,15 @@ export function ContentOverlay({
             />
           ) : null}
 
-          <DialogBody className={cn("p-0", isMobile && "pb-[env(safe-area-inset-bottom)]")}>
+          <DialogBody className="p-0">
             <div ref={bodyRef} className={CONTENT_OVERLAY_INNER_CLASS_NAME}>{children}</div>
           </DialogBody>
+
+          {isMobile ? (
+            <div className="flex items-center justify-end px-2.5 py-1.5 bg-muted/50 border-t border-border pb-[env(safe-area-inset-bottom)]">
+              {controls}
+            </div>
+          ) : null}
         </ContentViewerContext.Provider>
       </DialogContent>
     </Dialog>

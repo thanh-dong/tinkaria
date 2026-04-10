@@ -21,7 +21,6 @@ describe("RichContentBlock", () => {
       </RichContentBlock>
     )
 
-    // Collapsed: content should be wrapped in max-height container with overflow hidden
     expect(html).toContain("max-h-")
     expect(html).toContain("overflow-hidden")
   })
@@ -33,7 +32,6 @@ describe("RichContentBlock", () => {
       </RichContentBlock>
     )
 
-    // Expanded: no max-height restriction
     expect(html).not.toContain("max-h-")
   })
 
@@ -41,7 +39,6 @@ describe("RichContentBlock", () => {
     const codeHtml = renderToStaticMarkup(
       <RichContentBlock type="code"><pre>x</pre></RichContentBlock>
     )
-    // Code icon is an SVG, just check the wrapper renders
     expect(codeHtml).toContain("<svg")
 
     const markdownHtml = renderToStaticMarkup(
@@ -64,5 +61,76 @@ describe("RichContentBlock", () => {
     expect(CONTENT_BLOCK_BODY_CLASS_NAME).toContain("px-4")
     expect(CONTENT_BLOCK_BODY_CLASS_NAME).toContain("pb-4")
     expect(CONTENT_BLOCK_BODY_CLASS_NAME).toContain("pt-3.5")
+  })
+
+  test("renders copy button in header when rawContent is provided", () => {
+    const html = renderToStaticMarkup(
+      <RichContentBlock type="code" title="Code" rawContent="const x = 1">
+        <pre>const x = 1</pre>
+      </RichContentBlock>
+    )
+
+    expect(html).toContain('aria-label="Copy content"')
+  })
+
+  test("does not render copy button when rawContent is absent", () => {
+    const html = renderToStaticMarkup(
+      <RichContentBlock type="code" title="Code">
+        <pre>const x = 1</pre>
+      </RichContentBlock>
+    )
+
+    expect(html).not.toContain('aria-label="Copy content"')
+  })
+
+  test("renders embed controls for embed type", () => {
+    const html = renderToStaticMarkup(
+      <RichContentBlock type="embed" title="Diagram" rawContent="source">
+        <div>embed content</div>
+      </RichContentBlock>
+    )
+
+    expect(html).toContain('aria-label="Show rendered"')
+    expect(html).toContain('aria-label="Show source"')
+    expect(html).toContain('aria-label="Zoom out"')
+    expect(html).toContain('aria-label="Zoom in"')
+    expect(html).toContain("100%")
+  })
+
+  test("does not render embed controls for code type", () => {
+    const html = renderToStaticMarkup(
+      <RichContentBlock type="code" title="Code" rawContent="x">
+        <pre>x</pre>
+      </RichContentBlock>
+    )
+
+    expect(html).not.toContain('aria-label="Show rendered"')
+    expect(html).not.toContain('aria-label="Zoom out"')
+  })
+
+  test("renders expand and fullscreen controls for all types", () => {
+    for (const type of ["code", "markdown", "embed", "diff"] as const) {
+      const html = renderToStaticMarkup(
+        <RichContentBlock type={type} title="Test">
+          <div>content</div>
+        </RichContentBlock>
+      )
+
+      expect(html).toContain('aria-label="Expand content"')
+      expect(html).toContain('aria-label="Open in overlay"')
+    }
+  })
+
+  test("provides ContentViewerContext to children", () => {
+    // The block wraps children in ContentViewerContext.Provider
+    // which is verified by the embed controls rendering from viewer state
+    const html = renderToStaticMarkup(
+      <RichContentBlock type="embed" title="Embed">
+        <div>child</div>
+      </RichContentBlock>
+    )
+
+    // Embed state defaults: renderMode=render, zoom=1
+    expect(html).toContain("100%")
   })
 })

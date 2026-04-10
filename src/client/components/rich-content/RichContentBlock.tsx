@@ -1,4 +1,4 @@
-import { memo, useState, type ReactNode } from "react"
+import { memo, useCallback, useMemo, useReducer, useState, type ReactNode } from "react"
 import {
   Code,
   FileText,
@@ -6,9 +6,19 @@ import {
   Image,
   ChevronRight,
   Maximize2,
+  Copy,
+  Check,
 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { ContentOverlay } from "./ContentOverlay"
+import {
+  ContentViewerContext,
+  viewerReducer,
+  createInitialState,
+} from "./ContentViewerContext"
+import { useIsMobile } from "../../hooks/useIsMobile"
+import { IconButton } from "./IconButton"
+import { ViewerToolbar } from "./ViewerToolbar"
 import type { RichContentType } from "./types"
 
 const typeIcons: Record<RichContentType, typeof Code> = {
@@ -29,6 +39,7 @@ interface RichContentBlockProps {
   rawContent?: string
 }
 
+
 export const RichContentBlock = memo(function RichContentBlock({
   type,
   title,
@@ -38,68 +49,120 @@ export const RichContentBlock = memo(function RichContentBlock({
 }: RichContentBlockProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [overlayOpen, setOverlayOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [viewerState, dispatch] = useReducer(
+    viewerReducer,
+    type,
+    createInitialState
+  )
+  const isMobile = useIsMobile()
   const Icon = typeIcons[type]
   const displayTitle = title ?? type
 
-  return (
-    <div className="group/rich-content rounded-lg border border-border overflow-hidden">
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 border-b border-border text-xs">
-        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="truncate font-medium text-muted-foreground">
-          {displayTitle}
-        </span>
-        <div className="ml-auto flex items-center gap-0.5">
-          <button
-            type="button"
-            aria-label={expanded ? "Collapse content" : "Expand content"}
-            onClick={() => setExpanded((prev) => !prev)}
-            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <ChevronRight
-              className={cn(
-                "h-3.5 w-3.5 transition-transform duration-200",
-                expanded && "rotate-90"
-              )}
-            />
-          </button>
-          <button
-            type="button"
-            aria-label="Open in overlay"
-            onClick={() => setOverlayOpen(true)}
-            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Maximize2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
+  const handleCopy = useCallback(async () => {
+    if (!rawContent) return
+    try {
+      await navigator.clipboard.writeText(rawContent)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.warn(
+        "[tinkaria] clipboard write failed:",
+        err instanceof Error ? err.message : String(err)
+      )
+    }
+  }, [rawContent])
 
-      <div
-        className={cn(
-          "relative transition-[max-height] duration-200 ease-in-out",
-          !expanded && `${COLLAPSED_MAX_HEIGHT} overflow-hidden`
-        )}
+  const controls = (
+    <div className="flex items-center gap-0.5" data-controls="true">
+      {viewerState.type === "embed" && (
+        <>
+          <ViewerToolbar state={viewerState} dispatch={dispatch} />
+          <div className="mx-0.5 h-3 w-px bg-border" aria-hidden="true" />
+        </>
+      )}
+      {rawContent ? (
+        <IconButton
+          ariaLabel={copied ? "Copied" : "Copy content"}
+          onClick={handleCopy}
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5 text-green-400" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
+        </IconButton>
+      ) : null}
+      <IconButton
+        ariaLabel={expanded ? "Collapse content" : "Expand content"}
+        onClick={() => setExpanded((prev) => !prev)}
       >
-        <div className={CONTENT_BLOCK_BODY_CLASS_NAME}>
-          {children}
-        </div>
-        {!expanded && (
-          <div
-            className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none"
-            aria-hidden="true"
-          />
-        )}
-      </div>
-
-      <ContentOverlay
-        open={overlayOpen}
-        onOpenChange={setOverlayOpen}
-        title={displayTitle}
-        type={type}
-        rawContent={rawContent}
+        <ChevronRight
+          className={cn(
+            "h-3.5 w-3.5 transition-transform duration-200",
+            expanded && "rotate-90"
+          )}
+        />
+      </IconButton>
+      <IconButton
+        ariaLabel="Open in overlay"
+        onClick={() => setOverlayOpen(true)}
       >
-        {children}
-      </ContentOverlay>
+        <Maximize2 className="h-3.5 w-3.5" />
+      </IconButton>
     </div>
+  )
+
+  return (
+    <ContentViewerContext.Provider value={useMemo(() => ({ state: viewerState, dispatch }), [viewerState, dispatch])}>
+      <div className="group/rich-content rounded-lg border border-border overflow-hidden">
+        <div
+          className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 border-b border-border text-xs",
+            isMobile && "py-1"
+          )}
+        >
+          <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium text-muted-foreground">
+            {displayTitle}
+          </span>
+          {!isMobile ? (
+            <div className="ml-auto">{controls}</div>
+          ) : null}
+        </div>
+
+        <div
+          className={cn(
+            "relative transition-[max-height] duration-200 ease-in-out",
+            !expanded && `${COLLAPSED_MAX_HEIGHT} overflow-hidden`
+          )}
+        >
+          <div className={CONTENT_BLOCK_BODY_CLASS_NAME}>{children}</div>
+          {!expanded && (
+            <div
+              className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none"
+              aria-hidden="true"
+            />
+          )}
+        </div>
+
+        {isMobile ? (
+          <div className="flex items-center justify-end px-2.5 py-1.5 bg-muted/50 border-t border-border">
+            {controls}
+          </div>
+        ) : null}
+
+        <ContentOverlay
+          open={overlayOpen}
+          onOpenChange={setOverlayOpen}
+          title={displayTitle}
+          type={type}
+          rawContent={rawContent}
+        >
+          {children}
+        </ContentOverlay>
+      </div>
+    </ContentViewerContext.Provider>
   )
 })
 

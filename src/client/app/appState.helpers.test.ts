@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import {
   clearPendingSessionBootstrapAfterAttempt,
+  removeChatFromSidebar,
   transitionPendingSessionBootstrapToError,
   type PendingSessionBootstrap,
 } from "./appState.helpers"
+import type { SidebarData, SidebarChatRow } from "../../shared/types"
 
 function pendingBootstrap(kind: PendingSessionBootstrap["kind"], phase: PendingSessionBootstrap["phase"]): PendingSessionBootstrap {
   return {
@@ -89,5 +91,63 @@ describe("clearPendingSessionBootstrapAfterAttempt", () => {
       pendingBootstrap("fork", "compacting"),
       "chat-other",
     )).toEqual(pendingBootstrap("fork", "compacting"))
+  })
+})
+
+function chatRow(chatId: string, title = `Chat ${chatId}`): SidebarChatRow {
+  return {
+    _id: chatId,
+    _creationTime: 1,
+    chatId,
+    title,
+    status: "idle",
+    unread: false,
+    localPath: "/tmp/project",
+    provider: "claude",
+    hasAutomation: false,
+  }
+}
+
+function sidebarWith(...groups: Array<{ key: string; chats: SidebarChatRow[] }>): SidebarData {
+  return {
+    projectGroups: groups.map((g) => ({
+      groupKey: g.key,
+      localPath: `/tmp/${g.key}`,
+      chats: g.chats,
+    })),
+  }
+}
+
+describe("removeChatFromSidebar", () => {
+  test("removes the target chat from its project group", () => {
+    const data = sidebarWith({ key: "p1", chats: [chatRow("a"), chatRow("b"), chatRow("c")] })
+    const result = removeChatFromSidebar(data, "b")
+    expect(result.projectGroups[0].chats.map((c) => c.chatId)).toEqual(["a", "c"])
+  })
+
+  test("removes empty project groups after the last chat is deleted", () => {
+    const data = sidebarWith(
+      { key: "p1", chats: [chatRow("only")] },
+      { key: "p2", chats: [chatRow("other")] },
+    )
+    const result = removeChatFromSidebar(data, "only")
+    expect(result.projectGroups).toHaveLength(1)
+    expect(result.projectGroups[0].groupKey).toBe("p2")
+  })
+
+  test("returns identical data when chatId is not found", () => {
+    const data = sidebarWith({ key: "p1", chats: [chatRow("a")] })
+    const result = removeChatFromSidebar(data, "nonexistent")
+    expect(result).toEqual(data)
+  })
+
+  test("handles multiple project groups, only removing from the correct one", () => {
+    const data = sidebarWith(
+      { key: "p1", chats: [chatRow("a"), chatRow("b")] },
+      { key: "p2", chats: [chatRow("c"), chatRow("d")] },
+    )
+    const result = removeChatFromSidebar(data, "c")
+    expect(result.projectGroups[0].chats.map((c) => c.chatId)).toEqual(["a", "b"])
+    expect(result.projectGroups[1].chats.map((c) => c.chatId)).toEqual(["d"])
   })
 })

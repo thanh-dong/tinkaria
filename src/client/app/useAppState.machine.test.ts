@@ -125,6 +125,32 @@ describe("submitPipeline machine", () => {
     expect(getSubmitPipelineMode(busyObserved, "chat-1")).toBe("idle")
   })
 
+  test("flushes queued follow-up after a direct submit falls back to idle before busy is observed", () => {
+    const started = startDirectSubmit(createSubmitPipelineState(), {
+      chatId: "chat-1",
+      content: "First message",
+    })
+    const awaitingBusy = completeDirectSubmit(started, "chat-1")
+    const queuedWhileAwaitingBusy = queueSubmit(awaitingBusy, {
+      chatId: "chat-1",
+      content: "Second message",
+    })
+
+    const { state, flushRequest } = startQueuedFlush(queuedWhileAwaitingBusy, {
+      chatId: "chat-1",
+      isProcessing: false,
+    })
+
+    expect(flushRequest).toEqual({
+      chatId: "chat-1",
+      text: "Second message",
+      options: undefined,
+      restoreBlockedKey: "chat-1:Second message",
+    })
+    expect(getQueuedText(state, "chat-1")).toBe("")
+    expect(getSubmitPipelineMode(state, "chat-1")).toBe("flushing")
+  })
+
   test("clears local busy state when a direct submit fails", () => {
     const started = startDirectSubmit(createSubmitPipelineState(), {
       chatId: "chat-1",

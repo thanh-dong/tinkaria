@@ -112,6 +112,19 @@ export type StartChatIntent =
 export const TRANSCRIPT_TAIL_SIZE = 200
 export const PWA_RESUME_STALE_AFTER_MS = 15_000
 
+export function removeChatFromSidebar(data: SidebarData, chatId: string): SidebarData {
+  const filtered = data.projectGroups
+    .map((group) => {
+      const chats = group.chats.filter((chat) => chat.chatId !== chatId)
+      return chats.length === group.chats.length ? group : { ...group, chats }
+    })
+    .filter((group) => group.chats.length > 0)
+
+  return filtered.length === data.projectGroups.length && filtered.every((g, i) => g === data.projectGroups[i])
+    ? data
+    : { projectGroups: filtered }
+}
+
 export function getNewestRemainingChatId(projectGroups: SidebarData["projectGroups"], activeChatId: string): string | null {
   const projectGroup = projectGroups.find((group) => group.chats.some((chat) => chat.chatId === activeChatId))
   if (!projectGroup) return null

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { GitFork, Menu, Merge, PanelLeft } from "lucide-react"
+import { GitFork, Merge, MoreHorizontal, PanelLeft, X } from "lucide-react"
 import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
@@ -176,6 +176,7 @@ export function ChatNavbar({
   runtimeModel,
   runtimeProvider,
 }: Props) {
+  const [mobileExpanded, setMobileExpanded] = useState(false)
   const navbarAreaId = createUiIdentity("chat.navbar", "area")
   const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
   const mergeSessionActionId = createUiIdentity("chat.navbar.merge-session", "action")
@@ -206,10 +207,26 @@ export function ChatNavbar({
             variant="ghost"
             size="icon"
             className="md:hidden"
-            onClick={onOpenSidebar}
+            onClick={() => setMobileExpanded((v) => !v)}
+            data-testid="mobile-navbar-toggle"
+            title={mobileExpanded ? "Collapse actions" : "Show actions"}
           >
-            <Menu className="size-4.5" />
+            {mobileExpanded ? <X className="size-4.5" /> : <MoreHorizontal className="size-4.5" />}
           </Button>
+          {mobileExpanded ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => {
+                setMobileExpanded(false)
+                onOpenSidebar()
+              }}
+              title="Open sidebar"
+            >
+              <PanelLeft className="size-4.5" />
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"
@@ -223,8 +240,11 @@ export function ChatNavbar({
             {...getUiIdentityAttributeProps(forkSessionActionId)}
             variant="ghost"
             size="icon"
-            className="hidden md:inline-flex"
-            onClick={onForkSession}
+            className={mobileExpanded ? "inline-flex" : "hidden md:inline-flex"}
+            onClick={() => {
+              setMobileExpanded(false)
+              onForkSession()
+            }}
             title="Fork session"
           >
             <GitFork className="size-4.5" />
@@ -233,8 +253,11 @@ export function ChatNavbar({
             {...getUiIdentityAttributeProps(mergeSessionActionId)}
             variant="ghost"
             size="icon"
-            className="hidden md:inline-flex"
-            onClick={onMergeSession}
+            className={mobileExpanded ? "inline-flex" : "hidden md:inline-flex"}
+            onClick={() => {
+              setMobileExpanded(false)
+              onMergeSession()
+            }}
             title="Merge sessions"
           >
             <Merge className="size-4.5" />
@@ -253,10 +276,13 @@ export function ChatNavbar({
           ) : null}
         </div>
 
-        {/* Center: session title (always visible, compact on mobile when sidebar open) */}
+        {/* Center: session title — background pill on mobile for readability */}
         {chatTitle ? (
           <div
-            className="flex min-w-0 flex-1 items-center gap-1.5 px-1"
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-1.5 px-1",
+              "max-md:rounded-full max-md:bg-background/80 max-md:border max-md:border-border/60 max-md:px-2.5 max-md:py-1.5 max-md:backdrop-blur-xl max-md:shadow-sm"
+            )}
             data-testid="session-summary"
             data-status={chatStatus ?? "idle"}
           >

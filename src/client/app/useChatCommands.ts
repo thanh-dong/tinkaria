@@ -35,6 +35,7 @@ import {
   getSidebarChatRow,
   normalizeLocalFilePreviewErrorMessage,
   normalizeSessionBootstrapErrorMessage,
+  removeChatFromSidebar,
   resolveComposeIntent,
   shouldQueueChatSubmit,
   summarizeSessionBootstrapIntent,
@@ -134,6 +135,7 @@ export interface ChatCommandsArgs {
   messages: HydratedTranscriptMessage[]
   localProjects: LocalProjectsSnapshot | null
   setProjectSelection: React.Dispatch<React.SetStateAction<import("./useAppState.machine").ProjectSelectionState>>
+  setSidebarData: React.Dispatch<React.SetStateAction<SidebarData>>
   setPendingChatId: (id: string | null) => void
   setSidebarOpen: (open: boolean) => void
   setCommandError: (error: string | null) => void
@@ -217,6 +219,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     isProcessing,
     localProjects,
     setProjectSelection,
+    setSidebarData,
     setPendingChatId,
     setSidebarOpen,
     setCommandError,
@@ -475,17 +478,26 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       confirmVariant: "destructive",
     })
     if (!confirmed) return
-    try {
-      await socket.command({ type: "chat.delete", chatId: chat.chatId })
-      useChatInputStore.getState().clearQueuedDraft(chat.chatId)
-      deleteCachedChat(chat.chatId)
-      if (chat.chatId === activeChatId) {
-        const nextChatId = getNewestRemainingChatId(sidebarData.projectGroups, chat.chatId)
-        navigate(nextChatId ? `/chat/${nextChatId}` : "/")
-      }
-    } catch (error) {
-      setCommandError(error instanceof Error ? error.message : String(error))
+
+    // Optimistic: remove from sidebar immediately so the UI feels instant.
+    // Compute navigation target *before* updating sidebar state.
+    const nextChatId = chat.chatId === activeChatId
+      ? getNewestRemainingChatId(sidebarData.projectGroups, chat.chatId)
+      : null
+
+    setSidebarData((current) => removeChatFromSidebar(current, chat.chatId))
+    useChatInputStore.getState().clearQueuedDraft(chat.chatId)
+    deleteCachedChat(chat.chatId)
+
+    if (chat.chatId === activeChatId) {
+      navigate(nextChatId ? `/chat/${nextChatId}` : "/")
     }
+
+    // Fire-and-forget: server delete runs in the background.
+    // The server will push a fresh sidebar snapshot via WS on completion.
+    socket.command({ type: "chat.delete", chatId: chat.chatId }).catch((error) => {
+      console.warn("[useChatCommands] background chat.delete failed:", error instanceof Error ? error.message : String(error))
+    })
   }
 
   async function handleRenameChat(chatId: string, title: string) {

@@ -52,7 +52,7 @@ export const UserMessage = memo(function UserMessage({ content }: Props) {
         <SkillBadgesReadonly skills={parsed.skills} />
       ) : null}
       <div className="flex gap-2 justify-end pt-2">
-        <div className="group/user-message relative max-w-[85%] sm:max-w-[80%]">
+        <div className="group/user-message relative max-w-[85%] sm:max-w-[80%] min-w-[120px]">
           <Button
             type="button"
             variant="ghost"

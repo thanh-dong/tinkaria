@@ -1,0 +1,16 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V3: Dark Ember — dark background, warm red strokes, glowing feel -->
+  <rect width="256" height="256" rx="64" fill="#1C1917"/>
+  <g transform="translate(128 128)" stroke="#E05A3A" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 -74V-48"/>
+    <path d="M0 48V74"/>
+    <path d="M-74 0H-48"/>
+    <path d="M48 0H74"/>
+    <path d="M-52.3 -52.3L-34 -34"/>
+    <path d="M34 34L52.3 52.3"/>
+    <path d="M52.3 -52.3L34 -34"/>
+    <path d="M-34 34L-52.3 52.3"/>
+    <circle r="30"/>
+  </g>
+  <circle cx="128" cy="128" r="8" fill="#FF8A5B"/>
+</svg>

@@ -418,6 +418,12 @@
     animation: fade-in 250ms ease-out;
   }
 
+  /* Narration guard: delays text appearance during loading to prevent flash
+     when narration text briefly renders as TextMessage before collapsing into WipBlock */
+  .animate-narration-guard {
+    animation: fade-in 150ms ease-out 200ms both;
+  }
+
   @keyframes fade-in {
     from {
       opacity: 0;
@@ -509,6 +515,13 @@
     animation-delay: 0s, var(--tinkaria-typewriter-duration-ms);
   }
 
+  @keyframes homepage-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-homepage-enter {
+    animation: homepage-enter 0.2s ease-out both;
+  }
 
 }
 

@@ -245,7 +245,7 @@ describe("ChatNavbar", () => {
     expect(html).not.toContain('data-testid="session-summary"')
   })
 
-  test("fork and merge buttons are hidden on mobile", () => {
+  test("fork and merge buttons are hidden on mobile by default", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,
       ...defaultProps,
@@ -253,6 +253,28 @@ describe("ChatNavbar", () => {
 
     expect(htmlBefore(html, 'title="Fork session"')).toContain("hidden md:")
     expect(htmlBefore(html, 'title="Merge sessions"')).toContain("hidden md:")
+  })
+
+  test("mobile expand toggle is visible on mobile, hidden on desktop", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+    })
+
+    const expandElement = htmlElementForMarker(html, 'data-testid="mobile-navbar-toggle"')
+    expect(expandElement).toContain("md:hidden")
+  })
+
+  test("sidebar toggle is available separately from mobile expand", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+    })
+
+    // Desktop sidebar toggle (PanelLeft) should exist
+    expect(html).toContain('title="Collapse sidebar"')
+    // Mobile expand toggle should exist
+    expect(html).toContain('data-testid="mobile-navbar-toggle"')
   })
 
   test("right pill content is hidden on mobile", () => {
@@ -309,6 +331,19 @@ describe("ChatNavbar", () => {
     })
 
     expect(html).toContain('title="A very long session title that will be truncated"')
+  })
+
+  test("session title has background on mobile for visibility", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      chatTitle: "Some title",
+      chatStatus: "idle",
+    })
+
+    const summaryElement = htmlElementForMarker(html, 'data-testid="session-summary"')
+    expect(summaryElement).toContain("max-md:bg-")
+    expect(summaryElement).toContain("max-md:backdrop-blur")
   })
 
   test("model indicator is always visible (not hidden on mobile)", () => {

@@ -1,0 +1,23 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V4: Gradient Core — radial gradient: warm red center fading to dark at tips -->
+  <defs>
+    <radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D14A3D"/>
+      <stop offset="55%" stop-color="#D14A3D"/>
+      <stop offset="100%" stop-color="#17322C"/>
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke="url(#core-glow)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 -74V-48"/>
+    <path d="M0 48V74"/>
+    <path d="M-74 0H-48"/>
+    <path d="M48 0H74"/>
+    <path d="M-52.3 -52.3L-34 -34"/>
+    <path d="M34 34L52.3 52.3"/>
+    <path d="M52.3 -52.3L34 -34"/>
+    <path d="M-34 34L-52.3 52.3"/>
+    <circle r="30"/>
+  </g>
+  <circle cx="128" cy="128" r="8" fill="#D14A3D"/>
+</svg>

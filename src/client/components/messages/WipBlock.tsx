@@ -71,17 +71,12 @@ export const WipBlock = memo(function WipBlock({ steps, isLoading, localPath }: 
             <div className="grid grid-cols-[auto_1fr] items-center gap-1.5">
               <div className="w-5 h-5 relative flex items-center justify-center">
                 <ChevronRight
-                  className={`h-4.5 w-4.5 text-muted-icon transition-all duration-200 ${expanded ? "rotate-90" : ""}`}
+                  className={`h-4.5 w-4.5 transition-all duration-200 ${isLoading ? "text-[var(--logo)] animate-pulse" : "text-muted-icon"} ${expanded ? "rotate-90" : ""}`}
                 />
               </div>
               <MetaLabel className="text-left">
                 <AnimatedShinyText animate={isLoading} shimmerWidth={60}>
-                  <span className="inline-flex items-center gap-1.5">
-                    {isLoading && (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--logo)] animate-pulse" />
-                    )}
-                    {stepCount > 0 ? pluralize(stepCount, "step", "steps") : "Thinking"}
-                  </span>
+                  {stepCount > 0 ? pluralize(stepCount, "step", "steps") : "Thinking"}
                 </AnimatedShinyText>
               </MetaLabel>
             </div>
