@@ -200,17 +200,6 @@ export function getQueueActionDisabledState(args: { disabled: boolean; value: st
   return args.disabled || !args.value.trim()
 }
 
-export function getComposerConnectionBadgeLabel(reconnectVisualState: ComposerReconnectVisualState): string {
-  switch (reconnectVisualState) {
-    case "reconnecting":
-      return "Reconnecting"
-    case "reconnected":
-      return "Reconnected"
-    default:
-      return ""
-  }
-}
-
 export function getComposerActionDisabledState(args: {
   disabled: boolean
   reconnectVisualState: ComposerReconnectVisualState
@@ -729,7 +718,6 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const queueActionDisabled = getQueueActionDisabledState({ disabled: composerActionsDisabled, value })
   const submitActionDisabled = composerActionsDisabled || !value.trim()
   const showConnectionBadge = reconnectVisualState !== "idle"
-  const connectionBadgeLabel = getComposerConnectionBadgeLabel(reconnectVisualState)
   return (
     <div>
       {shouldShowQueuedBlock(queuedText) ? (
@@ -770,7 +758,8 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
             "max-w-[840px] mx-auto rounded-[29px] border pr-1.5 dark:bg-card/40 backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
             reconnectVisualState === "reconnecting" && "border-amber-400/30",
             reconnectVisualState === "reconnected" && "border-emerald-400/30",
-            reconnectVisualState === "idle" && "border-border",
+            reconnectVisualState === "idle" && !canCancel && "border-border",
+            reconnectVisualState === "idle" && canCancel && "animate-composer-running",
           )}
         >
           <div className="flex flex-col gap-1.5">
@@ -779,7 +768,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                 <div
                   {...getUiIdentityAttributeProps(connectionBadgeDescriptor)}
                   className={cn(
-                    "inline-flex items-center gap-1.5 text-[10px] font-medium transition-opacity duration-300",
+                    "inline-flex items-center transition-opacity duration-300",
                     reconnectVisualState === "reconnecting"
                       && "text-amber-600 dark:text-amber-300/70",
                     reconnectVisualState === "reconnected"
@@ -791,7 +780,6 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                   ) : (
                     <Check className="h-3 w-3" />
                   )}
-                  <span>{connectionBadgeLabel}</span>
                 </div>
               </div>
             ) : null}

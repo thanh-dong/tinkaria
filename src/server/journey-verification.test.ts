@@ -716,10 +716,10 @@ describe("journey verification inventory", () => {
     setBrowserOffline(session, true)
 
     const reconnecting = await waitFor("reconnecting composer badge", async () => {
-      const text = evalBrowser<string>(session, `(document.querySelector('[data-ui-id="chat.composer.connection.section"]')?.textContent ?? "").trim()`)
-      return text.includes("Reconnecting") ? text : false
+      const badge = evalBrowser<boolean>(session, `!!document.querySelector('[data-ui-id="chat.composer.connection.section"] .animate-spin')`)
+      return badge || false
     }, 20_000)
-    expect(reconnecting).toContain("Reconnecting")
+    expect(reconnecting).toBe(true)
 
     setBrowserOffline(session, false)
 
@@ -735,7 +735,7 @@ describe("journey verification inventory", () => {
           submitDisabled: submit instanceof HTMLButtonElement ? submit.disabled : null,
         };
       })()`)
-      if (state.connectionLabel.includes("Reconnecting")) return false
+      if (state.connectionLabel.length > 0) return false
       if (state.submitDisabled !== false) return false
       return state
     }, 20_000)

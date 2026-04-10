@@ -544,6 +544,15 @@
   50% { opacity: 1; transform: scale(1); }
 }
 
+@keyframes composer-running-pulse {
+  0%, 100% { border-color: oklch(71.2% 0.194 13.428 / 0.12); }
+  50% { border-color: oklch(71.2% 0.194 13.428 / 0.35); }
+}
+
+.animate-composer-running {
+  animation: composer-running-pulse 2.4s ease-in-out infinite;
+}
+
 .animate-wip-pulse {
   animation: wip-pulse 1.5s ease-in-out infinite;
 }
