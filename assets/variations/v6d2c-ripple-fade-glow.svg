@@ -1,0 +1,82 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Tinkaria Mark — d2c Refined
+    Quiet, deep, powerful. Geometric skeleton with organic warmth bleeding through.
+    Inca stepped fret accents at diagonal intersections.
+  -->
+  <defs>
+    <!-- Warm radial wash — ember breathing from center -->
+    <radialGradient id="ember-wash" cx="50%" cy="50%" r="42%">
+      <stop offset="0%" stop-color="#CF4F3A" stop-opacity="0.22"/>
+      <stop offset="50%" stop-color="#CF4F3A" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#CF4F3A" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Spoke end cap softening -->
+    <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#CF4F3A" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#CF4F3A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+
+  <g transform="translate(128 128)">
+    <!-- Layer 1: Ember wash — the organic warmth underneath everything -->
+    <circle r="52" fill="url(#ember-wash)"/>
+    <circle r="30" fill="url(#center-glow)"/>
+
+    <!-- Layer 2: Ripple rings — quiet depth, not decoration -->
+    <circle r="21" stroke="#CF4F3A" stroke-width="1" fill="none" opacity="0.28"/>
+    <circle r="42" stroke="#CF4F3A" stroke-width="0.7" fill="none" opacity="0.14"/>
+    <circle r="52" stroke="#CF4F3A" stroke-width="0.5" fill="none" opacity="0.07"/>
+
+    <!-- Layer 3: Main structural ring — the anchor -->
+    <circle r="31" stroke="#17322C" stroke-width="3" fill="none"/>
+
+    <!-- Layer 4: Stepped fret accents at diagonal/ring intersections -->
+    <!-- These are the Inca greca escalonada — precise, angular, tectonic -->
+    <g stroke="#CF4F3A" stroke-width="1.2" fill="none" opacity="0.35" stroke-linecap="square">
+      <!-- NE fret -->
+      <path d="M20 -24H24V-20H28V-16"/>
+      <!-- SE fret -->
+      <path d="M24 20V24H20V28H16"/>
+      <!-- SW fret -->
+      <path d="M-20 24H-24V20H-28V16"/>
+      <!-- NW fret -->
+      <path d="M-24 -20V-24H-20V-28H-16"/>
+    </g>
+
+    <!-- Layer 5: Cardinal spokes — the power, restrained -->
+    <!-- Tapered: thicker at tip, narrowing toward ring -->
+    <g stroke="#CF4F3A" stroke-linecap="round">
+      <!-- Outer segments: bold, the statement -->
+      <g stroke-width="7">
+        <path d="M0 -74V-56"/>
+        <path d="M0 56V74"/>
+        <path d="M-74 0H-56"/>
+        <path d="M56 0H74"/>
+      </g>
+      <!-- Inner segments: thinning toward the ring -->
+      <g stroke-width="4.5">
+        <path d="M0 -54V-44"/>
+        <path d="M0 44V54"/>
+        <path d="M-54 0H-44"/>
+        <path d="M44 0H54"/>
+      </g>
+    </g>
+
+    <!-- Layer 6: Diagonal spokes — contained energy, not decorative dashes -->
+    <g stroke="#17322C" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 4.5">
+      <path d="M-53 -53L-36 -36"/>
+      <path d="M36 36L53 53"/>
+      <path d="M53 -53L36 -36"/>
+      <path d="M-36 36L-53 53"/>
+    </g>
+
+    <!-- Layer 7: Center — the core heat -->
+    <circle r="7.5" fill="#CF4F3A"/>
+    <!-- Inner glow ring — barely there, felt not seen -->
+    <circle r="12" stroke="#CF4F3A" stroke-width="0.6" fill="none" opacity="0.18"/>
+  </g>
+</svg>

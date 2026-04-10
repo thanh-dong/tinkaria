@@ -1,0 +1,24 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ripple Gentle + Inca Stepped Rings: concentric stepped squares replace smooth ripple circles -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- inner stepped square (tocapu-like) -->
+    <rect x="-14" y="-14" width="28" height="28" stroke="#D14A3D" stroke-width="1.5" fill="none" opacity="0.45" transform="rotate(45)"/>
+    <!-- main ring stays circular (anchor) -->
+    <circle r="30" stroke="#17322C" stroke-width="4" fill="none"/>
+    <!-- outer stepped squares expanding -->
+    <rect x="-28" y="-28" width="56" height="56" stroke="#D14A3D" stroke-width="1" fill="none" opacity="0.25" transform="rotate(45)"/>
+    <rect x="-36" y="-36" width="72" height="72" stroke="#D14A3D" stroke-width="0.7" fill="none" opacity="0.12" transform="rotate(45)"/>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="9">
+      <path d="M0 -78V-50"/><path d="M0 50V78"/>
+      <path d="M-78 0H-50"/><path d="M50 0H78"/>
+    </g>
+    <!-- dashed dark diagonals -->
+    <g stroke="#17322C" stroke-width="2" stroke-dasharray="6 5">
+      <path d="M-55 -55L-36 -36"/><path d="M36 36L55 55"/>
+      <path d="M55 -55L36 -36"/><path d="M-36 36L-55 55"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="8" fill="#D14A3D"/>
+</svg>

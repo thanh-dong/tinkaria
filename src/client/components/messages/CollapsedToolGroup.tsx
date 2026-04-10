@@ -104,7 +104,7 @@ export const CollapsedToolGroup = memo(function CollapsedToolGroup({ messages, i
                 className={`h-4.5 w-4.5 transition-all duration-200 ${showLoadingState ? "text-[var(--logo)] animate-pulse" : "text-muted-icon"} ${expanded ? "rotate-90" : ""}`}
               />
             </div>
-            <MetaLabel className="text-left">
+            <MetaLabel className={`text-left ${!showLoadingState ? "text-muted-foreground" : ""}`}>
               <AnimatedShinyText animate={showLoadingState}>{label}</AnimatedShinyText>
             </MetaLabel>
           </div>

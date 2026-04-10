@@ -1,16 +1,21 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- V6: Cardinal Accent — bold red cardinals, hairline dark diagonals, thin dark ring -->
+  <!-- V6a: Dashed diagonals, solid bold cardinals, concentric center rings -->
   <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
   <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- bold red cardinals -->
     <g stroke="#D14A3D" stroke-width="9">
       <path d="M0 -72V-46"/><path d="M0 46V72"/>
       <path d="M-72 0H-46"/><path d="M46 0H72"/>
     </g>
-    <g stroke="#17322C" stroke-width="2.5">
+    <!-- dashed dark diagonals -->
+    <g stroke="#17322C" stroke-width="2.5" stroke-dasharray="6 5">
       <path d="M-52.3 -52.3L-34 -34"/><path d="M34 34L52.3 52.3"/>
       <path d="M52.3 -52.3L34 -34"/><path d="M-34 34L-52.3 52.3"/>
     </g>
+    <!-- thin dark ring -->
     <circle r="30" stroke="#17322C" stroke-width="4" fill="none"/>
+    <!-- inner concentric glow ring -->
+    <circle r="18" stroke="#D14A3D" stroke-width="1.5" fill="none" opacity="0.35"/>
   </g>
   <circle cx="128" cy="128" r="11" fill="#D14A3D"/>
 </svg>

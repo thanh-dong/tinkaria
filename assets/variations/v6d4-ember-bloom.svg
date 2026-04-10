@@ -1,0 +1,31 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V6d4: Ember Bloom — gradient fill + concentric rings = glowing ember from center -->
+  <defs>
+    <radialGradient id="bloom" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D14A3D" stop-opacity="0.35"/>
+      <stop offset="40%" stop-color="#D14A3D" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#D14A3D" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- warm bloom fill -->
+    <circle r="33" fill="url(#bloom)"/>
+    <!-- concentric structure rings -->
+    <circle r="17" stroke="#D14A3D" stroke-width="1" fill="none" opacity="0.3"/>
+    <circle r="25" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.18"/>
+    <!-- main dark ring -->
+    <circle r="33" stroke="#17322C" stroke-width="3.5" fill="none"/>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="9">
+      <path d="M0 -76V-50"/><path d="M0 50V76"/>
+      <path d="M-76 0H-50"/><path d="M50 0H76"/>
+    </g>
+    <!-- dashed dark diagonals -->
+    <g stroke="#17322C" stroke-width="2.5" stroke-dasharray="7 5">
+      <path d="M-53 -53L-38 -38"/><path d="M38 38L53 53"/>
+      <path d="M53 -53L38 -38"/><path d="M-38 38L-53 53"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="9" fill="#D14A3D"/>
+</svg>

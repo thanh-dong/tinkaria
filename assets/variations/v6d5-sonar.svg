@@ -1,0 +1,25 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V6d5: Sonar — many thin rings both inside and outside main ring, ping effect -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- inner sonar rings -->
+    <circle r="13" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.4"/>
+    <circle r="18" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.3"/>
+    <circle r="23" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.2"/>
+    <!-- main ring -->
+    <circle r="30" stroke="#17322C" stroke-width="4.5" fill="none"/>
+    <!-- outer echo ring -->
+    <circle r="37" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.15"/>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="8">
+      <path d="M0 -76V-48"/><path d="M0 48V76"/>
+      <path d="M-76 0H-48"/><path d="M48 0H76"/>
+    </g>
+    <!-- dashed dark diagonals, fine -->
+    <g stroke="#17322C" stroke-width="2" stroke-dasharray="5 5">
+      <path d="M-54 -54L-36 -36"/><path d="M36 36L54 54"/>
+      <path d="M54 -54L36 -36"/><path d="M-36 36L-54 54"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="6" fill="#D14A3D"/>
+</svg>

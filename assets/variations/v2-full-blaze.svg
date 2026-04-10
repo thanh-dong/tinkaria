@@ -1,16 +1,16 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- V2: Full Blaze — all strokes in warm red-orange, cream background -->
+  <!-- V2: Full Blaze — heavy cardinals, medium ring, fine diagonals, all red -->
   <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
-  <g transform="translate(128 128)" stroke="#C44230" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M0 -74V-48"/>
-    <path d="M0 48V74"/>
-    <path d="M-74 0H-48"/>
-    <path d="M48 0H74"/>
-    <path d="M-52.3 -52.3L-34 -34"/>
-    <path d="M34 34L52.3 52.3"/>
-    <path d="M52.3 -52.3L34 -34"/>
-    <path d="M-34 34L-52.3 52.3"/>
-    <circle r="30"/>
+  <g transform="translate(128 128)" stroke="#C44230" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="9">
+      <path d="M0 -70V-46"/><path d="M0 46V70"/>
+      <path d="M-70 0H-46"/><path d="M46 0H70"/>
+    </g>
+    <g stroke-width="4">
+      <path d="M-50 -50L-34 -34"/><path d="M34 34L50 50"/>
+      <path d="M50 -50L34 -34"/><path d="M-34 34L-50 50"/>
+    </g>
+    <circle r="30" stroke-width="6"/>
   </g>
-  <circle cx="128" cy="128" r="8" fill="#C44230"/>
+  <circle cx="128" cy="128" r="7" fill="#C44230"/>
 </svg>

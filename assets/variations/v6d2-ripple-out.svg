@@ -1,0 +1,24 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V6d2: Ripple Out — rings expand outward past the main ring, wave dispersing -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- inner solid red ring -->
+    <circle r="20" stroke="#D14A3D" stroke-width="2.5" fill="none" opacity="0.5"/>
+    <!-- main ring -->
+    <circle r="30" stroke="#17322C" stroke-width="4" fill="none"/>
+    <!-- outer ripple rings fading out -->
+    <circle r="38" stroke="#D14A3D" stroke-width="1.5" fill="none" opacity="0.3"/>
+    <circle r="44" stroke="#D14A3D" stroke-width="1" fill="none" opacity="0.15"/>
+    <!-- bold red cardinals punching through the ripples -->
+    <g stroke="#D14A3D" stroke-width="9">
+      <path d="M0 -78V-50"/><path d="M0 50V78"/>
+      <path d="M-78 0H-50"/><path d="M50 0H78"/>
+    </g>
+    <!-- dashed dark diagonals -->
+    <g stroke="#17322C" stroke-width="2.5" stroke-dasharray="6 5">
+      <path d="M-55 -55L-36 -36"/><path d="M36 36L55 55"/>
+      <path d="M55 -55L36 -36"/><path d="M-36 36L-55 55"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="8" fill="#D14A3D"/>
+</svg>

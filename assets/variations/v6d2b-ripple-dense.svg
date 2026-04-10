@@ -1,0 +1,30 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ripple Dense + Inca Chakana Center: stepped cross at core, sawtooth outer ring -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- mini chakana (stepped cross) at center -->
+    <path d="M0 -12V-6H-6V0H-12V6H-6V12H0V6H6V12 H6V6H12V0H6V-6H12 V-6H6V-12H0Z"
+          stroke="#D14A3D" stroke-width="1.5" fill="none" opacity="0.5"/>
+    <!-- inner ripple rings -->
+    <circle r="20" stroke="#D14A3D" stroke-width="1.2" fill="none" opacity="0.35"/>
+    <circle r="25" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.2"/>
+    <!-- main ring -->
+    <circle r="30" stroke="#17322C" stroke-width="4.5" fill="none"/>
+    <!-- outer ripples -->
+    <circle r="37" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.18"/>
+    <!-- sawtooth crown ring (zigzag) -->
+    <polygon points="0,-46 3,-42 6,-46 9,-42 12,-46 15,-42 18,-46 21,-42 24,-46 27,-42 30,-46 33,-42 36,-44 38,-40 40,-44 42,-40 44,-44 46,0 42,3 46,6 42,9 46,12 42,15 46,18 42,21 46,24 42,27 46,30 42,33 44,36 40,38 44,40 40,42 44,44 0,46 -3,42 -6,46 -9,42 -12,46 -15,42 -18,46 -21,42 -24,46 -27,42 -30,46 -33,42 -36,44 -38,40 -40,44 -42,40 -44,44 -46,0 -42,-3 -46,-6 -42,-9 -46,-12 -42,-15 -46,-18 -42,-21 -46,-24 -42,-27 -46,-30 -42,-33 -44,-36 -40,-38 -44,-40 -40,-42 -44,-44"
+            stroke="#D14A3D" stroke-width="0.5" fill="none" opacity="0.1"/>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="9">
+      <path d="M0 -78V-50"/><path d="M0 50V78"/>
+      <path d="M-78 0H-50"/><path d="M50 0H78"/>
+    </g>
+    <!-- dashed dark diagonals -->
+    <g stroke="#17322C" stroke-width="2" stroke-dasharray="5 5">
+      <path d="M-55 -55L-36 -36"/><path d="M36 36L55 55"/>
+      <path d="M55 -55L36 -36"/><path d="M-36 36L-55 55"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="5" fill="#D14A3D"/>
+</svg>

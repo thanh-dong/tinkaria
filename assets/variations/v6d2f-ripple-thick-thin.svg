@@ -1,0 +1,32 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ripple Thick-Thin + Inca Diamond Chain: rotated squares as ripple rings + small diamond accents -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- inner diamond (rotated square) ripple -->
+    <rect x="-12" y="-12" width="24" height="24" stroke="#D14A3D" stroke-width="2.2" fill="none" opacity="0.5" transform="rotate(45)"/>
+    <!-- second diamond ripple -->
+    <rect x="-20" y="-20" width="40" height="40" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.3" transform="rotate(45)"/>
+    <!-- main circular ring -->
+    <circle r="32" stroke="#17322C" stroke-width="4" fill="none"/>
+    <!-- outer diamond ripple -->
+    <rect x="-28" y="-28" width="56" height="56" stroke="#D14A3D" stroke-width="1.2" fill="none" opacity="0.18" transform="rotate(45)"/>
+    <!-- tiny diamond accents at cardinal points on the ring (tocapu markers) -->
+    <g fill="#D14A3D" opacity="0.3">
+      <rect x="-3" y="-35" width="6" height="6" transform="rotate(45 0 -32)"/>
+      <rect x="-3" y="29" width="6" height="6" transform="rotate(45 0 32)"/>
+      <rect x="-35" y="-3" width="6" height="6" transform="rotate(45 -32 0)"/>
+      <rect x="29" y="-3" width="6" height="6" transform="rotate(45 32 0)"/>
+    </g>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="9">
+      <path d="M0 -78V-50"/><path d="M0 50V78"/>
+      <path d="M-78 0H-50"/><path d="M50 0H78"/>
+    </g>
+    <!-- dashed dark diagonals -->
+    <g stroke="#17322C" stroke-width="2.5" stroke-dasharray="6 5">
+      <path d="M-55 -55L-36 -36"/><path d="M36 36L55 55"/>
+      <path d="M55 -55L36 -36"/><path d="M-36 36L-55 55"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="7" fill="#D14A3D"/>
+</svg>

@@ -1,0 +1,29 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V6e: Dotted halo ring, solid cardinals, dash diagonals, warm filled core -->
+  <defs>
+    <radialGradient id="core6e" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D14A3D" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#D14A3D" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- warm gradient fill inside -->
+    <circle r="28" fill="url(#core6e)"/>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="8">
+      <path d="M0 -72V-44"/><path d="M0 44V72"/>
+      <path d="M-72 0H-44"/><path d="M44 0H72"/>
+    </g>
+    <!-- dash diagonals -->
+    <g stroke="#17322C" stroke-width="2.5" stroke-dasharray="4 4">
+      <path d="M-52 -52L-32 -32"/><path d="M32 32L52 52"/>
+      <path d="M52 -52L32 -32"/><path d="M-32 32L-52 52"/>
+    </g>
+    <!-- dotted halo ring -->
+    <circle r="30" stroke="#17322C" stroke-width="3" fill="none" stroke-dasharray="2 6"/>
+    <!-- thin inner ring -->
+    <circle r="20" stroke="#D14A3D" stroke-width="1.5" fill="none" opacity="0.4"/>
+  </g>
+  <circle cx="128" cy="128" r="10" fill="#D14A3D"/>
+</svg>

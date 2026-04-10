@@ -58,6 +58,7 @@ async function runClaudeStructured(args: Omit<StructuredQuickResponseArgs<unknow
         type: "json_schema",
         schema: args.schema,
       },
+      persistSession: false,
       env: { ...process.env },
     },
   })

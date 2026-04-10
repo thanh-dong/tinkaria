@@ -1,0 +1,26 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ripple Dashed + Inca Zigzag Rays: diagonal spokes become zigzag (chevron) lines -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- inner dashed ripple -->
+    <circle r="18" stroke="#D14A3D" stroke-width="1.8" fill="none" opacity="0.45" stroke-dasharray="4 3"/>
+    <!-- main ring -->
+    <circle r="30" stroke="#17322C" stroke-width="4" fill="none"/>
+    <!-- outer fragmenting ripples -->
+    <circle r="38" stroke="#D14A3D" stroke-width="1.3" fill="none" opacity="0.28" stroke-dasharray="6 5"/>
+    <circle r="46" stroke="#D14A3D" stroke-width="0.9" fill="none" opacity="0.14" stroke-dasharray="8 8"/>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="9">
+      <path d="M0 -78V-50"/><path d="M0 50V78"/>
+      <path d="M-78 0H-50"/><path d="M50 0H78"/>
+    </g>
+    <!-- zigzag diagonal spokes (Inca chevron) instead of straight dashes -->
+    <g stroke="#17322C" stroke-width="2" fill="none">
+      <path d="M-55 -55L-50 -50L-46 -53L-42 -47L-38 -50L-36 -36"/>
+      <path d="M36 36L38 50L42 47L46 53L50 50L55 55"/>
+      <path d="M55 -55L50 -50L53 -46L47 -42L50 -38L36 -36"/>
+      <path d="M-36 36L-50 38L-47 42L-53 46L-50 50L-55 55"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="8" fill="#D14A3D"/>
+</svg>

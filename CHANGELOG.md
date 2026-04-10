@@ -1,32 +1,41 @@
 # Changelog
 
-## 1.0.0-rc.8 - 2026-04-08
+## 1.0.0-rc.9 - 2026-04-10
 
-This release candidate hardens the deployment-model shift before the next cut by making the new runtime actors publishable and documenting the safe-upgrade contract.
+This release candidate folds the untagged `rc.8` packaging/runtime work into a single verified cut and adds another round of transport hardening, orchestration visibility, and transcript/composer polish.
+
+### Added
+
+- Added independent runtime service seams for embedded NATS, runner, and server operation, plus the supporting NATS daemon manager and runner transport coverage needed to publish and supervise those actors safely.
+- Added structured orchestration hierarchy snapshots end-to-end, including child status derivation, closed-child tombstones, the composer `SubagentIndicator`, and a subagent session inspector that can open or inspect child transcripts from the chat UI.
+- Added a structured `/health` contract with heartbeat-based readiness for embedded NATS, server transport, split runner readiness, and background Codex kit availability.
 
 ### Changed
 
-- Updated the published package contents so the runtime subprocess entrypoints under `src/nats/` and `src/runner/` ship with the tarball instead of only working from source checkouts.
-- Updated the architecture and handoff docs to describe the current multi-process runtime: embedded NATS daemon, background Codex kit daemon, and optional split runner mode.
-- Expanded `/health` into an operational runtime contract with component status for embedded NATS, the server NATS connection, split runner readiness, and background Codex kit readiness.
+- Updated published package contents and operator docs so installed builds ship the runtime subprocess entrypoints under `src/nats/` and `src/runner/`, and the documented runtime model now matches the current multi-process Tinkaria architecture.
+- Reworked chat and transcript presentation around cleaner active-work affordances: reconnect state moved into the composer, the homepage became an activation hub, prompt copy affordances became explicit, transcript narration collapsed into compact WIP blocks, and tool-result image blocks now render inline.
+- Reduced frontend overhead by trimming composer/sidebar rerenders, batching inspector updates with `requestAnimationFrame`, and landing follow-on perf experiments around lazy loading, snapshot invalidation, and transport broadcast behavior.
 
 ### Fixed
 
-- Fixed the RC packaging contract so installed builds can boot the spawned NATS daemon process introduced by the deployment-model change.
-- Fixed operator docs that still referenced `Kanna`, `~/.kanna*`, and stale transport assumptions instead of Tinkaria's current runtime and data roots.
-- Fixed split-mode health reporting so runner CLI readiness now requires both registration and fresh heartbeat instead of a blind process-up assumption.
-- Fixed NATS snapshot publishing for active orchestration subscriptions so delegated-session hierarchy snapshots no longer spam `Unknown topic type: orchestration` in long-running deployments.
+- Fixed split-mode runtime correctness by restoring auto-title generation, hardening subprocess crash isolation, improving bootstrap/session error surfacing, and requiring fresh runner heartbeats instead of assuming a spawned process is ready.
+- Fixed NATS/session reliability issues across the stack: buffered websocket proxying, runner reconnect behavior, client fallback when snapshot subscription fails, and the orchestration-topic snapshot bug that previously logged `Unknown topic type: orchestration`.
+- Fixed chat correctness and polish regressions including blank chat loads, transcript scroll-follow edge cases, unread/read restoration, subagent indicator hook ordering, model indicator drift, quick-response session persistence, and WIP/tool metadata styling.
 
 ### Upgrade Notes
 
-- Active turns are still not restart-safe across RC upgrade or machine handoff. Quiesce or cancel active Codex/runner work before cutover.
-- After upgrade, verify `/health`, fetch a fresh auth token/browser session, and smoke-test at least one Claude send plus one Codex send.
+- Active turns are still not restart-safe across RC upgrade or machine handoff. Quiesce or cancel active Claude/Codex/runner work before cutover.
+- After upgrade, verify `/health`, fetch a fresh browser session if needed, and smoke-test at least one Claude send, one Codex send, and one subagent-inspector open.
 
 ### Verification
 
 - `npm pack --dry-run`
+- `bun test src/server/quick-response.test.ts src/server/session-discovery.test.ts src/client/components/chat-ui/ChatInput.test.tsx src/client/components/chat-ui/SubagentIndicator.test.ts src/client/app/ChatPage.test.ts src/client/components/messages/UserMessage.test.tsx src/client/app/ChatTranscript.test.tsx`
 - `bun test src/server/nats-publisher.test.ts`
 - `bun test src/server/nats-daemon-manager.test.ts src/server/runner-manager.test.ts src/server/transcript-consumer.test.ts src/shared/runner-protocol.test.ts src/nats/nats-daemon.test.ts src/runner/runner.test.ts`
+- `bun run build`
+- `agent-browser open http://127.0.0.1:3210/`
+- `curl -sf http://127.0.0.1:3210/health`
 - `bunx @typescript/native-preview --noEmit -p tsconfig.json`
 - `C3X_MODE=agent bash /home/lagz0ne/.codex/skills/c3/bin/c3x.sh check`
 

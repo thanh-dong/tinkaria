@@ -1,0 +1,23 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V6d3: Wave Dash — dashed concentric rings creating a wave texture -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- dashed concentric wave rings -->
+    <circle r="16" stroke="#D14A3D" stroke-width="1.5" fill="none" opacity="0.45" stroke-dasharray="3 4"/>
+    <circle r="22" stroke="#D14A3D" stroke-width="1.2" fill="none" opacity="0.3" stroke-dasharray="4 5"/>
+    <circle r="28" stroke="#D14A3D" stroke-width="1" fill="none" opacity="0.2" stroke-dasharray="5 6"/>
+    <!-- solid dark outer ring -->
+    <circle r="34" stroke="#17322C" stroke-width="3.5" fill="none"/>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="9">
+      <path d="M0 -76V-50"/><path d="M0 50V76"/>
+      <path d="M-76 0H-50"/><path d="M50 0H76"/>
+    </g>
+    <!-- dashed dark diagonals -->
+    <g stroke="#17322C" stroke-width="2.5" stroke-dasharray="7 5">
+      <path d="M-53 -53L-38 -38"/><path d="M38 38L53 53"/>
+      <path d="M53 -53L38 -38"/><path d="M-38 38L-53 53"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="8" fill="#D14A3D"/>
+</svg>

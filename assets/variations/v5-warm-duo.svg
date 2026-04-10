@@ -1,31 +1,24 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- V5: Warm Duo — ring + spoke tips in red, inner spokes dark, two-layer depth -->
+  <!-- V5: Warm Duo — bold red tips taper to thin dark inner, medium red ring -->
   <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
   <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
-    <!-- outer spoke tips in warm red -->
-    <g stroke="#D14A3D" stroke-width="6.5">
-      <path d="M0 -74V-58"/>
-      <path d="M0 58V74"/>
-      <path d="M-74 0H-58"/>
-      <path d="M58 0H74"/>
-      <path d="M-52.3 -52.3L-41 -41"/>
-      <path d="M41 41L52.3 52.3"/>
-      <path d="M52.3 -52.3L41 -41"/>
-      <path d="M-41 41L-52.3 52.3"/>
+    <g stroke="#D14A3D" stroke-width="8">
+      <path d="M0 -76V-60"/><path d="M0 60V76"/>
+      <path d="M-76 0H-60"/><path d="M60 0H76"/>
     </g>
-    <!-- inner spoke segments in dark -->
-    <g stroke="#17322C" stroke-width="6.5">
-      <path d="M0 -58V-48"/>
-      <path d="M0 48V58"/>
-      <path d="M-58 0H-48"/>
-      <path d="M48 0H58"/>
-      <path d="M-41 -41L-34 -34"/>
-      <path d="M34 34L41 41"/>
-      <path d="M41 -41L34 -34"/>
-      <path d="M-34 34L-41 41"/>
+    <g stroke="#D14A3D" stroke-width="6">
+      <path d="M-53.7 -53.7L-43 -43"/><path d="M43 43L53.7 53.7"/>
+      <path d="M53.7 -53.7L43 -43"/><path d="M-43 43L-53.7 53.7"/>
     </g>
-    <!-- ring in warm red -->
-    <circle r="30" stroke="#D14A3D" stroke-width="6.5" fill="none"/>
+    <g stroke="#17322C" stroke-width="3.5">
+      <path d="M0 -58V-48"/><path d="M0 48V58"/>
+      <path d="M-58 0H-48"/><path d="M48 0H58"/>
+    </g>
+    <g stroke="#17322C" stroke-width="2.5">
+      <path d="M-41 -41L-34 -34"/><path d="M34 34L41 41"/>
+      <path d="M41 -41L34 -34"/><path d="M-34 34L-41 41"/>
+    </g>
+    <circle r="30" stroke="#D14A3D" stroke-width="5.5" fill="none"/>
   </g>
-  <circle cx="128" cy="128" r="8" fill="#D14A3D"/>
+  <circle cx="128" cy="128" r="9" fill="#D14A3D"/>
 </svg>

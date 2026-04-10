@@ -1,20 +1,16 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- V1: Ember Ring — circle in warm red, spokes stay dark, bolder center dot -->
+  <!-- V1: Ember Ring — thick red ring, thin dark spokes, bold center -->
   <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
   <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
-    <!-- spokes in dark -->
-    <g stroke="#17322C" stroke-width="6.5">
-      <path d="M0 -74V-48"/>
-      <path d="M0 48V74"/>
-      <path d="M-74 0H-48"/>
-      <path d="M48 0H74"/>
-      <path d="M-52.3 -52.3L-34 -34"/>
-      <path d="M34 34L52.3 52.3"/>
-      <path d="M52.3 -52.3L34 -34"/>
-      <path d="M-34 34L-52.3 52.3"/>
+    <g stroke="#17322C" stroke-width="4">
+      <path d="M0 -74V-48"/><path d="M0 48V74"/>
+      <path d="M-74 0H-48"/><path d="M48 0H74"/>
     </g>
-    <!-- ring in warm red -->
-    <circle r="30" stroke="#D14A3D" stroke-width="6.5" fill="none"/>
+    <g stroke="#17322C" stroke-width="3">
+      <path d="M-52.3 -52.3L-34 -34"/><path d="M34 34L52.3 52.3"/>
+      <path d="M52.3 -52.3L34 -34"/><path d="M-34 34L-52.3 52.3"/>
+    </g>
+    <circle r="30" stroke="#D14A3D" stroke-width="8" fill="none"/>
   </g>
-  <circle cx="128" cy="128" r="9" fill="#D14A3D"/>
+  <circle cx="128" cy="128" r="11" fill="#D14A3D"/>
 </svg>

@@ -1,4 +1,4 @@
-import { UserRound, X } from "lucide-react"
+import { UserRound, X, Check } from "lucide-react"
 import type { ProcessedToolCall } from "./types"
 import { MetaRow, MetaLabel, MetaCodeBlock, ExpandableRow, VerticalLineContainer, getToolIcon, getToolLabel } from "./shared"
 import { memo, useMemo } from "react"
@@ -125,20 +125,25 @@ export const ToolCallMessage = memo(function ToolCallMessage({ message, isLoadin
         }
       >
 
-        <div className={`w-5 h-5 relative flex items-center justify-center`}>
+        <div className="w-5 h-5 relative flex items-center justify-center">
           {(() => {
             if (message.isError) {
               return <X className="size-4 text-destructive" />
             }
-            if (isAgent) {
-              return <UserRound className="size-4 text-muted-icon" />
+            if (showLoadingState) {
+              if (isAgent) return <UserRound className="size-4 text-[var(--logo)] animate-pulse" />
+              const Icon = getToolIcon(message.toolName)
+              return <Icon className="size-4 text-[var(--logo)] animate-pulse" />
             }
+            if (hasResult) {
+              return <Check className="size-3.5 text-muted-foreground/40" />
+            }
+            if (isAgent) return <UserRound className="size-4 text-muted-icon" />
             const Icon = getToolIcon(message.toolName)
-
             return <Icon className="size-4 text-muted-icon" />
           })()}
         </div>
-        <MetaLabel className="text-left transition-opacity duration-200 truncate">
+        <MetaLabel className={`text-left transition-opacity duration-200 truncate ${hasResult && !showLoadingState ? "text-muted-foreground" : ""}`}>
           <AnimatedShinyText
             animate={showLoadingState}
             shimmerWidth={Math.max(20, ((description || name)?.length ?? 33) * 3)}

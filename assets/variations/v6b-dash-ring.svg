@@ -1,16 +1,28 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- V6: Cardinal Accent — bold red cardinals, hairline dark diagonals, thin dark ring -->
+  <!-- V6b: Dashed ring, solid cardinals, radial fill center -->
+  <defs>
+    <radialGradient id="core6b" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D14A3D" stop-opacity="0.25"/>
+      <stop offset="70%" stop-color="#D14A3D" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#D14A3D" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
   <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
   <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- warm glow fill inside ring -->
+    <circle r="30" fill="url(#core6b)"/>
+    <!-- bold red cardinals -->
     <g stroke="#D14A3D" stroke-width="9">
       <path d="M0 -72V-46"/><path d="M0 46V72"/>
       <path d="M-72 0H-46"/><path d="M46 0H72"/>
     </g>
+    <!-- fine solid diagonals -->
     <g stroke="#17322C" stroke-width="2.5">
       <path d="M-52.3 -52.3L-34 -34"/><path d="M34 34L52.3 52.3"/>
       <path d="M52.3 -52.3L34 -34"/><path d="M-34 34L-52.3 52.3"/>
     </g>
-    <circle r="30" stroke="#17322C" stroke-width="4" fill="none"/>
+    <!-- dashed ring -->
+    <circle r="30" stroke="#17322C" stroke-width="4" fill="none" stroke-dasharray="8 6"/>
   </g>
   <circle cx="128" cy="128" r="11" fill="#D14A3D"/>
 </svg>

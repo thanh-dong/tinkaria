@@ -1,0 +1,25 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ripple Asymmetric + Inca Concentric Squares: square ripples inside, circular outside -->
+  <rect width="256" height="256" rx="64" fill="#FFF8EE"/>
+  <g transform="translate(128 128)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- inner: concentric squares (Inca style) -->
+    <rect x="-10" y="-10" width="20" height="20" stroke="#D14A3D" stroke-width="1.8" fill="none" opacity="0.5"/>
+    <rect x="-16" y="-16" width="32" height="32" stroke="#D14A3D" stroke-width="1.3" fill="none" opacity="0.35"/>
+    <rect x="-22" y="-22" width="44" height="44" stroke="#D14A3D" stroke-width="0.9" fill="none" opacity="0.2"/>
+    <!-- main circular ring (transition point) -->
+    <circle r="30" stroke="#17322C" stroke-width="4.5" fill="none"/>
+    <!-- outer: single circular echo -->
+    <circle r="40" stroke="#D14A3D" stroke-width="0.8" fill="none" opacity="0.1"/>
+    <!-- bold red cardinals -->
+    <g stroke="#D14A3D" stroke-width="9">
+      <path d="M0 -78V-50"/><path d="M0 50V78"/>
+      <path d="M-78 0H-50"/><path d="M50 0H78"/>
+    </g>
+    <!-- dashed dark diagonals -->
+    <g stroke="#17322C" stroke-width="2.5" stroke-dasharray="7 5">
+      <path d="M-55 -55L-36 -36"/><path d="M36 36L55 55"/>
+      <path d="M55 -55L36 -36"/><path d="M-36 36L-55 55"/>
+    </g>
+  </g>
+  <circle cx="128" cy="128" r="6" fill="#D14A3D"/>
+</svg>
