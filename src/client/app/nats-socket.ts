@@ -85,10 +85,7 @@ export class NatsSocket implements AppTransport {
       const proxyProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
       const proxyWsUrl = `${proxyProtocol}//${window.location.host}/nats-ws`
 
-      // HTTP only: try direct NATS WS first. If it throws (connection refused,
-      // DNS failure, etc.) we sequentially fall through to the proxy URL.
-      // No probe timer — the nats-core library's own failure path is our signal.
-      // Note: HTTPS path never uses direct NATS WS (mixed-content blocked).
+      // HTTPS blocks mixed ws://, so direct NATS WS is HTTP-only.
       if (
         auth.natsWsUrl
         && window.location.protocol !== "https:"
@@ -255,10 +252,8 @@ export class NatsSocket implements AppTransport {
   }
 
   private async monitorStatus(): Promise<void> {
-    // Capture the connection we were started with. All work below operates on
-    // THIS nc/js — never `this.nc`/`this.js` — so a concurrent connect that
-    // reassigns the instance fields cannot bind subscriptions to the wrong
-    // transport or confuse disconnect/reconnect scheduling.
+    // Bind to the nc/js we were started on so a concurrent reconnect swap can't
+    // leak subscriptions onto the successor connection.
     const nc = this.nc
     const js = this.js
     if (!nc) return
@@ -273,9 +268,6 @@ export class NatsSocket implements AppTransport {
             break
           case "reconnect":
             this.emitStatus("connected")
-            // js holds a reference to nc — no need to recreate on reconnect.
-            // Rebuild subscriptions against the CAPTURED nc/js so the reactivation
-            // cannot leak onto a successor connection via `this.nc`.
             reactivateSubscriptionsAfterReconnect(this.subscriptions, (id, entry) => {
               this.activateSubscription(nc, js, id, entry as SubscriptionEntry)
             })
@@ -285,17 +277,12 @@ export class NatsSocket implements AppTransport {
             break
         }
 
-        // Connection has been replaced by a successor — exit the old loop.
-        // The successor's own monitor is already running against the new nc.
         if (this.nc !== nc) break
       }
     } catch {
       // Connection closed
     }
 
-    // Only the monitor whose nc still matches this.nc is responsible for
-    // transitioning to disconnected + scheduling reconnect. A successor monitor
-    // has its own lifecycle.
     if (this.started && !this.reconnecting && this.nc === nc) {
       this.emitStatus("disconnected")
       this.scheduleReconnect()
@@ -355,7 +342,6 @@ export class NatsSocket implements AppTransport {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.warn(LOG_PREFIX, `JetStream consumer failed for chat ${entry.topic.chatId}: ${message}`)
-      // Fallback to plain subscription on the captured nc
       const evtSubject = chatMessageSubject(entry.topic.chatId)
       entry.eventSubscription = nc.subscribe(evtSubject)
       void this.consumeMessages(id, entry.eventSubscription, entry.eventListener)
@@ -406,18 +392,12 @@ export class NatsSocket implements AppTransport {
       }
       this.reconnecting = false
       this.unsubscribeAll()
-      // Force-close the underlying WebSocket. We use close() not drain() because
-      // this path is invoked from failure states where in-flight ops may never
-      // settle. Swallow errors — the connection is already being torn down.
       const nc = this.nc
       this.nc = null
       this.js = null
-      if (nc) {
-        await nc.close().catch((error) => {
-          const message = error instanceof Error ? error.message : String(error)
-          console.warn(LOG_PREFIX, `nc.close() during reset failed: ${message}`)
-        })
-      }
+      // close() not drain() — reset runs from failure states where
+      // in-flight ops may never settle.
+      if (nc) await nc.close().catch(() => {})
     } finally {
       this.resetting = false
     }

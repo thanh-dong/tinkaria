@@ -16,12 +16,6 @@ import type { RunnerAgent } from "./runner-agent"
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-// ── Connection lifecycle helpers ────────────────────────────────────
-
-/**
- * Explicit reconnect options applied by {@link connectRunner}. Kept in a named
- * constant so tests and future callers share the same invariants.
- */
 export const RUNNER_RECONNECT_OPTIONS = {
   maxReconnectAttempts: -1,
   reconnectTimeWait: 750,
@@ -32,15 +26,9 @@ export const RUNNER_RECONNECT_OPTIONS = {
 export interface ConnectRunnerOptions {
   natsUrl: string
   token?: string | undefined
-  /** Dependency-injected for tests; defaults to the real nats-io connect(). */
   connectFn?: typeof connect
 }
 
-/**
- * Connect the runner to NATS with explicit reconnect/ping settings so a short
- * network blip never leaves the process silently stranded. Any token, when
- * provided, is forwarded as-is while preserving the reconnect invariants.
- */
 export async function connectRunner(
   options: ConnectRunnerOptions,
 ): Promise<NatsConnection> {
@@ -53,16 +41,9 @@ export async function connectRunner(
 }
 
 export interface ShutdownConnectionOptions {
-  /** How long to wait for `drain()` before forcing `close()`. Defaults to 3s. */
   drainTimeoutMs?: number
 }
 
-/**
- * Drain a NATS connection with a hard timeout, falling back to `close()` so
- * shutdown can't hang indefinitely when the upstream server is already dead.
- * Every failure path is logged with `LOG_PREFIX` and never rethrown — this is
- * the last step of a graceful shutdown and must be resilient.
- */
 export async function shutdownConnection(
   nc: NatsConnection,
   options: ShutdownConnectionOptions = {},
@@ -77,17 +58,11 @@ export async function shutdownConnection(
     ])
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.warn(
-      LOG_PREFIX,
-      `runner drain timeout or failed: ${message} — falling back to close()`,
-    )
-    try {
-      await nc.close()
-    } catch (closeError) {
-      const closeMessage =
-        closeError instanceof Error ? closeError.message : String(closeError)
+    console.warn(LOG_PREFIX, `runner drain timeout or failed: ${message} — falling back to close()`)
+    await nc.close().catch((closeError) => {
+      const closeMessage = closeError instanceof Error ? closeError.message : String(closeError)
       console.warn(LOG_PREFIX, `runner close() also failed: ${closeMessage}`)
-    }
+    })
   }
 }
 
@@ -225,11 +200,7 @@ export class RunnerNatsHandler {
     }
   }
 
-  /**
-   * Test-only accessor for {@link publishHeartbeat}. Exercising it through a
-   * named method keeps the production path private while letting unit tests
-   * verify the try/catch/swallow invariant without touching the private member.
-   */
+  /** Test-only wrapper for the private heartbeat publisher. */
   publishHeartbeatForTest(): void {
     this.publishHeartbeat()
   }
