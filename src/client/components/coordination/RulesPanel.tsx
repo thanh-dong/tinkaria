@@ -30,7 +30,7 @@ export function RulesPanel({
   function handleAdd() {
     const content = newContent.trim()
     if (!content) return
-    const ruleId = `rule-${Date.now()}`
+    const ruleId = `rule-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     onSetRule(ruleId, content, "ui")
     setNewContent("")
     setShowAddForm(false)

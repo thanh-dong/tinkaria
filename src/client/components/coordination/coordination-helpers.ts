@@ -44,7 +44,3 @@ export function formatRelativeTimestamp(iso: string): string {
 export function isClaimConflicting(claim: ProjectClaim): boolean {
   return claim.conflictsWith !== null
 }
-
-export function getActiveClaimsCount(claims: ProjectClaim[]): number {
-  return claims.filter((c) => c.status === "active").length
-}

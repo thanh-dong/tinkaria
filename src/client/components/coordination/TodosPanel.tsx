@@ -71,11 +71,6 @@ export function TodosPanel({
     setShowAddForm(false)
   }
 
-  // Silence unused variable warnings — these callbacks are part of the public API
-  void onClaimTodo
-  void onCompleteTodo
-  void onAbandonTodo
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
@@ -161,6 +156,15 @@ export function TodosPanel({
                   <span className="text-xs text-muted-foreground">
                     {formatRelativeTimestamp(todo.updatedAt)}
                   </span>
+                  {todo.status === "open" && (
+                    <button className="text-xs text-primary hover:underline" onClick={() => onClaimTodo(todo.id, "ui")}>claim</button>
+                  )}
+                  {todo.status === "claimed" && (
+                    <>
+                      <button className="text-xs text-green-500 hover:underline" onClick={() => onCompleteTodo(todo.id, [])}>done</button>
+                      <button className="text-xs text-muted-foreground hover:underline" onClick={() => onAbandonTodo(todo.id)}>abandon</button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

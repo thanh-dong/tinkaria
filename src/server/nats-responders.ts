@@ -68,6 +68,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "snapshot.subscribe",
   "snapshot.unsubscribe",
   "sessions.refresh",
+  "project.coordination.snapshot",
 ])
 
 /** Commands handled by the Bun backend. */

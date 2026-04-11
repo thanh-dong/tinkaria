@@ -7,7 +7,7 @@ import {
   User,
   UserPlus,
 } from "lucide-react"
-import type { ProjectWorktree } from "../../../shared/project-agent-types"
+import type { ProjectWorktree, WorktreeStatus } from "../../../shared/project-agent-types"
 import { formatRelativeTimestamp } from "./coordination-helpers"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
@@ -19,7 +19,7 @@ export interface WorktreesPanelProps {
   onRemoveWorktree: (worktreeId: string) => void
 }
 
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_COLOR: Record<WorktreeStatus, string> = {
   ready: "text-blue-400",
   assigned: "text-green-500",
   removed: "text-muted-foreground",
