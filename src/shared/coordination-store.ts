@@ -1,5 +1,5 @@
 import type { ProjectCoordinationState } from "../server/events"
-import type { ProjectCoordinationSnapshot, TodoPriority } from "./project-agent-types"
+import type { WorkspaceCoordinationSnapshot, TodoPriority } from "./workspace-types"
 
 /**
  * Minimal interface for project coordination operations.
@@ -22,5 +22,5 @@ export interface CoordinationStore {
   setRule(projectId: string, ruleId: string, content: string, setBy: string): Promise<void>
   removeRule(projectId: string, ruleId: string): Promise<void>
   /** Optional: fetch a full coordination snapshot (used when state is not in-process). */
-  getSnapshot?(projectId: string): Promise<ProjectCoordinationSnapshot>
+  getSnapshot?(projectId: string): Promise<WorkspaceCoordinationSnapshot>
 }

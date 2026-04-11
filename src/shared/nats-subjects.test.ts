@@ -13,8 +13,8 @@ describe("snapshotSubject", () => {
     expect(snapshotSubject({ type: "sidebar" })).toBe("runtime.snap.sidebar")
   })
 
-  test("local-projects", () => {
-    expect(snapshotSubject({ type: "local-projects" })).toBe("runtime.snap.local-projects")
+  test("local-workspaces", () => {
+    expect(snapshotSubject({ type: "local-workspaces" })).toBe("runtime.snap.local-workspaces")
   })
 
   test("update", () => {

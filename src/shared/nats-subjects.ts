@@ -8,9 +8,9 @@ export function snapshotKvKey(topic: SubscriptionTopic): string {
   switch (topic.type) {
     case "chat": return `chat.${topic.chatId}`
     case "terminal": return `terminal.${topic.terminalId}`
-    case "sessions": return `sessions.${topic.projectId}`
+    case "sessions": return `sessions.${topic.workspaceId}`
     case "orchestration": return `orchestration.${topic.chatId}`
-    case "project": return `project.${topic.projectId}`
+    case "workspace": return `workspace.${topic.workspaceId}`
     default: return topic.type
   }
 }
@@ -49,13 +49,13 @@ export const CHAT_MESSAGE_EVENTS_STREAM_NAME = "KANNA_CHAT_MESSAGE_EVENTS"
 /** KV bucket name for snapshot caching */
 export const KV_BUCKET = "runtime_snapshots"
 
-/** JetStream stream name for project coordination events */
-export const PROJECT_COORDINATION_EVENTS_STREAM_NAME = "KANNA_PROJECT_COORDINATION_EVENTS"
+/** JetStream stream name for workspace coordination events */
+export const WORKSPACE_COORDINATION_EVENTS_STREAM_NAME = "KANNA_WORKSPACE_COORDINATION_EVENTS"
 
-/** Subject for project coordination events */
-export function projectCoordinationEventSubject(projectId: string): string {
-  return `${PREFIX}.evt.project.${projectId}`
+/** Subject for workspace coordination events */
+export function workspaceCoordinationEventSubject(workspaceId: string): string {
+  return `${PREFIX}.evt.workspace.${workspaceId}`
 }
 
-/** Wildcard: all project coordination events */
-export const ALL_PROJECT_COORDINATION_EVENTS = `${PREFIX}.evt.project.>`
+/** Wildcard: all workspace coordination events */
+export const ALL_WORKSPACE_COORDINATION_EVENTS = `${PREFIX}.evt.workspace.>`

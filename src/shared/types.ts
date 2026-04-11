@@ -159,7 +159,7 @@ export type SessionStatus =
   | "waiting_for_user"
   | "failed"
 
-export interface ProjectSummary {
+export interface WorkspaceSummary {
   id: string
   localPath: string
   title: string
@@ -181,14 +181,14 @@ export interface SidebarChatRow {
   hasAutomation: boolean
 }
 
-export interface SidebarProjectGroup {
+export interface SidebarWorkspaceGroup {
   groupKey: string
   localPath: string
   chats: SidebarChatRow[]
 }
 
 export interface SidebarData {
-  projectGroups: SidebarProjectGroup[]
+  workspaceGroups: SidebarWorkspaceGroup[]
 }
 
 export interface DiscoveredSession {
@@ -221,12 +221,12 @@ export interface DiscoveredSessionUsageBucket {
 }
 
 export interface SessionsSnapshot {
-  projectId: string
-  projectPath: string
+  workspaceId: string
+  workspacePath: string
   sessions: DiscoveredSession[]
 }
 
-export interface LocalProjectSummary {
+export interface LocalWorkspaceSummary {
   localPath: string
   title: string
   source: "saved" | "discovered"
@@ -234,12 +234,12 @@ export interface LocalProjectSummary {
   chatCount: number
 }
 
-export interface LocalProjectsSnapshot {
+export interface LocalWorkspacesSnapshot {
   machine: {
     id: "local"
     displayName: string
   }
-  projects: LocalProjectSummary[]
+  workspaces: LocalWorkspaceSummary[]
 }
 
 export type UpdateStatus =

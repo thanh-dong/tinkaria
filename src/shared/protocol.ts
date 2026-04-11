@@ -5,13 +5,13 @@ import type {
 
 export type SubscriptionTopic =
   | { type: "sidebar" }
-  | { type: "local-projects" }
+  | { type: "local-workspaces" }
   | { type: "update" }
   | { type: "chat"; chatId: string }
   | { type: "terminal"; terminalId: string }
-  | { type: "sessions"; projectId: string }
+  | { type: "sessions"; workspaceId: string }
   | { type: "orchestration"; chatId: string }
-  | { type: "project"; projectId: string }
+  | { type: "workspace"; workspaceId: string }
 
 export interface TerminalSnapshot {
   terminalId: string
@@ -77,15 +77,15 @@ export type ClientCommand =
   | { type: "snapshot.unsubscribe"; subscriptionId: string }
   | { type: "sessions.resume"; projectId: string; sessionId: string; provider: AgentProvider }
   | { type: "sessions.refresh"; projectId: string }
-  | { type: "project.todo.add"; projectId: string; todoId: string; description: string; priority?: "high" | "normal" | "low"; createdBy?: string }
-  | { type: "project.todo.claim"; projectId: string; todoId: string; sessionId: string }
-  | { type: "project.todo.complete"; projectId: string; todoId: string; outputs: string[] }
-  | { type: "project.todo.abandon"; projectId: string; todoId: string }
-  | { type: "project.claim.create"; projectId: string; claimId: string; intent: string; files: string[]; sessionId: string }
-  | { type: "project.claim.release"; projectId: string; claimId: string }
-  | { type: "project.worktree.create"; projectId: string; worktreeId: string; branch: string; baseBranch?: string }
-  | { type: "project.worktree.assign"; projectId: string; worktreeId: string; sessionId: string }
-  | { type: "project.worktree.remove"; projectId: string; worktreeId: string }
-  | { type: "project.rule.set"; projectId: string; ruleId: string; content: string; setBy: string }
-  | { type: "project.rule.remove"; projectId: string; ruleId: string }
-  | { type: "project.coordination.snapshot"; projectId: string }
+  | { type: "workspace.todo.add"; workspaceId: string; todoId: string; description: string; priority?: "high" | "normal" | "low"; createdBy?: string }
+  | { type: "workspace.todo.claim"; workspaceId: string; todoId: string; sessionId: string }
+  | { type: "workspace.todo.complete"; workspaceId: string; todoId: string; outputs: string[] }
+  | { type: "workspace.todo.abandon"; workspaceId: string; todoId: string }
+  | { type: "workspace.claim.create"; workspaceId: string; claimId: string; intent: string; files: string[]; sessionId: string }
+  | { type: "workspace.claim.release"; workspaceId: string; claimId: string }
+  | { type: "workspace.worktree.create"; workspaceId: string; worktreeId: string; branch: string; baseBranch?: string }
+  | { type: "workspace.worktree.assign"; workspaceId: string; worktreeId: string; sessionId: string }
+  | { type: "workspace.worktree.remove"; workspaceId: string; worktreeId: string }
+  | { type: "workspace.rule.set"; workspaceId: string; ruleId: string; content: string; setBy: string }
+  | { type: "workspace.rule.remove"; workspaceId: string; ruleId: string }
+  | { type: "workspace.coordination.snapshot"; workspaceId: string }

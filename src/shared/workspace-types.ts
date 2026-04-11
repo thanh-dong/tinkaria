@@ -28,7 +28,7 @@ export interface SearchResult {
   score: number
 }
 
-// --- ProjectAgent types ---
+// --- WorkspaceAgent types ---
 
 export interface DelegationResult {
   status: "ok" | "error"
@@ -51,7 +51,7 @@ export type CoordinationTodoStatus = "open" | "claimed" | "complete" | "abandone
 export type ClaimStatus = "active" | "released" | "conflict"
 export type WorktreeStatus = "ready" | "assigned" | "removed"
 
-export interface ProjectTodo {
+export interface WorkspaceTodo {
   id: string
   description: string
   priority: TodoPriority
@@ -63,7 +63,7 @@ export interface ProjectTodo {
   updatedAt: string
 }
 
-export interface ProjectClaim {
+export interface WorkspaceClaim {
   id: string
   intent: string
   files: string[]
@@ -73,7 +73,7 @@ export interface ProjectClaim {
   createdAt: string
 }
 
-export interface ProjectWorktree {
+export interface WorkspaceWorktree {
   id: string
   branch: string
   baseBranch: string
@@ -83,18 +83,18 @@ export interface ProjectWorktree {
   createdAt: string
 }
 
-export interface ProjectRule {
+export interface WorkspaceRule {
   id: string
   content: string
   setBy: string
   updatedAt: string
 }
 
-export interface ProjectCoordinationSnapshot {
-  projectId: string
-  todos: ProjectTodo[]
-  claims: ProjectClaim[]
-  worktrees: ProjectWorktree[]
-  rules: ProjectRule[]
+export interface WorkspaceCoordinationSnapshot {
+  workspaceId: string
+  todos: WorkspaceTodo[]
+  claims: WorkspaceClaim[]
+  worktrees: WorkspaceWorktree[]
+  rules: WorkspaceRule[]
   lastUpdated: string
 }
