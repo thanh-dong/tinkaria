@@ -165,29 +165,10 @@ export function deriveCoordinationSnapshot(
   }
 }
 
+/** Convenience overload accepting full StoreState (used by nats-publisher). */
 export function deriveProjectCoordinationSnapshot(
   state: StoreState,
   projectId: string,
 ): ProjectCoordinationSnapshot {
-  const coord = state.coordinationByProject.get(projectId) ?? createEmptyCoordinationState()
-
-  const todos = [...coord.todos.values()]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-
-  const claims = [...coord.claims.values()]
-    .filter((c) => c.status !== "released")
-
-  const worktrees = [...coord.worktrees.values()]
-    .filter((w) => w.status !== "removed")
-
-  const rules = [...coord.rules.values()]
-
-  return {
-    projectId,
-    todos,
-    claims,
-    worktrees,
-    rules,
-    lastUpdated: coord.lastUpdated,
-  }
+  return deriveCoordinationSnapshot(state, projectId)
 }

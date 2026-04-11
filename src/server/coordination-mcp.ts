@@ -17,6 +17,20 @@ async function getProjectSnapshot(store: CoordinationStore, projectId: string): 
   return deriveCoordinationSnapshot(store.state, projectId)
 }
 
+/** Read back an entity after mutation — tries in-process state first, falls back to snapshot. */
+async function readBackEntity(
+  store: CoordinationStore,
+  projectId: string,
+  collection: "todos" | "claims" | "worktrees" | "rules",
+  entityId: string,
+): Promise<unknown> {
+  const coord = store.state.coordinationByProject.get(projectId)
+  if (coord) return coord[collection].get(entityId) ?? { id: entityId }
+  const snapshot = await getProjectSnapshot(store, projectId)
+  const list = snapshot[collection] as Array<{ id: string }>
+  return list.find((e) => e.id === entityId) ?? { id: entityId }
+}
+
 export function createCoordinationMcpServer(store: CoordinationStore) {
   return createSdkMcpServer({
     name: "project-coordination",
@@ -33,10 +47,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         async (args) => {
           const todoId = randomUUID()
           await store.addTodo(args.projectId, todoId, args.description, args.priority ?? "normal", args.createdBy ?? "unknown")
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.todos.get(todoId) ?? { id: todoId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.todos.find((t) => t.id === todoId) ?? { id: todoId })
+          return json(await readBackEntity(store, args.projectId, "todos", todoId))
         },
       ),
       tool(
@@ -49,10 +60,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         },
         async (args) => {
           await store.claimTodo(args.projectId, args.todoId, args.sessionId)
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.todos.get(args.todoId) ?? { id: args.todoId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.todos.find((t) => t.id === args.todoId) ?? { id: args.todoId })
+          return json(await readBackEntity(store, args.projectId, "todos", args.todoId))
         },
       ),
       tool(
@@ -65,10 +73,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         },
         async (args) => {
           await store.completeTodo(args.projectId, args.todoId, args.outputs ?? [])
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.todos.get(args.todoId) ?? { id: args.todoId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.todos.find((t) => t.id === args.todoId) ?? { id: args.todoId })
+          return json(await readBackEntity(store, args.projectId, "todos", args.todoId))
         },
       ),
       tool(
@@ -80,10 +85,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         },
         async (args) => {
           await store.abandonTodo(args.projectId, args.todoId)
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.todos.get(args.todoId) ?? { id: args.todoId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.todos.find((t) => t.id === args.todoId) ?? { id: args.todoId })
+          return json(await readBackEntity(store, args.projectId, "todos", args.todoId))
         },
       ),
       tool(
@@ -98,10 +100,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         async (args) => {
           const claimId = randomUUID()
           await store.createClaim(args.projectId, claimId, args.intent, args.files, args.sessionId)
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.claims.get(claimId) ?? { id: claimId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.claims.find((c) => c.id === claimId) ?? { id: claimId })
+          return json(await readBackEntity(store, args.projectId, "claims", claimId))
         },
       ),
       tool(
@@ -113,10 +112,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         },
         async (args) => {
           await store.releaseClaim(args.projectId, args.claimId)
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.claims.get(args.claimId) ?? { id: args.claimId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.claims.find((c) => c.id === args.claimId) ?? { id: args.claimId })
+          return json(await readBackEntity(store, args.projectId, "claims", args.claimId))
         },
       ),
       tool(
@@ -130,10 +126,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         async (args) => {
           const worktreeId = randomUUID()
           await store.createWorktree(args.projectId, worktreeId, args.branch, args.baseBranch ?? "main", "")
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.worktrees.get(worktreeId) ?? { id: worktreeId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.worktrees.find((w) => w.id === worktreeId) ?? { id: worktreeId })
+          return json(await readBackEntity(store, args.projectId, "worktrees", worktreeId))
         },
       ),
       tool(
@@ -146,10 +139,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         },
         async (args) => {
           await store.assignWorktree(args.projectId, args.worktreeId, args.sessionId)
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.worktrees.get(args.worktreeId) ?? { id: args.worktreeId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.worktrees.find((w) => w.id === args.worktreeId) ?? { id: args.worktreeId })
+          return json(await readBackEntity(store, args.projectId, "worktrees", args.worktreeId))
         },
       ),
       tool(
@@ -176,10 +166,7 @@ export function createCoordinationMcpServer(store: CoordinationStore) {
         async (args) => {
           const ruleId = args.ruleId ?? randomUUID()
           await store.setRule(args.projectId, ruleId, args.content, args.setBy ?? "unknown")
-          const coord = store.state.coordinationByProject.get(args.projectId)
-          if (coord) return json(coord.rules.get(ruleId) ?? { id: ruleId })
-          const snapshot = await getProjectSnapshot(store, args.projectId)
-          return json(snapshot.rules.find((r) => r.id === ruleId) ?? { id: ruleId })
+          return json(await readBackEntity(store, args.projectId, "rules", ruleId))
         },
       ),
       tool(

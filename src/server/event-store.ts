@@ -746,7 +746,11 @@ export class EventStore {
     const event: CoordinationEvent = { v: STORE_VERSION, type: "claim_created", timestamp: Date.now(), projectId, claimId, intent, files, sessionId }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
 
-    // Auto-detect file overlap with existing active claims
+    // Auto-detect file overlap with existing active claims.
+    // INVARIANT: append() updates in-memory state synchronously via applyEvent(),
+    // so coordinationByProject is already current when we read it here.
+    // Only the first overlapping claim triggers a conflict event (intentional —
+    // downstream can trace the full conflict chain via claim_conflict_detected events).
     const coord = this.state.coordinationByProject.get(projectId)
     if (coord) {
       const fileSet = new Set(files)

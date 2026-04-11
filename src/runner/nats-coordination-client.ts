@@ -1,6 +1,6 @@
 import type { NatsConnection } from "@nats-io/transport-node"
 import type { CoordinationStore } from "../shared/coordination-store"
-import type { ProjectCoordinationSnapshot } from "../shared/project-agent-types"
+import type { ProjectCoordinationSnapshot, TodoPriority } from "../shared/project-agent-types"
 import { commandSubject } from "../shared/nats-subjects"
 
 const encoder = new TextEncoder()
@@ -43,7 +43,7 @@ export class NatsCoordinationClient implements CoordinationStore {
     return response.result
   }
 
-  async addTodo(projectId: string, todoId: string, description: string, priority: string, createdBy: string): Promise<void> {
+  async addTodo(projectId: string, todoId: string, description: string, priority: TodoPriority, createdBy: string): Promise<void> {
     await this.sendCommand("project.todo.add", { projectId, todoId, description, priority, createdBy })
   }
 

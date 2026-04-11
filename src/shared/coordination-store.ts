@@ -1,5 +1,5 @@
 import type { ProjectCoordinationState } from "../server/events"
-import type { ProjectCoordinationSnapshot } from "./project-agent-types"
+import type { ProjectCoordinationSnapshot, TodoPriority } from "./project-agent-types"
 
 /**
  * Minimal interface for project coordination operations.
@@ -10,7 +10,7 @@ export interface CoordinationStore {
   state: {
     coordinationByProject: Map<string, ProjectCoordinationState>
   }
-  addTodo(projectId: string, todoId: string, description: string, priority: string, createdBy: string): Promise<void>
+  addTodo(projectId: string, todoId: string, description: string, priority: TodoPriority, createdBy: string): Promise<void>
   claimTodo(projectId: string, todoId: string, sessionId: string): Promise<void>
   completeTodo(projectId: string, todoId: string, outputs: string[]): Promise<void>
   abandonTodo(projectId: string, todoId: string): Promise<void>
