@@ -1,21 +1,22 @@
 import { describe, expect, test } from "bun:test"
-import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveSidebarData } from "./read-models"
+import { deriveChatSnapshot, deriveLocalWorkspacesSnapshot, deriveSidebarData } from "./read-models"
 import { createEmptyState } from "./events"
 
 describe("read models", () => {
   test("include provider and model data in sidebar rows", () => {
     const state = createEmptyState()
-    state.projectsById.set("project-1", {
+    state.workspacesById.set("project-1", {
       id: "project-1",
       localPath: "/tmp/project",
       title: "Project",
       createdAt: 1,
       updatedAt: 1,
     })
-    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.workspaceIdsByPath.set("/tmp/project", "project-1")
     state.chatsById.set("chat-1", {
       id: "chat-1",
-      projectId: "project-1",
+      workspaceId: "project-1",
+    repoId: null,
       title: "Chat",
       createdAt: 1,
       updatedAt: 1,
@@ -28,23 +29,24 @@ describe("read models", () => {
     })
 
     const sidebar = deriveSidebarData(state, new Map())
-    expect(sidebar.projectGroups[0]?.chats[0]?.provider).toBe("codex")
-    expect(sidebar.projectGroups[0]?.chats[0]?.model).toBe("gpt-5.4")
+    expect(sidebar.workspaceGroups[0]?.chats[0]?.provider).toBe("codex")
+    expect(sidebar.workspaceGroups[0]?.chats[0]?.model).toBe("gpt-5.4")
   })
 
   test("includes available providers in chat snapshots", () => {
     const state = createEmptyState()
-    state.projectsById.set("project-1", {
+    state.workspacesById.set("project-1", {
       id: "project-1",
       localPath: "/tmp/project",
       title: "Project",
       createdAt: 1,
       updatedAt: 1,
     })
-    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.workspaceIdsByPath.set("/tmp/project", "project-1")
     state.chatsById.set("chat-1", {
       id: "chat-1",
-      projectId: "project-1",
+      workspaceId: "project-1",
+    repoId: null,
       title: "Chat",
       createdAt: 1,
       updatedAt: 1,
@@ -68,17 +70,18 @@ describe("read models", () => {
 
   test("includes available skills in chat snapshot when provided", () => {
     const state = createEmptyState()
-    state.projectsById.set("project-1", {
+    state.workspacesById.set("project-1", {
       id: "project-1",
       localPath: "/tmp/project",
       title: "Project",
       createdAt: 1,
       updatedAt: 1,
     })
-    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.workspaceIdsByPath.set("/tmp/project", "project-1")
     state.chatsById.set("chat-1", {
       id: "chat-1",
-      projectId: "project-1",
+      workspaceId: "project-1",
+    repoId: null,
       title: "Chat",
       createdAt: 1,
       updatedAt: 1,
@@ -95,17 +98,18 @@ describe("read models", () => {
 
   test("includes the persisted chat model in chat runtime", () => {
     const state = createEmptyState()
-    state.projectsById.set("project-1", {
+    state.workspacesById.set("project-1", {
       id: "project-1",
       localPath: "/tmp/project",
       title: "Project",
       createdAt: 1,
       updatedAt: 1,
     })
-    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.workspaceIdsByPath.set("/tmp/project", "project-1")
     state.chatsById.set("chat-1", {
       id: "chat-1",
-      projectId: "project-1",
+      workspaceId: "project-1",
+    repoId: null,
       title: "Chat",
       createdAt: 1,
       updatedAt: 1,
@@ -123,17 +127,18 @@ describe("read models", () => {
 
   test("defaults availableSkills to empty array when not provided", () => {
     const state = createEmptyState()
-    state.projectsById.set("project-1", {
+    state.workspacesById.set("project-1", {
       id: "project-1",
       localPath: "/tmp/project",
       title: "Project",
       createdAt: 1,
       updatedAt: 1,
     })
-    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.workspaceIdsByPath.set("/tmp/project", "project-1")
     state.chatsById.set("chat-1", {
       id: "chat-1",
-      projectId: "project-1",
+      workspaceId: "project-1",
+    repoId: null,
       title: "Chat",
       createdAt: 1,
       updatedAt: 1,
@@ -150,17 +155,18 @@ describe("read models", () => {
 
   test("prefers saved project metadata over discovered entries for the same path", () => {
     const state = createEmptyState()
-    state.projectsById.set("project-1", {
+    state.workspacesById.set("project-1", {
       id: "project-1",
       localPath: "/tmp/project",
       title: "Saved Project",
       createdAt: 1,
       updatedAt: 50,
     })
-    state.projectIdsByPath.set("/tmp/project", "project-1")
+    state.workspaceIdsByPath.set("/tmp/project", "project-1")
     state.chatsById.set("chat-1", {
       id: "chat-1",
-      projectId: "project-1",
+      workspaceId: "project-1",
+    repoId: null,
       title: "Chat",
       createdAt: 1,
       updatedAt: 75,
@@ -172,7 +178,7 @@ describe("read models", () => {
       lastTurnOutcome: null,
     })
 
-    const snapshot = deriveLocalProjectsSnapshot(state, [
+    const snapshot = deriveLocalWorkspacesSnapshot(state, [
       {
         localPath: "/tmp/project",
         title: "Discovered Project",
@@ -180,7 +186,7 @@ describe("read models", () => {
       },
     ], "Local Machine")
 
-    expect(snapshot.projects).toEqual([
+    expect(snapshot.workspaces).toEqual([
       {
         localPath: "/tmp/project",
         title: "Saved Project",

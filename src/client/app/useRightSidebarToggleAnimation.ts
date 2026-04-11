@@ -3,7 +3,7 @@ import type { GroupImperativeHandle } from "react-resizable-panels"
 import { interpolateLayout, TERMINAL_TOGGLE_ANIMATION_DURATION_MS } from "./terminalToggleAnimation"
 
 type UseRightSidebarToggleAnimationParams = {
-  projectId: string | null
+  workspaceId: string | null
   shouldRenderRightSidebarLayout: boolean
   showRightSidebar: boolean
   rightSidebarSize: number
@@ -17,7 +17,7 @@ type UseRightSidebarToggleAnimationResult = {
 }
 
 export function useRightSidebarToggleAnimation({
-  projectId,
+  workspaceId,
   shouldRenderRightSidebarLayout,
   showRightSidebar,
   rightSidebarSize,
@@ -70,7 +70,7 @@ export function useRightSidebarToggleAnimation({
     }
 
     const previousProjectId = previousProjectIdRef.current
-    const didProjectChange = previousProjectId !== null && previousProjectId !== projectId
+    const didProjectChange = previousProjectId !== null && previousProjectId !== workspaceId
     const isInitialOpen = showRightSidebar && !previousShowRightSidebarRef.current
     const isInitialRender = !previousShouldRenderRightSidebarLayoutRef.current
     const targetLayout: [number, number] = showRightSidebar ? [100 - rightSidebarSize, rightSidebarSize] : [100, 0]
@@ -82,7 +82,7 @@ export function useRightSidebarToggleAnimation({
           group.getLayout().rightSidebar ?? targetLayout[1],
         ]
 
-    previousProjectIdRef.current = projectId
+    previousProjectIdRef.current = workspaceId
     previousShouldRenderRightSidebarLayoutRef.current = shouldRenderRightSidebarLayout
     previousShowRightSidebarRef.current = showRightSidebar
 
@@ -124,7 +124,7 @@ export function useRightSidebarToggleAnimation({
     }
 
     animationFrameRef.current = window.requestAnimationFrame(step)
-  }, [projectId, rightSidebarSize, shouldRenderRightSidebarLayout, showRightSidebar])
+  }, [workspaceId, rightSidebarSize, shouldRenderRightSidebarLayout, showRightSidebar])
 
   useEffect(() => {
     if (shouldRenderRightSidebarLayout) return

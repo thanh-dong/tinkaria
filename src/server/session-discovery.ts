@@ -435,7 +435,7 @@ async function collectJsonlFiles(dir: string): Promise<string[]> {
 
 export async function scanCodexSessions(
   codexSessionsDir: string,
-  projectPath: string
+  workspacePath: string
 ): Promise<DiscoveredSession[]> {
   const files = await collectJsonlFiles(codexSessionsDir)
   const sessions: DiscoveredSession[] = []
@@ -461,7 +461,7 @@ export async function scanCodexSessions(
       continue
     }
 
-    if (meta.cwd !== projectPath) continue
+    if (meta.cwd !== workspacePath) continue
 
     const fileStat = await stat(filePath).catch(() => null)
     if (!fileStat) continue
@@ -539,8 +539,8 @@ export function mergeSessions(
 }
 
 interface DiscoverSessionsOptions {
-  projectId: string
-  projectPath: string
+  workspaceId: string
+  workspacePath: string
   store: EventStore
   claudeProjectDir: string | null
   codexSessionsDir: string | null
@@ -549,16 +549,16 @@ interface DiscoverSessionsOptions {
 export async function discoverSessions(
   options: DiscoverSessionsOptions
 ): Promise<SessionsSnapshot> {
-  const { projectId, projectPath, store, claudeProjectDir, codexSessionsDir } = options
+  const { workspaceId, workspacePath, store, claudeProjectDir, codexSessionsDir } = options
 
   // 1. Scan CLI sessions in parallel
   const [claudeCliSessions, codexCliSessions] = await Promise.all([
     claudeProjectDir ? scanClaudeSessions(claudeProjectDir) : Promise.resolve([]),
-    codexSessionsDir ? scanCodexSessions(codexSessionsDir, projectPath) : Promise.resolve([]),
+    codexSessionsDir ? scanCodexSessions(codexSessionsDir, workspacePath) : Promise.resolve([]),
   ])
 
   // 2. Collect Tinkaria chats with sessionToken
-  const tinkariaChats = store.listChatsByProject(projectId)
+  const tinkariaChats = store.listChatsByProject(workspaceId)
   const tinkariaSessions: DiscoveredSession[] = tinkariaChats
     .filter((chat) => chat.sessionToken !== null)
     .map((chat) => ({
@@ -575,20 +575,20 @@ export async function discoverSessions(
   const allCliSessions = [...claudeCliSessions, ...codexCliSessions]
   const sessions = mergeSessions(allCliSessions, tinkariaSessions)
 
-  return { projectId, projectPath, sessions }
+  return { workspaceId, workspacePath, sessions }
 }
 
-function encodeClaudeProjectDir(projectPath: string): string {
-  return join(homedir(), ".claude", "projects", projectPath.replace(/\//g, "-"))
+function encodeClaudeProjectDir(workspacePath: string): string {
+  return join(homedir(), ".claude", "projects", workspacePath.replace(/\//g, "-"))
 }
 
 export async function findSessionFile(
   sessionId: string,
   provider: AgentProvider,
-  projectPath: string
+  workspacePath: string
 ): Promise<string | null> {
   if (provider === "claude") {
-    const claudeDir = encodeClaudeProjectDir(projectPath)
+    const claudeDir = encodeClaudeProjectDir(workspacePath)
     const filePath = join(claudeDir, `${sessionId}.jsonl`)
     try {
       await stat(filePath)
@@ -620,9 +620,9 @@ export async function findSessionFile(
 export async function inspectSessionRuntime(
   sessionId: string,
   provider: AgentProvider,
-  projectPath: string
+  workspacePath: string
 ): Promise<DiscoveredSession["runtime"] | null> {
-  const filePath = await findSessionFile(sessionId, provider, projectPath)
+  const filePath = await findSessionFile(sessionId, provider, workspacePath)
   if (!filePath) return null
   return inspectSessionRuntimeFile(filePath, provider)
 }

@@ -4,7 +4,7 @@ import type { AgentProvider, DiscoveredSession } from "../../../../shared/types"
 import { SessionPicker } from "../SessionPicker"
 import { Button } from "../../ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
-import type { SidebarChatRow, SidebarProjectGroup } from "../../../../shared/types"
+import type { SidebarChatRow, SidebarWorkspaceGroup } from "../../../../shared/types"
 import { APP_NAME } from "../../../../shared/branding"
 import { getPathBasename } from "../../../lib/formatters"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../../lib/uiIdentityOverlay"
@@ -25,7 +25,7 @@ const MERGE_SESSION_DESCRIPTOR = createUiIdentityDescriptor({
 })
 
 interface Props {
-  projectGroups: SidebarProjectGroup[]
+  workspaceGroups: SidebarWorkspaceGroup[]
   collapsedSections: Set<string>
   expandedGroups: Set<string>
   onToggleSection: (key: string) => void
@@ -33,21 +33,21 @@ interface Props {
   renderChatRow: (chat: SidebarChatRow) => ReactNode
   chatsPerProject: number
   onNewLocalChat?: (localPath: string) => void
-  onRemoveProject?: (projectId: string) => void
+  onRemoveProject?: (workspaceId: string) => void
   isConnected?: boolean
   startingLocalPath?: string | null
-  sessionsForProject?: (projectId: string) => DiscoveredSession[]
-  sessionsWindowDaysForProject?: (projectId: string) => number
-  onOpenSessionPicker?: (projectId: string, open: boolean) => void
+  sessionsForProject?: (workspaceId: string) => DiscoveredSession[]
+  sessionsWindowDaysForProject?: (workspaceId: string) => number
+  onOpenSessionPicker?: (workspaceId: string, open: boolean) => void
   onNavigateToChat?: (chatId: string) => void
-  onResumeSession?: (projectId: string, sessionId: string, provider: AgentProvider) => void
-  onRefreshSessions?: (projectId: string) => void
-  onShowMoreSessions?: (projectId: string) => void
-  onMergeSession?: (projectId: string) => void
+  onResumeSession?: (workspaceId: string, sessionId: string, provider: AgentProvider) => void
+  onRefreshSessions?: (workspaceId: string) => void
+  onShowMoreSessions?: (workspaceId: string) => void
+  onMergeSession?: (workspaceId: string) => void
 }
 
 interface ProjectGroupSectionProps {
-  group: SidebarProjectGroup
+  group: SidebarWorkspaceGroup
   collapsedSections: Set<string>
   expandedGroups: Set<string>
   onToggleSection: (key: string) => void
@@ -55,17 +55,17 @@ interface ProjectGroupSectionProps {
   renderChatRow: (chat: SidebarChatRow) => ReactNode
   chatsPerProject: number
   onNewLocalChat?: (localPath: string) => void
-  onRemoveProject?: (projectId: string) => void
+  onRemoveProject?: (workspaceId: string) => void
   isConnected?: boolean
   startingLocalPath?: string | null
   sessions?: DiscoveredSession[]
   sessionsWindowDays?: number
-  onOpenSessionPicker?: (projectId: string, open: boolean) => void
+  onOpenSessionPicker?: (workspaceId: string, open: boolean) => void
   onNavigateToChat?: (chatId: string) => void
-  onResumeSession?: (projectId: string, sessionId: string, provider: AgentProvider) => void
-  onRefreshSessions?: (projectId: string) => void
-  onShowMoreSessions?: (projectId: string) => void
-  onMergeSession?: (projectId: string) => void
+  onResumeSession?: (workspaceId: string, sessionId: string, provider: AgentProvider) => void
+  onRefreshSessions?: (workspaceId: string) => void
+  onShowMoreSessions?: (workspaceId: string) => void
+  onMergeSession?: (workspaceId: string) => void
 }
 
 function ProjectGroupSection({
@@ -235,7 +235,7 @@ function ProjectGroupSection({
 }
 
 export function LocalProjectsSection({
-  projectGroups,
+  workspaceGroups,
   collapsedSections,
   expandedGroups,
   onToggleSection,
@@ -257,7 +257,7 @@ export function LocalProjectsSection({
 }: Props) {
   return (
     <>
-      {projectGroups.map((group) => (
+      {workspaceGroups.map((group) => (
         <ProjectGroupSection
           key={group.groupKey}
           group={group}

@@ -1,6 +1,6 @@
 // src/server/transcript-search.ts
 import type { TranscriptEntry, NormalizedToolCall } from "../shared/types"
-import type { SearchResult, SearchDocumentKind } from "../shared/project-agent-types"
+import type { SearchResult, SearchDocumentKind } from "../shared/workspace-types"
 import { BM25Index } from "./bm25"
 
 const TOOL_RESULT_MAX_CHARS = 500

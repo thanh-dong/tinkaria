@@ -1,10 +1,10 @@
 import type { TranscriptEntry, NormalizedToolCall } from "../shared/types"
 import type { StoreState } from "./events"
-import type { SessionRecord, SessionStatus } from "../shared/project-agent-types"
+import type { SessionRecord, SessionStatus } from "../shared/workspace-types"
 
 interface MutableSessionRecord {
   chatId: string
-  projectId: string
+  workspaceId: string
   intent: string
   status: SessionStatus
   provider: "claude" | "codex"
@@ -50,7 +50,7 @@ export class SessionIndex {
     if (!session) {
       session = {
         chatId,
-        projectId: chat.projectId,
+        workspaceId: chat.workspaceId,
         intent: "",
         status: "active",
         provider: chat.provider ?? "claude",
@@ -89,10 +89,10 @@ export class SessionIndex {
     }
   }
 
-  getSessionsByProject(projectId: string): SessionRecord[] {
+  getSessionsByProject(workspaceId: string): SessionRecord[] {
     const results: SessionRecord[] = []
     for (const session of this.sessions.values()) {
-      if (session.projectId === projectId) {
+      if (session.workspaceId === workspaceId) {
         results.push(this.toRecord(session))
       }
     }

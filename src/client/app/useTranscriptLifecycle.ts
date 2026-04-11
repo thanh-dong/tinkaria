@@ -261,7 +261,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
           messageCountRef.current = snapshot.messageCount
           setProjectSelection((current) => transitionProjectSelection(current, {
             type: "chat.snapshot_received",
-            projectId: snapshot.runtime.projectId,
+            workspaceId: snapshot.runtime.workspaceId,
           }))
           onChatSnapshotReceivedRef.current(snapshot)
         }
@@ -316,7 +316,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       unsub()
       orchestrationUnsub()
       // Save departing chat to cache — use sidebar's lastMessageAt as the source of truth
-      const departingSidebarChat = sidebarData.projectGroups
+      const departingSidebarChat = sidebarData.workspaceGroups
         .flatMap((g) => g.chats)
         .find((c) => c.chatId === chatId)
       if (chatId && messagesRef.current.length > 0) {
@@ -336,7 +336,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
   useEffect(() => {
     if (!activeChatId) return
     if (!sidebarReady || !chatReady) return
-    const exists = sidebarData.projectGroups.some((group) => group.chats.some((chat) => chat.chatId === activeChatId))
+    const exists = sidebarData.workspaceGroups.some((group) => group.chats.some((chat) => chat.chatId === activeChatId))
     if (exists) {
       if (pendingChatId === activeChatId) {
         setPendingChatId(null)
@@ -347,7 +347,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       return
     }
     navigate("/")
-  }, [activeChatId, chatReady, navigate, pendingChatId, sidebarData.projectGroups, sidebarReady])
+  }, [activeChatId, chatReady, navigate, pendingChatId, sidebarData.workspaceGroups, sidebarReady])
 
   // ── Clear pendingChatId when snapshot confirms the chat ───────────
   useEffect(() => {

@@ -11,7 +11,7 @@ import type { ChatMessageEvent, SessionsSnapshot, TranscriptEntry } from "../sha
 import type { SessionStatus } from "../shared/types"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
-import { deriveChatSnapshot, deriveLocalProjectsSnapshot, deriveProjectCoordinationSnapshot, deriveSessionsSnapshot, deriveSidebarData } from "./read-models"
+import { deriveChatSnapshot, deriveLocalWorkspacesSnapshot, deriveWorkspaceCoordinationSnapshot, deriveSessionsSnapshot, deriveSidebarData } from "./read-models"
 import { discoverSessions } from "./session-discovery"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
@@ -69,37 +69,37 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
   const sessionsCache = new Map<string, SessionsSnapshot>()
   const sessionsPollTimers = new Map<string, ReturnType<typeof setInterval>>()
 
-  function encodeClaudeProjectDir(projectPath: string): string {
-    return join(homedir(), ".claude", "projects", projectPath.replace(/\//g, "-"))
+  function encodeClaudeProjectDir(workspacePath: string): string {
+    return join(homedir(), ".claude", "projects", workspacePath.replace(/\//g, "-"))
   }
 
-  async function refreshSessions(projectId: string, projectPath: string): Promise<void> {
+  async function refreshSessions(workspaceId: string, workspacePath: string): Promise<void> {
     const home = homedir()
-    const claudeProjectDir = encodeClaudeProjectDir(projectPath)
+    const claudeProjectDir = encodeClaudeProjectDir(workspacePath)
     const codexSessionsDir = join(home, ".codex", "sessions")
 
     const snapshot = await discoverSessions({
-      projectId,
-      projectPath,
+      workspaceId,
+      workspacePath,
       store,
       claudeProjectDir,
       codexSessionsDir,
     })
 
-    sessionsCache.set(projectId, snapshot)
-    const topic = { type: "sessions" as const, projectId }
+    sessionsCache.set(workspaceId, snapshot)
+    const topic = { type: "sessions" as const, workspaceId }
     publishSnapshot(topic, snapshot)
   }
 
-  async function getOrRefreshSessionsSnapshot(projectId: string): Promise<SessionsSnapshot | null> {
-    const cached = sessionsCache.get(projectId)
+  async function getOrRefreshSessionsSnapshot(workspaceId: string): Promise<SessionsSnapshot | null> {
+    const cached = sessionsCache.get(workspaceId)
     if (cached) return cached
 
-    const project = store.state.projectsById.get(projectId)
+    const project = store.state.workspacesById.get(workspaceId)
     if (!project) return null
 
-    await refreshSessions(projectId, project.localPath)
-    return sessionsCache.get(projectId) ?? null
+    await refreshSessions(workspaceId, project.localPath)
+    return sessionsCache.get(workspaceId) ?? null
   }
 
   function publishSnapshot(topic: SubscriptionTopic, data: unknown): void {
@@ -126,13 +126,13 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     switch (topic.type) {
       case "sidebar":
         return deriveSidebarData(store.state, agent.getActiveStatuses())
-      case "local-projects":
-        return deriveLocalProjectsSnapshot(store.state, getDiscoveredProjects(), machineDisplayName)
+      case "local-workspaces":
+        return deriveLocalWorkspacesSnapshot(store.state, getDiscoveredProjects(), machineDisplayName)
       case "update":
         return updateManager?.getSnapshot() ?? DEFAULT_UPDATE_SNAPSHOT
       case "chat": {
         const chat = store.state.chatsById.get(topic.chatId)
-        const project = chat ? store.state.projectsById.get(chat.projectId) : undefined
+        const project = chat ? store.state.workspacesById.get(chat.workspaceId) : undefined
         const skills = project && skillCache ? await skillCache.get(project.localPath) : []
         return deriveChatSnapshot(
           store.state,
@@ -145,11 +145,11 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
       case "terminal":
         return terminals.getSnapshot(topic.terminalId)
       case "sessions":
-        return deriveSessionsSnapshot(await getOrRefreshSessionsSnapshot(topic.projectId))
+        return deriveSessionsSnapshot(await getOrRefreshSessionsSnapshot(topic.workspaceId))
       case "orchestration":
         return orchestrator?.getHierarchy(topic.chatId) ?? { children: [] }
-      case "project":
-        return deriveProjectCoordinationSnapshot(store.state, topic.projectId)
+      case "workspace":
+        return deriveWorkspaceCoordinationSnapshot(store.state, topic.workspaceId)
       default: {
         const _exhaustive: never = topic
         throw new Error(`Unknown topic type: ${(_exhaustive as SubscriptionTopic).type}`)
@@ -160,17 +160,17 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
   function addSubscription(subscriptionId: string, topic: SubscriptionTopic): void {
     activeSubscriptions.set(subscriptionId, topic)
 
-    if (topic.type === "sessions" && !sessionsPollTimers.has(topic.projectId)) {
-      const projectId = topic.projectId
-      const project = store.state.projectsById.get(projectId)
+    if (topic.type === "sessions" && !sessionsPollTimers.has(topic.workspaceId)) {
+      const workspaceId = topic.workspaceId
+      const project = store.state.workspacesById.get(workspaceId)
       if (project) {
-        const projectPath = project.localPath
+        const workspacePath = project.localPath
         const timer = setInterval(() => {
-          refreshSessions(projectId, projectPath).catch((err) =>
+          refreshSessions(workspaceId, workspacePath).catch((err) =>
             console.warn(LOG_PREFIX, "sessions scan failed:", err instanceof Error ? err.message : String(err))
           )
         }, 60_000)
-        sessionsPollTimers.set(projectId, timer)
+        sessionsPollTimers.set(workspaceId, timer)
       }
     }
   }
@@ -187,19 +187,19 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         lastJsonByKey.delete(key)
       }
 
-      // Clean up sessions poll timer if no remaining sessions subscriptions for this projectId
+      // Clean up sessions poll timer if no remaining sessions subscriptions for this workspaceId
       if (topic.type === "sessions") {
-        const projectId = topic.projectId
+        const workspaceId = topic.workspaceId
         const hasOtherSessionsSub = [...activeSubscriptions.values()].some(
-          (t) => t.type === "sessions" && t.projectId === projectId
+          (t) => t.type === "sessions" && t.workspaceId === workspaceId
         )
         if (!hasOtherSessionsSub) {
-          const timer = sessionsPollTimers.get(projectId)
+          const timer = sessionsPollTimers.get(workspaceId)
           if (timer) {
             clearInterval(timer)
-            sessionsPollTimers.delete(projectId)
+            sessionsPollTimers.delete(workspaceId)
           }
-          sessionsCache.delete(projectId)
+          sessionsCache.delete(workspaceId)
         }
       }
     }

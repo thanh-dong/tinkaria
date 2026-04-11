@@ -14,7 +14,7 @@ import {
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
 import type {
   DiscoveredSession,
-  LocalProjectsSnapshot,
+  LocalWorkspacesSnapshot,
 } from "../../shared/types"
 import type { SocketStatus } from "../app/socket-interface"
 import { PageHeader } from "../app/PageHeader"
@@ -27,23 +27,23 @@ import {
 import { cn } from "../lib/utils"
 import { SessionRuntimeBadges } from "./chat-ui/SessionRuntimeBadges"
 import { HomepagePreferences } from "./HomepagePreferences"
-import { NewProjectModal } from "./NewProjectModal"
+import { NewProjectModal } from "./NewWorkspaceModal"
 import { Button } from "./ui/button"
 
 interface LocalDevProps {
   connectionStatus: SocketStatus
   ready: boolean
-  snapshot: LocalProjectsSnapshot | null
+  snapshot: LocalWorkspacesSnapshot | null
   startingLocalPath: string | null
   commandError: string | null
   onOpenProject: (localPath: string) => Promise<void>
   onCreateProject: (project: { mode: "new" | "existing"; localPath: string; title: string }) => Promise<void>
-  sessionsForProject?: (projectId: string) => DiscoveredSession[]
-  onResumeSession?: (projectId: string, session: DiscoveredSession) => Promise<void>
+  sessionsForProject?: (workspaceId: string) => DiscoveredSession[]
+  onResumeSession?: (workspaceId: string, session: DiscoveredSession) => Promise<void>
 }
 
 interface HomepageRecentSession {
-  projectId: string
+  workspaceId: string
   projectTitle: string
   session: DiscoveredSession
 }
@@ -201,7 +201,7 @@ function truncateLabel(value: string, maxLength = 34): string {
   return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
 }
 
-function getProjectTitle(project: LocalProjectsSnapshot["projects"][number]) {
+function getProjectTitle(project: LocalWorkspacesSnapshot["workspaces"][number]) {
   return project.title || getPathBasename(project.localPath)
 }
 
@@ -215,7 +215,7 @@ function getProjectSecondaryLabel(session: DiscoveredSession | null) {
 }
 
 function getProjectOverviewSummary(
-  project: LocalProjectsSnapshot["projects"][number],
+  project: LocalWorkspacesSnapshot["workspaces"][number],
   session: DiscoveredSession | null,
 ) {
   const projectTitle = getProjectTitle(project)
@@ -230,17 +230,17 @@ function getProjectOverviewSummary(
 
 
 export function getHomepageRecentSessions(
-  snapshot: LocalProjectsSnapshot | null,
-  sessionsForProject?: (projectId: string) => DiscoveredSession[],
+  snapshot: LocalWorkspacesSnapshot | null,
+  sessionsForProject?: (workspaceId: string) => DiscoveredSession[],
 ): HomepageRecentSession[] {
   if (!snapshot || !sessionsForProject) {
     return []
   }
 
-  return snapshot.projects
+  return snapshot.workspaces
     .flatMap((project) =>
       sessionsForProject(project.localPath).map((session) => ({
-        projectId: project.localPath,
+        workspaceId: project.localPath,
         projectTitle: getProjectTitle(project),
         session,
       }))
@@ -249,8 +249,8 @@ export function getHomepageRecentSessions(
     .slice(0, 5)
 }
 
-export function getSortedHomepageProjects(snapshot: LocalProjectsSnapshot | null) {
-  return [...(snapshot?.projects ?? [])].sort((left, right) => {
+export function getSortedHomepageProjects(snapshot: LocalWorkspacesSnapshot | null) {
+  return [...(snapshot?.workspaces ?? [])].sort((left, right) => {
     const leftRank = left.lastOpenedAt ?? 0
     const rightRank = right.lastOpenedAt ?? 0
 
@@ -263,14 +263,14 @@ export function getSortedHomepageProjects(snapshot: LocalProjectsSnapshot | null
 }
 
 function getProjectSessions(
-  projectLocalPath: string,
-  sessionsForProject?: (projectId: string) => DiscoveredSession[],
+  workspaceLocalPath: string,
+  sessionsForProject?: (workspaceId: string) => DiscoveredSession[],
 ) {
   if (!sessionsForProject) {
     return []
   }
 
-  return [...sessionsForProject(projectLocalPath)].sort((left, right) => right.modifiedAt - left.modifiedAt)
+  return [...sessionsForProject(workspaceLocalPath)].sort((left, right) => right.modifiedAt - left.modifiedAt)
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -507,7 +507,7 @@ function ProjectOverviewPanel({
   onContinue,
   onStartTask,
 }: {
-  project: LocalProjectsSnapshot["projects"][number]
+  project: LocalWorkspacesSnapshot["workspaces"][number]
   sessions: DiscoveredSession[]
   loading: boolean
   onContinue: () => void
@@ -696,10 +696,10 @@ export function LocalDev({
                 <div className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden">
                   {recentSessions.map((item) => (
                     <RecentSessionRow
-                      key={`${item.projectId}:${item.session.sessionId}`}
+                      key={`${item.workspaceId}:${item.session.sessionId}`}
                       item={item}
                       onResume={() => {
-                        void onResumeSession?.(item.projectId, item.session)
+                        void onResumeSession?.(item.workspaceId, item.session)
                       }}
                     />
                   ))}

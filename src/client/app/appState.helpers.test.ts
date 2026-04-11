@@ -137,7 +137,7 @@ function chatRow(chatId: string, title = `Chat ${chatId}`): SidebarChatRow {
 
 function sidebarWith(...groups: Array<{ key: string; chats: SidebarChatRow[] }>): SidebarData {
   return {
-    projectGroups: groups.map((g) => ({
+    workspaceGroups: groups.map((g) => ({
       groupKey: g.key,
       localPath: `/tmp/${g.key}`,
       chats: g.chats,
@@ -149,7 +149,7 @@ describe("removeChatFromSidebar", () => {
   test("removes the target chat from its project group", () => {
     const data = sidebarWith({ key: "p1", chats: [chatRow("a"), chatRow("b"), chatRow("c")] })
     const result = removeChatFromSidebar(data, "b")
-    expect(result.projectGroups[0].chats.map((c) => c.chatId)).toEqual(["a", "c"])
+    expect(result.workspaceGroups[0].chats.map((c) => c.chatId)).toEqual(["a", "c"])
   })
 
   test("removes empty project groups after the last chat is deleted", () => {
@@ -158,8 +158,8 @@ describe("removeChatFromSidebar", () => {
       { key: "p2", chats: [chatRow("other")] },
     )
     const result = removeChatFromSidebar(data, "only")
-    expect(result.projectGroups).toHaveLength(1)
-    expect(result.projectGroups[0].groupKey).toBe("p2")
+    expect(result.workspaceGroups).toHaveLength(1)
+    expect(result.workspaceGroups[0].groupKey).toBe("p2")
   })
 
   test("returns identical data when chatId is not found", () => {
@@ -174,8 +174,8 @@ describe("removeChatFromSidebar", () => {
       { key: "p2", chats: [chatRow("c"), chatRow("d")] },
     )
     const result = removeChatFromSidebar(data, "c")
-    expect(result.projectGroups[0].chats.map((c) => c.chatId)).toEqual(["a", "b"])
-    expect(result.projectGroups[1].chats.map((c) => c.chatId)).toEqual(["d"])
+    expect(result.workspaceGroups[0].chats.map((c) => c.chatId)).toEqual(["a", "b"])
+    expect(result.workspaceGroups[1].chats.map((c) => c.chatId)).toEqual(["d"])
   })
 })
 

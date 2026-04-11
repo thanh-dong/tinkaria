@@ -20,7 +20,7 @@ function timestamped<T extends Omit<TranscriptEntry, "_id" | "createdAt">>(entry
 
 interface FakeChat {
   id: string
-  projectId: string
+  workspaceId: string
   title: string
   provider: "claude" | "codex" | null
   planMode: boolean
@@ -37,11 +37,11 @@ function createFakeStore() {
     chats,
     project,
     messagesByChatId,
-    async createChat(projectId: string) {
+    async createChat(workspaceId: string) {
       const id = `chat-${++chatCounter}`
       const chat: FakeChat = {
         id,
-        projectId,
+        workspaceId,
         title: "New Chat",
         provider: null,
         planMode: false,
@@ -189,7 +189,7 @@ describe("SessionOrchestrator", () => {
       // The spawned chat should exist in the store
       const spawned = ctx.store.requireChat(chatId)
       expect(spawned).toBeDefined()
-      expect(spawned.projectId).toBe("project-1")
+      expect(spawned.workspaceId).toBe("project-1")
     })
 
     test("passes instruction to startTurnForChat", async () => {

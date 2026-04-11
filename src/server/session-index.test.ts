@@ -15,21 +15,22 @@ function toolCallEntry(tool: NormalizedToolCall): Omit<ToolCallEntry, "_id" | "c
 
 function createState(chats: ChatRecord[]): StoreState {
   const chatsById = new Map<string, ChatRecord>()
-  const projectsById = new Map<string, { id: string; localPath: string; title: string; createdAt: number; updatedAt: number }>()
-  const projectIdsByPath = new Map<string, string>()
+  const workspacesById = new Map<string, { id: string; localPath: string; title: string; createdAt: number; updatedAt: number }>()
+  const workspaceIdsByPath = new Map<string, string>()
 
-  projectsById.set("p1", { id: "p1", localPath: "/tmp/p", title: "Test", createdAt: 0, updatedAt: 0 })
-  projectsById.set("p2", { id: "p2", localPath: "/tmp/p2", title: "Test2", createdAt: 0, updatedAt: 0 })
+  workspacesById.set("p1", { id: "p1", localPath: "/tmp/p", title: "Test", createdAt: 0, updatedAt: 0 })
+  workspacesById.set("p2", { id: "p2", localPath: "/tmp/p2", title: "Test2", createdAt: 0, updatedAt: 0 })
   for (const chat of chats) {
     chatsById.set(chat.id, chat)
   }
-  return { projectsById, projectIdsByPath, chatsById, coordinationByProject: new Map() }
+  return { workspacesById, workspaceIdsByPath, chatsById, coordinationByWorkspace: new Map() }
 }
 
-function makeChat(id: string, projectId = "p1", provider: "claude" | "codex" | null = "claude"): ChatRecord {
+function makeChat(id: string, workspaceId = "p1", provider: "claude" | "codex" | null = "claude"): ChatRecord {
   return {
     id,
-    projectId,
+    workspaceId,
+    repoId: null,
     title: "Chat",
     createdAt: Date.now(),
     updatedAt: Date.now(),

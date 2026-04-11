@@ -48,7 +48,7 @@ describe("parseProjectCliArgs", () => {
 
   test("parses --project flag", () => {
     const result = parseProjectCliArgs(["sessions", "--project", "p1"])
-    expect(result).toEqual({ command: "sessions", args: { projectId: "p1" } })
+    expect(result).toEqual({ command: "sessions", args: { workspaceId: "p1" } })
   })
 
   test("returns help for no args", () => {

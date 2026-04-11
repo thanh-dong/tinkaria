@@ -83,11 +83,11 @@ describe("runner process", () => {
         model: "test-model",
         planMode: false,
         appendUserPrompt: true,
-        projectLocalPath: "/tmp",
+        workspaceLocalPath: "/tmp",
         sessionToken: null,
         chatTitle: "Test",
         existingMessageCount: 0,
-        projectId: "p1",
+        workspaceId: "p1",
       })),
       { timeout: 5000 }
     )

@@ -96,11 +96,11 @@ describe("RunnerNatsHandler", () => {
       model: "test-model",
       planMode: false,
       appendUserPrompt: true,
-      projectLocalPath: "/tmp",
+      workspaceLocalPath: "/tmp",
       sessionToken: null,
       chatTitle: "New Chat",
       existingMessageCount: 0,
-      projectId: "p1",
+      workspaceId: "p1",
     }
 
     const reply = await nc.request(
@@ -135,8 +135,8 @@ describe("RunnerNatsHandler", () => {
 
     const startCmd: StartTurnCommand = {
       chatId: "chat-1", provider: "claude", content: "hello", model: "m",
-      planMode: false, appendUserPrompt: true, projectLocalPath: "/tmp",
-      sessionToken: null, chatTitle: "New Chat", existingMessageCount: 0, projectId: "p1",
+      planMode: false, appendUserPrompt: true, workspaceLocalPath: "/tmp",
+      sessionToken: null, chatTitle: "New Chat", existingMessageCount: 0, workspaceId: "p1",
     }
     await nc.request(runnerCmdSubject("r1", "start_turn"), encoder.encode(JSON.stringify(startCmd)), { timeout: 2000 })
     await new Promise((r) => setTimeout(r, 100))

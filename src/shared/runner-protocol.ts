@@ -33,14 +33,16 @@ export interface StartTurnCommand {
   chatId: string
   provider: AgentProvider
   content: string
+  delegatedContext?: string
+  isSpawned?: boolean
   model: string
   planMode: boolean
   appendUserPrompt: boolean
-  projectLocalPath: string
+  workspaceLocalPath: string
   sessionToken: string | null
   chatTitle: string
   existingMessageCount: number
-  projectId: string
+  workspaceId: string
 }
 
 export interface CancelTurnCommand {

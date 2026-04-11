@@ -1,4 +1,34 @@
-import { describe, expect, test } from "bun:test"
+import { beforeEach, describe, expect, test } from "bun:test"
+
+// Guard against prior tests wiping browser globals (order-dependent in full suite)
+function ensureBrowserGlobals() {
+  if (typeof globalThis.window !== "undefined") {
+    if (!globalThis.window.matchMedia) {
+      globalThis.window.matchMedia = (query: string) => ({
+        matches: false, media: query, onchange: null,
+        addListener: () => {}, removeListener: () => {},
+        addEventListener: () => {}, removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList
+    }
+    if (!globalThis.window.localStorage) {
+      const store = new Map<string, string>()
+      Object.defineProperty(globalThis.window, "localStorage", {
+        value: {
+          getItem: (k: string) => store.get(k) ?? null,
+          setItem: (k: string, v: string) => store.set(k, v),
+          removeItem: (k: string) => store.delete(k),
+          clear: () => store.clear(),
+          get length() { return store.size },
+          key: (i: number) => [...store.keys()][i] ?? null,
+        },
+        writable: true, configurable: true,
+      })
+    }
+  }
+}
+ensureBrowserGlobals()
+beforeEach(ensureBrowserGlobals)
 import { renderToStaticMarkup } from "react-dom/server"
 import { ThemeProvider } from "../hooks/useTheme"
 import { TooltipProvider } from "./ui/tooltip"
@@ -17,7 +47,7 @@ describe("getSortedHomepageProjects", () => {
   test("orders homepage projects by most recently opened first", () => {
     expect(getSortedHomepageProjects({
       machine: { id: "local", displayName: "Local Projects" },
-      projects: [
+      workspaces: [
         { localPath: "/tmp/alpha", title: "Alpha", source: "saved", chatCount: 1, lastOpenedAt: 2 },
         { localPath: "/tmp/gamma", title: "Gamma", source: "saved", chatCount: 0 },
         { localPath: "/tmp/beta", title: "Beta", source: "discovered", chatCount: 3, lastOpenedAt: 4 },
@@ -30,12 +60,12 @@ describe("getHomepageRecentSessions", () => {
   test("returns the most recent sessions across projects for welcome-back resume cards", () => {
     expect(getHomepageRecentSessions({
       machine: { id: "local", displayName: "Local Projects" },
-      projects: [
+      workspaces: [
         { localPath: "/tmp/alpha", title: "Alpha", source: "saved", chatCount: 1, lastOpenedAt: 2 },
         { localPath: "/tmp/beta", title: "Beta", source: "discovered", chatCount: 3, lastOpenedAt: 4 },
       ],
-    }, (projectId) => {
-      if (projectId === "/tmp/alpha") {
+    }, (workspaceId) => {
+      if (workspaceId === "/tmp/alpha") {
         return [{
           sessionId: "alpha-1",
           provider: "codex",
@@ -62,7 +92,7 @@ describe("getHomepageRecentSessions", () => {
   test("surfaces up to 5 recent sessions for the homepage", () => {
     const sessions = getHomepageRecentSessions({
       machine: { id: "local", displayName: "Local Projects" },
-      projects: [
+      workspaces: [
         { localPath: "/tmp/proj", title: "Proj", source: "saved", chatCount: 6, lastOpenedAt: 1 },
       ],
     }, () => Array.from({ length: 8 }, (_, i) => ({
@@ -131,7 +161,7 @@ describe("LocalDev homepage", () => {
               id: "local",
               displayName: "Local Projects",
             },
-            projects: [
+            workspaces: [
               {
                 localPath: "/workspace/alpha",
                 title: "Alpha",
@@ -152,8 +182,8 @@ describe("LocalDev homepage", () => {
           commandError={null}
           onOpenProject={async () => {}}
           onCreateProject={async () => {}}
-          sessionsForProject={(projectId) => {
-            if (projectId === "/workspace/alpha") {
+          sessionsForProject={(workspaceId) => {
+            if (workspaceId === "/workspace/alpha") {
               return [{
                 sessionId: "session-alpha",
                 provider: "codex",

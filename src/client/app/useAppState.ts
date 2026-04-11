@@ -14,7 +14,7 @@ import {
   type UpdateSnapshot,
 } from "../../shared/types"
 import { useChatInputStore } from "../stores/chatInputStore"
-import type { ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData } from "../../shared/types"
+import type { ChatSnapshot, HydratedTranscriptMessage, LocalWorkspacesSnapshot, SidebarChatRow, SidebarData } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import { useAppDialog } from "../components/ui/app-dialog"
 import { useSessionPolling } from "./useSessionPolling"
@@ -73,7 +73,7 @@ export interface AppState {
   socket: AppTransport
   activeChatId: string | null
   sidebarData: SidebarData
-  localProjects: LocalProjectsSnapshot | null
+  localProjects: LocalWorkspacesSnapshot | null
   updateSnapshot: UpdateSnapshot | null
   chatSnapshot: ChatSnapshot | null
   orchestrationHierarchy: OrchestrationHierarchySnapshot | null
@@ -109,7 +109,7 @@ export interface AppState {
   expandSidebar: () => void
   closeLocalFilePreview: () => void
   scrollToBottom: () => void
-  handleCreateChat: (projectId: string) => Promise<void>
+  handleCreateChat: (workspaceId: string) => Promise<void>
   handleOpenLocalProject: (localPath: string) => Promise<void>
   handleCreateProject: (project: ProjectRequest) => Promise<void>
   handleCheckForUpdates: (options?: { force?: boolean }) => Promise<void>
@@ -123,7 +123,7 @@ export interface AppState {
   clearQueuedText: () => void
   restoreQueuedText: () => string
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
-  handleRemoveProject: (projectId: string) => Promise<void>
+  handleRemoveProject: (workspaceId: string) => Promise<void>
   handleOpenExternal: (action: "open_finder") => Promise<void>
   handleOpenExternalPath: (action: "open_finder", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
@@ -131,17 +131,17 @@ export interface AppState {
   handleRenameChat: (chatId: string, title: string) => Promise<void>
   sessionsSnapshots: Map<string, SessionsSnapshot>
   sessionsWindowDays: Map<string, number>
-  handleOpenSessionPicker: (projectId: string, open: boolean) => void
-  handleResumeSession: (projectId: string, sessionId: string, provider: AgentProvider) => Promise<void>
-  handleRefreshSessions: (projectId: string) => void
-  handleShowMoreSessions: (projectId: string) => void
+  handleOpenSessionPicker: (workspaceId: string, open: boolean) => void
+  handleResumeSession: (workspaceId: string, sessionId: string, provider: AgentProvider) => Promise<void>
+  handleRefreshSessions: (workspaceId: string) => void
+  handleShowMoreSessions: (workspaceId: string) => void
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
   pendingSessionBootstrap: PendingSessionBootstrap | null
   dismissBootstrapError: () => void
   pendingMergeProjectId: string | null
-  requestMerge: (projectId: string) => void
+  requestMerge: (workspaceId: string) => void
   clearMergeRequest: () => void
   handleAskUserQuestion: (
     toolUseId: string,
@@ -161,8 +161,8 @@ export function useAppState(activeChatId: string | null): AppState {
   const socket = useAppSocket()
   const dialog = useAppDialog()
 
-  const [sidebarData, setSidebarData] = useState<SidebarData>({ projectGroups: [] })
-  const [localProjects, setLocalProjects] = useState<LocalProjectsSnapshot | null>(null)
+  const [sidebarData, setSidebarData] = useState<SidebarData>({ workspaceGroups: [] })
+  const [localProjects, setLocalProjects] = useState<LocalWorkspacesSnapshot | null>(null)
   const [updateSnapshot, setUpdateSnapshot] = useState<UpdateSnapshot | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<SocketStatus>("connecting")
   const [sidebarReady, setSidebarReady] = useState(false)
@@ -210,13 +210,13 @@ export function useAppState(activeChatId: string | null): AppState {
       setSidebarData(snapshot)
       setProjectSelection((current) => transitionProjectSelection(current, {
         type: "sidebar.loaded",
-        firstProjectId: snapshot.projectGroups[0]?.groupKey ?? null,
+        firstProjectId: snapshot.workspaceGroups[0]?.groupKey ?? null,
       }))
       useChatInputStore.getState().reconcileQueuedDrafts(
-        snapshot.projectGroups.flatMap((group) => group.chats.map((chat) => chat.chatId))
+        snapshot.workspaceGroups.flatMap((group) => group.chats.map((chat) => chat.chatId))
       )
       // Mark cached chats as stale when sidebar shows newer lastMessageAt
-      const allChats = snapshot.projectGroups.flatMap((group) => group.chats)
+      const allChats = snapshot.workspaceGroups.flatMap((group) => group.chats)
       markCachedChatsStale(allChats)
       setSidebarReady(true)
       setCommandError(null)
@@ -224,7 +224,7 @@ export function useAppState(activeChatId: string | null): AppState {
   }, [resumeRefreshNonce, socket])
 
   useEffect(() => {
-    return socket.subscribe<LocalProjectsSnapshot>({ type: "local-projects" }, (snapshot) => {
+    return socket.subscribe<LocalWorkspacesSnapshot>({ type: "local-workspaces" }, (snapshot) => {
       setLocalProjects(snapshot)
       setLocalProjectsReady(true)
       setCommandError(null)
@@ -313,8 +313,8 @@ export function useAppState(activeChatId: string | null): AppState {
     [activeChatId, chatSnapshot]
   )
   const activeSidebarChat = useMemo(
-    () => getSidebarChatRow(sidebarData.projectGroups, activeChatId),
-    [activeChatId, sidebarData.projectGroups]
+    () => getSidebarChatRow(sidebarData.workspaceGroups, activeChatId),
+    [activeChatId, sidebarData.workspaceGroups]
   )
   useEffect(() => {
     logAppState("active snapshot resolved", {
@@ -354,17 +354,17 @@ export function useAppState(activeChatId: string | null): AppState {
     runtime,
   })
 
-  const fallbackLocalProjectPath = localProjects?.projects[0]?.localPath ?? null
+  const fallbackLocalProjectPath = localProjects?.workspaces[0]?.localPath ?? null
   const selectedProject = resolveProjectSelection(projectSelection)
-  const selectedProjectId = selectedProject.projectId
+  const selectedProjectId = selectedProject.workspaceId
   const navbarLocalPath =
     runtime?.localPath
     ?? fallbackLocalProjectPath
-    ?? sidebarData.projectGroups[0]?.localPath
+    ?? sidebarData.workspaceGroups[0]?.localPath
   const hasSelectedProject = Boolean(
     selectedProjectId
-    ?? runtime?.projectId
-    ?? sidebarData.projectGroups[0]?.groupKey
+    ?? runtime?.workspaceId
+    ?? sidebarData.workspaceGroups[0]?.groupKey
     ?? fallbackLocalProjectPath
   )
   const chatHasKnownMessages = activeSidebarChat?.lastMessageAt !== undefined
@@ -382,10 +382,10 @@ export function useAppState(activeChatId: string | null): AppState {
   useEffect(() => {
     if (!activeChatId || !sidebarReady) return
     if (document.visibilityState !== "visible" || !document.hasFocus()) return
-    const chat = getSidebarChatRow(sidebarData.projectGroups, activeChatId)
+    const chat = getSidebarChatRow(sidebarData.workspaceGroups, activeChatId)
     if (!chat?.unread) return
     void socket.command({ type: "chat.markRead", chatId: activeChatId }).catch(setNormalizedCommandError)
-  }, [activeChatId, focusEpoch, sidebarData.projectGroups, sidebarReady, socket, setNormalizedCommandError])
+  }, [activeChatId, focusEpoch, sidebarData.workspaceGroups, sidebarReady, socket, setNormalizedCommandError])
 
   // Re-trigger mark-read when window regains focus
   useEffect(() => {

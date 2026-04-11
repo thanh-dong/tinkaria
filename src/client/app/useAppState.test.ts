@@ -33,7 +33,7 @@ import { createIncrementalHydrator } from "../lib/parseTranscript"
 
 function createSidebarData(): SidebarData {
   return {
-    projectGroups: [
+    workspaceGroups: [
       {
         groupKey: "project-1",
         localPath: "/tmp/project-1",
@@ -102,19 +102,19 @@ describe("getNewestRemainingChatId", () => {
   test("returns the next newest chat from the same project", () => {
     const sidebarData = createSidebarData()
 
-    expect(getNewestRemainingChatId(sidebarData.projectGroups, "chat-3")).toBe("chat-2")
+    expect(getNewestRemainingChatId(sidebarData.workspaceGroups, "chat-3")).toBe("chat-2")
   })
 
   test("returns null when no other chats remain in the project", () => {
     const sidebarData = createSidebarData()
 
-    expect(getNewestRemainingChatId(sidebarData.projectGroups, "chat-4")).toBeNull()
+    expect(getNewestRemainingChatId(sidebarData.workspaceGroups, "chat-4")).toBeNull()
   })
 
   test("returns null when the chat is not found", () => {
     const sidebarData = createSidebarData()
 
-    expect(getNewestRemainingChatId(sidebarData.projectGroups, "missing")).toBeNull()
+    expect(getNewestRemainingChatId(sidebarData.workspaceGroups, "missing")).toBeNull()
   })
 })
 
@@ -270,7 +270,7 @@ describe("resolveComposeIntent", () => {
         sidebarProjectId: "project-sidebar",
         fallbackLocalProjectPath: "/tmp/project",
       })
-    ).toEqual({ kind: "project_id", projectId: "project-selected" })
+    ).toEqual({ kind: "project_id", workspaceId: "project-selected" })
   })
 
   test("falls back to the first sidebar project", () => {
@@ -280,7 +280,7 @@ describe("resolveComposeIntent", () => {
         sidebarProjectId: "project-sidebar",
         fallbackLocalProjectPath: "/tmp/project",
       })
-    ).toEqual({ kind: "project_id", projectId: "project-sidebar" })
+    ).toEqual({ kind: "project_id", workspaceId: "project-sidebar" })
   })
 
   test("uses the first local project path when no project is selected", () => {
@@ -309,7 +309,7 @@ describe("getActiveChatSnapshot", () => {
     const snapshot: ChatSnapshot = {
       runtime: {
         chatId: "chat-1",
-        projectId: "project-1",
+        workspaceId: "project-1",
         localPath: "/tmp/project-1",
         title: "Chat 1",
         status: "idle",
@@ -330,7 +330,7 @@ describe("getActiveChatSnapshot", () => {
     const snapshot: ChatSnapshot = {
       runtime: {
         chatId: "chat-old",
-        projectId: "project-1",
+        workspaceId: "project-1",
         localPath: "/tmp/project-1",
         title: "Old chat",
         status: "idle",

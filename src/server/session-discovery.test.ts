@@ -185,12 +185,12 @@ describe("scanCodexSessions", () => {
     const dateDir = join(sessionsDir, "2026", "03", "31")
     await mkdir(dateDir, { recursive: true })
 
-    const projectPath = "/home/user/dev/kanna"
+    const workspacePath = "/home/user/dev/kanna"
 
     // Matching session
     const matchFile = join(dateDir, "session-match.jsonl")
     const matchLines = [
-      JSON.stringify({ type: "session_meta", payload: { id: "sess-1", cwd: projectPath, timestamp: Date.now() } }),
+      JSON.stringify({ type: "session_meta", payload: { id: "sess-1", cwd: workspacePath, timestamp: Date.now() } }),
       JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.4" } }),
       JSON.stringify({ type: "user", message: { content: "Fix the tests" } }),
       JSON.stringify({ type: "assistant", message: { content: "Done." } }),
@@ -220,7 +220,7 @@ describe("scanCodexSessions", () => {
     ]
     await writeFile(noMatchFile, noMatchLines.join("\n") + "\n")
 
-    const sessions = await scanCodexSessions(sessionsDir, projectPath)
+    const sessions = await scanCodexSessions(sessionsDir, workspacePath)
 
     expect(sessions).toHaveLength(1)
     expect(sessions[0].sessionId).toBe("sess-1")
@@ -247,7 +247,7 @@ describe("scanCodexSessions", () => {
     const dateDir = join(sessionsDir, "2026", "04", "06")
     await mkdir(dateDir, { recursive: true })
 
-    const projectPath = "/home/user/dev/kanna"
+    const workspacePath = "/home/user/dev/kanna"
     const longInstructions = "x".repeat(12_000)
     const sessionFile = join(dateDir, "session-long-meta.jsonl")
 
@@ -256,7 +256,7 @@ describe("scanCodexSessions", () => {
         type: "session_meta",
         payload: {
           id: "sess-long",
-          cwd: projectPath,
+          cwd: workspacePath,
           timestamp: Date.now(),
           base_instructions: { text: longInstructions },
         },
@@ -275,7 +275,7 @@ describe("scanCodexSessions", () => {
       }),
     ].join("\n") + "\n")
 
-    const sessions = await scanCodexSessions(sessionsDir, projectPath)
+    const sessions = await scanCodexSessions(sessionsDir, workspacePath)
 
     expect(sessions).toHaveLength(1)
     expect(sessions[0].sessionId).toBe("sess-long")
@@ -287,7 +287,7 @@ describe("scanCodexSessions", () => {
     const dateDir = join(sessionsDir, "2026", "04", "06")
     await mkdir(dateDir, { recursive: true })
 
-    const projectPath = "/home/user/dev/kanna"
+    const workspacePath = "/home/user/dev/kanna"
     const isoTimestamp = "2026-04-06T06:20:46.420Z"
     const sessionFile = join(dateDir, "session-iso-timestamp.jsonl")
 
@@ -296,14 +296,14 @@ describe("scanCodexSessions", () => {
         type: "session_meta",
         payload: {
           id: "sess-iso",
-          cwd: projectPath,
+          cwd: workspacePath,
           timestamp: isoTimestamp,
         },
       }),
       JSON.stringify({ type: "user", message: { content: "Recover the session history bug" } }),
     ].join("\n") + "\n")
 
-    const sessions = await scanCodexSessions(sessionsDir, projectPath)
+    const sessions = await scanCodexSessions(sessionsDir, workspacePath)
 
     expect(sessions).toHaveLength(1)
     expect(sessions[0].modifiedAt).toBe(Date.parse(isoTimestamp))
@@ -319,11 +319,11 @@ describe("scanCodexSessions", () => {
     const dateDir = join(sessionsDir, "2026", "04", "07")
     await mkdir(dateDir, { recursive: true })
 
-    const projectPath = "/home/user/dev/kanna"
+    const workspacePath = "/home/user/dev/kanna"
     await writeFile(
       join(dateDir, "title-helper.jsonl"),
       [
-        JSON.stringify({ type: "session_meta", payload: { id: "title-helper", cwd: projectPath, timestamp: Date.now() } }),
+        JSON.stringify({ type: "session_meta", payload: { id: "title-helper", cwd: workspacePath, timestamp: Date.now() } }),
         JSON.stringify({
           type: "user",
           message: {
@@ -335,12 +335,12 @@ describe("scanCodexSessions", () => {
     await writeFile(
       join(dateDir, "real-codex.jsonl"),
       [
-        JSON.stringify({ type: "session_meta", payload: { id: "real-codex", cwd: projectPath, timestamp: Date.now() } }),
+        JSON.stringify({ type: "session_meta", payload: { id: "real-codex", cwd: workspacePath, timestamp: Date.now() } }),
         JSON.stringify({ type: "user", message: { content: "Trace the sidebar flicker" } }),
       ].join("\n") + "\n"
     )
 
-    const sessions = await scanCodexSessions(sessionsDir, projectPath)
+    const sessions = await scanCodexSessions(sessionsDir, workspacePath)
 
     expect(sessions.map((session) => session.sessionId)).toEqual(["real-codex"])
   })
@@ -445,14 +445,14 @@ describe("discoverSessions", () => {
     )
 
     const snapshot = await discoverSessions({
-      projectId: project.id,
-      projectPath: "/home/user/dev/tinkaria",
+      workspaceId: project.id,
+      workspacePath: "/home/user/dev/tinkaria",
       store,
       claudeProjectDir: claudeDir,
       codexSessionsDir: "/nonexistent",
     })
 
-    expect(snapshot.projectId).toBe(project.id)
+    expect(snapshot.workspaceId).toBe(project.id)
     expect(snapshot.sessions.length).toBeGreaterThanOrEqual(2) // 1 tinkaria + 1 cli
     expect(snapshot.sessions.some((s) => s.source === "tinkaria")).toBe(true)
     expect(snapshot.sessions.some((s) => s.source === "cli")).toBe(true)
@@ -475,8 +475,8 @@ describe("discoverSessions", () => {
     )
 
     const snapshot = await discoverSessions({
-      projectId: project.id,
-      projectPath: "/home/user/dev/myapp",
+      workspaceId: project.id,
+      workspacePath: "/home/user/dev/myapp",
       store,
       claudeProjectDir: claudeDir,
       codexSessionsDir: null,
@@ -506,8 +506,8 @@ describe("discoverSessions", () => {
     )
 
     const snapshot = await discoverSessions({
-      projectId: project.id,
-      projectPath: "/home/user/dev/dedup",
+      workspaceId: project.id,
+      workspacePath: "/home/user/dev/dedup",
       store,
       claudeProjectDir: claudeDir,
       codexSessionsDir: null,
@@ -527,14 +527,14 @@ describe("discoverSessions", () => {
     const project = await store.openProject("/home/user/dev/empty", "empty")
 
     const snapshot = await discoverSessions({
-      projectId: project.id,
-      projectPath: "/home/user/dev/empty",
+      workspaceId: project.id,
+      workspacePath: "/home/user/dev/empty",
       store,
       claudeProjectDir: null,
       codexSessionsDir: null,
     })
 
-    expect(snapshot.projectId).toBe(project.id)
+    expect(snapshot.workspaceId).toBe(project.id)
     expect(snapshot.sessions).toEqual([])
   })
 })

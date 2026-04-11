@@ -7,12 +7,12 @@ import {
   Check,
   X,
 } from "lucide-react"
-import type { ProjectRule } from "../../../shared/project-agent-types"
+import type { WorkspaceRule } from "../../../shared/workspace-types"
 import { formatRelativeTimestamp } from "./coordination-helpers"
 import { Button } from "../ui/button"
 
 export interface RulesPanelProps {
-  rules: ProjectRule[]
+  rules: WorkspaceRule[]
   onSetRule: (ruleId: string, content: string, setBy: string) => void
   onRemoveRule: (ruleId: string) => void
 }
@@ -36,7 +36,7 @@ export function RulesPanel({
     setShowAddForm(false)
   }
 
-  function startEdit(rule: ProjectRule) {
+  function startEdit(rule: WorkspaceRule) {
     setEditingId(rule.id)
     setEditContent(rule.content)
   }

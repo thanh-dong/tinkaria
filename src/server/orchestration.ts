@@ -33,10 +33,10 @@ interface OrchestratorCoordinator {
 }
 
 interface OrchestratorStore {
-  createChat(projectId: string): Promise<{ id: string; projectId: string }>
-  requireChat(chatId: string): { id: string; projectId: string; provider: AgentProvider | null }
-  getProject(projectId: string): { id: string; localPath: string } | null
-  listChatsByProject(projectId: string): Array<{ id: string }>
+  createChat(workspaceId: string): Promise<{ id: string; workspaceId: string }>
+  requireChat(chatId: string): { id: string; workspaceId: string; provider: AgentProvider | null }
+  getProject(workspaceId: string): { id: string; localPath: string } | null
+  listChatsByProject(workspaceId: string): Array<{ id: string }>
   getMessages(chatId: string): Promise<TranscriptEntry[]>
 }
 
@@ -149,14 +149,14 @@ export class SessionOrchestrator {
       )
     }
 
-    const activeSteered = this.countActiveSteered(callerChat.projectId)
+    const activeSteered = this.countActiveSteered(callerChat.workspaceId)
     if (activeSteered >= this.maxConcurrency) {
       throw new Error(
-        `Max concurrency (${this.maxConcurrency}) reached for project ${callerChat.projectId}`,
+        `Max concurrency (${this.maxConcurrency}) reached for project ${callerChat.workspaceId}`,
       )
     }
 
-    const newChat = await this.store.createChat(callerChat.projectId)
+    const newChat = await this.store.createChat(callerChat.workspaceId)
     const now = Date.now()
     this.origins.set(newChat.id, {
       originChatId: callerChatId,
@@ -397,13 +397,13 @@ export class SessionOrchestrator {
     this.cleanup(chatId)
   }
 
-  private countActiveSteered(projectId: string): number {
+  private countActiveSteered(workspaceId: string): number {
     const statuses = this.coordinator.getActiveStatuses()
     let count = 0
     for (const [chatId, origin] of this.origins) {
       try {
         const chat = this.store.requireChat(chatId)
-        if (chat.projectId !== projectId) continue
+        if (chat.workspaceId !== workspaceId) continue
         const status = this.resolveChildStatus(chatId, origin, statuses)
         if (status === "spawning" || status === "running" || status === "waiting") {
           count += 1

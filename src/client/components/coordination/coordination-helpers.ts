@@ -1,13 +1,13 @@
 import type {
-  ProjectTodo,
-  ProjectClaim,
+  WorkspaceTodo,
+  WorkspaceClaim,
   CoordinationTodoStatus,
   TodoPriority,
-} from "../../../shared/project-agent-types"
+} from "../../../shared/workspace-types"
 
 export type TodoFilter = "all" | CoordinationTodoStatus
 
-export function filterTodos(todos: ProjectTodo[], filter: TodoFilter): ProjectTodo[] {
+export function filterTodos(todos: WorkspaceTodo[], filter: TodoFilter): WorkspaceTodo[] {
   if (filter === "all") return todos
   return todos.filter((t) => t.status === filter)
 }
@@ -22,7 +22,7 @@ export function prioritySortOrder(priority: TodoPriority): number {
   return PRIORITY_ORDER[priority] ?? 1
 }
 
-export function sortTodosByPriority(todos: ProjectTodo[]): ProjectTodo[] {
+export function sortTodosByPriority(todos: WorkspaceTodo[]): WorkspaceTodo[] {
   return [...todos].sort(
     (a, b) => prioritySortOrder(a.priority) - prioritySortOrder(b.priority)
   )
@@ -41,6 +41,6 @@ export function formatRelativeTimestamp(iso: string): string {
   return `${diffDay}d ago`
 }
 
-export function isClaimConflicting(claim: ProjectClaim): boolean {
+export function isClaimConflicting(claim: WorkspaceClaim): boolean {
   return claim.conflictsWith !== null
 }

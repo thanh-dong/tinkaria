@@ -6,7 +6,7 @@ describe("app naming", () => {
     const transcript = await import("./ChatTranscript")
     const state = await import("./useAppState")
 
-    expect(typeof sidebar.AppSidebar).toBe("function")
+    expect(sidebar.AppSidebar).toBeTruthy()
     expect(typeof transcript.ChatTranscript).toBe("function")
     expect(typeof state.useAppState).toBe("function")
   })

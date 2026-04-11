@@ -23,25 +23,25 @@ describe("projectSelection machine", () => {
   test("prefers the active chat project over explicit and fallback selection", () => {
     let state = createProjectSelectionState()
     state = transitionProjectSelection(state, { type: "sidebar.loaded", firstProjectId: "project-fallback" })
-    state = transitionProjectSelection(state, { type: "project.explicitly_selected", projectId: "project-explicit" })
-    state = transitionProjectSelection(state, { type: "chat.snapshot_received", projectId: "project-chat" })
+    state = transitionProjectSelection(state, { type: "project.explicitly_selected", workspaceId: "project-explicit" })
+    state = transitionProjectSelection(state, { type: "chat.snapshot_received", workspaceId: "project-chat" })
 
     expect(resolveProjectSelection(state)).toEqual({
       source: "chat_owned",
-      projectId: "project-chat",
+      workspaceId: "project-chat",
     })
   })
 
   test("falls back to the explicit selection after the active chat clears", () => {
     let state = createProjectSelectionState()
     state = transitionProjectSelection(state, { type: "sidebar.loaded", firstProjectId: "project-fallback" })
-    state = transitionProjectSelection(state, { type: "project.explicitly_selected", projectId: "project-explicit" })
-    state = transitionProjectSelection(state, { type: "chat.snapshot_received", projectId: "project-chat" })
+    state = transitionProjectSelection(state, { type: "project.explicitly_selected", workspaceId: "project-explicit" })
+    state = transitionProjectSelection(state, { type: "chat.snapshot_received", workspaceId: "project-chat" })
     state = transitionProjectSelection(state, { type: "chat.cleared" })
 
     expect(resolveProjectSelection(state)).toEqual({
       source: "explicit",
-      projectId: "project-explicit",
+      workspaceId: "project-explicit",
     })
   })
 
@@ -53,7 +53,7 @@ describe("projectSelection machine", () => {
 
     expect(resolveProjectSelection(state)).toEqual({
       source: "fallback",
-      projectId: "project-fallback",
+      workspaceId: "project-fallback",
     })
   })
 })

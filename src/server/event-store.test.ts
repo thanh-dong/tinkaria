@@ -57,9 +57,9 @@ describe("EventStore", () => {
     const chatId = "chat-1"
 
     const snapshot: SnapshotFile = {
-      v: 2,
+      v: 3,
       generatedAt: 10,
-      projects: [{
+      workspaces: [{
         id: "project-1",
         localPath: "/tmp/project",
         title: "Project",
@@ -68,7 +68,8 @@ describe("EventStore", () => {
       }],
       chats: [{
         id: chatId,
-        projectId: "project-1",
+        workspaceId: "project-1",
+    repoId: null,
         title: "Chat",
         createdAt: 1,
         updatedAt: 5,
@@ -88,7 +89,7 @@ describe("EventStore", () => {
 
     await writeFile(snapshotPath, JSON.stringify(snapshot, null, 2), "utf8")
     await writeFile(messagesLogPath, `${JSON.stringify({
-      v: 2,
+      v: 3,
       type: "message_appended",
       timestamp: 101,
       chatId,

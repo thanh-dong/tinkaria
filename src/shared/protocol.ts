@@ -34,7 +34,7 @@ export type TerminalEvent =
 export type ClientCommand =
   | { type: "project.open"; localPath: string }
   | { type: "project.create"; localPath: string; title: string }
-  | { type: "project.remove"; projectId: string }
+  | { type: "project.remove"; workspaceId: string }
   | { type: "system.ping" }
   | { type: "update.check"; force?: boolean }
   | { type: "update.install" }
@@ -47,14 +47,14 @@ export type ClientCommand =
       type: "system.readLocalFilePreview"
       localPath: string
     }
-  | { type: "chat.create"; projectId: string }
+  | { type: "chat.create"; workspaceId: string }
   | { type: "chat.rename"; chatId: string; title: string }
   | { type: "chat.delete"; chatId: string }
   | { type: "chat.markRead"; chatId: string }
   | {
       type: "chat.send"
       chatId?: string
-      projectId?: string
+      workspaceId?: string
       provider?: AgentProvider
       content: string
       model?: string
@@ -68,15 +68,15 @@ export type ClientCommand =
   | { type: "chat.generateMergePrompt"; chatIds: string[]; intent: string; preset?: string }
   | { type: "chat.getSessionRuntime"; chatId: string }
   | { type: "chat.getRepoStatus"; chatId: string }
-  | { type: "terminal.create"; projectId: string; terminalId: string; cols: number; rows: number; scrollback: number }
+  | { type: "terminal.create"; workspaceId: string; terminalId: string; cols: number; rows: number; scrollback: number }
   | { type: "terminal.input"; terminalId: string; data: string }
   | { type: "terminal.resize"; terminalId: string; cols: number; rows: number }
   | { type: "terminal.close"; terminalId: string }
   | { type: "chat.getMessages"; chatId: string; offset?: number; limit?: number }
   | { type: "snapshot.subscribe"; subscriptionId: string; topic: SubscriptionTopic }
   | { type: "snapshot.unsubscribe"; subscriptionId: string }
-  | { type: "sessions.resume"; projectId: string; sessionId: string; provider: AgentProvider }
-  | { type: "sessions.refresh"; projectId: string }
+  | { type: "sessions.resume"; workspaceId: string; sessionId: string; provider: AgentProvider }
+  | { type: "sessions.refresh"; workspaceId: string }
   | { type: "workspace.todo.add"; workspaceId: string; todoId: string; description: string; priority?: "high" | "normal" | "low"; createdBy?: string }
   | { type: "workspace.todo.claim"; workspaceId: string; todoId: string; sessionId: string }
   | { type: "workspace.todo.complete"; workspaceId: string; todoId: string; outputs: string[] }

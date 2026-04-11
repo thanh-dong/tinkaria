@@ -1,7 +1,7 @@
 import { describe, test, expect, mock } from "bun:test"
-import type { ProjectClaim } from "../../../shared/project-agent-types"
+import type { WorkspaceClaim } from "../../../shared/workspace-types"
 
-function makeClaim(overrides: Partial<ProjectClaim> = {}): ProjectClaim {
+function makeClaim(overrides: Partial<WorkspaceClaim> = {}): WorkspaceClaim {
   return {
     id: "c1",
     intent: "fix authentication bug",

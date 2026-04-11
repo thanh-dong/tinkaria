@@ -7,13 +7,13 @@ export function LocalProjectsPage() {
   const state = useOutletContext<AppState>()
   const navigate = useNavigate()
 
-  async function handleResumeHomepageSession(projectId: string, session: DiscoveredSession) {
+  async function handleResumeHomepageSession(workspaceId: string, session: DiscoveredSession) {
     if (session.chatId) {
       navigate(`/chat/${session.chatId}`)
       return
     }
 
-    await state.handleResumeSession(projectId, session.sessionId, session.provider)
+    await state.handleResumeSession(workspaceId, session.sessionId, session.provider)
   }
 
   return (
@@ -26,7 +26,7 @@ export function LocalProjectsPage() {
         commandError={state.commandError}
         onOpenProject={state.handleOpenLocalProject}
         onCreateProject={state.handleCreateProject}
-        sessionsForProject={(projectId) => state.sessionsSnapshots.get(projectId)?.sessions ?? []}
+        sessionsForProject={(workspaceId) => state.sessionsSnapshots.get(workspaceId)?.sessions ?? []}
         onResumeSession={handleResumeHomepageSession}
       />
     </div>

@@ -1,7 +1,7 @@
 import { describe, test, expect, mock } from "bun:test"
-import type { ProjectWorktree } from "../../../shared/project-agent-types"
+import type { WorkspaceWorktree } from "../../../shared/workspace-types"
 
-function makeWorktree(overrides: Partial<ProjectWorktree> = {}): ProjectWorktree {
+function makeWorktree(overrides: Partial<WorkspaceWorktree> = {}): WorkspaceWorktree {
   return {
     id: "wt1",
     branch: "feat/auth",

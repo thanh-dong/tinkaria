@@ -68,7 +68,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "snapshot.subscribe",
   "snapshot.unsubscribe",
   "sessions.refresh",
-  "project.coordination.snapshot",
+  "workspace.coordination.snapshot",
 ])
 
 /** Commands handled by the Bun backend. */
@@ -101,18 +101,18 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "snapshot.unsubscribe",
   "sessions.resume",
   "sessions.refresh",
-  "project.todo.add",
-  "project.todo.claim",
-  "project.todo.complete",
-  "project.todo.abandon",
-  "project.claim.create",
-  "project.claim.release",
-  "project.worktree.create",
-  "project.worktree.assign",
-  "project.worktree.remove",
-  "project.rule.set",
-  "project.rule.remove",
-  "project.coordination.snapshot",
+  "workspace.todo.add",
+  "workspace.todo.claim",
+  "workspace.todo.complete",
+  "workspace.todo.abandon",
+  "workspace.claim.create",
+  "workspace.claim.release",
+  "workspace.worktree.create",
+  "workspace.worktree.assign",
+  "workspace.worktree.remove",
+  "workspace.rule.set",
+  "workspace.rule.remove",
+  "workspace.coordination.snapshot",
 ]
 
 export function registerCommandResponders(args: RegisterRespondersArgs): { dispose: () => void } {
@@ -189,25 +189,25 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         await ensureProjectDirectory(command.localPath)
         const project = await store.openProject(command.localPath)
         await refreshDiscovery()
-        return { projectId: project.id }
+        return { workspaceId: project.id }
       }
 
       case "project.create": {
         await ensureProjectDirectory(command.localPath)
         const project = await store.openProject(command.localPath, command.title)
         await refreshDiscovery()
-        return { projectId: project.id }
+        return { workspaceId: project.id }
       }
 
       case "project.remove": {
-        const project = store.getProject(command.projectId)
-        for (const chat of store.listChatsByProject(command.projectId)) {
+        const project = store.getProject(command.workspaceId)
+        for (const chat of store.listChatsByProject(command.workspaceId)) {
           await agent.disposeChat(chat.id)
         }
         if (project) {
           terminals.closeByCwd(project.localPath)
         }
-        await store.removeProject(command.projectId)
+        await store.removeProject(command.workspaceId)
         return undefined
       }
 
@@ -220,7 +220,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         return readLocalFilePreview(command.localPath)
 
       case "chat.create": {
-        const chat = await store.createChat(command.projectId)
+        const chat = await store.createChat(command.workspaceId)
         return { chatId: chat.id }
       }
 
@@ -258,7 +258,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (!chat) {
           throw new Error("Chat not found")
         }
-        const project = store.getProject(chat.projectId)
+        const project = store.getProject(chat.workspaceId)
         if (!project) {
           throw new Error("Project not found")
         }
@@ -275,7 +275,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (!firstChat) {
           throw new Error(`Chat not found: ${command.chatIds[0]}`)
         }
-        const mergeProject = store.getProject(firstChat.projectId)
+        const mergeProject = store.getProject(firstChat.workspaceId)
         if (!mergeProject) {
           throw new Error("Project not found")
         }
@@ -292,12 +292,12 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       }
 
       case "terminal.create": {
-        const project = store.getProject(command.projectId)
+        const project = store.getProject(command.workspaceId)
         if (!project) {
           throw new Error("Project not found")
         }
         return terminals.createTerminal({
-          projectPath: project.localPath,
+          workspacePath: project.localPath,
           terminalId: command.terminalId,
           cols: command.cols,
           rows: command.rows,
@@ -332,7 +332,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (!chat?.sessionToken || !chat.provider) {
           return { runtime: null }
         }
-        const project = store.getProject(chat.projectId)
+        const project = store.getProject(chat.workspaceId)
         if (!project) {
           return { runtime: null }
         }
@@ -346,7 +346,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (!chat) {
           return { repoStatus: null }
         }
-        const project = store.getProject(chat.projectId)
+        const project = store.getProject(chat.workspaceId)
         if (!project) {
           return { repoStatus: null }
         }
@@ -357,7 +357,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
 
       case "snapshot.subscribe": {
         publisher.addSubscription(command.subscriptionId, command.topic)
-        if (command.topic.type === "local-projects") {
+        if (command.topic.type === "local-workspaces") {
           await refreshDiscovery()
         }
         return await publisher.getSnapshot(command.topic)
@@ -369,20 +369,20 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       }
 
       case "sessions.refresh": {
-        const project = store.getProject(command.projectId)
+        const project = store.getProject(command.workspaceId)
         if (project) {
-          publisher.refreshSessions(command.projectId, project.localPath)
+          publisher.refreshSessions(command.workspaceId, project.localPath)
         }
         return undefined
       }
 
       case "sessions.resume": {
-        const chat = await store.createChat(command.projectId)
+        const chat = await store.createChat(command.workspaceId)
         await store.setSessionToken(chat.id, command.sessionId)
         await store.setChatProvider(chat.id, command.provider)
 
         // Import CLI transcript in background (don't block response)
-        const project = store.getProject(command.projectId)
+        const project = store.getProject(command.workspaceId)
         if (project) {
           findSessionFile(command.sessionId, command.provider, project.localPath)
             .then((filePath) => {
@@ -398,53 +398,53 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         return { chatId: chat.id }
       }
 
-      case "project.todo.add": {
-        await store.addTodo(command.projectId, command.todoId, command.description, command.priority ?? "normal", command.createdBy ?? "user")
+      case "workspace.todo.add": {
+        await store.addTodo(command.workspaceId, command.todoId, command.description, command.priority ?? "normal", command.createdBy ?? "user")
         return { ok: true }
       }
-      case "project.todo.claim": {
-        await store.claimTodo(command.projectId, command.todoId, command.sessionId)
+      case "workspace.todo.claim": {
+        await store.claimTodo(command.workspaceId, command.todoId, command.sessionId)
         return { ok: true }
       }
-      case "project.todo.complete": {
-        await store.completeTodo(command.projectId, command.todoId, command.outputs)
+      case "workspace.todo.complete": {
+        await store.completeTodo(command.workspaceId, command.todoId, command.outputs)
         return { ok: true }
       }
-      case "project.todo.abandon": {
-        await store.abandonTodo(command.projectId, command.todoId)
+      case "workspace.todo.abandon": {
+        await store.abandonTodo(command.workspaceId, command.todoId)
         return { ok: true }
       }
-      case "project.claim.create": {
-        await store.createClaim(command.projectId, command.claimId, command.intent, command.files, command.sessionId)
+      case "workspace.claim.create": {
+        await store.createClaim(command.workspaceId, command.claimId, command.intent, command.files, command.sessionId)
         return { ok: true }
       }
-      case "project.claim.release": {
-        await store.releaseClaim(command.projectId, command.claimId)
+      case "workspace.claim.release": {
+        await store.releaseClaim(command.workspaceId, command.claimId)
         return { ok: true }
       }
-      case "project.worktree.create": {
-        await store.createWorktree(command.projectId, command.worktreeId, command.branch, command.baseBranch ?? "main", "")
+      case "workspace.worktree.create": {
+        await store.createWorktree(command.workspaceId, command.worktreeId, command.branch, command.baseBranch ?? "main", "")
         return { ok: true }
       }
-      case "project.worktree.assign": {
-        await store.assignWorktree(command.projectId, command.worktreeId, command.sessionId)
+      case "workspace.worktree.assign": {
+        await store.assignWorktree(command.workspaceId, command.worktreeId, command.sessionId)
         return { ok: true }
       }
-      case "project.worktree.remove": {
-        await store.removeWorktree(command.projectId, command.worktreeId)
+      case "workspace.worktree.remove": {
+        await store.removeWorktree(command.workspaceId, command.worktreeId)
         return { ok: true }
       }
-      case "project.rule.set": {
-        await store.setRule(command.projectId, command.ruleId, command.content, command.setBy)
+      case "workspace.rule.set": {
+        await store.setRule(command.workspaceId, command.ruleId, command.content, command.setBy)
         return { ok: true }
       }
-      case "project.rule.remove": {
-        await store.removeRule(command.projectId, command.ruleId)
+      case "workspace.rule.remove": {
+        await store.removeRule(command.workspaceId, command.ruleId)
         return { ok: true }
       }
 
-      case "project.coordination.snapshot": {
-        return deriveCoordinationSnapshot(store.state, command.projectId)
+      case "workspace.coordination.snapshot": {
+        return deriveCoordinationSnapshot(store.state, command.workspaceId)
       }
 
       default: {

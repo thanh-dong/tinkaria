@@ -10,7 +10,7 @@ import { TerminalPane } from "./TerminalPane"
 import { getMinimumTerminalWidth, getMinimumTerminalWorkspaceWidth } from "./TerminalWorkspaceLayout"
 
 interface Props {
-  projectId: string
+  workspaceId: string
   layout: ProjectTerminalLayout
   socket: AppTransport
   connectionStatus: SocketStatus
@@ -18,13 +18,13 @@ interface Props {
   minColumnWidth: number
   focusRequestVersion?: number
   splitTerminalShortcut?: string[]
-  onAddTerminal: (projectId: string, afterTerminalId?: string) => void
-  onRemoveTerminal: (projectId: string, terminalId: string) => void
-  onTerminalLayout: (projectId: string, sizes: number[]) => void
+  onAddTerminal: (workspaceId: string, afterTerminalId?: string) => void
+  onRemoveTerminal: (workspaceId: string, terminalId: string) => void
+  onTerminalLayout: (workspaceId: string, sizes: number[]) => void
 }
 
 export function TerminalWorkspace({
-  projectId,
+  workspaceId,
   layout,
   socket,
   connectionStatus,
@@ -102,7 +102,7 @@ export function TerminalWorkspace({
             orientation="horizontal"
             className="h-full min-h-0"
             onLayoutChanged={(nextLayout) => onTerminalLayout(
-              projectId,
+              workspaceId,
               layout.terminals.map((terminal) => nextLayout[terminal.id] ?? terminal.size)
             )}
           >
@@ -149,7 +149,7 @@ export function TerminalWorkspace({
                             variant="ghost"
                             size="icon-sm"
                             aria-label="Add terminal to the right"
-                            onClick={() => onAddTerminal(projectId, terminalPane.id)}
+                            onClick={() => onAddTerminal(workspaceId, terminalPane.id)}
                           >
                             <Plus className="size-3.5" />
                           </Button>
@@ -160,7 +160,7 @@ export function TerminalWorkspace({
                         variant="ghost"
                         size="icon-sm"
                         aria-label="Archive terminal"
-                        onClick={() => onRemoveTerminal(projectId, terminalPane.id)}
+                        onClick={() => onRemoveTerminal(workspaceId, terminalPane.id)}
                       >
                         <X className="size-3.5" />
                       </Button>
@@ -168,7 +168,7 @@ export function TerminalWorkspace({
                   </div>
 
                   <TerminalPane
-                    projectId={projectId}
+                    workspaceId={workspaceId}
                     terminalId={terminalPane.id}
                     socket={socket}
                     scrollback={scrollback}

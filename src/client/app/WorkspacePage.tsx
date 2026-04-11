@@ -1,8 +1,8 @@
 import { useCallback } from "react"
 import { useOutletContext, useParams } from "react-router-dom"
 import { Loader2 } from "lucide-react"
-import type { TodoPriority } from "../../shared/project-agent-types"
-import { useProjectSubscription } from "./useProjectSubscription"
+import type { TodoPriority } from "../../shared/workspace-types"
+import { useWorkspaceSubscription } from "./useWorkspaceSubscription"
 import { PageHeader } from "./PageHeader"
 import { TodosPanel } from "../components/coordination/TodosPanel"
 import { ClaimsPanel } from "../components/coordination/ClaimsPanel"
@@ -14,156 +14,156 @@ function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-export function ProjectPage() {
-  const { id: projectId } = useParams<{ id: string }>()
+export function WorkspacePage() {
+  const { id: workspaceId } = useParams<{ id: string }>()
   const state = useOutletContext<AppState>()
-  const snapshot = useProjectSubscription(state.socket, projectId ?? null)
+  const snapshot = useWorkspaceSubscription(state.socket, workspaceId ?? null)
 
   const handleAddTodo = useCallback(
     (description: string, priority: TodoPriority) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.todo.add",
-        projectId,
+        type: "workspace.todo.add",
+        workspaceId,
         todoId: generateId("todo"),
         description,
         priority,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleClaimTodo = useCallback(
     (todoId: string, sessionId: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.todo.claim",
-        projectId,
+        type: "workspace.todo.claim",
+        workspaceId,
         todoId,
         sessionId,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleCompleteTodo = useCallback(
     (todoId: string, outputs: string[]) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.todo.complete",
-        projectId,
+        type: "workspace.todo.complete",
+        workspaceId,
         todoId,
         outputs,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleAbandonTodo = useCallback(
     (todoId: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.todo.abandon",
-        projectId,
+        type: "workspace.todo.abandon",
+        workspaceId,
         todoId,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleCreateClaim = useCallback(
     (intent: string, files: string[], sessionId: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.claim.create",
-        projectId,
+        type: "workspace.claim.create",
+        workspaceId,
         claimId: generateId("claim"),
         intent,
         files,
         sessionId,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleReleaseClaim = useCallback(
     (claimId: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.claim.release",
-        projectId,
+        type: "workspace.claim.release",
+        workspaceId,
         claimId,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleCreateWorktree = useCallback(
     (branch: string, baseBranch: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.worktree.create",
-        projectId,
+        type: "workspace.worktree.create",
+        workspaceId,
         worktreeId: generateId("wt"),
         branch,
         baseBranch,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleAssignWorktree = useCallback(
     (worktreeId: string, sessionId: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.worktree.assign",
-        projectId,
+        type: "workspace.worktree.assign",
+        workspaceId,
         worktreeId,
         sessionId,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleRemoveWorktree = useCallback(
     (worktreeId: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.worktree.remove",
-        projectId,
+        type: "workspace.worktree.remove",
+        workspaceId,
         worktreeId,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleSetRule = useCallback(
     (ruleId: string, content: string, setBy: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.rule.set",
-        projectId,
+        type: "workspace.rule.set",
+        workspaceId,
         ruleId,
         content,
         setBy,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
   const handleRemoveRule = useCallback(
     (ruleId: string) => {
-      if (!projectId) return
+      if (!workspaceId) return
       void state.socket.command({
-        type: "project.rule.remove",
-        projectId,
+        type: "workspace.rule.remove",
+        workspaceId,
         ruleId,
       })
     },
-    [projectId, state.socket]
+    [workspaceId, state.socket]
   )
 
-  if (!projectId) {
+  if (!workspaceId) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-muted-foreground">No project selected</p>
@@ -181,7 +181,7 @@ export function ProjectPage() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 relative">
-      <PageHeader title="Project Coordination" subtitle={projectId} />
+      <PageHeader title="Project Coordination" subtitle={workspaceId} />
       <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-px bg-border min-h-0 mx-4 mb-4 rounded-lg overflow-hidden border border-border">
         <div className="bg-background overflow-hidden">
           <TodosPanel

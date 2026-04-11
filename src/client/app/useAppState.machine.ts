@@ -9,15 +9,15 @@ export interface ProjectSelectionState {
 
 export type ProjectSelectionEvent =
   | { type: "sidebar.loaded"; firstProjectId: string | null }
-  | { type: "project.explicitly_selected"; projectId: string }
-  | { type: "chat.snapshot_received"; projectId: string }
+  | { type: "project.explicitly_selected"; workspaceId: string }
+  | { type: "chat.snapshot_received"; workspaceId: string }
   | { type: "chat.cleared" }
 
 export type ProjectSelectionSource = "none" | "fallback" | "explicit" | "chat_owned"
 
 export interface ResolvedProjectSelection {
   source: ProjectSelectionSource
-  projectId: string | null
+  workspaceId: string | null
 }
 
 export function createProjectSelectionState(): ProjectSelectionState {
@@ -41,12 +41,12 @@ export function transitionProjectSelection(
     case "project.explicitly_selected":
       return {
         ...state,
-        explicitProjectId: event.projectId,
+        explicitProjectId: event.workspaceId,
       }
     case "chat.snapshot_received":
       return {
         ...state,
-        activeChatProjectId: event.projectId,
+        activeChatProjectId: event.workspaceId,
       }
     case "chat.cleared":
       return {
@@ -58,18 +58,18 @@ export function transitionProjectSelection(
 
 export function resolveProjectSelection(state: ProjectSelectionState): ResolvedProjectSelection {
   if (state.activeChatProjectId) {
-    return { source: "chat_owned", projectId: state.activeChatProjectId }
+    return { source: "chat_owned", workspaceId: state.activeChatProjectId }
   }
 
   if (state.explicitProjectId) {
-    return { source: "explicit", projectId: state.explicitProjectId }
+    return { source: "explicit", workspaceId: state.explicitProjectId }
   }
 
   if (state.fallbackProjectId) {
-    return { source: "fallback", projectId: state.fallbackProjectId }
+    return { source: "fallback", workspaceId: state.fallbackProjectId }
   }
 
-  return { source: "none", projectId: null }
+  return { source: "none", workspaceId: null }
 }
 
 export interface SubmitPipelineOptions {

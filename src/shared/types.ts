@@ -1,4 +1,4 @@
-export const STORE_VERSION = 2 as const
+export const STORE_VERSION = 3 as const
 export const PROTOCOL_VERSION = 1 as const
 
 export type AgentProvider = "claude" | "codex"
@@ -647,7 +647,7 @@ export type HydratedTranscriptMessage =
 
 export interface ChatRuntime {
   chatId: string
-  projectId: string
+  workspaceId: string
   localPath: string
   title: string
   status: SessionStatus

@@ -1,4 +1,4 @@
-import type { ProjectCoordinationState } from "../server/events"
+import type { WorkspaceCoordinationState } from "../server/events"
 import type { WorkspaceCoordinationSnapshot, TodoPriority } from "./workspace-types"
 
 /**
@@ -8,19 +8,19 @@ import type { WorkspaceCoordinationSnapshot, TodoPriority } from "./workspace-ty
  */
 export interface CoordinationStore {
   state: {
-    coordinationByProject: Map<string, ProjectCoordinationState>
+    coordinationByWorkspace: Map<string, WorkspaceCoordinationState>
   }
-  addTodo(projectId: string, todoId: string, description: string, priority: TodoPriority, createdBy: string): Promise<void>
-  claimTodo(projectId: string, todoId: string, sessionId: string): Promise<void>
-  completeTodo(projectId: string, todoId: string, outputs: string[]): Promise<void>
-  abandonTodo(projectId: string, todoId: string): Promise<void>
-  createClaim(projectId: string, claimId: string, intent: string, files: string[], sessionId: string): Promise<void>
-  releaseClaim(projectId: string, claimId: string): Promise<void>
-  createWorktree(projectId: string, worktreeId: string, branch: string, baseBranch: string, path: string): Promise<void>
-  assignWorktree(projectId: string, worktreeId: string, sessionId: string): Promise<void>
-  removeWorktree(projectId: string, worktreeId: string): Promise<void>
-  setRule(projectId: string, ruleId: string, content: string, setBy: string): Promise<void>
-  removeRule(projectId: string, ruleId: string): Promise<void>
+  addTodo(workspaceId: string, todoId: string, description: string, priority: TodoPriority, createdBy: string): Promise<void>
+  claimTodo(workspaceId: string, todoId: string, sessionId: string): Promise<void>
+  completeTodo(workspaceId: string, todoId: string, outputs: string[]): Promise<void>
+  abandonTodo(workspaceId: string, todoId: string): Promise<void>
+  createClaim(workspaceId: string, claimId: string, intent: string, files: string[], sessionId: string): Promise<void>
+  releaseClaim(workspaceId: string, claimId: string): Promise<void>
+  createWorktree(workspaceId: string, worktreeId: string, branch: string, baseBranch: string, path: string): Promise<void>
+  assignWorktree(workspaceId: string, worktreeId: string, sessionId: string): Promise<void>
+  removeWorktree(workspaceId: string, worktreeId: string): Promise<void>
+  setRule(workspaceId: string, ruleId: string, content: string, setBy: string): Promise<void>
+  removeRule(workspaceId: string, ruleId: string): Promise<void>
   /** Optional: fetch a full coordination snapshot (used when state is not in-process). */
-  getSnapshot?(projectId: string): Promise<WorkspaceCoordinationSnapshot>
+  getSnapshot?(workspaceId: string): Promise<WorkspaceCoordinationSnapshot>
 }

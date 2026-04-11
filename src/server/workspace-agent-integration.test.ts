@@ -2,8 +2,8 @@ import { describe, expect, test, afterEach } from "bun:test"
 import { SessionIndex } from "./session-index"
 import { EventStore } from "./event-store"
 import { TranscriptSearchIndex } from "./transcript-search"
-import { ProjectAgent } from "./project-agent"
-import { createProjectAgentRouter } from "./project-agent-routes"
+import { WorkspaceAgent } from "./workspace-agent"
+import { createWorkspaceAgentRouter } from "./workspace-agent-routes"
 import type { TranscriptEntry } from "../shared/types"
 import type { StoreState, ChatRecord } from "./events"
 import { mkdtemp, rm } from "node:fs/promises"
@@ -26,10 +26,10 @@ async function createIntegration() {
   const sessions = new SessionIndex()
   const search = new TranscriptSearchIndex()
   const project = await store.openProject("/tmp/test-integration", "Integration Test")
-  const projectId = project.id
-  const agent = new ProjectAgent({ sessions, store, search, projectId })
-  const router = createProjectAgentRouter(agent)
-  return { store, sessions, search, agent, router, projectId }
+  const workspaceId = project.id
+  const agent = new WorkspaceAgent({ sessions, store, search, workspaceId })
+  const router = createWorkspaceAgentRouter(agent)
+  return { store, sessions, search, agent, router, workspaceId }
 }
 
 afterEach(async () => {
@@ -37,26 +37,26 @@ afterEach(async () => {
   tempDirs = []
 })
 
-function makeState(projectId: string): StoreState {
-  const projectsById = new Map([[projectId, { id: projectId, localPath: "/tmp/p", title: "Test", createdAt: 0, updatedAt: 0 }]])
-  const projectIdsByPath = new Map<string, string>()
+function makeState(workspaceId: string): StoreState {
+  const workspacesById = new Map([[workspaceId, { id: workspaceId, localPath: "/tmp/p", title: "Test", createdAt: 0, updatedAt: 0 }]])
+  const workspaceIdsByPath = new Map<string, string>()
   const chatsById = new Map<string, ChatRecord>([
     ["c1", {
-      id: "c1", projectId, title: "Chat 1", createdAt: Date.now(), updatedAt: Date.now(),
+      id: "c1", workspaceId, repoId: null, title: "Chat 1", createdAt: Date.now(), updatedAt: Date.now(),
       unread: false, provider: "claude", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
     ["c2", {
-      id: "c2", projectId, title: "Chat 2", createdAt: Date.now(), updatedAt: Date.now(),
+      id: "c2", workspaceId, repoId: null, title: "Chat 2", createdAt: Date.now(), updatedAt: Date.now(),
       unread: false, provider: "codex", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
   ])
-  return { projectsById, projectIdsByPath, chatsById, coordinationByProject: new Map() }
+  return { workspacesById, workspaceIdsByPath, chatsById, coordinationByWorkspace: new Map() }
 }
 
 describe("project agent integration", () => {
   test("end-to-end: messages → indexes → query via HTTP routes", async () => {
-    const { sessions, search, router, projectId } = await createIntegration()
-    const state = makeState(projectId)
+    const { sessions, search, router, workspaceId } = await createIntegration()
+    const state = makeState(workspaceId)
 
     // Simulate two sessions sending messages
     const e1 = timestamped({ kind: "user_prompt", content: "implement auth middleware with JWT" })
@@ -67,13 +67,13 @@ describe("project agent integration", () => {
     search.addEntry("c2", e2)
 
     // Query sessions via HTTP
-    const sessionsRes = await router(new Request(`http://localhost/api/project/sessions?projectId=${projectId}`))
+    const sessionsRes = await router(new Request(`http://localhost/api/workspace/sessions?workspaceId=${workspaceId}`))
     const sessionsBody = await sessionsRes.json() as Array<Record<string, unknown>>
     expect(sessionsRes.status).toBe(200)
     expect(sessionsBody.length).toBe(2)
 
     // Search transcripts via HTTP
-    const searchRes = await router(new Request("http://localhost/api/project/search", {
+    const searchRes = await router(new Request("http://localhost/api/workspace/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: "auth JWT middleware", limit: 5 }),
@@ -84,7 +84,7 @@ describe("project agent integration", () => {
     expect(searchBody[0].chatId).toBe("c1")
 
     // Claim task via HTTP
-    const claimRes = await router(new Request("http://localhost/api/project/claim", {
+    const claimRes = await router(new Request("http://localhost/api/workspace/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ description: "implement auth middleware", session: "c1", branch: "feat/auth" }),
@@ -94,12 +94,12 @@ describe("project agent integration", () => {
     expect(claimBody.status).toBe("claimed")
 
     // List tasks via HTTP
-    const tasksRes = await router(new Request("http://localhost/api/project/tasks"))
+    const tasksRes = await router(new Request("http://localhost/api/workspace/tasks"))
     const tasksBody = await tasksRes.json() as Array<Record<string, unknown>>
     expect(tasksBody.length).toBe(1)
 
     // Delegate via HTTP
-    const delegateRes = await router(new Request("http://localhost/api/project/delegate", {
+    const delegateRes = await router(new Request("http://localhost/api/workspace/delegate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ request: "who is working on auth?" }),
@@ -117,22 +117,22 @@ describe("project agent integration", () => {
     const store1 = new EventStore(dir)
     await store1.initialize()
     const project1 = await store1.openProject("/tmp/durable", "Durable Test")
-    const agent1 = new ProjectAgent({
+    const agent1 = new WorkspaceAgent({
       sessions: new SessionIndex(),
       store: store1,
       search: new TranscriptSearchIndex(),
-      projectId: project1.id,
+      workspaceId: project1.id,
     })
     const task = await agent1.claimTask("durable task", "session-1", null)
 
     // Second store instance: reload from same directory
     const store2 = new EventStore(dir)
     await store2.initialize()
-    const agent2 = new ProjectAgent({
+    const agent2 = new WorkspaceAgent({
       sessions: new SessionIndex(),
       store: store2,
       search: new TranscriptSearchIndex(),
-      projectId: project1.id,
+      workspaceId: project1.id,
     })
 
     const tasks = agent2.listTasks()
@@ -146,7 +146,7 @@ describe("project agent integration", () => {
     const { router } = await createIntegration()
 
     // Claim
-    const claimRes = await router(new Request("http://localhost/api/project/claim", {
+    const claimRes = await router(new Request("http://localhost/api/workspace/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ description: "setup database", session: "c1", branch: null }),
@@ -155,7 +155,7 @@ describe("project agent integration", () => {
     expect(claimed.status).toBe("claimed")
 
     // Complete
-    const completeRes = await router(new Request("http://localhost/api/project/complete", {
+    const completeRes = await router(new Request("http://localhost/api/workspace/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: claimed.id, outputs: ["migrations/001.sql"] }),

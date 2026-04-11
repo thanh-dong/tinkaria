@@ -8,7 +8,7 @@ import {
 function makeRuntime(overrides: Partial<ChatRuntime> = {}): ChatRuntime {
   return {
     chatId: "chat-1",
-    projectId: "project-1",
+    workspaceId: "project-1",
     localPath: "/tmp/project",
     title: "Chat",
     status: "idle",

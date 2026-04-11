@@ -7,10 +7,10 @@ export interface ProjectRightSidebarLayout {
 }
 
 interface RightSidebarState {
-  projects: Record<string, ProjectRightSidebarLayout>
-  toggleVisibility: (projectId: string) => void
-  setSize: (projectId: string, size: number) => void
-  clearProject: (projectId: string) => void
+  workspaces: Record<string, ProjectRightSidebarLayout>
+  toggleVisibility: (workspaceId: string) => void
+  setSize: (workspaceId: string, size: number) => void
+  clearProject: (workspaceId: string) => void
 }
 
 export const RIGHT_SIDEBAR_MIN_SIZE_PERCENT = 20
@@ -30,19 +30,19 @@ function createDefaultProjectLayout(): ProjectRightSidebarLayout {
   }
 }
 
-function getProjectLayout(projects: Record<string, ProjectRightSidebarLayout>, projectId: string): ProjectRightSidebarLayout {
-  return projects[projectId] ?? createDefaultProjectLayout()
+function getProjectLayout(workspaces: Record<string, ProjectRightSidebarLayout>, workspaceId: string): ProjectRightSidebarLayout {
+  return workspaces[workspaceId] ?? createDefaultProjectLayout()
 }
 
 export function migrateRightSidebarStore(persistedState: unknown) {
   if (!persistedState || typeof persistedState !== "object") {
-    return { projects: {} }
+    return { workspaces: {} }
   }
 
-  const state = persistedState as { projects?: Record<string, Partial<ProjectRightSidebarLayout>> }
-  const projects = Object.fromEntries(
-    Object.entries(state.projects ?? {}).map(([projectId, layout]) => [
-      projectId,
+  const state = persistedState as { workspaces?: Record<string, Partial<ProjectRightSidebarLayout>>; projects?: Record<string, Partial<ProjectRightSidebarLayout>> }
+  const workspaces = Object.fromEntries(
+    Object.entries(state.workspaces ?? state.projects ?? {}).map(([workspaceId, layout]) => [
+      workspaceId,
       {
         isVisible: false,
         size: clampSize(layout.size ?? DEFAULT_RIGHT_SIDEBAR_SIZE),
@@ -50,37 +50,37 @@ export function migrateRightSidebarStore(persistedState: unknown) {
     ])
   )
 
-  return { projects }
+  return { workspaces }
 }
 
 export const useRightSidebarStore = create<RightSidebarState>()(
   persist(
     (set) => ({
-      projects: {},
-      toggleVisibility: (projectId) =>
+      workspaces: {},
+      toggleVisibility: (workspaceId) =>
         set((state) => ({
-          projects: {
-            ...state.projects,
-            [projectId]: {
-              ...getProjectLayout(state.projects, projectId),
-              isVisible: !getProjectLayout(state.projects, projectId).isVisible,
+          workspaces: {
+            ...state.workspaces,
+            [workspaceId]: {
+              ...getProjectLayout(state.workspaces, workspaceId),
+              isVisible: !getProjectLayout(state.workspaces, workspaceId).isVisible,
             },
           },
         })),
-      setSize: (projectId, size) =>
+      setSize: (workspaceId, size) =>
         set((state) => ({
-          projects: {
-            ...state.projects,
-            [projectId]: {
-              ...getProjectLayout(state.projects, projectId),
+          workspaces: {
+            ...state.workspaces,
+            [workspaceId]: {
+              ...getProjectLayout(state.workspaces, workspaceId),
               size: clampSize(size),
             },
           },
         })),
-      clearProject: (projectId) =>
+      clearProject: (workspaceId) =>
         set((state) => {
-          const { [projectId]: _removed, ...rest } = state.projects
-          return { projects: rest }
+          const { [workspaceId]: _removed, ...rest } = state.workspaces
+          return { workspaces: rest }
         }),
     }),
     {

@@ -336,7 +336,7 @@ describe("sidebar ui identity coverage", () => {
         TooltipProvider,
         null,
         createElement(LocalProjectsSection, {
-          projectGroups: [
+          workspaceGroups: [
             {
               groupKey: "project-1",
               localPath: "/tmp/project-1",

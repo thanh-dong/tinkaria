@@ -88,8 +88,8 @@ export function usePwaResume(args: {
   useEffect(() => {
     if (resumeRefreshNonce === 0) return
 
-    for (const projectId of getResumeRefreshSessionProjectIds(openSessionProjectIds)) {
-      void socket.command({ type: "sessions.refresh", projectId }).catch((error) => {
+    for (const workspaceId of getResumeRefreshSessionProjectIds(openSessionProjectIds)) {
+      void socket.command({ type: "sessions.refresh", workspaceId }).catch((error) => {
         setNormalizedCommandError(error)
       })
     }

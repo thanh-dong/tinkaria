@@ -2,15 +2,15 @@ import type {
   ChatRuntime,
   ChatSnapshot,
   SessionStatus,
-  LocalProjectsSnapshot,
+  LocalWorkspacesSnapshot,
   SessionsSnapshot,
   SidebarChatRow,
   SidebarData,
-  SidebarProjectGroup,
+  SidebarWorkspaceGroup,
 } from "../shared/types"
-import type { ChatRecord, StoreState, ProjectCoordinationState } from "./events"
+import type { ChatRecord, StoreState, WorkspaceCoordinationState } from "./events"
 import { createEmptyCoordinationState } from "./events"
-import type { ProjectCoordinationSnapshot } from "../shared/project-agent-types"
+import type { WorkspaceCoordinationSnapshot } from "../shared/workspace-types"
 import { resolveLocalPath } from "./paths"
 import { SERVER_PROVIDERS } from "./provider-catalog"
 
@@ -24,13 +24,13 @@ export function deriveSidebarData(
   state: StoreState,
   activeStatuses: Map<string, SessionStatus>
 ): SidebarData {
-  const projects = [...state.projectsById.values()]
+  const projects = [...state.workspacesById.values()]
     .filter((project) => !project.deletedAt)
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
-  const projectGroups: SidebarProjectGroup[] = projects.map((project) => {
+  const workspaceGroups: SidebarWorkspaceGroup[] = projects.map((project) => {
     const chats: SidebarChatRow[] = [...state.chatsById.values()]
-      .filter((chat) => chat.projectId === project.id && !chat.deletedAt)
+      .filter((chat) => chat.workspaceId === project.id && !chat.deletedAt)
       .sort((a, b) => (b.lastMessageAt ?? b.updatedAt) - (a.lastMessageAt ?? a.updatedAt))
       .map((chat) => ({
         _id: chat.id,
@@ -53,19 +53,19 @@ export function deriveSidebarData(
     }
   })
 
-  return { projectGroups }
+  return { workspaceGroups }
 }
 
-export function deriveLocalProjectsSnapshot(
+export function deriveLocalWorkspacesSnapshot(
   state: StoreState,
   discoveredProjects: Array<{ localPath: string; title: string; modifiedAt: number }>,
   machineName: string
-): LocalProjectsSnapshot {
-  const projects = new Map<string, LocalProjectsSnapshot["projects"][number]>()
+): LocalWorkspacesSnapshot {
+  const workspaces = new Map<string, LocalWorkspacesSnapshot["workspaces"][number]>()
 
   for (const project of discoveredProjects) {
     const normalizedPath = resolveLocalPath(project.localPath)
-    projects.set(normalizedPath, {
+    workspaces.set(normalizedPath, {
       localPath: normalizedPath,
       title: project.title,
       source: "discovered",
@@ -74,14 +74,14 @@ export function deriveLocalProjectsSnapshot(
     })
   }
 
-  for (const project of [...state.projectsById.values()].filter((entry) => !entry.deletedAt)) {
-    const chats = [...state.chatsById.values()].filter((chat) => chat.projectId === project.id && !chat.deletedAt)
+  for (const project of [...state.workspacesById.values()].filter((entry) => !entry.deletedAt)) {
+    const chats = [...state.chatsById.values()].filter((chat) => chat.workspaceId === project.id && !chat.deletedAt)
     const lastOpenedAt = chats.reduce(
       (latest, chat) => Math.max(latest, chat.lastMessageAt ?? chat.updatedAt ?? 0),
       project.updatedAt
     )
 
-    projects.set(project.localPath, {
+    workspaces.set(project.localPath, {
       localPath: project.localPath,
       title: project.title,
       source: "saved",
@@ -95,7 +95,7 @@ export function deriveLocalProjectsSnapshot(
       id: "local",
       displayName: machineName,
     },
-    projects: [...projects.values()].sort((a, b) => (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0)),
+    workspaces: [...workspaces.values()].sort((a, b) => (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0)),
   }
 }
 
@@ -108,12 +108,12 @@ export function deriveChatSnapshot(
 ): ChatSnapshot | null {
   const chat = state.chatsById.get(chatId)
   if (!chat || chat.deletedAt) return null
-  const project = state.projectsById.get(chat.projectId)
+  const project = state.workspacesById.get(chat.workspaceId)
   if (!project || project.deletedAt) return null
 
   const runtime: ChatRuntime = {
     chatId: chat.id,
-    projectId: project.id,
+    workspaceId: project.id,
     localPath: project.localPath,
     title: chat.title,
     status: deriveStatus(chat, activeStatuses.get(chat.id)),
@@ -137,12 +137,12 @@ export function deriveSessionsSnapshot(
   return cachedSnapshot
 }
 
-/** Derive a coordination snapshot from any state with coordinationByProject. */
+/** Derive a coordination snapshot from any state with coordinationByWorkspace. */
 export function deriveCoordinationSnapshot(
-  state: { coordinationByProject: Map<string, ProjectCoordinationState> },
-  projectId: string,
-): ProjectCoordinationSnapshot {
-  const coord = state.coordinationByProject.get(projectId) ?? createEmptyCoordinationState()
+  state: { coordinationByWorkspace: Map<string, WorkspaceCoordinationState> },
+  workspaceId: string,
+): WorkspaceCoordinationSnapshot {
+  const coord = state.coordinationByWorkspace.get(workspaceId) ?? createEmptyCoordinationState()
 
   const todos = [...coord.todos.values()]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -156,7 +156,7 @@ export function deriveCoordinationSnapshot(
   const rules = [...coord.rules.values()]
 
   return {
-    projectId,
+    workspaceId,
     todos,
     claims,
     worktrees,
@@ -166,9 +166,9 @@ export function deriveCoordinationSnapshot(
 }
 
 /** Convenience overload accepting full StoreState (used by nats-publisher). */
-export function deriveProjectCoordinationSnapshot(
+export function deriveWorkspaceCoordinationSnapshot(
   state: StoreState,
-  projectId: string,
-): ProjectCoordinationSnapshot {
-  return deriveCoordinationSnapshot(state, projectId)
+  workspaceId: string,
+): WorkspaceCoordinationSnapshot {
+  return deriveCoordinationSnapshot(state, workspaceId)
 }

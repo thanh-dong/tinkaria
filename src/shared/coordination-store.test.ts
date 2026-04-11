@@ -6,7 +6,7 @@ describe("CoordinationStore interface", () => {
     // This is a compile-time test — if CoordinationStore is incompatible
     // with EventStore's methods, tsc will fail.
     const mockStore: CoordinationStore = {
-      state: { coordinationByProject: new Map() },
+      state: { coordinationByWorkspace: new Map() },
       addTodo: async () => {},
       claimTodo: async () => {},
       completeTodo: async () => {},

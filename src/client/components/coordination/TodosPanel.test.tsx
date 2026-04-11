@@ -1,7 +1,7 @@
 import { describe, test, expect, mock } from "bun:test"
-import type { ProjectTodo } from "../../../shared/project-agent-types"
+import type { WorkspaceTodo } from "../../../shared/workspace-types"
 
-function makeTodo(overrides: Partial<ProjectTodo> = {}): ProjectTodo {
+function makeTodo(overrides: Partial<WorkspaceTodo> = {}): WorkspaceTodo {
   return {
     id: "t1",
     description: "Implement feature X",

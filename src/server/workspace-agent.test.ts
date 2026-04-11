@@ -1,6 +1,6 @@
 // src/server/project-agent.test.ts
 import { describe, expect, test, afterEach } from "bun:test"
-import { ProjectAgent } from "./project-agent"
+import { WorkspaceAgent } from "./workspace-agent"
 import { SessionIndex } from "./session-index"
 import { EventStore } from "./event-store"
 import { TranscriptSearchIndex } from "./transcript-search"
@@ -19,10 +19,10 @@ async function createAgent() {
   const search = new TranscriptSearchIndex()
 
   const project = await store.openProject("/tmp/test", "Test Project")
-  const projectId = project.id
+  const workspaceId = project.id
 
-  const agent = new ProjectAgent({ sessions, store, search, projectId })
-  return { agent, sessions, store, search, projectId }
+  const agent = new WorkspaceAgent({ sessions, store, search, workspaceId })
+  return { agent, sessions, store, search, workspaceId }
 }
 
 afterEach(async () => {
@@ -30,11 +30,11 @@ afterEach(async () => {
   tempDirs = []
 })
 
-describe("ProjectAgent", () => {
+describe("WorkspaceAgent", () => {
   describe("querySessions", () => {
     test("returns sessions for project", async () => {
-      const { agent, projectId } = await createAgent()
-      const result = agent.querySessions(projectId)
+      const { agent, workspaceId } = await createAgent()
+      const result = agent.querySessions(workspaceId)
       expect(result).toEqual([])
     })
   })

@@ -19,7 +19,7 @@ async function createStoreWithProject() {
   const store = createTestStore()
   await store.initialize()
   const project = await store.openProject("/tmp/coord-mcp-test")
-  return { store, projectId: project.id }
+  return { store, workspaceId: project.id }
 }
 
 type ToolRegistry = Record<string, { handler: (args: Record<string, unknown>) => Promise<unknown> }>
@@ -40,29 +40,29 @@ describe("createCoordinationMcpServer", () => {
     )
 
     expect(tools).toEqual([
-      "project_todo_add",
-      "project_todo_claim",
-      "project_todo_complete",
-      "project_todo_abandon",
-      "project_claim_create",
-      "project_claim_release",
-      "project_worktree_create",
-      "project_worktree_assign",
-      "project_worktree_remove",
-      "project_rule_set",
-      "project_rule_remove",
-      "project_snapshot_get",
+      "workspace_todo_add",
+      "workspace_todo_claim",
+      "workspace_todo_complete",
+      "workspace_todo_abandon",
+      "workspace_claim_create",
+      "workspace_claim_release",
+      "workspace_worktree_create",
+      "workspace_worktree_assign",
+      "workspace_worktree_remove",
+      "workspace_rule_set",
+      "workspace_rule_remove",
+      "workspace_snapshot_get",
     ])
   })
 })
 
 describe("coordination MCP tool handlers", () => {
-  test("project_todo_add creates a todo and returns it", async () => {
-    const { store, projectId } = await createStoreWithProject()
+  test("workspace_todo_add creates a todo and returns it", async () => {
+    const { store, workspaceId } = await createStoreWithProject()
     const tools = getTools(store)
 
-    const result = await tools.project_todo_add.handler({
-      projectId,
+    const result = await tools.workspace_todo_add.handler({
+      workspaceId,
       description: "Fix the login bug",
       priority: "high",
       createdBy: "session-a",
@@ -76,21 +76,21 @@ describe("coordination MCP tool handlers", () => {
     expect(todo.id).toBeDefined()
   })
 
-  test("project_claim_create detects conflicts on overlapping files", async () => {
-    const { store, projectId } = await createStoreWithProject()
+  test("workspace_claim_create detects conflicts on overlapping files", async () => {
+    const { store, workspaceId } = await createStoreWithProject()
     const tools = getTools(store)
 
     // First claim — no conflict
-    await tools.project_claim_create.handler({
-      projectId,
+    await tools.workspace_claim_create.handler({
+      workspaceId,
       intent: "Refactor auth",
       files: ["src/auth.ts", "src/login.ts"],
       sessionId: "s-1",
     })
 
     // Overlapping claim — should detect conflict
-    const conflictResult = await tools.project_claim_create.handler({
-      projectId,
+    const conflictResult = await tools.workspace_claim_create.handler({
+      workspaceId,
       intent: "Fix login",
       files: ["src/login.ts"],
       sessionId: "s-2",
@@ -101,36 +101,36 @@ describe("coordination MCP tool handlers", () => {
     expect(claim.conflictsWith).toBeDefined()
   })
 
-  test("project_snapshot_get returns full coordination state", async () => {
-    const { store, projectId } = await createStoreWithProject()
+  test("workspace_snapshot_get returns full coordination state", async () => {
+    const { store, workspaceId } = await createStoreWithProject()
     const tools = getTools(store)
 
-    await tools.project_todo_add.handler({ projectId, description: "Task A" })
-    await tools.project_rule_set.handler({ projectId, content: "Use strict TypeScript" })
+    await tools.workspace_todo_add.handler({ workspaceId, description: "Task A" })
+    await tools.workspace_rule_set.handler({ workspaceId, content: "Use strict TypeScript" })
 
-    const result = await tools.project_snapshot_get.handler({ projectId }) as { content: Array<{ text: string }> }
+    const result = await tools.workspace_snapshot_get.handler({ workspaceId }) as { content: Array<{ text: string }> }
 
     const snapshot = JSON.parse(result.content[0].text)
-    expect(snapshot.projectId).toBe(projectId)
+    expect(snapshot.workspaceId).toBe(workspaceId)
     expect(snapshot.todos).toHaveLength(1)
     expect(snapshot.rules).toHaveLength(1)
   })
 
   test("todo lifecycle: add → claim → complete", async () => {
-    const { store, projectId } = await createStoreWithProject()
+    const { store, workspaceId } = await createStoreWithProject()
     const tools = getTools(store)
 
     // Add
-    const addResult = await tools.project_todo_add.handler({
-      projectId,
+    const addResult = await tools.workspace_todo_add.handler({
+      workspaceId,
       description: "Build feature X",
       createdBy: "s-1",
     }) as { content: Array<{ text: string }> }
     const todoId = JSON.parse(addResult.content[0].text).id
 
     // Claim
-    const claimResult = await tools.project_todo_claim.handler({
-      projectId,
+    const claimResult = await tools.workspace_todo_claim.handler({
+      workspaceId,
       todoId,
       sessionId: "s-2",
     }) as { content: Array<{ text: string }> }
@@ -138,8 +138,8 @@ describe("coordination MCP tool handlers", () => {
     expect(JSON.parse(claimResult.content[0].text).claimedBy).toBe("s-2")
 
     // Complete
-    const completeResult = await tools.project_todo_complete.handler({
-      projectId,
+    const completeResult = await tools.workspace_todo_complete.handler({
+      workspaceId,
       todoId,
       outputs: ["feature-x.ts"],
     }) as { content: Array<{ text: string }> }

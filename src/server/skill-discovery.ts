@@ -15,10 +15,10 @@ async function listSkillNames(dir: string): Promise<string[]> {
   }
 }
 
-export async function scanSkillDirs(projectPath: string, homeDir?: string): Promise<string[]> {
+export async function scanSkillDirs(workspacePath: string, homeDir?: string): Promise<string[]> {
   const home = homeDir ?? homedir()
   const userSkillsDir = join(home, ".claude", "skills")
-  const projectSkillsDir = join(projectPath, ".claude", "skills")
+  const projectSkillsDir = join(workspacePath, ".claude", "skills")
 
   const [userSkills, projectSkills] = await Promise.all([
     listSkillNames(userSkillsDir),
@@ -56,20 +56,20 @@ export class SkillCache {
     this.homeDir = options?.homeDir
   }
 
-  async get(projectPath: string): Promise<string[]> {
-    const entry = this.cache.get(projectPath)
+  async get(workspacePath: string): Promise<string[]> {
+    const entry = this.cache.get(workspacePath)
     if (entry && Date.now() < entry.expiresAt) {
       return entry.skills
     }
 
-    const skills = await scanSkillDirs(projectPath, this.homeDir)
-    this.cache.set(projectPath, { skills, expiresAt: Date.now() + this.ttlMs })
+    const skills = await scanSkillDirs(workspacePath, this.homeDir)
+    this.cache.set(workspacePath, { skills, expiresAt: Date.now() + this.ttlMs })
     return skills
   }
 
-  invalidate(projectPath?: string): void {
-    if (projectPath) {
-      this.cache.delete(projectPath)
+  invalidate(workspacePath?: string): void {
+    if (workspacePath) {
+      this.cache.delete(workspacePath)
     } else {
       this.cache.clear()
     }

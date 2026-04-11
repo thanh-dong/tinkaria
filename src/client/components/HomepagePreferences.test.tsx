@@ -1,7 +1,37 @@
-import { describe, expect, test } from "bun:test"
+import { beforeEach, describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import { ThemeProvider } from "../hooks/useTheme"
 import { HomepagePreferences } from "./HomepagePreferences"
+
+// Guard against prior tests wiping browser globals (order-dependent in full suite)
+function ensureBrowserGlobals() {
+  if (typeof globalThis.window !== "undefined") {
+    if (!globalThis.window.matchMedia) {
+      globalThis.window.matchMedia = (query: string) => ({
+        matches: false, media: query, onchange: null,
+        addListener: () => {}, removeListener: () => {},
+        addEventListener: () => {}, removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList
+    }
+    if (!globalThis.window.localStorage) {
+      const store = new Map<string, string>()
+      Object.defineProperty(globalThis.window, "localStorage", {
+        value: {
+          getItem: (k: string) => store.get(k) ?? null,
+          setItem: (k: string, v: string) => store.set(k, v),
+          removeItem: (k: string) => store.delete(k),
+          clear: () => store.clear(),
+          get length() { return store.size },
+          key: (i: number) => [...store.keys()][i] ?? null,
+        },
+        writable: true, configurable: true,
+      })
+    }
+  }
+}
+ensureBrowserGlobals()
+beforeEach(ensureBrowserGlobals)
 
 describe("HomepagePreferences", () => {
   test("renders theme options, provider options, and ui identity", () => {

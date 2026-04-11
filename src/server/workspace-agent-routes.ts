@@ -1,6 +1,6 @@
 // src/server/project-agent-routes.ts
 import { LOG_PREFIX } from "../shared/branding"
-import type { ProjectAgent } from "./project-agent"
+import type { WorkspaceAgent } from "./workspace-agent"
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -23,14 +23,14 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-export function createProjectAgentRouter(agent: ProjectAgent): (req: Request) => Promise<Response> {
+export function createWorkspaceAgentRouter(agent: WorkspaceAgent): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url)
-    const path = url.pathname.replace(/^\/api\/project/, "")
+    const path = url.pathname.replace(/^\/api\/workspace/, "")
 
     if (req.method === "GET" && path === "/sessions") {
-      const projectId = url.searchParams.get("projectId") ?? ""
-      return jsonResponse(agent.querySessions(projectId))
+      const workspaceId = url.searchParams.get("workspaceId") ?? ""
+      return jsonResponse(agent.querySessions(workspaceId))
     }
 
     if (req.method === "GET" && path.startsWith("/sessions/")) {

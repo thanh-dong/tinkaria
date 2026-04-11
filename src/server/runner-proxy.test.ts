@@ -29,21 +29,23 @@ function createMockStore() {
   const store = {
     requireChat: (chatId: string) => ({
       id: chatId,
-      projectId: "p1",
+      workspaceId: "p1",
+    repoId: null,
       title: "Test Chat",
       provider: "claude" as const,
       sessionToken: null,
       planMode: false,
     }),
-    getProject: (_projectId: string) => ({
+    getProject: (_workspaceId: string) => ({
       id: "p1",
       localPath: "/tmp/test-project",
       title: "Test Project",
     }),
     getMessages: (_chatId: string) => [],
-    createChat: async (_projectId: string) => ({
+    createChat: async (_workspaceId: string) => ({
       id: "new-chat-id",
-      projectId: _projectId,
+      workspaceId: _workspaceId,
+    repoId: null,
       title: "New Chat",
       provider: null,
       sessionToken: null,
@@ -91,6 +93,7 @@ describe("RunnerProxy", () => {
     runnerNc = await connect({ servers: natsServer.url })
 
     mockRunner = createMockRunner(runnerNc, RUNNER_ID)
+    await runnerNc.flush()
 
     const activeStatuses = new Map<string, SessionStatus>()
     const store = createMockStore()
@@ -124,7 +127,7 @@ describe("RunnerProxy", () => {
       provider: "claude",
       content: "Hello agent",
       model: "sonnet",
-      projectLocalPath: "/tmp/test-project",
+      workspaceLocalPath: "/tmp/test-project",
       appendUserPrompt: true,
     })
 
@@ -137,7 +140,7 @@ describe("RunnerProxy", () => {
 
     const result = await proxy!.send({
       type: "chat.send",
-      projectId: "p1",
+      workspaceId: "p1",
       content: "New conversation",
     })
 
@@ -150,7 +153,7 @@ describe("RunnerProxy", () => {
     })
   })
 
-  test("send() without chatId or projectId throws", async () => {
+  test("send() without chatId or workspaceId throws", async () => {
     await setup()
 
     await expect(
@@ -158,7 +161,7 @@ describe("RunnerProxy", () => {
         type: "chat.send",
         content: "No context",
       }),
-    ).rejects.toThrow("Missing projectId")
+    ).rejects.toThrow("Missing workspaceId")
   })
 
   test("cancel() forwards CancelTurnCommand", async () => {
@@ -220,6 +223,8 @@ describe("RunnerProxy", () => {
       chatId: "orch-chat",
       provider: "claude",
       content: "Orchestrated task",
+      delegatedContext: "Forked parent chat context:\nUser: Investigate the auth race.",
+      isSpawned: true,
       model: "sonnet",
       planMode: false,
       appendUserPrompt: true,
@@ -232,10 +237,12 @@ describe("RunnerProxy", () => {
       chatId: "orch-chat",
       provider: "claude",
       content: "Orchestrated task",
+      delegatedContext: "Forked parent chat context:\nUser: Investigate the auth race.",
+      isSpawned: true,
       model: "sonnet",
       planMode: false,
       appendUserPrompt: true,
-      projectLocalPath: "/tmp/test-project",
+      workspaceLocalPath: "/tmp/test-project",
     })
 
     const modelCall = store._calls.find((c) => c.method === "setChatModel")
@@ -267,6 +274,7 @@ describe("RunnerProxy", () => {
         )
       }
     })()
+    await runnerNc.flush()
 
     proxy = new RunnerProxy({
       nc: clientNc,

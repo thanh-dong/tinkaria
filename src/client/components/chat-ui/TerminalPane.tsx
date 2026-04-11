@@ -14,7 +14,7 @@ const TERMINAL_PANE_UI_DESCRIPTOR = createUiIdentityDescriptor({
 })
 
 interface Props {
-  projectId: string
+  workspaceId: string
   terminalId: string
   socket: AppTransport
   scrollback: number
@@ -146,7 +146,7 @@ function syncTerminalSize(
 }
 
 export function TerminalPane({
-  projectId,
+  workspaceId,
   terminalId,
   socket,
   scrollback,
@@ -366,7 +366,7 @@ export function TerminalPane({
       lastSizeRef.current = size
       void socket.command({
         type: "terminal.create",
-        projectId,
+        workspaceId,
         terminalId,
         cols: size.cols,
         rows: size.rows,
@@ -440,7 +440,7 @@ export function TerminalPane({
         }
       },
     })
-  }, [connectionStatus, projectId, scrollback, socket, terminalId])
+  }, [connectionStatus, workspaceId, scrollback, socket, terminalId])
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-4" {...getUiIdentityAttributeProps(TERMINAL_PANE_UI_DESCRIPTOR)}>

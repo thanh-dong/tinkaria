@@ -22,7 +22,7 @@ import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
 import { useChatInputStore } from "../stores/chatInputStore"
 import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
 import { useRightSidebarStore } from "../stores/rightSidebarStore"
-import type { ChatSnapshot, HydratedTranscriptMessage, LocalProjectsSnapshot, SidebarChatRow, SidebarData } from "../../shared/types"
+import type { ChatSnapshot, HydratedTranscriptMessage, LocalWorkspacesSnapshot, SidebarChatRow, SidebarData } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import type { useAppDialog } from "../components/ui/app-dialog"
 import { deleteCachedChat } from "./chatCache"
@@ -133,7 +133,7 @@ export interface ChatCommandsArgs {
   fallbackLocalProjectPath: string | null
   isProcessing: boolean
   messages: HydratedTranscriptMessage[]
-  localProjects: LocalProjectsSnapshot | null
+  localProjects: LocalWorkspacesSnapshot | null
   setProjectSelection: React.Dispatch<React.SetStateAction<import("./useAppState.machine").ProjectSelectionState>>
   setSidebarData: React.Dispatch<React.SetStateAction<SidebarData>>
   setPendingChatId: (id: string | null) => void
@@ -159,7 +159,7 @@ export interface ChatCommandsReturn {
   sessionsWindowDays: Map<string, number>
 
   // Handlers
-  handleCreateChat: (projectId: string) => Promise<void>
+  handleCreateChat: (workspaceId: string) => Promise<void>
   handleOpenLocalProject: (localPath: string) => Promise<void>
   handleCreateProject: (project: ProjectRequest) => Promise<void>
   handleCheckForUpdates: (options?: { force?: boolean }) => Promise<void>
@@ -172,21 +172,21 @@ export interface ChatCommandsReturn {
   handleCancel: () => Promise<void>
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
   handleRenameChat: (chatId: string, title: string) => Promise<void>
-  handleRemoveProject: (projectId: string) => Promise<void>
+  handleRemoveProject: (workspaceId: string) => Promise<void>
   handleOpenExternal: (action: "open_finder") => Promise<void>
   handleOpenExternalPath: (action: "open_finder", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
   handleOpenExternalLink: (href: string) => boolean
   closeLocalFilePreview: () => void
-  handleOpenSessionPicker: (projectId: string, open: boolean) => void
-  handleResumeSession: (projectId: string, sessionId: string, provider: AgentProvider) => Promise<void>
-  handleRefreshSessions: (projectId: string) => void
-  handleShowMoreSessions: (projectId: string) => void
+  handleOpenSessionPicker: (workspaceId: string, open: boolean) => void
+  handleResumeSession: (workspaceId: string, sessionId: string, provider: AgentProvider) => Promise<void>
+  handleRefreshSessions: (workspaceId: string) => void
+  handleShowMoreSessions: (workspaceId: string) => void
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
   dismissBootstrapError: () => void
-  requestMerge: (projectId: string) => void
+  requestMerge: (workspaceId: string) => void
   clearMergeRequest: () => void
   handleAskUserQuestion: (
     toolUseId: string,
@@ -283,12 +283,12 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     })
   }
 
-  async function createChatForProject(projectId: string) {
+  async function createChatForProject(workspaceId: string) {
     useChatPreferencesStore.getState().initializeComposerForNewChat()
-    const result = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
+    const result = await socket.command<{ chatId: string }>({ type: "chat.create", workspaceId })
     setProjectSelection((current) => transitionProjectSelection(current, {
       type: "project.explicitly_selected",
-      projectId,
+      workspaceId,
     }))
     setPendingChatId(result.chatId)
     navigate(`/chat/${result.chatId}`)
@@ -296,22 +296,22 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     setCommandError(null)
   }
 
-  async function resolveProjectIdForStartChat(intent: StartChatIntent): Promise<{ projectId: string; localPath?: string }> {
+  async function resolveProjectIdForStartChat(intent: StartChatIntent): Promise<{ workspaceId: string; localPath?: string }> {
     if (intent.kind === "project_id") {
-      return { projectId: intent.projectId }
+      return { workspaceId: intent.workspaceId }
     }
 
     if (intent.kind === "local_path") {
-      const result = await socket.command<{ projectId: string }>({ type: "project.open", localPath: intent.localPath })
-      return { projectId: result.projectId, localPath: intent.localPath }
+      const result = await socket.command<{ workspaceId: string }>({ type: "project.open", localPath: intent.localPath })
+      return { workspaceId: result.workspaceId, localPath: intent.localPath }
     }
 
-    const result = await socket.command<{ projectId: string }>(
+    const result = await socket.command<{ workspaceId: string }>(
       intent.project.mode === "new"
         ? { type: "project.create", localPath: intent.project.localPath, title: intent.project.title }
         : { type: "project.open", localPath: intent.project.localPath }
     )
-    return { projectId: result.projectId, localPath: intent.project.localPath }
+    return { workspaceId: result.workspaceId, localPath: intent.project.localPath }
   }
 
   async function startChatFromIntent(intent: StartChatIntent) {
@@ -325,8 +325,8 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
         setStartingLocalPath(localPath)
       }
 
-      const { projectId } = await resolveProjectIdForStartChat(intent)
-      await createChatForProject(projectId)
+      const { workspaceId } = await resolveProjectIdForStartChat(intent)
+      await createChatForProject(workspaceId)
     } catch (error) {
       setCommandError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -336,8 +336,8 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
   // --- Navigation/creation commands ---
 
-  async function handleCreateChat(projectId: string) {
-    await startChatFromIntent({ kind: "project_id", projectId })
+  async function handleCreateChat(workspaceId: string) {
+    await startChatFromIntent({ kind: "project_id", workspaceId })
   }
 
   async function handleOpenLocalProject(localPath: string) {
@@ -351,7 +351,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
   function handleCompose() {
     const intent = resolveComposeIntent({
       selectedProjectId,
-      sidebarProjectId: sidebarData.projectGroups[0]?.groupKey,
+      sidebarProjectId: sidebarData.workspaceGroups[0]?.groupKey,
       fallbackLocalProjectPath,
     })
     if (intent) {
@@ -366,20 +366,20 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
   async function handleSend(content: string, options?: SubmitOptions) {
     try {
-      let projectId = selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
-      if (!activeChatId && !projectId && fallbackLocalProjectPath) {
-        const project = await socket.command<{ projectId: string }>({
+      let workspaceId = selectedProjectId ?? sidebarData.workspaceGroups[0]?.groupKey ?? null
+      if (!activeChatId && !workspaceId && fallbackLocalProjectPath) {
+        const project = await socket.command<{ workspaceId: string }>({
           type: "project.open",
           localPath: fallbackLocalProjectPath,
         })
-        projectId = project.projectId
+        workspaceId = project.workspaceId
         setProjectSelection((current) => transitionProjectSelection(current, {
           type: "project.explicitly_selected",
-          projectId,
+          workspaceId,
         }))
       }
 
-      if (!activeChatId && !projectId) {
+      if (!activeChatId && !workspaceId) {
         throw new Error("Open a project first")
       }
 
@@ -399,7 +399,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       const result = await socket.command<{ chatId?: string }>({
         type: "chat.send",
         chatId: activeChatId ?? undefined,
-        projectId: activeChatId ? undefined : projectId ?? undefined,
+        workspaceId: activeChatId ? undefined : workspaceId ?? undefined,
         provider: options?.provider,
         content,
         model: options?.model,
@@ -482,7 +482,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     // Optimistic: remove from sidebar immediately so the UI feels instant.
     // Compute navigation target *before* updating sidebar state.
     const nextChatId = chat.chatId === activeChatId
-      ? getNewestRemainingChatId(sidebarData.projectGroups, chat.chatId)
+      ? getNewestRemainingChatId(sidebarData.workspaceGroups, chat.chatId)
       : null
 
     setSidebarData((current) => removeChatFromSidebar(current, chat.chatId))
@@ -513,8 +513,8 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
   // --- Project commands ---
 
-  async function handleRemoveProject(projectId: string) {
-    const project = sidebarData.projectGroups.find((group) => group.groupKey === projectId)
+  async function handleRemoveProject(workspaceId: string) {
+    const project = sidebarData.workspaceGroups.find((group) => group.groupKey === workspaceId)
     if (!project) return
     const projectName = project.localPath.split("/").filter(Boolean).pop() ?? project.localPath
     const confirmed = await dialog.confirm({
@@ -526,14 +526,14 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     if (!confirmed) return
 
     try {
-      await socket.command({ type: "project.remove", projectId })
+      await socket.command({ type: "project.remove", workspaceId })
       for (const chat of project.chats) {
         useChatInputStore.getState().clearQueuedDraft(chat.chatId)
         deleteCachedChat(chat.chatId)
       }
-      useTerminalLayoutStore.getState().clearProject(projectId)
-      useRightSidebarStore.getState().clearProject(projectId)
-      if (runtime?.projectId === projectId) {
+      useTerminalLayoutStore.getState().clearProject(workspaceId)
+      useRightSidebarStore.getState().clearProject(workspaceId)
+      if (runtime?.workspaceId === workspaceId) {
         navigate("/")
       }
       setCommandError(null)
@@ -585,7 +585,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
   // --- External link commands ---
 
   async function handleOpenExternal(action: "open_finder") {
-    const localPath = runtime?.localPath ?? localProjects?.projects[0]?.localPath ?? sidebarData.projectGroups[0]?.localPath
+    const localPath = runtime?.localPath ?? localProjects?.workspaces[0]?.localPath ?? sidebarData.workspaceGroups[0]?.localPath
     if (!localPath) return
     try {
       await openExternal({
@@ -634,31 +634,31 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
   // --- Session commands ---
 
   const handleOpenSessionPicker = useCallback(
-    (projectId: string, open: boolean) => {
+    (workspaceId: string, open: boolean) => {
       if (open) {
-        if (activeSessionsSubs.current.has(projectId)) return
+        if (activeSessionsSubs.current.has(workspaceId)) return
         const unsub = socket.subscribe<SessionsSnapshot>(
-          { type: "sessions", projectId },
+          { type: "sessions", workspaceId },
           (snapshot) => {
-            setSessionsSnapshots((prev) => new Map(prev).set(projectId, snapshot))
+            setSessionsSnapshots((prev) => new Map(prev).set(workspaceId, snapshot))
           }
         )
-        activeSessionsSubs.current.set(projectId, unsub)
+        activeSessionsSubs.current.set(workspaceId, unsub)
       } else {
-        const unsub = activeSessionsSubs.current.get(projectId)
+        const unsub = activeSessionsSubs.current.get(workspaceId)
         unsub?.()
-        activeSessionsSubs.current.delete(projectId)
+        activeSessionsSubs.current.delete(workspaceId)
       }
     },
     [socket]
   )
 
   const handleResumeSession = useCallback(
-    async (projectId: string, sessionId: string, provider: AgentProvider) => {
+    async (workspaceId: string, sessionId: string, provider: AgentProvider) => {
       try {
         const result = await socket.command<{ chatId: string }>({
           type: "sessions.resume",
-          projectId,
+          workspaceId,
           sessionId,
           provider,
         })
@@ -675,8 +675,8 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
   )
 
   const handleRefreshSessions = useCallback(
-    (projectId: string) => {
-      void socket.command({ type: "sessions.refresh", projectId }).catch((error) => {
+    (workspaceId: string) => {
+      void socket.command({ type: "sessions.refresh", workspaceId }).catch((error) => {
         setCommandError(error instanceof Error ? error.message : String(error))
       })
     },
@@ -684,10 +684,10 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
   )
 
   const handleShowMoreSessions = useCallback(
-    (projectId: string) => {
+    (workspaceId: string) => {
       setSessionsWindowDays((prev) => {
-        const current = prev.get(projectId) ?? 7
-        return new Map(prev).set(projectId, current + 7)
+        const current = prev.get(workspaceId) ?? 7
+        return new Map(prev).set(workspaceId, current + 7)
       })
     },
     []
@@ -705,18 +705,18 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     if (!activeChatId) {
       throw new Error("Open a chat first")
     }
-    const projectId = chatSnapshot?.runtime?.projectId ?? selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
-    if (!projectId) {
+    const workspaceId = chatSnapshot?.runtime?.workspaceId ?? selectedProjectId ?? sidebarData.workspaceGroups[0]?.groupKey ?? null
+    if (!workspaceId) {
       throw new Error("Open a project first")
     }
 
-    const sourceTitle = getSidebarChatRow(sidebarData.projectGroups, activeChatId)?.title?.trim() || chatSnapshot?.runtime?.title || activeChatId
+    const sourceTitle = getSidebarChatRow(sidebarData.workspaceGroups, activeChatId)?.title?.trim() || chatSnapshot?.runtime?.title || activeChatId
     const previewTitle = deriveForkSessionPreviewTitle({
       sourceTitle,
       intent,
     })
     const previewIntent = summarizeSessionBootstrapIntent(intent)
-    const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
+    const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", workspaceId })
     await socket.command({
       type: "chat.rename",
       chatId,
@@ -779,19 +779,19 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       throw new Error("Select at least 1 session to merge")
     }
 
-    const projectId = pendingMergeProjectId ?? selectedProjectId ?? sidebarData.projectGroups[0]?.groupKey ?? null
-    if (!projectId) {
+    const workspaceId = pendingMergeProjectId ?? selectedProjectId ?? sidebarData.workspaceGroups[0]?.groupKey ?? null
+    if (!workspaceId) {
       throw new Error("Open a project first")
     }
 
-    const sourceLabels = getSidebarChatLabels(sidebarData.projectGroups, chatIds)
+    const sourceLabels = getSidebarChatLabels(sidebarData.workspaceGroups, chatIds)
     const previewTitle = deriveMergeSessionPreviewTitle({
       sourceLabels,
       intent,
     })
     const previewIntent = summarizeSessionBootstrapIntent(intent)
     // Step 1: Create chat + navigate instantly
-    const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", projectId })
+    const { chatId } = await socket.command<{ chatId: string }>({ type: "chat.create", workspaceId })
     await socket.command({
       type: "chat.rename",
       chatId,
@@ -920,7 +920,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     handleForkSession,
     handleMergeSession,
     dismissBootstrapError: () => setPendingSessionBootstrap(null),
-    requestMerge: (projectId: string) => setPendingMergeProjectId(projectId),
+    requestMerge: (workspaceId: string) => setPendingMergeProjectId(workspaceId),
     clearMergeRequest: () => setPendingMergeProjectId(null),
     handleAskUserQuestion,
     handleExitPlanMode,

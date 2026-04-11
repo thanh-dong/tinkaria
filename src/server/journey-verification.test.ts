@@ -386,21 +386,21 @@ async function openNewChatFromHomepage(session: string, fixture: FixtureEnvironm
     ])
 
     const projectOpened = projectEvents.find((event) =>
-      event.type === "project_opened" && event.localPath === fixture.fixtureProjectDir
+      event.type === "workspace_opened" && event.localPath === fixture.fixtureProjectDir
     )
-    if (!projectOpened || typeof projectOpened.projectId !== "string") {
+    if (!projectOpened || typeof projectOpened.workspaceId !== "string") {
       return false
     }
 
     const chatCreated = chatEvents.find((event) =>
-      event.type === "chat_created" && event.projectId === projectOpened.projectId && typeof event.chatId === "string"
+      event.type === "chat_created" && event.workspaceId === projectOpened.workspaceId && typeof event.chatId === "string"
     )
     if (!chatCreated || typeof chatCreated.chatId !== "string") {
       return false
     }
 
     return {
-      projectId: projectOpened.projectId,
+      workspaceId: projectOpened.workspaceId,
       chatId: chatCreated.chatId,
     }
   }, 10_000)
@@ -694,9 +694,9 @@ describe("journey verification inventory", () => {
 
     const createdPath = path.join(fixture.homeDir, APP_NAME, "coverage-project")
     const snapshot = JSON.parse(await readFile(path.join(fixture.dataDir, "snapshot.json"), "utf8")) as {
-      projects?: Array<{ localPath?: string }>
+      workspaces?: Array<{ localPath?: string }>
     }
-    expect(snapshot.projects?.some((project) => project.localPath === createdPath)).toBe(true)
+    expect(snapshot.workspaces?.some((ws) => ws.localPath === createdPath)).toBe(true)
   }, 90_000)
 
   test.skip("shows reconnecting and reconnected composer states after offline recovery", async () => {

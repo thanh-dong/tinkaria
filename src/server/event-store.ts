@@ -8,7 +8,7 @@ import {
   type ChatEvent,
   type CoordinationEvent,
   type MessageEvent,
-  type ProjectEvent,
+  type WorkspaceEvent,
   type SnapshotFile,
   type StoreEvent,
   type StoreState,
@@ -106,9 +106,9 @@ export class EventStore {
         await this.clearStorage()
         return
       }
-      for (const project of parsed.projects) {
-        this.state.projectsById.set(project.id, { ...project })
-        this.state.projectIdsByPath.set(project.localPath, project.id)
+      for (const project of parsed.workspaces) {
+        this.state.workspacesById.set(project.id, { ...project })
+        this.state.workspaceIdsByPath.set(project.localPath, project.id)
       }
       for (const chat of parsed.chats) {
         this.state.chatsById.set(chat.id, { ...chat, unread: chat.unread ?? false, model: chat.model ?? null })
@@ -120,7 +120,7 @@ export class EventStore {
           for (const claim of entry.claims) coord.claims.set(claim.id, claim)
           for (const wt of entry.worktrees) coord.worktrees.set(wt.id, wt)
           for (const rule of entry.rules) coord.rules.set(rule.id, rule)
-          this.state.coordinationByProject.set(entry.projectId, coord)
+          this.state.coordinationByWorkspace.set(entry.workspaceId, coord)
         }
       }
       if (parsed.messages?.length) {
@@ -136,10 +136,10 @@ export class EventStore {
   }
 
   private resetState() {
-    this.state.projectsById.clear()
-    this.state.projectIdsByPath.clear()
+    this.state.workspacesById.clear()
+    this.state.workspaceIdsByPath.clear()
     this.state.chatsById.clear()
-    this.state.coordinationByProject.clear()
+    this.state.coordinationByWorkspace.clear()
     this.transcriptCache.clear()
   }
 
@@ -150,7 +150,7 @@ export class EventStore {
 
   private async replayLogs() {
     if (this.storageReset) return
-    await this.replayLog<ProjectEvent>(this.projectsLogPath)
+    await this.replayLog<WorkspaceEvent>(this.projectsLogPath)
     if (this.storageReset) return
     await this.replayLog<ChatEvent>(this.chatsLogPath)
     if (this.storageReset) return
@@ -201,31 +201,32 @@ export class EventStore {
 
   private applyEvent(event: StoreEvent) {
     switch (event.type) {
-      case "project_opened": {
+      case "workspace_opened": {
         const localPath = resolveLocalPath(event.localPath)
         const project = {
-          id: event.projectId,
+          id: event.workspaceId,
           localPath,
           title: event.title,
           createdAt: event.timestamp,
           updatedAt: event.timestamp,
         }
-        this.state.projectsById.set(project.id, project)
-        this.state.projectIdsByPath.set(localPath, project.id)
+        this.state.workspacesById.set(project.id, project)
+        this.state.workspaceIdsByPath.set(localPath, project.id)
         break
       }
-      case "project_removed": {
-        const project = this.state.projectsById.get(event.projectId)
+      case "workspace_removed": {
+        const project = this.state.workspacesById.get(event.workspaceId)
         if (!project) break
         project.deletedAt = event.timestamp
         project.updatedAt = event.timestamp
-        this.state.projectIdsByPath.delete(project.localPath)
+        this.state.workspaceIdsByPath.delete(project.localPath)
         break
       }
       case "chat_created": {
         const chat = {
           id: event.chatId,
-          projectId: event.projectId,
+          workspaceId: event.workspaceId,
+          repoId: null,
           title: event.title,
           createdAt: event.timestamp,
           updatedAt: event.timestamp,
@@ -325,7 +326,7 @@ export class EventStore {
         break
       }
       case "todo_added": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         coord.todos.set(event.todoId, {
           id: event.todoId,
           description: event.description,
@@ -341,7 +342,7 @@ export class EventStore {
         break
       }
       case "todo_claimed": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         const todo = coord.todos.get(event.todoId)
         if (!todo) break
         todo.status = "claimed"
@@ -351,7 +352,7 @@ export class EventStore {
         break
       }
       case "todo_completed": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         const todo = coord.todos.get(event.todoId)
         if (!todo) break
         todo.status = "complete"
@@ -361,7 +362,7 @@ export class EventStore {
         break
       }
       case "todo_abandoned": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         const todo = coord.todos.get(event.todoId)
         if (!todo) break
         todo.status = "abandoned"
@@ -370,7 +371,7 @@ export class EventStore {
         break
       }
       case "claim_created": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         coord.claims.set(event.claimId, {
           id: event.claimId,
           intent: event.intent,
@@ -384,7 +385,7 @@ export class EventStore {
         break
       }
       case "claim_released": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         const claim = coord.claims.get(event.claimId)
         if (!claim) break
         claim.status = "released"
@@ -392,7 +393,7 @@ export class EventStore {
         break
       }
       case "claim_conflict_detected": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         const claim = coord.claims.get(event.claimId)
         if (!claim) break
         claim.status = "conflict"
@@ -401,7 +402,7 @@ export class EventStore {
         break
       }
       case "worktree_created": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         coord.worktrees.set(event.worktreeId, {
           id: event.worktreeId,
           branch: event.branch,
@@ -415,7 +416,7 @@ export class EventStore {
         break
       }
       case "worktree_assigned": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         const wt = coord.worktrees.get(event.worktreeId)
         if (!wt) break
         wt.assignedTo = event.sessionId
@@ -424,7 +425,7 @@ export class EventStore {
         break
       }
       case "worktree_removed": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         const wt = coord.worktrees.get(event.worktreeId)
         if (!wt) break
         wt.status = "removed"
@@ -433,7 +434,7 @@ export class EventStore {
         break
       }
       case "rule_set": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         coord.rules.set(event.ruleId, {
           id: event.ruleId,
           content: event.content,
@@ -444,7 +445,7 @@ export class EventStore {
         break
       }
       case "rule_removed": {
-        const coord = this.getOrCreateCoordination(event.projectId)
+        const coord = this.getOrCreateCoordination(event.workspaceId)
         coord.rules.delete(event.ruleId)
         coord.lastUpdated = new Date(event.timestamp).toISOString()
         break
@@ -452,11 +453,11 @@ export class EventStore {
     }
   }
 
-  private getOrCreateCoordination(projectId: string) {
-    let coord = this.state.coordinationByProject.get(projectId)
+  private getOrCreateCoordination(workspaceId: string) {
+    let coord = this.state.coordinationByWorkspace.get(workspaceId)
     if (!coord) {
       coord = createEmptyCoordinationState()
-      this.state.coordinationByProject.set(projectId, coord)
+      this.state.coordinationByWorkspace.set(workspaceId, coord)
     }
     return coord
   }
@@ -517,44 +518,44 @@ export class EventStore {
 
   async openProject(localPath: string, title?: string) {
     const normalized = resolveLocalPath(localPath)
-    const existingId = this.state.projectIdsByPath.get(normalized)
+    const existingId = this.state.workspaceIdsByPath.get(normalized)
     if (existingId) {
-      const existing = this.state.projectsById.get(existingId)
+      const existing = this.state.workspacesById.get(existingId)
       if (existing && !existing.deletedAt) {
         return existing
       }
     }
 
-    const projectId = crypto.randomUUID()
-    const event: ProjectEvent = {
+    const workspaceId = crypto.randomUUID()
+    const event: WorkspaceEvent = {
       v: STORE_VERSION,
-      type: "project_opened",
+      type: "workspace_opened",
       timestamp: Date.now(),
-      projectId,
+      workspaceId,
       localPath: normalized,
       title: title?.trim() || path.basename(normalized) || normalized,
     }
     await this.append(this.projectsLogPath, event)
-    return this.state.projectsById.get(projectId)!
+    return this.state.workspacesById.get(workspaceId)!
   }
 
-  async removeProject(projectId: string) {
-    const project = this.getProject(projectId)
+  async removeProject(workspaceId: string) {
+    const project = this.getProject(workspaceId)
     if (!project) {
       throw new Error("Project not found")
     }
 
-    const event: ProjectEvent = {
+    const event: WorkspaceEvent = {
       v: STORE_VERSION,
-      type: "project_removed",
+      type: "workspace_removed",
       timestamp: Date.now(),
-      projectId,
+      workspaceId,
     }
     await this.append(this.projectsLogPath, event)
   }
 
-  async createChat(projectId: string) {
-    const project = this.state.projectsById.get(projectId)
+  async createChat(workspaceId: string) {
+    const project = this.state.workspacesById.get(workspaceId)
     if (!project || project.deletedAt) {
       throw new Error("Project not found")
     }
@@ -564,7 +565,7 @@ export class EventStore {
       type: "chat_created",
       timestamp: Date.now(),
       chatId,
-      projectId,
+      workspaceId,
       title: "New Chat",
     }
     await this.append(this.chatsLogPath, event)
@@ -722,36 +723,36 @@ export class EventStore {
 
   // --- Coordination mutation methods ---
 
-  async addTodo(projectId: string, todoId: string, description: string, priority: "high" | "normal" | "low", createdBy: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_added", timestamp: Date.now(), projectId, todoId, description, priority, createdBy }
+  async addTodo(workspaceId: string, todoId: string, description: string, priority: "high" | "normal" | "low", createdBy: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_added", timestamp: Date.now(), workspaceId, todoId, description, priority, createdBy }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async claimTodo(projectId: string, todoId: string, claimedBy: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_claimed", timestamp: Date.now(), projectId, todoId, claimedBy }
+  async claimTodo(workspaceId: string, todoId: string, claimedBy: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_claimed", timestamp: Date.now(), workspaceId, todoId, claimedBy }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async completeTodo(projectId: string, todoId: string, outputs: string[]) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_completed", timestamp: Date.now(), projectId, todoId, outputs }
+  async completeTodo(workspaceId: string, todoId: string, outputs: string[]) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_completed", timestamp: Date.now(), workspaceId, todoId, outputs }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async abandonTodo(projectId: string, todoId: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_abandoned", timestamp: Date.now(), projectId, todoId }
+  async abandonTodo(workspaceId: string, todoId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "todo_abandoned", timestamp: Date.now(), workspaceId, todoId }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async createClaim(projectId: string, claimId: string, intent: string, files: string[], sessionId: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "claim_created", timestamp: Date.now(), projectId, claimId, intent, files, sessionId }
+  async createClaim(workspaceId: string, claimId: string, intent: string, files: string[], sessionId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "claim_created", timestamp: Date.now(), workspaceId, claimId, intent, files, sessionId }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
 
     // Auto-detect file overlap with existing active claims.
     // INVARIANT: append() updates in-memory state synchronously via applyEvent(),
-    // so coordinationByProject is already current when we read it here.
+    // so coordinationByWorkspace is already current when we read it here.
     // Only the first overlapping claim triggers a conflict event (intentional —
     // downstream can trace the full conflict chain via claim_conflict_detected events).
-    const coord = this.state.coordinationByProject.get(projectId)
+    const coord = this.state.coordinationByWorkspace.get(workspaceId)
     if (coord) {
       const fileSet = new Set(files)
       for (const [existingId, existing] of coord.claims) {
@@ -760,7 +761,7 @@ export class EventStore {
         if (overlapping.length > 0) {
           const conflictEvent: CoordinationEvent = {
             v: STORE_VERSION, type: "claim_conflict_detected", timestamp: Date.now(),
-            projectId, claimId, conflictsWith: existingId, overlappingFiles: overlapping,
+            workspaceId, claimId, conflictsWith: existingId, overlappingFiles: overlapping,
           }
           await this.append<CoordinationEvent>(this.coordinationLogPath, conflictEvent)
           break
@@ -769,38 +770,38 @@ export class EventStore {
     }
   }
 
-  async releaseClaim(projectId: string, claimId: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "claim_released", timestamp: Date.now(), projectId, claimId }
+  async releaseClaim(workspaceId: string, claimId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "claim_released", timestamp: Date.now(), workspaceId, claimId }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async createWorktree(projectId: string, worktreeId: string, branch: string, baseBranch: string, wtPath: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_created", timestamp: Date.now(), projectId, worktreeId, branch, baseBranch, path: wtPath }
+  async createWorktree(workspaceId: string, worktreeId: string, branch: string, baseBranch: string, wtPath: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_created", timestamp: Date.now(), workspaceId, worktreeId, branch, baseBranch, path: wtPath }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async assignWorktree(projectId: string, worktreeId: string, sessionId: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_assigned", timestamp: Date.now(), projectId, worktreeId, sessionId }
+  async assignWorktree(workspaceId: string, worktreeId: string, sessionId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_assigned", timestamp: Date.now(), workspaceId, worktreeId, sessionId }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async removeWorktree(projectId: string, worktreeId: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_removed", timestamp: Date.now(), projectId, worktreeId }
+  async removeWorktree(workspaceId: string, worktreeId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "worktree_removed", timestamp: Date.now(), workspaceId, worktreeId }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async setRule(projectId: string, ruleId: string, content: string, setBy: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "rule_set", timestamp: Date.now(), projectId, ruleId, content, setBy }
+  async setRule(workspaceId: string, ruleId: string, content: string, setBy: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "rule_set", timestamp: Date.now(), workspaceId, ruleId, content, setBy }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  async removeRule(projectId: string, ruleId: string) {
-    const event: CoordinationEvent = { v: STORE_VERSION, type: "rule_removed", timestamp: Date.now(), projectId, ruleId }
+  async removeRule(workspaceId: string, ruleId: string) {
+    const event: CoordinationEvent = { v: STORE_VERSION, type: "rule_removed", timestamp: Date.now(), workspaceId, ruleId }
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
-  getProject(projectId: string) {
-    const project = this.state.projectsById.get(projectId)
+  getProject(workspaceId: string) {
+    const project = this.state.workspacesById.get(workspaceId)
     if (!project || project.deletedAt) return null
     return project
   }
@@ -861,17 +862,17 @@ export class EventStore {
   }
 
   listProjects() {
-    return [...this.state.projectsById.values()].filter((project) => !project.deletedAt)
+    return [...this.state.workspacesById.values()].filter((project) => !project.deletedAt)
   }
 
-  listChatsByProject(projectId: string) {
+  listChatsByProject(workspaceId: string) {
     return [...this.state.chatsById.values()]
-      .filter((chat) => chat.projectId === projectId && !chat.deletedAt)
+      .filter((chat) => chat.workspaceId === workspaceId && !chat.deletedAt)
       .sort((a, b) => (b.lastMessageAt ?? b.updatedAt) - (a.lastMessageAt ?? a.updatedAt))
   }
 
-  getChatCount(projectId: string) {
-    return this.listChatsByProject(projectId).length
+  getChatCount(workspaceId: string) {
+    return this.listChatsByProject(workspaceId).length
   }
 
   async getLegacyTranscriptStats(): Promise<LegacyTranscriptStats> {
@@ -903,9 +904,9 @@ export class EventStore {
 
   private createSnapshot(): SnapshotFile {
     const coordination: SnapshotFile["coordination"] = []
-    for (const [projectId, coord] of this.state.coordinationByProject) {
+    for (const [workspaceId, coord] of this.state.coordinationByWorkspace) {
       coordination.push({
-        projectId,
+        workspaceId,
         todos: [...coord.todos.values()],
         claims: [...coord.claims.values()],
         worktrees: [...coord.worktrees.values()],
@@ -915,7 +916,7 @@ export class EventStore {
     return {
       v: STORE_VERSION,
       generatedAt: Date.now(),
-      projects: this.listProjects().map((project) => ({ ...project })),
+      workspaces: this.listProjects().map((project) => ({ ...project })),
       chats: [...this.state.chatsById.values()]
         .filter((chat) => !chat.deletedAt)
         .map((chat) => ({ ...chat })),

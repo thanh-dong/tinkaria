@@ -19,8 +19,8 @@ import {
 import { TooltipProvider } from "../components/ui/tooltip"
 import { AppSidebar } from "./AppSidebar"
 import { ChatPage } from "./ChatPage"
-import { LocalProjectsPage } from "./LocalProjectsPage"
-import { ProjectPage } from "./ProjectPage"
+import { LocalProjectsPage } from "./LocalWorkspacesPage"
+import { WorkspacePage } from "./WorkspacePage"
 import { AppStateContext } from "./AppStateContext"
 import { useAppState } from "./useAppState"
 import { useEventCallback } from "../hooks/useEventCallback"
@@ -329,8 +329,8 @@ function AppLayout() {
   const closeSidebar = useEventCallback(() => state.closeSidebar())
   const collapseSidebar = useEventCallback(() => state.collapseSidebar())
   const expandSidebar = useEventCallback(() => state.expandSidebar())
-  const handleCreateChat = useEventCallback((projectId: string) => {
-    void state.handleCreateChat(projectId)
+  const handleCreateChat = useEventCallback((workspaceId: string) => {
+    void state.handleCreateChat(workspaceId)
   })
   const handleDeleteChat = useEventCallback((chat: Parameters<typeof state.handleDeleteChat>[0]) => {
     void state.handleDeleteChat(chat)
@@ -338,32 +338,32 @@ function AppLayout() {
   const handleRenameChat = useEventCallback((chatId: string, title: string) => {
     void state.handleRenameChat(chatId, title)
   })
-  const handleRemoveProject = useEventCallback((projectId: string) => {
-    void state.handleRemoveProject(projectId)
+  const handleRemoveProject = useEventCallback((workspaceId: string) => {
+    void state.handleRemoveProject(workspaceId)
   })
   const handleInstallUpdate = useEventCallback(() => {
     void state.handleInstallUpdate()
   })
-  const sessionsForProject = useEventCallback((projectId: string) =>
-    state.sessionsSnapshots.get(projectId)?.sessions ?? []
+  const sessionsForProject = useEventCallback((workspaceId: string) =>
+    state.sessionsSnapshots.get(workspaceId)?.sessions ?? []
   )
-  const sessionsWindowDaysForProject = useEventCallback((projectId: string) =>
-    state.sessionsWindowDays.get(projectId) ?? 7
+  const sessionsWindowDaysForProject = useEventCallback((workspaceId: string) =>
+    state.sessionsWindowDays.get(workspaceId) ?? 7
   )
-  const handleResumeSession = useEventCallback((projectId: string, sessionId: string, provider: Parameters<typeof state.handleResumeSession>[2]) => {
-    void state.handleResumeSession(projectId, sessionId, provider)
+  const handleResumeSession = useEventCallback((workspaceId: string, sessionId: string, provider: Parameters<typeof state.handleResumeSession>[2]) => {
+    void state.handleResumeSession(workspaceId, sessionId, provider)
   })
-  const handleMergeSession = useEventCallback((projectId: string) => {
-    state.requestMerge(projectId)
+  const handleMergeSession = useEventCallback((workspaceId: string) => {
+    state.requestMerge(workspaceId)
   })
-  const handleOpenSessionPicker = useEventCallback((projectId: string, open: boolean) => {
-    state.handleOpenSessionPicker(projectId, open)
+  const handleOpenSessionPicker = useEventCallback((workspaceId: string, open: boolean) => {
+    state.handleOpenSessionPicker(workspaceId, open)
   })
-  const handleRefreshSessions = useEventCallback((projectId: string) => {
-    state.handleRefreshSessions(projectId)
+  const handleRefreshSessions = useEventCallback((workspaceId: string) => {
+    state.handleRefreshSessions(workspaceId)
   })
-  const handleShowMoreSessions = useEventCallback((projectId: string) => {
-    state.handleShowMoreSessions(projectId)
+  const handleShowMoreSessions = useEventCallback((workspaceId: string) => {
+    state.handleShowMoreSessions(workspaceId)
   })
 
   return (
@@ -418,7 +418,7 @@ function AppInner() {
           <Route path="/" element={<LocalProjectsPage />} />
           <Route path="/settings/*" element={<Navigate to="/" replace />} />
           <Route path="/chat/:chatId" element={<ChatPage />} />
-          <Route path="/project/:id" element={<ProjectPage />} />
+          <Route path="/workspace/:id" element={<WorkspacePage />} />
         </Route>
       </Routes>
     </AppStateContext.Provider>

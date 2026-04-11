@@ -47,11 +47,11 @@ function makeCmd(overrides?: Partial<StartTurnCommand>): StartTurnCommand {
     model: "test-model",
     planMode: false,
     appendUserPrompt: true,
-    projectLocalPath: "/tmp/test",
+    workspaceLocalPath: "/tmp/test",
     sessionToken: null,
     chatTitle: "New Chat",
     existingMessageCount: 0,
-    projectId: "p1",
+    workspaceId: "p1",
     ...overrides,
   }
 }
@@ -150,6 +150,34 @@ describe("RunnerAgent", () => {
     const transcripts = collected.filter((e) => e.type === "transcript") as any[]
     const kinds = transcripts.map((e) => e.entry?.kind)
     expect(kinds).not.toContain("user_prompt")
+  })
+
+  test("delegatedContext is prepended for the harness without rewriting the visible user prompt", async () => {
+    let capturedContent = ""
+    const turnFactory: TurnFactory = async (args) => {
+      capturedContent = args.content
+      return createMockTurn([
+        { type: "transcript", entry: ts({ kind: "result", subtype: "success", isError: false, durationMs: 10, result: "ok" }) },
+      ])
+    }
+    const agent = new RunnerAgent({ nc, createTurn: turnFactory })
+    const collected = collectEvents(nc, "chat-1")
+
+    await agent.startTurn(makeCmd({
+      content: "Write the regression test",
+      delegatedContext: "Forked parent chat context:\nUser: Investigate the auth race condition",
+      isSpawned: true,
+    }))
+    await new Promise((r) => setTimeout(r, 300))
+
+    expect(capturedContent).toBe(
+      "Forked parent chat context:\nUser: Investigate the auth race condition\n\nNew task:\nWrite the regression test",
+    )
+
+    const transcripts = collected.filter((event) => event.type === "transcript") as Array<RunnerTurnEvent & { type: "transcript" }>
+    const userPrompt = transcripts.find((event) => event.entry.kind === "user_prompt")
+    expect(userPrompt?.entry.kind).toBe("user_prompt")
+    expect(userPrompt && "content" in userPrompt.entry ? userPrompt.entry.content : undefined).toBe("Write the regression test")
   })
 
   test("session_token events are published", async () => {
@@ -305,7 +333,7 @@ describe("RunnerAgent", () => {
 
   test("passes coordinationStore to createTurn when provided", async () => {
     const mockStore = {
-      state: { coordinationByProject: new Map() },
+      state: { coordinationByWorkspace: new Map() },
       addTodo: async () => {},
       claimTodo: async () => {},
       completeTodo: async () => {},

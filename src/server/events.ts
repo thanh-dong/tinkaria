@@ -1,13 +1,26 @@
-import type { AgentProvider, ProjectSummary, TranscriptEntry } from "../shared/types"
-import type { ProjectTodo, ProjectClaim, ProjectWorktree, ProjectRule } from "../shared/project-agent-types"
+import type { AgentProvider, WorkspaceSummary, TranscriptEntry } from "../shared/types"
+import type { WorkspaceTodo, WorkspaceClaim, WorkspaceWorktree, WorkspaceRule } from "../shared/workspace-types"
 
-export interface ProjectRecord extends ProjectSummary {
+export interface WorkspaceRecord extends WorkspaceSummary {
   deletedAt?: number
+}
+
+export interface RepoRecord {
+  id: string
+  workspaceId: string
+  origin: string | null
+  localPath: string
+  label: string | null
+  status: "cloned" | "pending" | "error"
+  branch: string | null
+  createdAt: number
+  updatedAt: number
 }
 
 export interface ChatRecord {
   id: string
-  projectId: string
+  workspaceId: string
+  repoId: string | null
   title: string
   createdAt: number
   updatedAt: number
@@ -21,22 +34,22 @@ export interface ChatRecord {
   lastTurnOutcome: "success" | "failed" | "cancelled" | null
 }
 
-export interface ProjectCoordinationState {
-  todos: Map<string, ProjectTodo>
-  claims: Map<string, ProjectClaim>
-  worktrees: Map<string, ProjectWorktree>
-  rules: Map<string, ProjectRule>
+export interface WorkspaceCoordinationState {
+  todos: Map<string, WorkspaceTodo>
+  claims: Map<string, WorkspaceClaim>
+  worktrees: Map<string, WorkspaceWorktree>
+  rules: Map<string, WorkspaceRule>
   lastUpdated: string
 }
 
 export interface StoreState {
-  projectsById: Map<string, ProjectRecord>
-  projectIdsByPath: Map<string, string>
+  workspacesById: Map<string, WorkspaceRecord>
+  workspaceIdsByPath: Map<string, string>
   chatsById: Map<string, ChatRecord>
-  coordinationByProject: Map<string, ProjectCoordinationState>
+  coordinationByWorkspace: Map<string, WorkspaceCoordinationState>
 }
 
-export function createEmptyCoordinationState(): ProjectCoordinationState {
+export function createEmptyCoordinationState(): WorkspaceCoordinationState {
   return {
     todos: new Map(),
     claims: new Map(),
@@ -47,73 +60,73 @@ export function createEmptyCoordinationState(): ProjectCoordinationState {
 }
 
 export interface SnapshotFile {
-  v: 2
+  v: 2 | 3
   generatedAt: number
-  projects: ProjectRecord[]
+  workspaces: WorkspaceRecord[]
   chats: ChatRecord[]
   messages?: Array<{ chatId: string; entries: TranscriptEntry[] }>
-  coordination?: Array<{ projectId: string; todos: ProjectTodo[]; claims: ProjectClaim[]; worktrees: ProjectWorktree[]; rules: ProjectRule[] }>
+  coordination?: Array<{ workspaceId: string; todos: WorkspaceTodo[]; claims: WorkspaceClaim[]; worktrees: WorkspaceWorktree[]; rules: WorkspaceRule[] }>
 }
 
-export type ProjectEvent = {
-  v: 2
-  type: "project_opened"
+export type WorkspaceEvent = {
+  v: 3
+  type: "workspace_opened"
   timestamp: number
-  projectId: string
+  workspaceId: string
   localPath: string
   title: string
 } | {
-  v: 2
-  type: "project_removed"
+  v: 3
+  type: "workspace_removed"
   timestamp: number
-  projectId: string
+  workspaceId: string
 }
 
 export type ChatEvent =
   | {
-      v: 2
+      v: 3
       type: "chat_created"
       timestamp: number
       chatId: string
-      projectId: string
+      workspaceId: string
       title: string
     }
   | {
-      v: 2
+      v: 3
       type: "chat_renamed"
       timestamp: number
       chatId: string
       title: string
     }
   | {
-      v: 2
+      v: 3
       type: "chat_deleted"
       timestamp: number
       chatId: string
     }
   | {
-      v: 2
+      v: 3
       type: "chat_provider_set"
       timestamp: number
       chatId: string
       provider: AgentProvider
     }
   | {
-      v: 2
+      v: 3
       type: "chat_model_set"
       timestamp: number
       chatId: string
       model: string | null
     }
   | {
-      v: 2
+      v: 3
       type: "chat_plan_mode_set"
       timestamp: number
       chatId: string
       planMode: boolean
     }
   | {
-      v: 2
+      v: 3
       type: "chat_read_state_set"
       timestamp: number
       chatId: string
@@ -121,7 +134,7 @@ export type ChatEvent =
     }
 
 export type MessageEvent = {
-  v: 2
+  v: 3
   type: "message_appended"
   timestamp: number
   chatId: string
@@ -130,32 +143,32 @@ export type MessageEvent = {
 
 export type TurnEvent =
   | {
-      v: 2
+      v: 3
       type: "turn_started"
       timestamp: number
       chatId: string
     }
   | {
-      v: 2
+      v: 3
       type: "turn_finished"
       timestamp: number
       chatId: string
     }
   | {
-      v: 2
+      v: 3
       type: "turn_failed"
       timestamp: number
       chatId: string
       error: string
     }
   | {
-      v: 2
+      v: 3
       type: "turn_cancelled"
       timestamp: number
       chatId: string
     }
   | {
-      v: 2
+      v: 3
       type: "session_token_set"
       timestamp: number
       chatId: string
@@ -163,27 +176,27 @@ export type TurnEvent =
     }
 
 export type CoordinationEvent =
-  | { v: 2; type: "todo_added"; timestamp: number; projectId: string; todoId: string; description: string; priority: "high" | "normal" | "low"; createdBy: string }
-  | { v: 2; type: "todo_claimed"; timestamp: number; projectId: string; todoId: string; claimedBy: string }
-  | { v: 2; type: "todo_completed"; timestamp: number; projectId: string; todoId: string; outputs: string[] }
-  | { v: 2; type: "todo_abandoned"; timestamp: number; projectId: string; todoId: string }
-  | { v: 2; type: "claim_created"; timestamp: number; projectId: string; claimId: string; intent: string; files: string[]; sessionId: string }
-  | { v: 2; type: "claim_released"; timestamp: number; projectId: string; claimId: string }
-  | { v: 2; type: "claim_conflict_detected"; timestamp: number; projectId: string; claimId: string; conflictsWith: string; overlappingFiles: string[] }
-  | { v: 2; type: "worktree_created"; timestamp: number; projectId: string; worktreeId: string; branch: string; baseBranch: string; path: string }
-  | { v: 2; type: "worktree_assigned"; timestamp: number; projectId: string; worktreeId: string; sessionId: string }
-  | { v: 2; type: "worktree_removed"; timestamp: number; projectId: string; worktreeId: string }
-  | { v: 2; type: "rule_set"; timestamp: number; projectId: string; ruleId: string; content: string; setBy: string }
-  | { v: 2; type: "rule_removed"; timestamp: number; projectId: string; ruleId: string }
+  | { v: 3; type: "todo_added"; timestamp: number; workspaceId: string; todoId: string; description: string; priority: "high" | "normal" | "low"; createdBy: string }
+  | { v: 3; type: "todo_claimed"; timestamp: number; workspaceId: string; todoId: string; claimedBy: string }
+  | { v: 3; type: "todo_completed"; timestamp: number; workspaceId: string; todoId: string; outputs: string[] }
+  | { v: 3; type: "todo_abandoned"; timestamp: number; workspaceId: string; todoId: string }
+  | { v: 3; type: "claim_created"; timestamp: number; workspaceId: string; claimId: string; intent: string; files: string[]; sessionId: string }
+  | { v: 3; type: "claim_released"; timestamp: number; workspaceId: string; claimId: string }
+  | { v: 3; type: "claim_conflict_detected"; timestamp: number; workspaceId: string; claimId: string; conflictsWith: string; overlappingFiles: string[] }
+  | { v: 3; type: "worktree_created"; timestamp: number; workspaceId: string; worktreeId: string; branch: string; baseBranch: string; path: string }
+  | { v: 3; type: "worktree_assigned"; timestamp: number; workspaceId: string; worktreeId: string; sessionId: string }
+  | { v: 3; type: "worktree_removed"; timestamp: number; workspaceId: string; worktreeId: string }
+  | { v: 3; type: "rule_set"; timestamp: number; workspaceId: string; ruleId: string; content: string; setBy: string }
+  | { v: 3; type: "rule_removed"; timestamp: number; workspaceId: string; ruleId: string }
 
-export type StoreEvent = ProjectEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent
+export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent
 
 export function createEmptyState(): StoreState {
   return {
-    projectsById: new Map(),
-    projectIdsByPath: new Map(),
+    workspacesById: new Map(),
+    workspaceIdsByPath: new Map(),
     chatsById: new Map(),
-    coordinationByProject: new Map(),
+    coordinationByWorkspace: new Map(),
   }
 }
 

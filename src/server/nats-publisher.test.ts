@@ -35,8 +35,8 @@ async function makeTempDir(prefix = "tinkaria-nats-publisher-") {
   return dir
 }
 
-function encodeClaudeProjectDir(projectPath: string, homeDir: string) {
-  return join(homeDir, ".claude", "projects", projectPath.replace(/\//g, "-"))
+function encodeClaudeProjectDir(workspacePath: string, homeDir: string) {
+  return join(homeDir, ".claude", "projects", workspacePath.replace(/\//g, "-"))
 }
 
 function mockArgs(overrides: Partial<CreateNatsPublisherArgs> = {}): CreateNatsPublisherArgs {
@@ -94,7 +94,7 @@ describe("createNatsPublisher", () => {
     expect(msgs.length).toBe(1)
 
     const data = JSON.parse(msgs[0])
-    expect(data).toHaveProperty("projectGroups")
+    expect(data).toHaveProperty("workspaceGroups")
 
     publisher.dispose()
   })
@@ -138,7 +138,7 @@ describe("createNatsPublisher", () => {
     expect(entry).not.toBeNull()
 
     const data = entry!.json() as Record<string, unknown>
-    expect(data).toHaveProperty("projectGroups")
+    expect(data).toHaveProperty("workspaceGroups")
 
     publisher.dispose()
   })
@@ -150,10 +150,10 @@ describe("createNatsPublisher", () => {
     const publisher = await createNatsPublisher(mockArgs())
 
     publisher.addSubscription("sub-1", { type: "sidebar" })
-    publisher.addSubscription("sub-2", { type: "local-projects" })
+    publisher.addSubscription("sub-2", { type: "local-workspaces" })
 
     const sidebarSub = nc.subscribe(snapshotSubject({ type: "sidebar" }))
-    const localProjectsSub = nc.subscribe(snapshotSubject({ type: "local-projects" }))
+    const localProjectsSub = nc.subscribe(snapshotSubject({ type: "local-workspaces" }))
 
     publisher.broadcastSnapshots()
 
@@ -309,10 +309,10 @@ describe("createNatsPublisher", () => {
     const store = new EventStore(storeDir)
     await store.initialize()
 
-    const projectPath = `/home/user/dev/kanna-refresh-${Date.now()}`
-    const project = await store.openProject(projectPath, "kanna")
+    const workspacePath = `/home/user/dev/kanna-refresh-${Date.now()}`
+    const project = await store.openProject(workspacePath, "kanna")
 
-    const claudeDir = encodeClaudeProjectDir(projectPath, homedir())
+    const claudeDir = encodeClaudeProjectDir(workspacePath, homedir())
     tempDirs.push(claudeDir)
     await mkdir(claudeDir, { recursive: true })
     await writeFile(
@@ -324,9 +324,9 @@ describe("createNatsPublisher", () => {
     )
 
     const publisher = await createNatsPublisher(mockArgs({ store }))
-    await publisher.refreshSessions(project.id, projectPath)
+    await publisher.refreshSessions(project.id, workspacePath)
 
-    const snapshot = await publisher.getSnapshot({ type: "sessions", projectId: project.id }) as {
+    const snapshot = await publisher.getSnapshot({ type: "sessions", workspaceId: project.id }) as {
       sessions: Array<{ sessionId: string, source: string }>
     }
 
@@ -347,10 +347,10 @@ describe("createNatsPublisher", () => {
     const store = new EventStore(storeDir)
     await store.initialize()
 
-    const projectPath = `/home/user/dev/kanna-initial-${Date.now()}`
-    const project = await store.openProject(projectPath, "kanna")
+    const workspacePath = `/home/user/dev/kanna-initial-${Date.now()}`
+    const project = await store.openProject(workspacePath, "kanna")
 
-    const claudeDir = encodeClaudeProjectDir(projectPath, homedir())
+    const claudeDir = encodeClaudeProjectDir(workspacePath, homedir())
     tempDirs.push(claudeDir)
     await mkdir(claudeDir, { recursive: true })
     await writeFile(
@@ -359,7 +359,7 @@ describe("createNatsPublisher", () => {
     )
 
     const publisher = await createNatsPublisher(mockArgs({ store }))
-    const snapshot = await publisher.getSnapshot({ type: "sessions", projectId: project.id }) as {
+    const snapshot = await publisher.getSnapshot({ type: "sessions", workspaceId: project.id }) as {
       sessions: Array<{ sessionId: string }>
     }
 

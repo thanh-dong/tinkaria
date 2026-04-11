@@ -1,23 +1,23 @@
 import { describe, test, expect, mock } from "bun:test"
 import type { AppTransport } from "./socket-interface"
-import type { ProjectCoordinationSnapshot } from "../../shared/project-agent-types"
+import type { WorkspaceCoordinationSnapshot } from "../../shared/workspace-types"
 import type { SubscriptionTopic } from "../../shared/protocol"
 
-describe("useProjectSubscription contract", () => {
+describe("useWorkspaceSubscription contract", () => {
   test("subscribes with correct topic shape", () => {
     const subscribeMock = mock(() => () => {})
     const fakeSocket: Pick<AppTransport, "subscribe"> = {
       subscribe: subscribeMock,
     }
 
-    const projectId = "proj-123"
-    const topic: SubscriptionTopic = { type: "project", projectId }
+    const workspaceId = "proj-123"
+    const topic: SubscriptionTopic = { type: "workspace", workspaceId }
 
-    fakeSocket.subscribe<ProjectCoordinationSnapshot>(topic, () => {})
+    fakeSocket.subscribe<WorkspaceCoordinationSnapshot>(topic, () => {})
 
     expect(subscribeMock).toHaveBeenCalledTimes(1)
     const [calledTopic] = subscribeMock.mock.calls[0] as unknown as [SubscriptionTopic, unknown]
-    expect(calledTopic).toEqual({ type: "project", projectId: "proj-123" })
+    expect(calledTopic).toEqual({ type: "workspace", workspaceId: "proj-123" })
   })
 
   test("unsubscribe function is returned", () => {
@@ -26,8 +26,8 @@ describe("useProjectSubscription contract", () => {
       subscribe: mock(() => unsubMock),
     }
 
-    const unsub = fakeSocket.subscribe<ProjectCoordinationSnapshot>(
-      { type: "project", projectId: "proj-123" },
+    const unsub = fakeSocket.subscribe<WorkspaceCoordinationSnapshot>(
+      { type: "workspace", workspaceId: "proj-123" },
       () => {}
     )
 

@@ -105,7 +105,7 @@ export interface ProjectRequest {
 }
 
 export type StartChatIntent =
-  | { kind: "project_id"; projectId: string }
+  | { kind: "project_id"; workspaceId: string }
   | { kind: "local_path"; localPath: string }
   | { kind: "project_request"; project: ProjectRequest }
 
@@ -158,32 +158,32 @@ export async function fetchTranscriptRange(args: {
 }
 
 export function removeChatFromSidebar(data: SidebarData, chatId: string): SidebarData {
-  const filtered = data.projectGroups
+  const filtered = data.workspaceGroups
     .map((group) => {
       const chats = group.chats.filter((chat) => chat.chatId !== chatId)
       return chats.length === group.chats.length ? group : { ...group, chats }
     })
     .filter((group) => group.chats.length > 0)
 
-  return filtered.length === data.projectGroups.length && filtered.every((g, i) => g === data.projectGroups[i])
+  return filtered.length === data.workspaceGroups.length && filtered.every((g, i) => g === data.workspaceGroups[i])
     ? data
-    : { projectGroups: filtered }
+    : { workspaceGroups: filtered }
 }
 
-export function getNewestRemainingChatId(projectGroups: SidebarData["projectGroups"], activeChatId: string): string | null {
-  const projectGroup = projectGroups.find((group) => group.chats.some((chat) => chat.chatId === activeChatId))
+export function getNewestRemainingChatId(workspaceGroups: SidebarData["workspaceGroups"], activeChatId: string): string | null {
+  const projectGroup = workspaceGroups.find((group) => group.chats.some((chat) => chat.chatId === activeChatId))
   if (!projectGroup) return null
 
   return projectGroup.chats.find((chat) => chat.chatId !== activeChatId)?.chatId ?? null
 }
 
 export function getSidebarChatRow(
-  projectGroups: SidebarData["projectGroups"],
+  workspaceGroups: SidebarData["workspaceGroups"],
   activeChatId: string | null
 ): SidebarChatRow | null {
   if (!activeChatId) return null
 
-  for (const group of projectGroups) {
+  for (const group of workspaceGroups) {
     const chat = group.chats.find((candidate) => candidate.chatId === activeChatId)
     if (chat) return chat
   }
@@ -192,10 +192,10 @@ export function getSidebarChatRow(
 }
 
 export function getSidebarChatLabels(
-  projectGroups: SidebarData["projectGroups"],
+  workspaceGroups: SidebarData["workspaceGroups"],
   chatIds: string[],
 ): string[] {
-  return chatIds.map((chatId) => getSidebarChatRow(projectGroups, chatId)?.title?.trim() || chatId)
+  return chatIds.map((chatId) => getSidebarChatRow(workspaceGroups, chatId)?.title?.trim() || chatId)
 }
 
 export function shouldStickToBottomOnComposerSubmit(distanceFromBottom: number, viewportHeight = 0) {
@@ -360,9 +360,9 @@ export function resolveComposeIntent(params: {
   sidebarProjectId?: string | null
   fallbackLocalProjectPath?: string | null
 }): StartChatIntent | null {
-  const projectId = params.selectedProjectId ?? params.sidebarProjectId ?? null
-  if (projectId) {
-    return { kind: "project_id", projectId }
+  const workspaceId = params.selectedProjectId ?? params.sidebarProjectId ?? null
+  if (workspaceId) {
+    return { kind: "project_id", workspaceId }
   }
 
   if (params.fallbackLocalProjectPath) {

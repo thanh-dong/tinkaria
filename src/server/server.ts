@@ -12,7 +12,7 @@ import { generateAuthToken } from "./nats-auth"
 import { readToken } from "../nats/nats-token"
 import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
-import { ensureTerminalEventsStream, ensureChatMessageStream, ensureRunnerEventsStream, ensureProjectCoordinationStream } from "./nats-streams"
+import { ensureTerminalEventsStream, ensureChatMessageStream, ensureRunnerEventsStream, ensureWorkspaceCoordinationStream } from "./nats-streams"
 import { RunnerManager, type RunnerReadiness } from "./runner-manager"
 import { RunnerProxy } from "./runner-proxy"
 import { TranscriptConsumer } from "./transcript-consumer"
@@ -21,8 +21,8 @@ import type { ClientCommand } from "../shared/protocol"
 import { SessionOrchestrator } from "./orchestration"
 import { SessionIndex } from "./session-index"
 import { TranscriptSearchIndex } from "./transcript-search"
-import { ProjectAgent } from "./project-agent"
-import { createProjectAgentRouter } from "./project-agent-routes"
+import { WorkspaceAgent } from "./workspace-agent"
+import { createWorkspaceAgentRouter } from "./workspace-agent-routes"
 import { SkillCache } from "./skill-discovery"
 
 export interface StartServerOptions {
@@ -265,7 +265,7 @@ export async function startServer(options: StartServerOptions = {}) {
     ensureTerminalEventsStream(natsConnector.nc),
     ensureChatMessageStream(natsConnector.nc),
     ensureRunnerEventsStream(natsConnector.nc),
-    ensureProjectCoordinationStream(natsConnector.nc),
+    ensureWorkspaceCoordinationStream(natsConnector.nc),
   ])
 
   const getHealthcheck = (): ServerHealthcheck => {
@@ -287,13 +287,13 @@ export async function startServer(options: StartServerOptions = {}) {
   // Project agent: cross-session awareness and coordination
   const sessionIndex = new SessionIndex()
   const transcriptSearch = new TranscriptSearchIndex()
-  const projectAgent = new ProjectAgent({
+  const projectAgent = new WorkspaceAgent({
     sessions: sessionIndex,
     store,
     search: transcriptSearch,
-    projectId: "",
+    workspaceId: "",
   })
-  const projectAgentRouter = createProjectAgentRouter(projectAgent)
+  const projectAgentRouter = createWorkspaceAgentRouter(projectAgent)
 
   // Use indirection to break the circular dependency:
   // coordinator -> onStateChange -> publisher.broadcastSnapshots
@@ -446,7 +446,7 @@ export async function startServer(options: StartServerOptions = {}) {
             })
           }
 
-          if (url.pathname.startsWith("/api/project/")) {
+          if (url.pathname.startsWith("/api/workspace/")) {
             return projectAgentRouter(req)
           }
 

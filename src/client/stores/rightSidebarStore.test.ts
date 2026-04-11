@@ -5,11 +5,11 @@ const PROJECT_ID = "project-1"
 
 describe("rightSidebarStore", () => {
   beforeEach(() => {
-    useRightSidebarStore.setState({ projects: {} })
+    useRightSidebarStore.setState({ workspaces: {} })
   })
 
   test("defaults to a closed drawer", () => {
-    const layout = useRightSidebarStore.getState().projects[PROJECT_ID] ?? getDefaultProjectRightSidebarLayout()
+    const layout = useRightSidebarStore.getState().workspaces[PROJECT_ID] ?? getDefaultProjectRightSidebarLayout()
     expect(layout.isVisible).toBe(false)
     expect(layout.size).toBe(20)
   })
@@ -20,11 +20,11 @@ describe("rightSidebarStore", () => {
     useRightSidebarStore.getState().toggleVisibility("project-2")
     useRightSidebarStore.getState().setSize("project-2", 26)
 
-    expect(useRightSidebarStore.getState().projects[PROJECT_ID]).toEqual({
+    expect(useRightSidebarStore.getState().workspaces[PROJECT_ID]).toEqual({
       isVisible: true,
       size: 34,
     })
-    expect(useRightSidebarStore.getState().projects["project-2"]).toEqual({
+    expect(useRightSidebarStore.getState().workspaces["project-2"]).toEqual({
       isVisible: true,
       size: 26,
     })
@@ -32,17 +32,17 @@ describe("rightSidebarStore", () => {
 
   test("clamps resized widths", () => {
     useRightSidebarStore.getState().setSize(PROJECT_ID, 4)
-    expect(useRightSidebarStore.getState().projects[PROJECT_ID]?.size).toBe(20)
+    expect(useRightSidebarStore.getState().workspaces[PROJECT_ID]?.size).toBe(20)
 
     useRightSidebarStore.getState().setSize(PROJECT_ID, 80)
-    expect(useRightSidebarStore.getState().projects[PROJECT_ID]?.size).toBe(50)
+    expect(useRightSidebarStore.getState().workspaces[PROJECT_ID]?.size).toBe(50)
   })
 
   test("clearing a project removes its saved drawer state", () => {
     useRightSidebarStore.getState().toggleVisibility(PROJECT_ID)
     useRightSidebarStore.getState().clearProject(PROJECT_ID)
 
-    const layout = useRightSidebarStore.getState().projects[PROJECT_ID] ?? getDefaultProjectRightSidebarLayout()
+    const layout = useRightSidebarStore.getState().workspaces[PROJECT_ID] ?? getDefaultProjectRightSidebarLayout()
     expect(layout.isVisible).toBe(false)
     expect(layout.size).toBe(20)
   })
@@ -58,7 +58,7 @@ describe("rightSidebarStore", () => {
       })
 
     expect(migrated).toEqual({
-      projects: {
+      workspaces: {
         [PROJECT_ID]: {
           isVisible: false,
           size: 34,

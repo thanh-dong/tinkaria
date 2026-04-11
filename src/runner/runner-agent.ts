@@ -35,6 +35,13 @@ export type TurnFactory = (args: {
   store?: CoordinationStore
 }) => Promise<HarnessTurn>
 
+function buildHarnessInput(cmd: StartTurnCommand): string {
+  if (!cmd.delegatedContext?.trim()) {
+    return cmd.content
+  }
+  return `${cmd.delegatedContext}\n\nNew task:\n${cmd.content}`
+}
+
 interface PendingToolRequest {
   toolUseId: string
   tool: NormalizedToolCall & { toolKind: "ask_user_question" | "exit_plan_mode" }
@@ -161,8 +168,8 @@ export class RunnerAgent {
     // Start the harness turn
     const turn = await this.createTurn({
       provider: cmd.provider,
-      content: cmd.content,
-      localPath: cmd.projectLocalPath,
+      content: buildHarnessInput(cmd),
+      localPath: cmd.workspaceLocalPath,
       model: cmd.model,
       planMode: cmd.planMode,
       sessionToken: cmd.sessionToken,
@@ -195,7 +202,7 @@ export class RunnerAgent {
 
     // Background: title generation
     if (shouldGenerateTitle) {
-      void this.generateTitleInBackground(cmd.chatId, cmd.content, cmd.projectLocalPath)
+      void this.generateTitleInBackground(cmd.chatId, cmd.content, cmd.workspaceLocalPath)
     }
 
     // Run the turn asynchronously

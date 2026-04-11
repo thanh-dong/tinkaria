@@ -5,9 +5,9 @@ import {
   prioritySortOrder,
   isClaimConflicting,
 } from "./coordination-helpers"
-import type { ProjectTodo, ProjectClaim } from "../../../shared/project-agent-types"
+import type { WorkspaceTodo, WorkspaceClaim } from "../../../shared/workspace-types"
 
-function makeTodo(overrides: Partial<ProjectTodo> = {}): ProjectTodo {
+function makeTodo(overrides: Partial<WorkspaceTodo> = {}): WorkspaceTodo {
   return {
     id: "t1",
     description: "Test todo",
@@ -22,7 +22,7 @@ function makeTodo(overrides: Partial<ProjectTodo> = {}): ProjectTodo {
   }
 }
 
-function makeClaim(overrides: Partial<ProjectClaim> = {}): ProjectClaim {
+function makeClaim(overrides: Partial<WorkspaceClaim> = {}): WorkspaceClaim {
   return {
     id: "c1",
     intent: "fix bug",

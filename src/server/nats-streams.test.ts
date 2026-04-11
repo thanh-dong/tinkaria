@@ -80,10 +80,10 @@ describe("KV snapshot bucket", () => {
     const kv = await kvm.create(KV_BUCKET)
     const encoder = new TextEncoder()
 
-    await kv.put("sidebar", encoder.encode(JSON.stringify({ projectGroups: [] })))
+    await kv.put("sidebar", encoder.encode(JSON.stringify({ workspaceGroups: [] })))
     const entry = await kv.get("sidebar")
     expect(entry).not.toBeNull()
-    expect(entry!.json() as Record<string, unknown>).toEqual({ projectGroups: [] })
+    expect(entry!.json() as Record<string, unknown>).toEqual({ workspaceGroups: [] })
   })
 
   test("kv dedup: identical puts create new revisions", async () => {
@@ -104,7 +104,7 @@ describe("KV snapshot bucket", () => {
 
   test("snapshotKvKey maps topics correctly", () => {
     expect(snapshotKvKey({ type: "sidebar" })).toBe("sidebar")
-    expect(snapshotKvKey({ type: "local-projects" })).toBe("local-projects")
+    expect(snapshotKvKey({ type: "local-workspaces" })).toBe("local-workspaces")
     expect(snapshotKvKey({ type: "chat", chatId: "abc" })).toBe("chat.abc")
     expect(snapshotKvKey({ type: "terminal", terminalId: "t1" })).toBe("terminal.t1")
   })

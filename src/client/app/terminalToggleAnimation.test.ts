@@ -22,7 +22,7 @@ describe("terminalToggleAnimation", () => {
   test("animates the first open after the project view is already mounted", () => {
     const result = resolveTerminalAnimationState({
       previousProjectId: "project-1",
-      projectId: "project-1",
+      workspaceId: "project-1",
       previousShouldRenderTerminalLayout: false,
       previousShowTerminalPane: false,
       showTerminalPane: true,
@@ -43,7 +43,7 @@ describe("terminalToggleAnimation", () => {
   test("skips animation on the first render for a newly mounted project", () => {
     const result = resolveTerminalAnimationState({
       previousProjectId: null,
-      projectId: "project-1",
+      workspaceId: "project-1",
       previousShouldRenderTerminalLayout: false,
       previousShowTerminalPane: false,
       showTerminalPane: true,
@@ -62,7 +62,7 @@ describe("terminalToggleAnimation", () => {
   test("skips animation when switching projects", () => {
     const result = resolveTerminalAnimationState({
       previousProjectId: "project-1",
-      projectId: "project-2",
+      workspaceId: "project-2",
       previousShouldRenderTerminalLayout: true,
       previousShowTerminalPane: true,
       showTerminalPane: true,
@@ -83,7 +83,7 @@ describe("terminalToggleAnimation", () => {
   test("does not request terminal focus on the initial chat mount when the terminal is already open", () => {
     expect(shouldRequestTerminalFocus({
       previousProjectId: null,
-      projectId: "project-1",
+      workspaceId: "project-1",
       showTerminalPane: true,
       wasTerminalVisible: false,
     })).toBe(false)
@@ -92,7 +92,7 @@ describe("terminalToggleAnimation", () => {
   test("requests terminal focus only when the user opens the terminal after the project is already mounted", () => {
     expect(shouldRequestTerminalFocus({
       previousProjectId: "project-1",
-      projectId: "project-1",
+      workspaceId: "project-1",
       showTerminalPane: true,
       wasTerminalVisible: false,
     })).toBe(true)

@@ -2,11 +2,11 @@
 
 **Date:** 2026-04-11
 **Status:** Draft
-**Approach:** Rename-in-place (Project → Workspace)
+**Approach:** Structured rename plus repo child model (Project → Workspace, add Repo)
 
 ## Overview
 
-Replace the "project" concept with "workspace" as the top-level organizational unit. A workspace manages multiple repos, owns coordination state (todos, claims, worktrees, rules), agent configurations, and workflows. Execution is sandboxed per workspace via Docker.
+Replace the "project" concept with "workspace" as the top-level organizational unit. A workspace manages multiple repos, owns coordination state (todos, claims, worktrees, rules), agent configurations, and workflows. Chats and sessions stay repo-scoped by default. Workspace-level chats are exceptional admin/support flows, not the default working model. The product remains browser/PWA-first even as workspace execution grows more capable over time.
 
 ## Jobs to be Done
 
@@ -20,6 +20,14 @@ Replace the "project" concept with "workspace" as the top-level organizational u
 | 6 | Evolve the workspace | Needs change → reshape repos, settings, agent configs without losing history |
 | 7 | Configure agents | Want agents to follow patterns → versioned configs in workspace git dir |
 | 8 | Isolate execution | Workflows and agents run → sandboxed container per workspace |
+
+## Scope Rules
+
+- **Default chat scope = repo.** Most chats target exactly one repo.
+- **Workspace-level chats are exceptional.** Reserve them for workspace-admin/support flows such as shared LLM/support settings, not day-to-day coding.
+- **Session discovery/resume is repo-scoped for Phase 1.** Workspace read models may aggregate repo data, but session ownership stays attached to a repo.
+- **Repo removal archives the repo and its chats together.** Removed repos do not get reassigned into workspace-level chats.
+- **Browser/PWA-first remains the product constraint.** Sandbox/runtime work must support the frontend instead of redefining the product around a local-native or container-first shell.
 
 ## Domain Model
 
@@ -50,7 +58,7 @@ interface RepoRecord {
 interface ChatRecord {
   id: string
   workspaceId: string         // replaces projectId
-  repoId: string | null       // which repo this chat targets, null for workspace-level chats
+  repoId: string | null       // null only for exceptional workspace-admin/support chats
   title: string
   createdAt: number
   updatedAt: number
@@ -65,10 +73,10 @@ interface ChatRecord {
 }
 
 interface CoordinationState {
-  todos: Map<string, ProjectTodo>       // rename to WorkspaceTodo later
-  claims: Map<string, ProjectClaim>     // rename to WorkspaceClaim later
-  worktrees: Map<string, ProjectWorktree>
-  rules: Map<string, ProjectRule>       // rename to WorkspaceRule later
+  todos: Map<string, WorkspaceTodo>
+  claims: Map<string, WorkspaceClaim>
+  worktrees: Map<string, WorkspaceWorktree>
+  rules: Map<string, WorkspaceRule>
   lastUpdated: string
 }
 ```
@@ -84,6 +92,8 @@ interface StoreState {
   coordinationByWorkspace: Map<string, CoordinationState>
 }
 ```
+
+Phase 1 should assume repo-scoped chats and sessions. `repoId: null` is reserved for future workspace-admin/support flows and should not drive the initial implementation plan.
 
 ### Entity Relationships
 
@@ -119,11 +129,11 @@ repo_label_updated   { id, label }
 chat_created         { id, workspaceId, repoId, title, provider }
 ```
 
-All existing chat events keep their shape, but `projectId` → `workspaceId`.
+All existing chat events keep their shape, but `projectId` → `workspaceId` and repo-scoped chat ownership becomes explicit via `repoId`.
 
 ### Coordination (rekey only)
 
-All existing coordination events (`todo_added`, `todo_claimed`, `claim_created`, etc.) change `projectId` → `workspaceId`. No other structural changes.
+All existing coordination events (`todo_added`, `todo_claimed`, `claim_created`, etc.) change `projectId` → `workspaceId`. No other structural changes. NATS subjects rename in Phase 1: `runtime.cmd.project.*` → `runtime.cmd.workspace.*`, `runtime.evt.project.*` → `runtime.evt.workspace.*`, `runtime.snap.project.*` → `runtime.snap.workspace.*`. No legacy `project.*` wire format is maintained.
 
 ### Workflow Execution
 
@@ -181,6 +191,8 @@ on_failure: stop                    # or continue, or rollback
 
 Workflows execute inside the workspace's sandbox. Steps are MCP tool invocations. The workflow engine resolves `target: all` to all repos in the workspace.
 
+Phase 1 workflow execution is still subordinate to the browser product. The workflow engine should start from first-party/allowlisted behavior and avoid assuming a general arbitrary-tool automation surface on day one.
+
 ## Sandbox Architecture
 
 Each workspace gets a Docker container for execution isolation:
@@ -204,14 +216,14 @@ Each workspace gets a Docker container for execution isolation:
 +----------------+    +----------------+
 ```
 
-**Host ↔ Sandbox boundary = NATS.** Same pattern as existing `NatsCoordinationClient`. The sandbox:
+**Coordination boundary = NATS.** Same pattern as existing `NatsCoordinationClient`. The sandbox:
 - Mounts repos as volumes (clone-in or bind-mount)
 - Runs agent runtime + workflow engine
 - Communicates coordination state via NATS request/reply to host EventStore
 - Has resource limits (CPU, memory, disk)
 - Cannot access other workspace containers
 
-**Sandbox is an eventual goal, not a day-one requirement.** Initial implementation runs everything in-process. The NATS boundary already exists and naturally becomes the container boundary when Docker is introduced.
+**Sandbox is an eventual goal, not a day-one requirement.** Initial implementation runs everything in-process. Today, NATS already provides a coordination seam, but provider runtime ownership, restart recovery, and transcript replay are still separate concerns and should be planned explicitly rather than treated as automatically solved by containerization.
 
 ## Policies (Async Reactions)
 
@@ -220,7 +232,7 @@ Each workspace gets a Docker container for execution isolation:
 | GitClonePolicy | `repo_clone_started` | Clone origin to target path | `repo_cloned` / `repo_clone_failed` |
 | ConflictDetection | `claim_created` | Check file overlaps across workspace | `claim_conflict_detected` |
 | GitCommitPolicy | `agent_config_saved` | Commit to workspace git dir | `agent_config_committed` |
-| CleanupPolicy | `repo_removed` | Handle orphaned chats | (archive or reassign) |
+| CleanupPolicy | `repo_removed` | Archive the repo and archive its chats | `chat_archived` / repo archive marker |
 
 ## Read Models
 
@@ -233,10 +245,11 @@ Each workspace gets a Docker container for execution isolation:
 | RepoStatus | `reposById` + live git status | Repo list, sync indicators |
 | WorkflowRuns | workflow events | Workflow history panel |
 | AgentCatalog | workspace config dir | Agent config UI |
+| SessionList | repo-scoped discovery/readback | Repo chat surfaces, resume picker |
 
 ## What Gets Renamed (Rename-in-Place)
 
-This is a systematic rename with no new abstractions beyond repo management, workflows, and sandbox:
+This is not a pure text rename. It is a systematic project → workspace rename plus a new first-class repo child entity, with repo-scoped chat/session semantics preserved for the first implementation slice:
 
 | Current | New |
 |---------|-----|
@@ -251,11 +264,15 @@ This is a systematic rename with no new abstractions beyond repo management, wor
 | `ProjectTodo` / `ProjectClaim` etc | `WorkspaceTodo` / `WorkspaceClaim` etc |
 | `ProjectAgent` | `WorkspaceAgent` |
 | `deriveProjectCoordinationSnapshot` | `deriveWorkspaceCoordinationSnapshot` |
-| `project.todo.add` (NATS subject) | `workspace.todo.add` |
-| `project.coordination.snapshot` | `workspace.coordination.snapshot` |
+| `runtime.cmd.project.todo.add` (NATS) | `runtime.cmd.workspace.todo.add` |
+| `runtime.evt.project.*` (NATS) | `runtime.evt.workspace.*` |
+| `runtime.snap.project.*` (NATS) | `runtime.snap.workspace.*` |
+| `project.{id}` (KV key) | `workspace.{id}` |
 | `ProjectPage` (React) | `WorkspacePage` |
 | `useProjectSubscription` | `useWorkspaceSubscription` |
 | `/project/:id` route | `/workspace/:id` route |
+
+The implementation plan should treat chat/session/runtime seams as real architecture work, not as incidental fallout from a string rename.
 
 ## New Components
 
@@ -269,14 +286,19 @@ This is a systematic rename with no new abstractions beyond repo management, wor
 
 ## Migration
 
-No data migration needed — there's no production data. This is a clean replacement of the project concept with workspace.
+There is no production migration burden, but there is persistent local state. The implementation plan must explicitly choose one of these strategies:
+
+1. Bump the store version and intentionally reset local project/chat state.
+2. Write a local migration from project-shaped state/events to workspace+repo state/events.
+
+That choice should be made before Phase 1 starts rather than left implicit.
 
 ## Implementation Phases
 
-1. **Rename-in-place**: Project → Workspace across all code. Add `RepoRecord` entity. Update EventStore state shape.
+1. **Structured rename foundation**: Project → Workspace across all code, including NATS subjects (`project.*` → `workspace.*`) and coordination types (`ProjectTodo` → `WorkspaceTodo`, etc.) — no deferred renames. Add `RepoRecord` entity. Keep chats/sessions repo-scoped. Choose local-state migration strategy (version bump + reset OR event migration) before starting. Update EventStore state shape.
 2. **Workspace directory**: Create `~/.tinkaria/workspaces/<id>/` with git init. Agent config read/write.
 3. **Repo management**: AddRepo, CloneRepo, RemoveRepo commands. Git operations (clone, pull, push).
-4. **Workflow engine**: YAML parsing, step execution via MCP tools, run tracking.
-5. **Sandbox** (future): Docker container per workspace, NATS as boundary.
+4. **Workflow engine**: YAML parsing, first-party/allowlisted step execution via MCP tools, run tracking.
+5. **Sandbox** (future): Docker container per workspace, with coordination, runtime ownership, and replay/reattach boundaries planned explicitly.
 
 Phases 1-2 are the foundation. Phase 3 makes workspaces useful. Phase 4 enables automation. Phase 5 is the isolation goal.

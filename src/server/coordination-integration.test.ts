@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "bun:test"
 import { EventStore } from "./event-store"
-import { deriveProjectCoordinationSnapshot } from "./read-models"
+import { deriveWorkspaceCoordinationSnapshot } from "./read-models"
 import { rmSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
 
@@ -16,15 +16,15 @@ describe("coordination integration", () => {
     const store = new EventStore(TEST_DIR)
     await store.initialize()
     const project = await store.openProject("/tmp/test-coord-integration", "Test")
-    const projectId = project.id
+    const workspaceId = project.id
 
-    await store.addTodo(projectId, "t-1", "Build feature", "high", "session-a")
-    await store.claimTodo(projectId, "t-1", "session-b")
-    await store.completeTodo(projectId, "t-1", ["feature.ts"])
-    await store.createClaim(projectId, "c-1", "Refactor", ["src/a.ts"], "session-a")
-    await store.setRule(projectId, "r-1", "No any types", "user")
+    await store.addTodo(workspaceId, "t-1", "Build feature", "high", "session-a")
+    await store.claimTodo(workspaceId, "t-1", "session-b")
+    await store.completeTodo(workspaceId, "t-1", ["feature.ts"])
+    await store.createClaim(workspaceId, "c-1", "Refactor", ["src/a.ts"], "session-a")
+    await store.setRule(workspaceId, "r-1", "No any types", "user")
 
-    const snapshot = deriveProjectCoordinationSnapshot(store.state, projectId)
+    const snapshot = deriveWorkspaceCoordinationSnapshot(store.state, workspaceId)
     expect(snapshot.todos).toHaveLength(1)
     expect(snapshot.todos[0].status).toBe("complete")
     expect(snapshot.claims).toHaveLength(1)
@@ -34,7 +34,7 @@ describe("coordination integration", () => {
 
     const store2 = new EventStore(TEST_DIR)
     await store2.initialize()
-    const snapshot2 = deriveProjectCoordinationSnapshot(store2.state, projectId)
+    const snapshot2 = deriveWorkspaceCoordinationSnapshot(store2.state, workspaceId)
     expect(snapshot2.todos).toHaveLength(1)
     expect(snapshot2.todos[0].description).toBe("Build feature")
     expect(snapshot2.todos[0].status).toBe("complete")
@@ -49,12 +49,12 @@ describe("coordination integration", () => {
     const store = new EventStore(TEST_DIR)
     await store.initialize()
     const project = await store.openProject("/tmp/test-coord-conflict", "Test")
-    const projectId = project.id
+    const workspaceId = project.id
 
-    await store.createClaim(projectId, "c-1", "Auth refactor", ["src/auth.ts", "src/middleware.ts"], "s-1")
-    await store.createClaim(projectId, "c-2", "Fix middleware", ["src/middleware.ts"], "s-2")
+    await store.createClaim(workspaceId, "c-1", "Auth refactor", ["src/auth.ts", "src/middleware.ts"], "s-1")
+    await store.createClaim(workspaceId, "c-2", "Fix middleware", ["src/middleware.ts"], "s-2")
 
-    const snapshot = deriveProjectCoordinationSnapshot(store.state, projectId)
+    const snapshot = deriveWorkspaceCoordinationSnapshot(store.state, workspaceId)
     const conflictClaim = snapshot.claims.find((c) => c.id === "c-2")
     expect(conflictClaim).toBeDefined()
     expect(conflictClaim!.status).toBe("conflict")

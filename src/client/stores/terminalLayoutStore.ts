@@ -15,14 +15,14 @@ export interface ProjectTerminalLayout {
 }
 
 interface TerminalLayoutState {
-  projects: Record<string, ProjectTerminalLayout>
-  addTerminal: (projectId: string, afterTerminalId?: string) => void
-  removeTerminal: (projectId: string, terminalId: string) => void
-  toggleVisibility: (projectId: string) => void
-  resetMainSizes: (projectId: string) => void
-  setMainSizes: (projectId: string, sizes: number[]) => void
-  setTerminalSizes: (projectId: string, sizes: number[]) => void
-  clearProject: (projectId: string) => void
+  workspaces: Record<string, ProjectTerminalLayout>
+  addTerminal: (workspaceId: string, afterTerminalId?: string) => void
+  removeTerminal: (workspaceId: string, terminalId: string) => void
+  toggleVisibility: (workspaceId: string) => void
+  resetMainSizes: (workspaceId: string) => void
+  setMainSizes: (workspaceId: string, sizes: number[]) => void
+  setTerminalSizes: (workspaceId: string, sizes: number[]) => void
+  clearProject: (workspaceId: string) => void
 }
 
 export const DEFAULT_TERMINAL_MAIN_SIZES: [number, number] = [68, 32]
@@ -36,8 +36,8 @@ function createDefaultProjectLayout(): ProjectTerminalLayout {
   }
 }
 
-function getProjectLayout(projects: Record<string, ProjectTerminalLayout>, projectId: string): ProjectTerminalLayout {
-  return projects[projectId] ?? createDefaultProjectLayout()
+function getProjectLayout(workspaces: Record<string, ProjectTerminalLayout>, workspaceId: string): ProjectTerminalLayout {
+  return workspaces[workspaceId] ?? createDefaultProjectLayout()
 }
 
 function normalizeSizes(values: number[]): number[] {
@@ -69,23 +69,23 @@ function scaleForAdditionalTerminal(terminals: TerminalPaneLayout[]): TerminalPa
 }
 
 function withProjectLayout(
-  projects: Record<string, ProjectTerminalLayout>,
-  projectId: string,
+  workspaces: Record<string, ProjectTerminalLayout>,
+  workspaceId: string,
   update: (layout: ProjectTerminalLayout) => ProjectTerminalLayout
 ) {
   return {
-    ...projects,
-    [projectId]: update(getProjectLayout(projects, projectId)),
+    ...workspaces,
+    [workspaceId]: update(getProjectLayout(workspaces, workspaceId)),
   }
 }
 
 export const useTerminalLayoutStore = create<TerminalLayoutState>()(
   persist(
     (set) => ({
-      projects: {},
-      addTerminal: (projectId, afterTerminalId) =>
+      workspaces: {},
+      addTerminal: (workspaceId, afterTerminalId) =>
         set((state) => ({
-          projects: withProjectLayout(state.projects, projectId, (layout) => {
+          workspaces: withProjectLayout(state.workspaces, workspaceId, (layout) => {
             const existing = scaleForAdditionalTerminal(layout.terminals)
             const nextTerminal: TerminalPaneLayout = {
               id: globalThis.crypto?.randomUUID?.() ?? `terminal-${Date.now()}-${layout.nextTerminalIndex}`,
@@ -107,9 +107,9 @@ export const useTerminalLayoutStore = create<TerminalLayoutState>()(
             }
           }),
         })),
-      removeTerminal: (projectId, terminalId) =>
+      removeTerminal: (workspaceId, terminalId) =>
         set((state) => ({
-          projects: withProjectLayout(state.projects, projectId, (layout) => {
+          workspaces: withProjectLayout(state.workspaces, workspaceId, (layout) => {
             const remaining = layout.terminals.filter((terminal) => terminal.id !== terminalId)
             if (remaining.length === 0) {
               return {
@@ -128,34 +128,34 @@ export const useTerminalLayoutStore = create<TerminalLayoutState>()(
             }
           }),
         })),
-      toggleVisibility: (projectId) =>
+      toggleVisibility: (workspaceId) =>
         set((state) => ({
-          projects: withProjectLayout(state.projects, projectId, (layout) => ({
+          workspaces: withProjectLayout(state.workspaces, workspaceId, (layout) => ({
             ...layout,
             isVisible: layout.terminals.length > 0 ? !layout.isVisible : false,
           })),
         })),
-      resetMainSizes: (projectId) =>
+      resetMainSizes: (workspaceId) =>
         set((state) => ({
-          projects: withProjectLayout(state.projects, projectId, (layout) => ({
+          workspaces: withProjectLayout(state.workspaces, workspaceId, (layout) => ({
             ...layout,
             mainSizes: [...DEFAULT_TERMINAL_MAIN_SIZES],
           })),
         })),
-      setMainSizes: (projectId, sizes) =>
+      setMainSizes: (workspaceId, sizes) =>
         set((state) => {
           if (sizes.length !== 2) return state
           const normalized = normalizeSizes(sizes) as [number, number]
           return {
-            projects: withProjectLayout(state.projects, projectId, (layout) => ({
+            workspaces: withProjectLayout(state.workspaces, workspaceId, (layout) => ({
               ...layout,
               mainSizes: normalized,
             })),
           }
         }),
-      setTerminalSizes: (projectId, sizes) =>
+      setTerminalSizes: (workspaceId, sizes) =>
         set((state) => ({
-          projects: withProjectLayout(state.projects, projectId, (layout) => {
+          workspaces: withProjectLayout(state.workspaces, workspaceId, (layout) => {
             if (sizes.length !== layout.terminals.length) return layout
             const normalizedSizes = normalizeSizes(sizes)
             return {
@@ -167,10 +167,10 @@ export const useTerminalLayoutStore = create<TerminalLayoutState>()(
             }
           }),
         })),
-      clearProject: (projectId) =>
+      clearProject: (workspaceId) =>
         set((state) => {
-          const { [projectId]: _removed, ...rest } = state.projects
-          return { projects: rest }
+          const { [workspaceId]: _removed, ...rest } = state.workspaces
+          return { workspaces: rest }
         }),
     }),
     {

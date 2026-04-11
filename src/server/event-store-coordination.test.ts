@@ -22,16 +22,16 @@ async function createStoreWithProject() {
   const store = new EventStore(dataDir)
   await store.initialize()
   const project = await store.openProject("/tmp/coord-project")
-  return { dataDir, store, projectId: project.id }
+  return { dataDir, store, workspaceId: project.id }
 }
 
 describe("EventStore coordination", () => {
   test("appends todo_added and replays on restart", async () => {
-    const { dataDir, store, projectId } = await createStoreWithProject()
+    const { dataDir, store, workspaceId } = await createStoreWithProject()
 
-    await store.addTodo(projectId, "t1", "Build feature X", "high", "agent-1")
+    await store.addTodo(workspaceId, "t1", "Build feature X", "high", "agent-1")
 
-    const coord = store.state.coordinationByProject.get(projectId)!
+    const coord = store.state.coordinationByWorkspace.get(workspaceId)!
     expect(coord.todos.get("t1")).toMatchObject({
       id: "t1",
       description: "Build feature X",
@@ -44,74 +44,74 @@ describe("EventStore coordination", () => {
     // Replay on restart
     const store2 = new EventStore(dataDir)
     await store2.initialize()
-    const coord2 = store2.state.coordinationByProject.get(projectId)!
+    const coord2 = store2.state.coordinationByWorkspace.get(workspaceId)!
     expect(coord2.todos.get("t1")?.description).toBe("Build feature X")
   })
 
   test("todo claim, complete, abandon lifecycle", async () => {
-    const { store, projectId } = await createStoreWithProject()
+    const { store, workspaceId } = await createStoreWithProject()
 
-    await store.addTodo(projectId, "t1", "Task A", "normal", "agent-1")
-    await store.claimTodo(projectId, "t1", "agent-2")
-    expect(store.state.coordinationByProject.get(projectId)!.todos.get("t1")?.status).toBe("claimed")
-    expect(store.state.coordinationByProject.get(projectId)!.todos.get("t1")?.claimedBy).toBe("agent-2")
+    await store.addTodo(workspaceId, "t1", "Task A", "normal", "agent-1")
+    await store.claimTodo(workspaceId, "t1", "agent-2")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.todos.get("t1")?.status).toBe("claimed")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.todos.get("t1")?.claimedBy).toBe("agent-2")
 
-    await store.completeTodo(projectId, "t1", ["output.ts"])
-    expect(store.state.coordinationByProject.get(projectId)!.todos.get("t1")?.status).toBe("complete")
-    expect(store.state.coordinationByProject.get(projectId)!.todos.get("t1")?.outputs).toEqual(["output.ts"])
+    await store.completeTodo(workspaceId, "t1", ["output.ts"])
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.todos.get("t1")?.status).toBe("complete")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.todos.get("t1")?.outputs).toEqual(["output.ts"])
 
-    await store.addTodo(projectId, "t2", "Task B", "low", "agent-1")
-    await store.claimTodo(projectId, "t2", "agent-3")
-    await store.abandonTodo(projectId, "t2")
-    expect(store.state.coordinationByProject.get(projectId)!.todos.get("t2")?.status).toBe("abandoned")
+    await store.addTodo(workspaceId, "t2", "Task B", "low", "agent-1")
+    await store.claimTodo(workspaceId, "t2", "agent-3")
+    await store.abandonTodo(workspaceId, "t2")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.todos.get("t2")?.status).toBe("abandoned")
   })
 
   test("claim with file overlap detects conflict", async () => {
-    const { store, projectId } = await createStoreWithProject()
+    const { store, workspaceId } = await createStoreWithProject()
 
-    await store.createClaim(projectId, "c1", "Refactor auth", ["src/auth.ts", "src/login.ts"], "session-1")
-    await store.createClaim(projectId, "c2", "Fix login bug", ["src/login.ts", "src/utils.ts"], "session-2")
+    await store.createClaim(workspaceId, "c1", "Refactor auth", ["src/auth.ts", "src/login.ts"], "session-1")
+    await store.createClaim(workspaceId, "c2", "Fix login bug", ["src/login.ts", "src/utils.ts"], "session-2")
 
-    const c2 = store.state.coordinationByProject.get(projectId)!.claims.get("c2")!
+    const c2 = store.state.coordinationByWorkspace.get(workspaceId)!.claims.get("c2")!
     expect(c2.status).toBe("conflict")
     expect(c2.conflictsWith).toBe("c1")
   })
 
   test("worktree create and assign", async () => {
-    const { store, projectId } = await createStoreWithProject()
+    const { store, workspaceId } = await createStoreWithProject()
 
-    await store.createWorktree(projectId, "w1", "feat/auth", "main", "/tmp/wt1")
-    const wt = store.state.coordinationByProject.get(projectId)!.worktrees.get("w1")!
+    await store.createWorktree(workspaceId, "w1", "feat/auth", "main", "/tmp/wt1")
+    const wt = store.state.coordinationByWorkspace.get(workspaceId)!.worktrees.get("w1")!
     expect(wt.status).toBe("ready")
     expect(wt.assignedTo).toBeNull()
 
-    await store.assignWorktree(projectId, "w1", "session-1")
-    expect(store.state.coordinationByProject.get(projectId)!.worktrees.get("w1")?.status).toBe("assigned")
-    expect(store.state.coordinationByProject.get(projectId)!.worktrees.get("w1")?.assignedTo).toBe("session-1")
+    await store.assignWorktree(workspaceId, "w1", "session-1")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.worktrees.get("w1")?.status).toBe("assigned")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.worktrees.get("w1")?.assignedTo).toBe("session-1")
 
-    await store.removeWorktree(projectId, "w1")
-    expect(store.state.coordinationByProject.get(projectId)!.worktrees.get("w1")?.status).toBe("removed")
-    expect(store.state.coordinationByProject.get(projectId)!.worktrees.get("w1")?.assignedTo).toBeNull()
+    await store.removeWorktree(workspaceId, "w1")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.worktrees.get("w1")?.status).toBe("removed")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.worktrees.get("w1")?.assignedTo).toBeNull()
   })
 
   test("rule set and remove", async () => {
-    const { store, projectId } = await createStoreWithProject()
+    const { store, workspaceId } = await createStoreWithProject()
 
-    await store.setRule(projectId, "r1", "No console.log in production", "lead")
-    expect(store.state.coordinationByProject.get(projectId)!.rules.get("r1")?.content).toBe("No console.log in production")
+    await store.setRule(workspaceId, "r1", "No console.log in production", "lead")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.rules.get("r1")?.content).toBe("No console.log in production")
 
-    await store.setRule(projectId, "r1", "No console.log or debugger", "lead")
-    expect(store.state.coordinationByProject.get(projectId)!.rules.get("r1")?.content).toBe("No console.log or debugger")
+    await store.setRule(workspaceId, "r1", "No console.log or debugger", "lead")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.rules.get("r1")?.content).toBe("No console.log or debugger")
 
-    await store.removeRule(projectId, "r1")
-    expect(store.state.coordinationByProject.get(projectId)!.rules.has("r1")).toBe(false)
+    await store.removeRule(workspaceId, "r1")
+    expect(store.state.coordinationByWorkspace.get(workspaceId)!.rules.has("r1")).toBe(false)
   })
 
   test("compact preserves coordination state", async () => {
-    const { dataDir, store, projectId } = await createStoreWithProject()
+    const { dataDir, store, workspaceId } = await createStoreWithProject()
 
-    await store.addTodo(projectId, "t1", "Survive compaction", "high", "agent-1")
-    await store.setRule(projectId, "r1", "Be excellent", "lead")
+    await store.addTodo(workspaceId, "t1", "Survive compaction", "high", "agent-1")
+    await store.setRule(workspaceId, "r1", "Be excellent", "lead")
     await store.compact()
 
     // Coordination JSONL should be truncated
@@ -121,19 +121,19 @@ describe("EventStore coordination", () => {
     const snapshot = JSON.parse(await readFile(join(dataDir, "snapshot.json"), "utf8")) as SnapshotFile
     expect(snapshot.coordination).toBeDefined()
     expect(snapshot.coordination!.length).toBe(1)
-    expect(snapshot.coordination![0].projectId).toBe(projectId)
+    expect(snapshot.coordination![0].workspaceId).toBe(workspaceId)
 
     // New store should restore from snapshot
     const store2 = new EventStore(dataDir)
     await store2.initialize()
-    expect(store2.state.coordinationByProject.get(projectId)!.todos.get("t1")?.description).toBe("Survive compaction")
-    expect(store2.state.coordinationByProject.get(projectId)!.rules.get("r1")?.content).toBe("Be excellent")
+    expect(store2.state.coordinationByWorkspace.get(workspaceId)!.todos.get("t1")?.description).toBe("Survive compaction")
+    expect(store2.state.coordinationByWorkspace.get(workspaceId)!.rules.get("r1")?.content).toBe("Be excellent")
   })
 
   test("clearStorage resets coordination state", async () => {
-    const { dataDir, store, projectId } = await createStoreWithProject()
+    const { dataDir, store, workspaceId } = await createStoreWithProject()
 
-    await store.addTodo(projectId, "t1", "Will be cleared", "normal", "agent-1")
+    await store.addTodo(workspaceId, "t1", "Will be cleared", "normal", "agent-1")
 
     // Force a version mismatch to trigger clearStorage during replay
     const coordPath = join(dataDir, "coordination.jsonl")
@@ -144,6 +144,6 @@ describe("EventStore coordination", () => {
     await store2.initialize()
 
     // State should be empty after clearStorage
-    expect(store2.state.coordinationByProject.size).toBe(0)
+    expect(store2.state.coordinationByWorkspace.size).toBe(0)
   })
 })

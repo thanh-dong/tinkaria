@@ -32,10 +32,10 @@ function createMockStore() {
     openProject: async (_path: string, _title?: string) => ({ id: "proj-1" }),
     getProject: (id: string) => (id === "proj-1" ? { id: "proj-1", localPath: "/tmp/test-project" } : null),
     getChat: (id: string) => (id === "chat-1"
-      ? { id: "chat-1", projectId: "proj-1", provider: "codex", sessionToken: "session-1" }
+      ? { id: "chat-1", workspaceId: "proj-1", provider: "codex", sessionToken: "session-1" }
       : null),
     removeProject: async () => {},
-    createChat: async (_projectId: string) => ({ id: "chat-1" }),
+    createChat: async (_workspaceId: string) => ({ id: "chat-1" }),
     renameChat: async () => {},
     deleteChat: async () => {},
     listChatsByProject: () => [{ id: "chat-1" }],
@@ -265,7 +265,7 @@ describe("nats-responders", () => {
     const multiChatStore = {
       ...createMockStore(),
       getChat: (id: string) => {
-        if (id === "chat-1" || id === "chat-2") return { id, projectId: "proj-1", provider: "claude", sessionToken: `session-${id}` }
+        if (id === "chat-1" || id === "chat-2") return { id, workspaceId: "proj-1", provider: "claude", sessionToken: `session-${id}` }
         return null
       },
       getMessages: (chatId: string) => {
@@ -319,7 +319,7 @@ describe("nats-responders", () => {
     const multiChatStore = {
       ...createMockStore(),
       getChat: (id: string) => {
-        if (id === "chat-1" || id === "chat-2") return { id, projectId: "proj-1", provider: "claude", sessionToken: `session-${id}` }
+        if (id === "chat-1" || id === "chat-2") return { id, workspaceId: "proj-1", provider: "claude", sessionToken: `session-${id}` }
         return null
       },
     }
@@ -418,7 +418,7 @@ describe("nats-responders", () => {
   test("chat.create returns chatId and triggers onStateChange", async () => {
     let changed = false
     const { clientNc } = await setup({ onStateChange: () => { changed = true } })
-    const res = await sendCommand(clientNc, { type: "chat.create", projectId: "proj-1" })
+    const res = await sendCommand(clientNc, { type: "chat.create", workspaceId: "proj-1" })
     expect(res.ok).toBe(true)
     expect(res.result).toEqual({ chatId: "chat-1" })
     expect(changed).toBe(true)
@@ -493,16 +493,16 @@ describe("nats-responders", () => {
     expect(responses).toHaveLength(1)
   })
 
-  test("project.open returns projectId and triggers onStateChange", async () => {
+  test("project.open returns workspaceId and triggers onStateChange", async () => {
     let changed = false
     const { clientNc } = await setup({ onStateChange: () => { changed = true } })
     const res = await sendCommand(clientNc, { type: "project.open", localPath: "/tmp/test-project" })
     expect(res.ok).toBe(true)
-    expect(res.result).toEqual({ projectId: "proj-1" })
+    expect(res.result).toEqual({ workspaceId: "proj-1" })
     expect(changed).toBe(true)
   })
 
-  test("project.create returns projectId", async () => {
+  test("project.create returns workspaceId", async () => {
     const { clientNc } = await setup()
     const res = await sendCommand(clientNc, {
       type: "project.create",
@@ -510,7 +510,7 @@ describe("nats-responders", () => {
       title: "Test",
     })
     expect(res.ok).toBe(true)
-    expect(res.result).toEqual({ projectId: "proj-1" })
+    expect(res.result).toEqual({ workspaceId: "proj-1" })
   })
 
   test("project.remove disposes chats and triggers onStateChange", async () => {
@@ -524,7 +524,7 @@ describe("nats-responders", () => {
       agent: mockAgent as never,
       onStateChange: () => { changed = true },
     })
-    const res = await sendCommand(clientNc, { type: "project.remove", projectId: "proj-1" })
+    const res = await sendCommand(clientNc, { type: "project.remove", workspaceId: "proj-1" })
     expect(res.ok).toBe(true)
     expect(disposed).toContain("chat-1")
     expect(changed).toBe(true)
@@ -534,7 +534,7 @@ describe("nats-responders", () => {
     const { clientNc } = await setup()
     const res = await sendCommand(clientNc, {
       type: "terminal.create",
-      projectId: "proj-1",
+      workspaceId: "proj-1",
       terminalId: "term-1",
       cols: 80,
       rows: 24,
@@ -549,7 +549,7 @@ describe("nats-responders", () => {
     const { clientNc } = await setup()
     const res = await sendCommand(clientNc, {
       type: "terminal.create",
-      projectId: "nonexistent",
+      workspaceId: "nonexistent",
       terminalId: "term-1",
       cols: 80,
       rows: 24,
@@ -655,7 +655,7 @@ describe("nats-responders", () => {
     const ping = await sendCommand(clientNc, { type: "system.ping" })
     expect(ping.ok).toBe(true)
 
-    const create = await sendCommand(clientNc, { type: "chat.create", projectId: "proj-1" })
+    const create = await sendCommand(clientNc, { type: "chat.create", workspaceId: "proj-1" })
     expect(create.ok).toBe(true)
 
     const read = await sendCommand(clientNc, { type: "update.check" })
@@ -728,7 +728,7 @@ describe("nats-responders", () => {
     await sendCommand(clientNc, {
       type: "snapshot.subscribe",
       subscriptionId: "sub-lp",
-      topic: { type: "local-projects" },
+      topic: { type: "local-workspaces" },
     })
     expect(refreshed).toBe(true)
   })

@@ -24,19 +24,19 @@ interface AppSidebarProps {
   onClose: () => void
   onCollapse: () => void
   onExpand: () => void
-  onCreateChat: (projectId: string) => void
+  onCreateChat: (workspaceId: string) => void
   onDeleteChat: (chat: SidebarChatRow) => void
   onRenameChat: (chatId: string, title: string) => void
-  onRemoveProject: (projectId: string) => void
+  onRemoveProject: (workspaceId: string) => void
   updateSnapshot: UpdateSnapshot | null
   onInstallUpdate: () => void
-  sessionsForProject: (projectId: string) => DiscoveredSession[]
-  sessionsWindowDaysForProject: (projectId: string) => number
-  onOpenSessionPicker: (projectId: string, open: boolean) => void
-  onResumeSession: (projectId: string, sessionId: string, provider: AgentProvider) => void
-  onRefreshSessions: (projectId: string) => void
-  onShowMoreSessions: (projectId: string) => void
-  onMergeSession?: (projectId: string) => void
+  sessionsForProject: (workspaceId: string) => DiscoveredSession[]
+  sessionsWindowDaysForProject: (workspaceId: string) => number
+  onOpenSessionPicker: (workspaceId: string, open: boolean) => void
+  onResumeSession: (workspaceId: string, sessionId: string, provider: AgentProvider) => void
+  onRefreshSessions: (workspaceId: string) => void
+  onShowMoreSessions: (workspaceId: string) => void
+  onMergeSession?: (workspaceId: string) => void
 }
 
 function areDiscoveredSessionsEqual(
@@ -82,7 +82,7 @@ export function areAppSidebarPropsEqual(previous: AppSidebarProps, next: AppSide
     return false
   }
 
-  for (const group of next.data.projectGroups) {
+  for (const group of next.data.workspaceGroups) {
     if (
       previous.sessionsWindowDaysForProject(group.groupKey) !== next.sessionsWindowDaysForProject(group.groupKey)
       || !areDiscoveredSessionsEqual(
@@ -181,16 +181,16 @@ function AppSidebarInner({
     }
   }, [])
 
-  const orderedProjectGroups = data.projectGroups
+  const orderedProjectGroups = data.workspaceGroups
 
-  const projectIdByPath = useMemo(
-    () => new Map(data.projectGroups.map((group) => [group.localPath, group.groupKey])),
-    [data.projectGroups]
+  const workspaceIdByPath = useMemo(
+    () => new Map(data.workspaceGroups.map((group) => [group.localPath, group.groupKey])),
+    [data.workspaceGroups]
   )
 
   const activeVisibleCount = useMemo(
-    () => data.projectGroups.reduce((count, group) => count + group.chats.length, 0),
-    [data.projectGroups]
+    () => data.workspaceGroups.reduce((count, group) => count + group.chats.length, 0),
+    [data.workspaceGroups]
   )
 
   const toggleSection = useCallback((key: string) => {
@@ -415,13 +415,13 @@ function AppSidebarInner({
               </div>
             ) : null}
 
-            {!hasVisibleChats && !isConnecting && data.projectGroups.length === 0 ? (
+            {!hasVisibleChats && !isConnecting && data.workspaceGroups.length === 0 ? (
               <p className="text-sm text-slate-400 p-2 mt-6 text-center">No conversations yet</p>
             ) : null}
 
             <Suspense fallback={null}>
               <LocalProjectsSection
-                projectGroups={orderedProjectGroups}
+                workspaceGroups={orderedProjectGroups}
                 collapsedSections={collapsedSections}
                 expandedGroups={expandedGroups}
                 onToggleSection={toggleSection}
@@ -429,9 +429,9 @@ function AppSidebarInner({
                 renderChatRow={renderChatRow}
                 chatsPerProject={chatsPerProject}
                 onNewLocalChat={(localPath) => {
-                  const projectId = projectIdByPath.get(localPath)
-                  if (projectId) {
-                    onCreateChat(projectId)
+                  const workspaceId = workspaceIdByPath.get(localPath)
+                  if (workspaceId) {
+                    onCreateChat(workspaceId)
                   }
                 }}
                 onRemoveProject={onRemoveProject}

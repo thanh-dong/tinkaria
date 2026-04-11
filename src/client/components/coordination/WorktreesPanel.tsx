@@ -7,13 +7,13 @@ import {
   User,
   UserPlus,
 } from "lucide-react"
-import type { ProjectWorktree, WorktreeStatus } from "../../../shared/project-agent-types"
+import type { WorkspaceWorktree, WorktreeStatus } from "../../../shared/workspace-types"
 import { formatRelativeTimestamp } from "./coordination-helpers"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
 
 export interface WorktreesPanelProps {
-  worktrees: ProjectWorktree[]
+  worktrees: WorkspaceWorktree[]
   onCreateWorktree: (branch: string, baseBranch: string) => void
   onAssignWorktree: (worktreeId: string, sessionId: string) => void
   onRemoveWorktree: (worktreeId: string) => void

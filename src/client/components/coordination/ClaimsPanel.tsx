@@ -6,13 +6,13 @@ import {
   ShieldOff,
   Plus,
 } from "lucide-react"
-import type { ProjectClaim } from "../../../shared/project-agent-types"
+import type { WorkspaceClaim } from "../../../shared/workspace-types"
 import { isClaimConflicting, formatRelativeTimestamp } from "./coordination-helpers"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
 
 export interface ClaimsPanelProps {
-  claims: ProjectClaim[]
+  claims: WorkspaceClaim[]
   onCreateClaim: (intent: string, files: string[], sessionId: string) => void
   onReleaseClaim: (claimId: string) => void
 }

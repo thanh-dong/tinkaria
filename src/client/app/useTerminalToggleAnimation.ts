@@ -5,7 +5,7 @@ import { interpolateLayout, TERMINAL_TOGGLE_ANIMATION_DURATION_MS } from "./term
 
 type UseTerminalToggleAnimationParams = {
   chatInputRef: RefObject<HTMLTextAreaElement | null>
-  projectId: string | null
+  workspaceId: string | null
   shouldRenderTerminalLayout: boolean
   showTerminalPane: boolean
   terminalLayout: ProjectTerminalLayout
@@ -21,7 +21,7 @@ type UseTerminalToggleAnimationResult = {
 
 type ResolveTerminalAnimationStateArgs = {
   previousProjectId: string | null
-  projectId: string | null
+  workspaceId: string | null
   previousShouldRenderTerminalLayout: boolean
   previousShowTerminalPane: boolean
   showTerminalPane: boolean
@@ -37,29 +37,29 @@ type ResolvedTerminalAnimationState = {
 
 export function shouldRequestTerminalFocus(args: {
   previousProjectId: string | null
-  projectId: string | null
+  workspaceId: string | null
   showTerminalPane: boolean
   wasTerminalVisible: boolean
 }) {
-  const didProjectChange = args.previousProjectId !== null && args.previousProjectId !== args.projectId
-  const isInitialProjectMount = args.previousProjectId === null && args.projectId !== null
+  const didProjectChange = args.previousProjectId !== null && args.previousProjectId !== args.workspaceId
+  const isInitialProjectMount = args.previousProjectId === null && args.workspaceId !== null
 
   return !didProjectChange && !isInitialProjectMount && args.showTerminalPane && !args.wasTerminalVisible
 }
 
 export function resolveTerminalAnimationState({
   previousProjectId,
-  projectId,
+  workspaceId,
   previousShouldRenderTerminalLayout,
   previousShowTerminalPane,
   showTerminalPane,
   terminalLayout,
   liveLayout,
 }: ResolveTerminalAnimationStateArgs): ResolvedTerminalAnimationState {
-  const didProjectChange = previousProjectId !== null && previousProjectId !== projectId
+  const didProjectChange = previousProjectId !== null && previousProjectId !== workspaceId
   const isInitialOpen = showTerminalPane && !previousShowTerminalPane
   const isInitialRender = !previousShouldRenderTerminalLayout
-  const isInitialProjectRender = previousProjectId === null && projectId !== null
+  const isInitialProjectRender = previousProjectId === null && workspaceId !== null
   const targetLayout: [number, number] = showTerminalPane ? terminalLayout.mainSizes : [100, 0]
   const currentLayout: [number, number] = isInitialOpen || isInitialRender ? [100, 0] : liveLayout
 
@@ -72,7 +72,7 @@ export function resolveTerminalAnimationState({
 
 export function useTerminalToggleAnimation({
   chatInputRef,
-  projectId,
+  workspaceId,
   shouldRenderTerminalLayout,
   showTerminalPane,
   terminalLayout,
@@ -95,20 +95,20 @@ export function useTerminalToggleAnimation({
 
     if (shouldRequestTerminalFocus({
       previousProjectId,
-      projectId,
+      workspaceId,
       showTerminalPane,
       wasTerminalVisible: wasVisible,
     })) {
       setTerminalFocusRequestVersion((current) => current + 1)
     }
 
-    if (previousProjectId !== null && previousProjectId === projectId && !showTerminalPane && wasVisible) {
+    if (previousProjectId !== null && previousProjectId === workspaceId && !showTerminalPane && wasVisible) {
       chatInputRef.current?.focus({ preventScroll: true })
     }
 
     previousFocusedTerminalVisibilityRef.current = showTerminalPane
-    previousProjectIdRef.current = projectId
-  }, [chatInputRef, projectId, showTerminalPane])
+    previousProjectIdRef.current = workspaceId
+  }, [chatInputRef, workspaceId, showTerminalPane])
 
   useEffect(() => {
     return () => {
@@ -150,7 +150,7 @@ export function useTerminalToggleAnimation({
     const previousProjectId = previousProjectIdRef.current
     const { currentLayout, shouldSkipAnimation, targetLayout } = resolveTerminalAnimationState({
       previousProjectId,
-      projectId,
+      workspaceId,
       previousShouldRenderTerminalLayout: previousShouldRenderTerminalLayoutRef.current,
       previousShowTerminalPane: previousShowTerminalPaneRef.current,
       showTerminalPane,
@@ -202,7 +202,7 @@ export function useTerminalToggleAnimation({
     }
 
     animationFrameRef.current = window.requestAnimationFrame(step)
-  }, [projectId, shouldRenderTerminalLayout, showTerminalPane, terminalLayout.mainSizes])
+  }, [workspaceId, shouldRenderTerminalLayout, showTerminalPane, terminalLayout.mainSizes])
 
   useEffect(() => {
     if (shouldRenderTerminalLayout) return

@@ -1,7 +1,7 @@
 import { describe, test, expect, mock } from "bun:test"
-import type { ProjectRule } from "../../../shared/project-agent-types"
+import type { WorkspaceRule } from "../../../shared/workspace-types"
 
-function makeRule(overrides: Partial<ProjectRule> = {}): ProjectRule {
+function makeRule(overrides: Partial<WorkspaceRule> = {}): WorkspaceRule {
   return {
     id: "r1",
     content: "Always write tests before implementation",

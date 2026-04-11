@@ -9,13 +9,13 @@ import {
   ArrowDownCircle,
   X,
 } from "lucide-react"
-import type { ProjectTodo, TodoPriority, CoordinationTodoStatus } from "../../../shared/project-agent-types"
+import type { WorkspaceTodo, TodoPriority, CoordinationTodoStatus } from "../../../shared/workspace-types"
 import { filterTodos, sortTodosByPriority, formatRelativeTimestamp, type TodoFilter } from "./coordination-helpers"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
 
 export interface TodosPanelProps {
-  todos: ProjectTodo[]
+  todos: WorkspaceTodo[]
   onAddTodo: (description: string, priority: TodoPriority) => void
   onClaimTodo: (todoId: string, sessionId: string) => void
   onCompleteTodo: (todoId: string, outputs: string[]) => void

@@ -27,7 +27,7 @@ export function parseProjectCliArgs(argv: string[]): CliCommand {
   // Normalize flag names to match API expectations
   const normalized: Record<string, string> = {}
   for (const [key, value] of Object.entries(flags)) {
-    if (key === "project") normalized["projectId"] = value
+    if (key === "project") normalized["workspaceId"] = value
     else normalized[key] = value
   }
   const args: Record<string, string | undefined> = { ...normalized }
@@ -109,19 +109,19 @@ export async function executeCommand(
       case "help":
         return { output: getHelpText(), exitCode: 0 }
       case "sessions": {
-        const projectId = args.projectId ?? ""
-        const res = await fetch(`${baseUrl}/api/project/sessions?projectId=${encodeURIComponent(projectId)}`)
+        const workspaceId = args.workspaceId ?? ""
+        const res = await fetch(`${baseUrl}/api/workspace/sessions?workspaceId=${encodeURIComponent(workspaceId)}`)
         data = await res.json()
         break
       }
       case "session-detail": {
-        const res = await fetch(`${baseUrl}/api/project/sessions/${args.chatId}`)
+        const res = await fetch(`${baseUrl}/api/workspace/sessions/${args.chatId}`)
         if (res.status === 404) return { output: formatOutput("error", { error: "Session not found" }, json), exitCode: 1 }
         data = await res.json()
         break
       }
       case "search": {
-        const res = await fetch(`${baseUrl}/api/project/search`, {
+        const res = await fetch(`${baseUrl}/api/workspace/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: args.query, limit: 10 }),
@@ -130,18 +130,18 @@ export async function executeCommand(
         break
       }
       case "tasks": {
-        const res = await fetch(`${baseUrl}/api/project/tasks`)
+        const res = await fetch(`${baseUrl}/api/workspace/tasks`)
         data = await res.json()
         break
       }
       case "task-detail": {
-        const res = await fetch(`${baseUrl}/api/project/tasks/${args.taskId}`)
+        const res = await fetch(`${baseUrl}/api/workspace/tasks/${args.taskId}`)
         if (res.status === 404) return { output: formatOutput("error", { error: "Task not found" }, json), exitCode: 1 }
         data = await res.json()
         break
       }
       case "claim": {
-        const res = await fetch(`${baseUrl}/api/project/claim`, {
+        const res = await fetch(`${baseUrl}/api/workspace/claim`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ description: args.description, session: args.session, branch: args.branch ?? null }),
@@ -151,7 +151,7 @@ export async function executeCommand(
         break
       }
       case "complete": {
-        const res = await fetch(`${baseUrl}/api/project/complete`, {
+        const res = await fetch(`${baseUrl}/api/workspace/complete`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ taskId: args.taskId, outputs: [] }),
@@ -161,10 +161,10 @@ export async function executeCommand(
         break
       }
       case "delegate": {
-        const res = await fetch(`${baseUrl}/api/project/delegate`, {
+        const res = await fetch(`${baseUrl}/api/workspace/delegate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ request: args.request, projectId: args.projectId ?? "" }),
+          body: JSON.stringify({ request: args.request, workspaceId: args.workspaceId ?? "" }),
         })
         data = await res.json()
         break

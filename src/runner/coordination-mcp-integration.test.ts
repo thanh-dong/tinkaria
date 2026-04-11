@@ -73,18 +73,18 @@ describe("coordination MCP via runner NATS client", () => {
 
   test("NatsCoordinationClient can add a todo via NATS and retrieve via getSnapshot", async () => {
     const project = await store.openProject("/tmp/test-coord-mcp-runner", "Test")
-    const projectId = project.id
+    const workspaceId = project.id
 
     const client = new NatsCoordinationClient(clientNc)
 
-    await client.addTodo(projectId, "t-1", "Implement feature X", "high", "session-runner")
+    await client.addTodo(workspaceId, "t-1", "Implement feature X", "high", "session-runner")
 
     // Verify via direct store (server-side truth)
-    const serverSnapshot = await store.state.coordinationByProject.get(projectId)
+    const serverSnapshot = await store.state.coordinationByWorkspace.get(workspaceId)
     expect(serverSnapshot?.todos.get("t-1")?.description).toBe("Implement feature X")
 
     // Verify via getSnapshot (NATS round-trip)
-    const snapshot = await client.getSnapshot(projectId)
+    const snapshot = await client.getSnapshot(workspaceId)
     expect(snapshot.todos).toHaveLength(1)
     expect(snapshot.todos[0].description).toBe("Implement feature X")
     expect(snapshot.todos[0].status).toBe("open")
@@ -100,31 +100,31 @@ describe("coordination MCP via runner NATS client", () => {
 
   test("NatsCoordinationClient full coordination lifecycle via NATS", async () => {
     const project = await store.openProject("/tmp/test-coord-lifecycle", "Lifecycle")
-    const projectId = project.id
+    const workspaceId = project.id
 
     const client = new NatsCoordinationClient(clientNc)
 
     // Add and claim a todo
-    await client.addTodo(projectId, "t-1", "Build feature", "normal", "session-a")
-    await client.claimTodo(projectId, "t-1", "session-b")
+    await client.addTodo(workspaceId, "t-1", "Build feature", "normal", "session-a")
+    await client.claimTodo(workspaceId, "t-1", "session-b")
 
-    let snapshot = await client.getSnapshot(projectId)
+    let snapshot = await client.getSnapshot(workspaceId)
     expect(snapshot.todos[0].status).toBe("claimed")
 
     // Complete the todo
-    await client.completeTodo(projectId, "t-1", ["feature.ts"])
-    snapshot = await client.getSnapshot(projectId)
+    await client.completeTodo(workspaceId, "t-1", ["feature.ts"])
+    snapshot = await client.getSnapshot(workspaceId)
     expect(snapshot.todos[0].status).toBe("complete")
 
     // Create a file claim
-    await client.createClaim(projectId, "c-1", "Refactor auth", ["src/auth.ts"], "session-a")
-    snapshot = await client.getSnapshot(projectId)
+    await client.createClaim(workspaceId, "c-1", "Refactor auth", ["src/auth.ts"], "session-a")
+    snapshot = await client.getSnapshot(workspaceId)
     expect(snapshot.claims).toHaveLength(1)
     expect(snapshot.claims[0].status).toBe("active")
 
     // Set a rule
-    await client.setRule(projectId, "r-1", "No any types", "session-a")
-    snapshot = await client.getSnapshot(projectId)
+    await client.setRule(workspaceId, "r-1", "No any types", "session-a")
+    snapshot = await client.getSnapshot(workspaceId)
     expect(snapshot.rules).toHaveLength(1)
     expect(snapshot.rules[0].content).toBe("No any types")
   })

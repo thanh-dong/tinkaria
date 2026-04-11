@@ -65,12 +65,16 @@ describe("runner protocol types", () => {
   test("StartTurnCommand has required fields", () => {
     const cmd: StartTurnCommand = {
       chatId: "c1", provider: "claude", content: "hello",
+      delegatedContext: "Forked parent chat context:\nUser: earlier work",
+      isSpawned: true,
       model: "claude-sonnet-4-6", planMode: false, appendUserPrompt: true,
-      projectLocalPath: "/tmp", sessionToken: null, chatTitle: "New Chat",
-      existingMessageCount: 0, projectId: "p1",
+      workspaceLocalPath: "/tmp", sessionToken: null, chatTitle: "New Chat",
+      existingMessageCount: 0, workspaceId: "p1",
     }
     expect(cmd.chatId).toBe("c1")
     expect(cmd.provider).toBe("claude")
+    expect(cmd.delegatedContext).toContain("Forked parent chat context:")
+    expect(cmd.isSpawned).toBe(true)
   })
 
   test("CancelTurnCommand has required fields", () => {

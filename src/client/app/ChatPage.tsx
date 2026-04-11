@@ -311,8 +311,8 @@ export function ChatPage() {
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const mobileSidebarSwipeRef = useRef<MobileSidebarSwipeState | null>(null)
   const previousMessageCountRef = useRef(state.messages.length)
-  const projectId = state.runtime?.projectId ?? null
-  const projectRightSidebarLayout = useRightSidebarStore((store) => (projectId ? store.projects[projectId] : undefined))
+  const workspaceId = state.runtime?.workspaceId ?? null
+  const projectRightSidebarLayout = useRightSidebarStore((store) => (workspaceId ? store.workspaces[workspaceId] : undefined))
   const rightSidebarLayout = projectRightSidebarLayout ?? DEFAULT_PROJECT_RIGHT_SIDEBAR_LAYOUT
   const toggleRightSidebar = useRightSidebarStore((store) => store.toggleVisibility)
   const setRightSidebarSize = useRightSidebarStore((store) => store.setSize)
@@ -335,20 +335,20 @@ export function ChatPage() {
     state.clearQueuedText()
   })
   const handleRestoreQueuedText = useEventCallback(() => state.restoreQueuedText())
-  const showRightSidebar = Boolean(projectId && rightSidebarLayout.isVisible)
+  const showRightSidebar = Boolean(workspaceId && rightSidebarLayout.isVisible)
   const [forkDialogOpen, setForkDialogOpen] = useState(false)
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
   const [composerLiftPx, setComposerLiftPx] = useState(0)
-  const mergeSourceProjectId = state.pendingMergeProjectId ?? projectId
+  const mergeSourceProjectId = state.pendingMergeProjectId ?? workspaceId
   const mergeAvailableChats = useMemo(() => {
     if (!mergeSourceProjectId) return []
-    const group = state.sidebarData.projectGroups.find((g) => g.groupKey === mergeSourceProjectId)
+    const group = state.sidebarData.workspaceGroups.find((g) => g.groupKey === mergeSourceProjectId)
     if (!group) return []
     return group.chats.filter((chat) => chat.chatId !== state.activeChatId)
-  }, [mergeSourceProjectId, state.sidebarData.projectGroups, state.activeChatId])
+  }, [mergeSourceProjectId, state.sidebarData.workspaceGroups, state.activeChatId])
   const knownChatIds = useMemo(
-    () => new Set(state.sidebarData.projectGroups.flatMap((group) => group.chats.map((chat) => chat.chatId))),
-    [state.sidebarData.projectGroups],
+    () => new Set(state.sidebarData.workspaceGroups.flatMap((group) => group.chats.map((chat) => chat.chatId))),
+    [state.sidebarData.workspaceGroups],
   )
   const transcriptVisibility = getTranscriptAreaVisibility({
     messageCount: state.messages.length,
@@ -361,14 +361,14 @@ export function ChatPage() {
     }
   }, [state.pendingMergeProjectId])
 
-  const shouldRenderRightSidebarLayout = Boolean(projectId)
+  const shouldRenderRightSidebarLayout = Boolean(workspaceId)
   const {
     isAnimating: isRightSidebarAnimating,
     panelGroupRef: rightSidebarPanelGroupRef,
     sidebarPanelRef,
     sidebarVisualRef,
   } = useRightSidebarToggleAnimation({
-    projectId,
+    workspaceId,
     shouldRenderRightSidebarLayout,
     showRightSidebar,
     rightSidebarSize: rightSidebarLayout.size,
@@ -427,12 +427,12 @@ export function ChatPage() {
 
   useEffect(() => {
     function handleGlobalKeydown(event: KeyboardEvent) {
-      if (!projectId) return
+      if (!workspaceId) return
       const mod = event.metaKey || event.ctrlKey
 
       if (mod && event.key === "b") {
         event.preventDefault()
-        toggleRightSidebar(projectId)
+        toggleRightSidebar(workspaceId)
         return
       }
 
@@ -444,7 +444,7 @@ export function ChatPage() {
 
     window.addEventListener("keydown", handleGlobalKeydown)
     return () => window.removeEventListener("keydown", handleGlobalKeydown)
-  }, [projectId, state, toggleRightSidebar])
+  }, [workspaceId, state, toggleRightSidebar])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -797,9 +797,9 @@ export function ChatPage() {
       onPointerCancel={handleMobileSidebarPointerEnd}
       {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.page)}
     >
-      {shouldRenderRightSidebarLayout && projectId ? (
+      {shouldRenderRightSidebarLayout && workspaceId ? (
         <ResizablePanelGroup
-          key={`${projectId}-right-sidebar`}
+          key={`${workspaceId}-right-sidebar`}
           groupRef={rightSidebarPanelGroupRef}
           orientation="horizontal"
           className="flex-1 min-h-0"
@@ -823,7 +823,7 @@ export function ChatPage() {
               return
             }
 
-            setRightSidebarSize(projectId, clampRightSidebarSize(layout.rightSidebar))
+            setRightSidebarSize(workspaceId, clampRightSidebarSize(layout.rightSidebar))
           }}
         >
           <ResizablePanel
@@ -854,7 +854,7 @@ export function ChatPage() {
               data-right-sidebar-animated="false"
               data-right-sidebar-visual
             >
-              <RightSidebar onClose={() => toggleRightSidebar(projectId)} />
+              <RightSidebar onClose={() => toggleRightSidebar(workspaceId)} />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>

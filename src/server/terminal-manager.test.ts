@@ -55,7 +55,7 @@ async function createSession(terminalId: string) {
   })
 
   manager.createTerminal({
-    projectPath: tempProjectPath,
+    workspacePath: tempProjectPath,
     terminalId,
     cols: 80,
     rows: 24,
@@ -273,7 +273,7 @@ describeIfSupported("TerminalManager", () => {
 
     const createManagedSession = async (terminalId: string) => {
       manager.createTerminal({
-        projectPath: tempProjectPath,
+        workspacePath: tempProjectPath,
         terminalId,
         cols: 80,
         rows: 24,

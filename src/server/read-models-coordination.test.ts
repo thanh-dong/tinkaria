@@ -1,13 +1,13 @@
 import { describe, test, expect } from "bun:test"
-import { deriveProjectCoordinationSnapshot } from "./read-models"
+import { deriveWorkspaceCoordinationSnapshot } from "./read-models"
 import { createEmptyState, createEmptyCoordinationState } from "./events"
 
-describe("deriveProjectCoordinationSnapshot", () => {
+describe("deriveWorkspaceCoordinationSnapshot", () => {
   test("returns empty snapshot for unknown project", () => {
     const state = createEmptyState()
-    const snapshot = deriveProjectCoordinationSnapshot(state, "unknown-proj")
+    const snapshot = deriveWorkspaceCoordinationSnapshot(state, "unknown-proj")
     expect(snapshot).toEqual({
-      projectId: "unknown-proj",
+      workspaceId: "unknown-proj",
       todos: [],
       claims: [],
       worktrees: [],
@@ -30,9 +30,9 @@ describe("deriveProjectCoordinationSnapshot", () => {
       createdAt: "2026-04-10T01:00:00.000Z", updatedAt: "2026-04-10T01:00:00.000Z",
     })
     coord.lastUpdated = "2026-04-10T01:00:00.000Z"
-    state.coordinationByProject.set("proj-1", coord)
+    state.coordinationByWorkspace.set("proj-1", coord)
 
-    const snapshot = deriveProjectCoordinationSnapshot(state, "proj-1")
+    const snapshot = deriveWorkspaceCoordinationSnapshot(state, "proj-1")
     expect(snapshot.todos).toHaveLength(2)
     expect(snapshot.todos[0].id).toBe("t-2")
     expect(snapshot.lastUpdated).toBe("2026-04-10T01:00:00.000Z")
@@ -58,9 +58,9 @@ describe("deriveProjectCoordinationSnapshot", () => {
       assignedTo: null, status: "removed", createdAt: "2026-04-10T00:00:00.000Z",
     })
     coord.lastUpdated = "2026-04-10T00:00:00.000Z"
-    state.coordinationByProject.set("proj-1", coord)
+    state.coordinationByWorkspace.set("proj-1", coord)
 
-    const snapshot = deriveProjectCoordinationSnapshot(state, "proj-1")
+    const snapshot = deriveWorkspaceCoordinationSnapshot(state, "proj-1")
     expect(snapshot.claims).toHaveLength(1)
     expect(snapshot.claims[0].id).toBe("c-1")
     expect(snapshot.worktrees).toHaveLength(1)

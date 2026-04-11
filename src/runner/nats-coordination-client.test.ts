@@ -17,9 +17,9 @@ describe("NatsCoordinationClient", () => {
     expect(callArgs[0]).toBe("runtime.cmd.project.todo.add")
   })
 
-  test("state.coordinationByProject returns empty map initially", () => {
+  test("state.coordinationByWorkspace returns empty map initially", () => {
     const client = new NatsCoordinationClient({} as any)
-    expect(client.state.coordinationByProject.size).toBe(0)
+    expect(client.state.coordinationByWorkspace.size).toBe(0)
   })
 
   test("throws when server returns error", async () => {

@@ -59,8 +59,8 @@ export class RunnerProxy {
   async send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }> {
     let chatId = command.chatId
     if (!chatId) {
-      if (!command.projectId) throw new Error("Missing projectId for new chat")
-      const created = await this.store.createChat(command.projectId)
+      if (!command.workspaceId) throw new Error("Missing workspaceId for new chat")
+      const created = await this.store.createChat(command.workspaceId)
       chatId = created.id
     }
 
@@ -81,7 +81,7 @@ export class RunnerProxy {
       planMode = catalog.supportsPlanMode ? Boolean(command.planMode) : false
     }
 
-    const project = this.store.getProject(chat.projectId)
+    const project = this.store.getProject(chat.workspaceId)
     if (!project) throw new Error("Project not found")
 
     const existingMessages = await this.store.getMessages(chatId)
@@ -93,11 +93,11 @@ export class RunnerProxy {
       model,
       planMode,
       appendUserPrompt: true,
-      projectLocalPath: project.localPath,
+      workspaceLocalPath: project.localPath,
       sessionToken: chat.sessionToken,
       chatTitle: chat.title,
       existingMessageCount: existingMessages.length,
-      projectId: chat.projectId,
+      workspaceId: chat.workspaceId,
     }
 
     if (chat.provider !== provider) {
@@ -127,7 +127,7 @@ export class RunnerProxy {
     appendUserPrompt: boolean
   }): Promise<void> {
     const chat = this.store.requireChat(args.chatId)
-    const project = this.store.getProject(chat.projectId)
+    const project = this.store.getProject(chat.workspaceId)
     if (!project) throw new Error("Project not found")
 
     if (chat.provider !== args.provider) {
@@ -143,14 +143,16 @@ export class RunnerProxy {
       chatId: args.chatId,
       provider: args.provider,
       content: args.content,
+      delegatedContext: args.delegatedContext,
+      isSpawned: args.isSpawned,
       model: args.model,
       planMode: args.planMode,
       appendUserPrompt: args.appendUserPrompt,
-      projectLocalPath: project.localPath,
+      workspaceLocalPath: project.localPath,
       sessionToken: chat.sessionToken,
       chatTitle: chat.title,
       existingMessageCount: (await this.store.getMessages(args.chatId)).length,
-      projectId: chat.projectId,
+      workspaceId: chat.workspaceId,
     }
     await this.sendCommand("start_turn", startCmd)
   }
