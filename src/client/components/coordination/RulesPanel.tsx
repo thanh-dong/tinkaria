@@ -2,7 +2,6 @@ import { useState } from "react"
 import {
   BookOpen,
   Edit3,
-  Plus,
   Trash2,
   Check,
   X,
@@ -10,6 +9,10 @@ import {
 import type { WorkspaceRule } from "../../../shared/workspace-types"
 import { formatRelativeTimestamp } from "./coordination-helpers"
 import { Button } from "../ui/button"
+import { Textarea } from "../ui/textarea"
+import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip"
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "../ui/alert-dialog"
+import { PanelHeader, PanelAddForm, PanelBody, PanelEmptyState, PanelListItem } from "./CoordinationPanel"
 
 export interface RulesPanelProps {
   rules: WorkspaceRule[]
@@ -51,63 +54,55 @@ export function RulesPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <h3 className="text-sm font-semibold text-foreground">
-          Rules
-          {rules.length > 0 && (
-            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-              ({rules.length})
-            </span>
-          )}
-        </h3>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setShowAddForm(!showAddForm)}
-          aria-label="Add rule"
-        >
-          <Plus className="h-4 w-4" />
+      <PanelHeader title="Rules" count={rules.length} onAdd={() => setShowAddForm(!showAddForm)} addLabel="Add rule" />
+
+      <PanelAddForm show={showAddForm}>
+        <Textarea
+          size="sm"
+          placeholder="Rule content..."
+          rows={3}
+          value={newContent}
+          onChange={(e) => setNewContent(e.target.value)}
+          autoFocus
+        />
+        <Button variant="default" size="sm" onClick={handleAdd}>
+          Add Rule
         </Button>
-      </div>
+      </PanelAddForm>
 
-      {showAddForm && (
-        <div className="px-3 py-2 border-b border-border space-y-2">
-          <textarea
-            className="w-full bg-transparent border border-border rounded-md px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-            placeholder="Rule content..."
-            rows={3}
-            value={newContent}
-            onChange={(e) => setNewContent(e.target.value)}
-            autoFocus
-          />
-          <Button variant="default" size="sm" onClick={handleAdd}>
-            Add Rule
-          </Button>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto">
+      <PanelBody>
         {rules.length === 0 && (
-          <p className="px-3 py-6 text-sm text-muted-foreground text-center">No rules</p>
+          <PanelEmptyState message="No rules yet" description="Set conventions for your team" actionLabel="Add rule" onAction={() => setShowAddForm(true)} />
         )}
         {rules.map((rule) => (
-          <div key={rule.id} className="px-3 py-2 border-b border-border/50 hover:bg-muted/30 transition-colors">
+          <PanelListItem key={rule.id}>
             {editingId === rule.id ? (
               <div className="space-y-2">
-                <textarea
-                  className="w-full bg-transparent border border-border rounded-md px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                <Textarea
+                  size="sm"
                   rows={3}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") { setEditingId(null); setEditContent("") } }}
                   autoFocus
                 />
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon-sm" onClick={() => handleSaveEdit(rule.id)} aria-label="Save">
-                    <Check className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon-sm" onClick={() => setEditingId(null)} aria-label="Cancel">
-                    <X className="h-3 w-3" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleSaveEdit(rule.id)} aria-label="Save">
+                        <Check className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Save</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" onClick={() => setEditingId(null)} aria-label="Cancel">
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Cancel</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             ) : (
@@ -116,12 +111,36 @@ export function RulesPanel({
                   <BookOpen className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                   <p className="text-sm text-foreground flex-1">{rule.content}</p>
                   <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="icon-sm" onClick={() => startEdit(rule)} aria-label="Edit rule">
-                      <Edit3 className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => onRemoveRule(rule.id)} aria-label="Remove rule">
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon-sm" onClick={() => startEdit(rule)} aria-label="Edit rule">
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit rule</TooltipContent>
+                    </Tooltip>
+                    <AlertDialog>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" aria-label="Remove rule">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Remove rule</TooltipContent>
+                      </Tooltip>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove rule?</AlertDialogTitle>
+                          <AlertDialogDescription>This rule will be permanently removed from the workspace.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => onRemoveRule(rule.id)}>Remove</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 ml-6">
@@ -130,9 +149,9 @@ export function RulesPanel({
                 </div>
               </>
             )}
-          </div>
+          </PanelListItem>
         ))}
-      </div>
+      </PanelBody>
     </div>
   )
 }

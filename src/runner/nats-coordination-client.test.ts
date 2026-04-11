@@ -14,7 +14,7 @@ describe("NatsCoordinationClient", () => {
 
     expect(mockNc.request).toHaveBeenCalled()
     const callArgs = mockNc.request.mock.calls[0]
-    expect(callArgs[0]).toBe("runtime.cmd.project.todo.add")
+    expect(callArgs[0]).toBe("runtime.cmd.workspace.todo.add")
   })
 
   test("state.coordinationByWorkspace returns empty map initially", () => {

@@ -17,6 +17,7 @@ import { cn } from "../../lib/utils"
 import { PROVIDER_ICONS } from "../icons/ProviderIcons"
 export { PROVIDER_ICONS }
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
+import { Button } from "../ui/button"
 
 export function PopoverMenuItem({
   onClick,
@@ -34,11 +35,12 @@ export function PopoverMenuItem({
   disabled?: boolean
 }) {
   return (
-    <button
+    <Button
+      variant="ghost"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full flex items-center gap-2 p-2 border border-border/0 rounded-lg text-left transition-opacity",
+        "w-full flex items-center gap-2 p-2 border border-border/0 rounded-lg text-left h-auto justify-start transition-opacity",
         selected ? "bg-muted border-border" : "hover:opacity-60",
         disabled && "opacity-40 cursor-not-allowed"
       )}
@@ -48,7 +50,7 @@ export function PopoverMenuItem({
         <div className="text-sm font-medium">{label}</div>
         {description ? <div className="text-xs text-muted-foreground">{description}</div> : null}
       </div>
-    </button>
+    </Button>
   )
 }
 
@@ -71,32 +73,33 @@ export function InputPopover({
 
   if (disabled) {
     return (
-      <button
+      <Button
+        variant="ghost"
         {...(triggerUiId ? getUiIdentityAttributeProps(triggerUiId) : {})}
         disabled
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 text-sm rounded-md text-muted-foreground [&>svg]:shrink-0 opacity-70 cursor-default [&>span]:whitespace-nowrap",
+          "flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground [&>svg]:shrink-0 opacity-70 [&>span]:whitespace-nowrap h-auto",
           triggerClassName
         )}
       >
         {trigger}
-      </button>
+      </Button>
     )
   }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <Button
+          variant="ghost"
           {...(triggerUiId ? getUiIdentityAttributeProps(triggerUiId) : {})}
           className={cn(
-            "flex items-center gap-1.5 px-2 py-1 text-sm rounded-md transition-colors text-muted-foreground [&>svg]:shrink-0 [&>span]:whitespace-nowrap",
-            "hover:bg-muted/50",
+            "flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground [&>svg]:shrink-0 [&>span]:whitespace-nowrap h-auto",
             triggerClassName
           )}
         >
           {trigger}
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent
         {...(contentUiId ? getUiIdentityAttributeProps(contentUiId) : {})}

@@ -45,50 +45,50 @@ export class NatsCoordinationClient implements CoordinationStore {
   }
 
   async addTodo(workspaceId: string, todoId: string, description: string, priority: TodoPriority, createdBy: string): Promise<void> {
-    await this.sendCommand("project.todo.add", { workspaceId, todoId, description, priority, createdBy })
+    await this.sendCommand("workspace.todo.add", { workspaceId, todoId, description, priority, createdBy })
   }
 
   async claimTodo(workspaceId: string, todoId: string, sessionId: string): Promise<void> {
-    await this.sendCommand("project.todo.claim", { workspaceId, todoId, sessionId })
+    await this.sendCommand("workspace.todo.claim", { workspaceId, todoId, sessionId })
   }
 
   async completeTodo(workspaceId: string, todoId: string, outputs: string[]): Promise<void> {
-    await this.sendCommand("project.todo.complete", { workspaceId, todoId, outputs })
+    await this.sendCommand("workspace.todo.complete", { workspaceId, todoId, outputs })
   }
 
   async abandonTodo(workspaceId: string, todoId: string): Promise<void> {
-    await this.sendCommand("project.todo.abandon", { workspaceId, todoId })
+    await this.sendCommand("workspace.todo.abandon", { workspaceId, todoId })
   }
 
   async createClaim(workspaceId: string, claimId: string, intent: string, files: string[], sessionId: string): Promise<void> {
-    await this.sendCommand("project.claim.create", { workspaceId, claimId, intent, files, sessionId })
+    await this.sendCommand("workspace.claim.create", { workspaceId, claimId, intent, files, sessionId })
   }
 
   async releaseClaim(workspaceId: string, claimId: string): Promise<void> {
-    await this.sendCommand("project.claim.release", { workspaceId, claimId })
+    await this.sendCommand("workspace.claim.release", { workspaceId, claimId })
   }
 
   async createWorktree(workspaceId: string, worktreeId: string, branch: string, baseBranch: string, _path: string): Promise<void> {
-    await this.sendCommand("project.worktree.create", { workspaceId, worktreeId, branch, baseBranch })
+    await this.sendCommand("workspace.worktree.create", { workspaceId, worktreeId, branch, baseBranch })
   }
 
   async assignWorktree(workspaceId: string, worktreeId: string, sessionId: string): Promise<void> {
-    await this.sendCommand("project.worktree.assign", { workspaceId, worktreeId, sessionId })
+    await this.sendCommand("workspace.worktree.assign", { workspaceId, worktreeId, sessionId })
   }
 
   async removeWorktree(workspaceId: string, worktreeId: string): Promise<void> {
-    await this.sendCommand("project.worktree.remove", { workspaceId, worktreeId })
+    await this.sendCommand("workspace.worktree.remove", { workspaceId, worktreeId })
   }
 
   async setRule(workspaceId: string, ruleId: string, content: string, setBy: string): Promise<void> {
-    await this.sendCommand("project.rule.set", { workspaceId, ruleId, content, setBy })
+    await this.sendCommand("workspace.rule.set", { workspaceId, ruleId, content, setBy })
   }
 
   async removeRule(workspaceId: string, ruleId: string): Promise<void> {
-    await this.sendCommand("project.rule.remove", { workspaceId, ruleId })
+    await this.sendCommand("workspace.rule.remove", { workspaceId, ruleId })
   }
 
   async getSnapshot(workspaceId: string): Promise<WorkspaceCoordinationSnapshot> {
-    return this.sendCommand("project.coordination.snapshot", { workspaceId }) as Promise<WorkspaceCoordinationSnapshot>
+    return this.sendCommand("workspace.coordination.snapshot", { workspaceId }) as Promise<WorkspaceCoordinationSnapshot>
   }
 }

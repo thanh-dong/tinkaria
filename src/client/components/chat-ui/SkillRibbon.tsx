@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react"
 import { Sparkles, ChevronRight } from "lucide-react"
+import { Button } from "../ui/button"
 import type { AgentProvider } from "../../../shared/types"
 import { cn } from "../../lib/utils"
 import { createUiIdentity, createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
@@ -86,19 +87,18 @@ export const SkillRibbon = memo(function SkillRibbon({
           contentClassName
         )}>
           {sorted.map((skill) => (
-            <button
+            <Button
               key={skill}
-              type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => onInsert(skill)}
               {...getUiIdentityAttributeProps(SKILL_RIBBON_UI_DESCRIPTORS.skillButton)}
               className={cn(
-                "shrink-0 px-2 py-0.5 text-xs font-mono rounded-md transition-colors",
-                "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground",
-                "border border-transparent hover:border-border/50"
+                "shrink-0 font-mono",
               )}
             >
               {formatSkillCommand(skill, provider)}
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}

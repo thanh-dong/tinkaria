@@ -1,4 +1,5 @@
 import { X } from "lucide-react"
+import { Button } from "../ui/button"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 
 interface RightSidebarProps {
@@ -20,14 +21,14 @@ export function RightSidebar({ onClose }: RightSidebarProps) {
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
           <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">Diffs</div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             aria-label="Close right sidebar"
             onClick={onClose}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-1 items-center justify-center px-6 text-center">

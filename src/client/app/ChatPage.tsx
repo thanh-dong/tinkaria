@@ -11,6 +11,7 @@ import { RightSidebar } from "../components/chat-ui/RightSidebar"
 // Lazy-loaded: imports react-markdown, only needed when user opens a file preview
 const LocalFilePreviewDialog = lazy(() => import("../components/messages/LocalFilePreviewDialog").then(m => ({ default: m.LocalFilePreviewDialog })))
 import { ProcessingMessage } from "../components/messages/ProcessingMessage"
+import { Button } from "../components/ui/button"
 import { Card, CardContent } from "../components/ui/card"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../components/ui/resizable"
 import { ScrollArea } from "../components/ui/scroll-area"
@@ -642,13 +643,13 @@ export function ChatPage() {
                           {state.pendingSessionBootstrap.errorMessage}
                         </span>
                       ) : null}
-                      <button
-                        type="button"
-                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => state.dismissBootstrapError()}
                       >
                         Dismiss
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <>
@@ -737,12 +738,14 @@ export function ChatPage() {
               : "scale-60 duration-300 ease-out pointer-events-none blur-sm opacity-0"
           )}
         >
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={state.scrollToBottom}
-            className="flex items-center transition-colors gap-1.5 px-2 bg-white hover:bg-muted border border-border rounded-full aspect-square cursor-pointer text-sm text-primary hover:text-foreground dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-100 dark:border-slate-600"
+            className="rounded-full border border-border bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600 dark:hover:bg-slate-600"
           >
             <ArrowDown className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
       </CardContent>
 

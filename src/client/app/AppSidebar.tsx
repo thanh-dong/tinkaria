@@ -320,8 +320,8 @@ function AppSidebarInner({
         onPointerCancel={handleSwipePointerEnd}
       >
         <div className=" pl-3 pr-[7px] h-[64px] max-h-[64px] md:h-[55px] md:max-h-[55px] border-b flex items-center justify-between">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             className="group/sidebar-shell flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:text-foreground"
             onClick={() => {
               navigate("/")
@@ -340,7 +340,7 @@ function AppSidebarInner({
             <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">
               {APP_NAME}
             </span>
-          </button>
+          </Button>
           <div className="flex items-center">
             {showDevBadge ? (
               <span
@@ -447,6 +447,10 @@ function AppSidebarInner({
                 onRefreshSessions={onRefreshSessions}
                 onShowMoreSessions={onShowMoreSessions}
                 onMergeSession={onMergeSession}
+                onOpenCoordination={(workspaceId) => {
+                  navigate(`/workspace/${workspaceId}`)
+                  onClose()
+                }}
               />
             </Suspense>
           </div>

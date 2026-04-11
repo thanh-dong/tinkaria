@@ -3,6 +3,7 @@ import { Check, ChevronLeft, MessageCircleQuestion } from "lucide-react"
 import type { ProcessedToolCall, AskUserQuestionItem, AskUserQuestionOption } from "./types"
 import type { AskUserQuestionAnswerMap } from "../../../shared/types"
 import { Button } from "../ui/button"
+import { Input } from "../ui/input"
 import { cn } from "../../lib/utils"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 
@@ -64,12 +65,14 @@ function QuestionCard({
       <div className="relative">
         <h3 className="font-medium text-foreground text-sm p-3 px-4 bg-card border-b border-border text-foreground flex flex-row items-center gap-2">
           {showBackButton ? (
-            <button
+            <Button
+              variant="ghost"
+              size="icon-sm"
               onClick={onBack}
-              className=" text-muted-foreground hover:opacity-60 transition-all flex items-center"
+              className="text-muted-foreground"
             >
               <ChevronLeft className="h-4 w-4 -ml-0.5" strokeWidth={3} />
-            </button>
+            </Button>
           ) : totalQuestions > 1 ? (
             <span className="font-bold text-muted-foreground whitespace-nowrap">{currentIndex + 1} of {totalQuestions}</span>
           ) : null}
@@ -146,9 +149,10 @@ function OptionRow({
 
   if (onClick) {
     return (
-      <button
+      <Button
+        variant="ghost"
         onClick={onClick}
-        className={cn(baseClasses, borderClass, "transition-all cursor-pointer")}
+        className={cn(baseClasses, borderClass, "transition-all cursor-pointer h-auto w-full justify-start rounded-none")}
         {...getUiIdentityAttributeProps(ASK_USER_OPTION_ACTION_DESCRIPTOR)}
       >
         <div className="flex items-center justify-between gap-3">
@@ -157,7 +161,7 @@ function OptionRow({
           </div>
           <Checkbox selected={selected} multiSelect={multiSelect} />
         </div>
-      </button>
+      </Button>
     )
   }
 
@@ -368,7 +372,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
         {/* Custom input */}
         <div className="transition-all bg-background">
           <div className="flex pr-5 items-center justify-between gap-3">
-            <input
+            <Input
               type="text"
               value={customInput}
               onChange={(e) => handleCustomInputChange(currentQuestion, e.target.value)}

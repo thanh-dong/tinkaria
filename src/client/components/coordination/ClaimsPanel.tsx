@@ -1,24 +1,27 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {
   FileCode2,
   AlertTriangle,
   Shield,
   ShieldOff,
-  Plus,
 } from "lucide-react"
 import type { WorkspaceClaim } from "../../../shared/workspace-types"
 import { isClaimConflicting, formatRelativeTimestamp } from "./coordination-helpers"
-import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
+import { Input } from "../ui/input"
+import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip"
+import { PanelHeader, PanelAddForm, PanelBody, PanelEmptyState, PanelListItem, PanelCollapsibleSection, SessionSelect, type SessionOption } from "./CoordinationPanel"
 
 export interface ClaimsPanelProps {
   claims: WorkspaceClaim[]
+  sessions?: SessionOption[]
   onCreateClaim: (intent: string, files: string[], sessionId: string) => void
   onReleaseClaim: (claimId: string) => void
 }
 
 export function ClaimsPanel({
   claims,
+  sessions,
   onCreateClaim,
   onReleaseClaim,
 }: ClaimsPanelProps) {
@@ -27,8 +30,13 @@ export function ClaimsPanel({
   const [newFiles, setNewFiles] = useState("")
   const [newSessionId, setNewSessionId] = useState("")
 
-  const activeClaims = claims.filter((c) => c.status === "active")
-  const releasedClaims = claims.filter((c) => c.status !== "active")
+  const [activeClaims, releasedClaims] = useMemo(() => claims.reduce<[WorkspaceClaim[], WorkspaceClaim[]]>(
+    ([active, released], c) => {
+      ;(c.status === "active" ? active : released).push(c)
+      return [active, released]
+    },
+    [[], []]
+  ), [claims])
 
   function handleCreate() {
     const intent = newIntent.trim()
@@ -44,65 +52,38 @@ export function ClaimsPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <h3 className="text-sm font-semibold text-foreground">
-          Claims
-          {activeClaims.length > 0 && (
-            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-              ({activeClaims.length} active)
-            </span>
-          )}
-        </h3>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setShowAddForm(!showAddForm)}
-          aria-label="Create claim"
-        >
-          <Plus className="h-4 w-4" />
+      <PanelHeader title="Claims" count={activeClaims.length} countLabel={`${activeClaims.length} active`} onAdd={() => setShowAddForm(!showAddForm)} addLabel="Create claim" />
+
+      <PanelAddForm show={showAddForm}>
+        <Input
+          size="sm"
+          placeholder="Intent (e.g. fix auth bug)..."
+          value={newIntent}
+          onChange={(e) => setNewIntent(e.target.value)}
+          autoFocus
+        />
+        <Input
+          size="sm"
+          placeholder="Files (comma-separated)..."
+          value={newFiles}
+          onChange={(e) => setNewFiles(e.target.value)}
+        />
+        <SessionSelect sessions={sessions} value={newSessionId} onChange={setNewSessionId} />
+        <Button variant="default" size="sm" onClick={handleCreate}>
+          Claim
         </Button>
-      </div>
+      </PanelAddForm>
 
-      {showAddForm && (
-        <div className="px-3 py-2 border-b border-border space-y-2">
-          <input
-            className="w-full bg-transparent border border-border rounded-md px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            placeholder="Intent (e.g. fix auth bug)..."
-            value={newIntent}
-            onChange={(e) => setNewIntent(e.target.value)}
-            autoFocus
-          />
-          <input
-            className="w-full bg-transparent border border-border rounded-md px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            placeholder="Files (comma-separated)..."
-            value={newFiles}
-            onChange={(e) => setNewFiles(e.target.value)}
-          />
-          <input
-            className="w-full bg-transparent border border-border rounded-md px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            placeholder="Session ID..."
-            value={newSessionId}
-            onChange={(e) => setNewSessionId(e.target.value)}
-          />
-          <Button variant="default" size="sm" onClick={handleCreate}>
-            Claim
-          </Button>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto">
+      <PanelBody>
         {claims.length === 0 && (
-          <p className="px-3 py-6 text-sm text-muted-foreground text-center">No claims</p>
+          <PanelEmptyState message="No active claims" description="Claim files to prevent conflicts" actionLabel="Create claim" onAction={() => setShowAddForm(true)} />
         )}
         {activeClaims.map((claim) => {
           const conflicting = isClaimConflicting(claim)
           return (
-            <div
+            <PanelListItem
               key={claim.id}
-              className={cn(
-                "px-3 py-2 border-b border-border/50 hover:bg-muted/30 transition-colors",
-                conflicting && "bg-red-500/5 border-l-2 border-l-red-500"
-              )}
+              className={conflicting ? "bg-red-500/5 border-l-2 border-l-red-500" : undefined}
             >
               <div className="flex items-center gap-2">
                 {conflicting ? (
@@ -111,15 +92,20 @@ export function ClaimsPanel({
                   <Shield className="h-4 w-4 text-green-500 shrink-0" />
                 )}
                 <span className="text-sm font-medium text-foreground truncate">{claim.intent}</span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="ml-auto"
-                  onClick={() => onReleaseClaim(claim.id)}
-                  aria-label="Release claim"
-                >
-                  <ShieldOff className="h-3 w-3" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="ml-auto"
+                      onClick={() => onReleaseClaim(claim.id)}
+                      aria-label="Release claim"
+                    >
+                      <ShieldOff className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Release claim</TooltipContent>
+                </Tooltip>
               </div>
               <div className="flex flex-wrap gap-1 mt-1 ml-6">
                 {claim.files.map((file) => (
@@ -141,23 +127,22 @@ export function ClaimsPanel({
                   </span>
                 )}
               </div>
-            </div>
+            </PanelListItem>
           )
         })}
         {releasedClaims.length > 0 && (
-          <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border">
-            Released ({releasedClaims.length})
-          </div>
+          <PanelCollapsibleSection label="Released" count={releasedClaims.length}>
+            {releasedClaims.map((claim) => (
+              <PanelListItem key={claim.id} className="opacity-50">
+                <div className="flex items-center gap-2">
+                  <ShieldOff className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-muted-foreground truncate">{claim.intent}</span>
+                </div>
+              </PanelListItem>
+            ))}
+          </PanelCollapsibleSection>
         )}
-        {releasedClaims.map((claim) => (
-          <div key={claim.id} className="px-3 py-2 border-b border-border/50 opacity-50">
-            <div className="flex items-center gap-2">
-              <ShieldOff className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm text-muted-foreground truncate">{claim.intent}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+      </PanelBody>
     </div>
   )
 }

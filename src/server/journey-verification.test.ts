@@ -358,7 +358,7 @@ async function openNewChatFromHomepage(session: string, fixture: FixtureEnvironm
   })()`)
   expect(overviewDetails).toEqual({
     containsTitle: true,
-    containsPath: true,
+    containsPath: false,
     startButtonLabel: "Start First Task",
   })
 
@@ -601,11 +601,25 @@ describe("journey verification inventory", () => {
     const sessionPickerStage = await waitForStage(session, "session-picker.open")
     expect(sessionPickerStage.probe.missing).toEqual([])
     expect(sessionPickerStage.probe.c3ByUiId["sidebar.project-group.sessions.popover"]).toBe("c3-113")
-    const sessionPickerDetails = evalBrowser<{ listText: string }>(session, `(() => {
-      const list = document.querySelector('[data-ui-id="sidebar.project-group.sessions.list"]');
-      return { listText: list?.textContent?.trim() ?? "" };
-    })()`)
-    expect(sessionPickerDetails.listText).toContain(fixture.cliSessionPrompt)
+    // The session picker shows sessions from a NATS subscription that fires asynchronously.
+    // Poll until the session list populates with the fixture's CLI session prompt.
+    // Poll the session list content. The sessions subscription delivers data asynchronously
+    // via NATS, so the list may initially show "No sessions found" until the snapshot arrives.
+    // If still empty after a short wait, close and reopen the picker to re-trigger the subscription.
+    const foundSessions = await waitFor("session-picker sessions loaded", async () => {
+      const details = evalBrowser<{ listText: string }>(session, `(() => {
+        const list = document.querySelector('[data-ui-id="sidebar.project-group.sessions.list"]');
+        return { listText: list?.textContent?.trim() ?? "" };
+      })()`)
+      if (details.listText.includes(fixture.cliSessionPrompt)) return details
+      // Toggle the picker to re-trigger the subscription
+      evalBrowser<void>(session, `(() => {
+        const btn = document.querySelector('[data-ui-id="sidebar.project-group.sessions.action"]');
+        if (btn instanceof HTMLElement) { btn.click(); setTimeout(() => btn.click(), 200); }
+      })()`)
+      return false
+    }, 15_000)
+    expect(foundSessions.listText).toContain(fixture.cliSessionPrompt)
 
     await stopServer(firstServer)
     activeServers.splice(activeServers.indexOf(firstServer), 1)

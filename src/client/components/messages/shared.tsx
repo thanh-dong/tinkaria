@@ -30,6 +30,7 @@ import {
   Check,
 } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { Button } from "../ui/button"
 import { parseLocalFileLink, stripWorkspacePath } from "../../lib/pathUtils"
 import { formatBashCommandTitle, toTitleCase } from "../../lib/formatters"
 import { RichContentBlock } from "../rich-content/RichContentBlock"
@@ -203,18 +204,19 @@ export function MetaCodeBlock({ label, children, copyText }: { label: ReactNode;
     <div className="group/codeblock">
       <div className="flex items-center gap-1.5 mb-1">
         <span className="font-medium text-muted-foreground">{label}</span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           aria-label={copied ? "Copied" : "Copy content"}
           onClick={handleCopy}
           className={cn(
-            "ml-auto flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-0 group-hover/codeblock:opacity-100 transition-opacity",
-            !copied && "hover:bg-accent hover:text-foreground",
+            "ml-auto text-muted-foreground opacity-0 group-hover/codeblock:opacity-100 transition-opacity",
             copied && "pointer-events-none"
           )}
         >
           {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
-        </button>
+        </Button>
       </div>
       <pre className="text-xs font-mono whitespace-no-wrap break-all bg-muted border border-border rounded-lg p-2 max-h-64 overflow-auto w-full">
         {children}

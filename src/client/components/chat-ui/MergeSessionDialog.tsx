@@ -21,8 +21,10 @@ import {
   RESPONSIVE_MODAL_FOOTER_CLASS_NAME,
   DialogTitle,
 } from "../ui/dialog"
+import { Input } from "../ui/input"
 import { Textarea } from "../ui/textarea"
 import { InputPopover, PopoverMenuItem, PROVIDER_ICONS } from "./ChatPreferenceControls"
+import { Button } from "../ui/button"
 
 interface Props {
   open: boolean
@@ -257,13 +259,14 @@ function MergeSessionDialogBody({
         <div className="space-y-2">
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
-            <input
+            <Input
               {...getUiIdentityAttributeProps(MERGE_SESSION_UI_DESCRIPTORS.sessionsSearchInput)}
               type="text"
+              size="sm"
               placeholder="Search sessions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs pl-6 pr-2 py-1.5 bg-muted/50 border border-border rounded-lg outline-none placeholder:text-muted-foreground/50 focus:border-primary/40 transition-colors"
+              className="pl-6"
             />
           </div>
           <div className="flex items-center justify-between px-0.5">
@@ -285,12 +288,14 @@ function MergeSessionDialogBody({
                   const selected = selectedChatIds.has(chat.chatId)
                   const atLimit = selectedChatIds.size >= MAX_MERGE_SESSIONS && !selected
                   return (
-                    <button
+                    <Button
                       key={chat.chatId}
+                      variant="outline"
+                      size="sm"
                       onClick={() => toggleChat(chat.chatId)}
                       disabled={atLimit}
                       className={cn(
-                        "flex items-center gap-2.5 px-3 py-2 text-left transition-colors border-b border-border last:border-b-0",
+                        "flex items-center gap-2.5 px-3 py-2 text-left h-auto w-full justify-start rounded-none border-0 border-b border-border last:border-b-0",
                         selected ? "bg-primary/10" : "hover:bg-muted/50",
                         atLimit && "opacity-40 cursor-not-allowed",
                       )}
@@ -333,7 +338,7 @@ function MergeSessionDialogBody({
                       <span className="text-[10px] text-muted-foreground shrink-0">
                         {formatRelativeTime(chat.lastMessageAt ?? chat._creationTime)}
                       </span>
-                    </button>
+                    </Button>
                   )
                 })}
               </div>

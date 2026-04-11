@@ -10,6 +10,7 @@ import {
 import { useIsMobile } from "../../hooks/useIsMobile"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
+import { Input } from "../ui/input"
 import {
   Dialog,
   DialogContent,
@@ -201,16 +202,17 @@ export const SessionPickerContent = memo(function SessionPickerContent({
       <div className="flex items-center gap-1.5">
         <div className="relative flex-1">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
-          <input
+          <Input
             {...getUiIdentityAttributeProps(SESSION_PICKER_UI_DESCRIPTORS.searchInput)}
             type="text"
+            size="sm"
             placeholder="Search sessions..."
             value={searchQuery}
             onChange={(e) => {
               onSearchChange(e.target.value)
               setActiveIndex(-1)
             }}
-            className="w-full text-xs pl-6 pr-2 py-1.5 bg-muted/50 border border-border rounded-lg outline-none placeholder:text-muted-foreground/50 focus:border-primary/40 transition-colors"
+            className="pl-6"
           />
         </div>
         <Button
@@ -239,11 +241,13 @@ export const SessionPickerContent = memo(function SessionPickerContent({
         ) : (
           <div className="flex flex-col gap-0.5">
             {filtered.map((session, index) => (
-              <button
+              <Button
                 key={session.sessionId}
+                variant="ghost"
+                size="sm"
                 onClick={() => onSelectSession(session)}
                 className={cn(
-                  "flex items-start gap-2 px-2 py-1.5 rounded-lg text-left transition-colors hover:bg-muted/50 mx-1",
+                  "flex items-start gap-2 px-2 py-1.5 rounded-lg text-left h-auto w-full justify-start mx-1",
                   index === activeIndex && "bg-muted/50"
                 )}
               >
@@ -261,7 +265,7 @@ export const SessionPickerContent = memo(function SessionPickerContent({
                     {formatRelativeTime(session.modifiedAt)}
                   </span>
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -269,12 +273,14 @@ export const SessionPickerContent = memo(function SessionPickerContent({
 
       {/* Show more button */}
       {visible.hasMore ? (
-        <button
+        <Button
+          variant="link"
+          size="sm"
           onClick={onShowMore}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center py-1"
+          className="text-xs text-muted-foreground w-full"
         >
           Show older sessions
-        </button>
+        </Button>
       ) : null}
     </div>
   )

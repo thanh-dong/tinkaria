@@ -17,6 +17,7 @@ import {
   type UiIdentityOverlayAnchorRect,
 } from "../components/ui/UiIdentityOverlay"
 import { TooltipProvider } from "../components/ui/tooltip"
+import { Toaster } from "sonner"
 import { AppSidebar } from "./AppSidebar"
 import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalWorkspacesPage"
@@ -432,6 +433,7 @@ export function App() {
       <AppDialogProvider>
         <AppInner />
       </AppDialogProvider>
+      <Toaster theme="dark" position="bottom-right" />
     </TooltipProvider>
   )
 }

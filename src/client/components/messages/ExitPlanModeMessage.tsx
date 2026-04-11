@@ -4,6 +4,7 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { ProcessedToolCall } from "./types"
 import { Button } from "../ui/button"
+import { Textarea } from "../ui/textarea"
 import { createMarkdownComponents } from "./shared"
 import { cn } from "../../lib/utils"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
@@ -173,7 +174,7 @@ export const ExitPlanModeMessage = memo(function ExitPlanModeMessage({ message, 
 
           {showEditInput && (
             <div className="flex flex-col gap-2">
-              <textarea
+              <Textarea
                 ref={textareaRef}
                 value={editMessage}
                 onChange={(e) => setEditMessage(e.target.value)}

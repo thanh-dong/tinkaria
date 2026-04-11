@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo } from "react"
-import { ChevronRight, FolderOpen, Loader2, Merge, SquarePen } from "lucide-react"
+import { ChevronRight, FolderOpen, LayoutGrid, Loader2, Merge, SquarePen } from "lucide-react"
 import type { AgentProvider, DiscoveredSession } from "../../../../shared/types"
 import { SessionPicker } from "../SessionPicker"
 import { Button } from "../../ui/button"
@@ -44,6 +44,7 @@ interface Props {
   onRefreshSessions?: (workspaceId: string) => void
   onShowMoreSessions?: (workspaceId: string) => void
   onMergeSession?: (workspaceId: string) => void
+  onOpenCoordination?: (workspaceId: string) => void
 }
 
 interface ProjectGroupSectionProps {
@@ -66,6 +67,7 @@ interface ProjectGroupSectionProps {
   onRefreshSessions?: (workspaceId: string) => void
   onShowMoreSessions?: (workspaceId: string) => void
   onMergeSession?: (workspaceId: string) => void
+  onOpenCoordination?: (workspaceId: string) => void
 }
 
 function ProjectGroupSection({
@@ -88,6 +90,7 @@ function ProjectGroupSection({
   onRefreshSessions,
   onShowMoreSessions,
   onMergeSession,
+  onOpenCoordination,
 }: ProjectGroupSectionProps) {
   const { groupKey, localPath, chats: pathChats } = group
 
@@ -174,6 +177,27 @@ function ProjectGroupSection({
             </TooltipContent>
           </Tooltip>
         )}
+        {onOpenCoordination && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5.5 w-5.5 !rounded opacity-100 md:opacity-0 md:group-hover/section:opacity-100"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onOpenCoordination(groupKey)
+                }}
+                aria-label="Coordination board"
+              >
+                <LayoutGrid className="size-3.5 text-slate-500 dark:text-slate-400" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={4}>
+              Coordination board
+            </TooltipContent>
+          </Tooltip>
+        )}
         {onNewLocalChat && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -221,12 +245,14 @@ function ProjectGroupSection({
         <div className="space-y-[2px] mb-2 ">
           {displayChats.map(renderChatRow)}
           {hasMore && (
-            <button
+            <Button
+              variant="link"
+              size="sm"
               onClick={() => onToggleExpandedGroup(groupKey)}
-              className="pl-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="pl-2.5 py-1 text-xs text-muted-foreground h-auto"
             >
               {isExpanded ? "Show less" : `Show more (${pathChats.length - chatsPerProject})`}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -254,6 +280,7 @@ export function LocalProjectsSection({
   onRefreshSessions,
   onShowMoreSessions,
   onMergeSession,
+  onOpenCoordination,
 }: Props) {
   return (
     <>
@@ -279,6 +306,7 @@ export function LocalProjectsSection({
           onRefreshSessions={onRefreshSessions}
           onShowMoreSessions={onShowMoreSessions}
           onMergeSession={onMergeSession}
+          onOpenCoordination={onOpenCoordination}
         />
       ))}
     </>

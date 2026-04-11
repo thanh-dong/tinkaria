@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react"
+import { Button } from "../ui/button"
 import { ChatTranscript } from "../../app/ChatTranscript"
 import { fetchTranscriptRange } from "../../app/appState.helpers"
 import { getLatestToolIds } from "../../app/derived"
@@ -178,11 +179,12 @@ function TreeNodeButton({
   const isTerminal = !isActiveStatus(node.status)
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="sm"
       onClick={() => onSelect(node.chatId)}
       className={cn(
-        "flex min-w-[14rem] items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors md:min-w-0",
+        "flex min-w-[14rem] items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors md:min-w-0 h-auto",
         isSelected
           ? "border-primary/30 bg-primary/10"
           : "border-border/70 bg-background/70 hover:bg-muted/70",
@@ -211,7 +213,7 @@ function TreeNodeButton({
           </span>
         </div>
       </div>
-    </button>
+    </Button>
   )
 }
 
@@ -431,12 +433,13 @@ export const SubagentIndicator = memo(function SubagentIndicator({
           className,
         )}
       >
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setOpen(true)}
           {...getUiIdentityAttributeProps(INDICATOR_DESCRIPTORS.toggle)}
           className={cn(
-            "group flex min-h-9 items-center gap-2 rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs text-foreground/80 shadow-sm transition-colors hover:bg-muted/60",
+            "group flex min-h-9 items-center gap-2 rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs text-foreground/80 shadow-sm transition-colors hover:bg-muted/60 h-auto",
             "max-md:max-w-full max-md:justify-between",
           )}
         >
@@ -454,7 +457,7 @@ export const SubagentIndicator = memo(function SubagentIndicator({
             </span>
           </span>
           {counts.failed > 0 ? <span className="text-red-400">{counts.failed} failed</span> : null}
-        </button>
+        </Button>
       </div>
 
       <DialogContent
@@ -497,16 +500,16 @@ export const SubagentIndicator = memo(function SubagentIndicator({
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => {
                         refreshSelectedSession()
                       }}
-                      className="inline-flex h-8 items-center gap-1 rounded-full border border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                       Refresh
-                    </button>
+                    </Button>
                     {canOpenKnownChat && selectedNode ? (
                       <a
                         href={`/chat/${selectedNode.chatId}`}

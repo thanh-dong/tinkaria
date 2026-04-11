@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from "react"
 import { EllipsisVertical, Loader2, Pencil, Trash2 } from "lucide-react"
 import type { SidebarChatRow } from "../../../../shared/types"
 import { AnimatedShinyText } from "../../ui/animated-shiny-text"
+import { Input } from "../../ui/input"
 import { Button } from "../../ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../ui/dropdown-menu"
 import { formatSidebarAgeLabel } from "../../../lib/formatters"
@@ -139,9 +140,10 @@ function ChatRowInner({
           </div>
         ) : null}
         {isEditing ? (
-          <input
+          <Input
             ref={inputRef}
-            className="text-sm flex-1 bg-transparent border border-border rounded px-1 py-0 outline-none focus:ring-1 focus:ring-ring translate-y-[-0.5px]"
+            size="sm"
+            className="flex-1 translate-y-[-0.5px]"
             value={editValue}
             onChange={(event) => setEditValue(event.target.value)}
             onKeyDown={(event) => {
