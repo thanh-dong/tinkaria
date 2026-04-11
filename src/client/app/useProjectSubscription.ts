@@ -9,10 +9,8 @@ export function useProjectSubscription(
   const [snapshot, setSnapshot] = useState<ProjectCoordinationSnapshot | null>(null)
 
   useEffect(() => {
-    if (!projectId) {
-      setSnapshot(null)
-      return
-    }
+    setSnapshot(null)
+    if (!projectId) return
 
     return socket.subscribe<ProjectCoordinationSnapshot>(
       { type: "project", projectId },

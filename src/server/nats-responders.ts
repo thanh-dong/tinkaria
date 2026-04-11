@@ -399,7 +399,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       }
 
       case "project.todo.add": {
-        await store.addTodo(command.projectId, command.todoId, command.description, command.priority ?? "normal", "user")
+        await store.addTodo(command.projectId, command.todoId, command.description, command.priority ?? "normal", command.createdBy ?? "user")
         return { ok: true }
       }
       case "project.todo.claim": {

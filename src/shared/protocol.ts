@@ -77,7 +77,7 @@ export type ClientCommand =
   | { type: "snapshot.unsubscribe"; subscriptionId: string }
   | { type: "sessions.resume"; projectId: string; sessionId: string; provider: AgentProvider }
   | { type: "sessions.refresh"; projectId: string }
-  | { type: "project.todo.add"; projectId: string; todoId: string; description: string; priority?: "high" | "normal" | "low" }
+  | { type: "project.todo.add"; projectId: string; todoId: string; description: string; priority?: "high" | "normal" | "low"; createdBy?: string }
   | { type: "project.todo.claim"; projectId: string; todoId: string; sessionId: string }
   | { type: "project.todo.complete"; projectId: string; todoId: string; outputs: string[] }
   | { type: "project.todo.abandon"; projectId: string; todoId: string }

@@ -2,9 +2,9 @@ import type { NatsConnection } from "@nats-io/transport-node"
 import type { CoordinationStore } from "../shared/coordination-store"
 import type { ProjectCoordinationSnapshot, TodoPriority } from "../shared/project-agent-types"
 import { commandSubject } from "../shared/nats-subjects"
+import { decompressPayload } from "../shared/compression"
 
 const encoder = new TextEncoder()
-const decoder = new TextDecoder()
 
 /**
  * NATS-backed coordination store for the runner process.
@@ -36,7 +36,8 @@ export class NatsCoordinationClient implements CoordinationStore {
       encoder.encode(JSON.stringify({ type, ...payload })),
       { timeout: 5_000 },
     )
-    const response = JSON.parse(decoder.decode(reply.data)) as { ok: boolean; error?: string; result?: unknown }
+    const decompressed = await decompressPayload(reply.data)
+    const response = JSON.parse(new TextDecoder().decode(decompressed)) as { ok: boolean; error?: string; result?: unknown }
     if (!response.ok) {
       throw new Error(response.error ?? `Coordination command ${type} failed`)
     }

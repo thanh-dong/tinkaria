@@ -66,9 +66,9 @@ export function formatOutput(command: string, data: unknown, json: boolean): str
   if (command === "tasks" && Array.isArray(data)) {
     if (data.length === 0) return "No tasks tracked."
     const rows = data.map((t: Record<string, unknown>) =>
-      `${t.id}  ${String(t.status).padEnd(12)}  ${t.ownedBy}  ${String(t.description).slice(0, 50)}`
+      `${t.id}  ${String(t.status).padEnd(12)}  ${t.claimedBy ?? t.createdBy ?? "-"}  ${String(t.description).slice(0, 50)}`
     )
-    return ["ID     STATUS        OWNER     DESCRIPTION", ...rows].join("\n")
+    return ["ID     STATUS        CLAIMED_BY  DESCRIPTION", ...rows].join("\n")
   }
 
   return JSON.stringify(data, null, 2)
