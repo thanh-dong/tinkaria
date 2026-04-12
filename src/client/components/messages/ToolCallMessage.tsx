@@ -24,6 +24,24 @@ function isSoftError(result: unknown): boolean {
   return SOFT_ERROR_PATTERNS.some((pattern) => lower.includes(pattern))
 }
 
+const TOOL_ERROR_HINTS: Array<{ pattern: string; hint: string }> = [
+  { pattern: "permission denied", hint: "The tool couldn't access a file. Check file permissions." },
+  { pattern: "command not found", hint: "The command isn't installed or isn't in PATH." },
+  { pattern: "timed out", hint: "The operation took too long." },
+  { pattern: "timeout", hint: "The operation took too long." },
+  { pattern: "enoent", hint: "A referenced file or directory doesn't exist." },
+  { pattern: "no such file", hint: "A referenced file or directory doesn't exist." },
+]
+
+export function getToolErrorHint(result: string): string | null {
+  if (!result) return null
+  const lower = result.toLowerCase()
+  for (const { pattern, hint } of TOOL_ERROR_HINTS) {
+    if (lower.includes(pattern)) return hint
+  }
+  return null
+}
+
 const TOOL_CALL_ITEM_DESCRIPTOR = createUiIdentityDescriptor({
   id: "message.tool-call.item",
   c3ComponentId: "c3-111",
