@@ -108,7 +108,7 @@ describe("AppSidebar", () => {
     expect(html).toContain("tinkaria-mark-fine.svg")
   })
 
-  test("renders the chat model indicator and provider glyph next to the sidebar row menu", () => {
+  test("renders the chat model indicator and provider glyph without inline chat-row action buttons", () => {
     const html = renderSidebar({
       data: {
         workspaceGroups: [
@@ -135,7 +135,7 @@ describe("AppSidebar", () => {
 
     expect(html).toContain("gpt-5.4")
     expect(html).toContain('title="Codex"')
-    expect(html).toContain('title="Chat actions"')
+    expect(html).not.toContain('title="Chat actions"')
   })
 
   test("keeps project-group actions inside the hold menu instead of rendering inline buttons", () => {
