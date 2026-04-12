@@ -149,9 +149,17 @@ export const ToolCallMessage = memo(function ToolCallMessage({ message, isLoadin
                     text={imageResult.text}
                   />
                 ) : (
-                  <MetaCodeBlock label={message.isError ? "Error" : "Result"} copyText={resultText}>
-                    {resultText}
-                  </MetaCodeBlock>
+                  <>
+                    {message.isError && !isSoftError(message.result) && (() => {
+                      const hint = getToolErrorHint(resultText)
+                      return hint ? (
+                        <span className="text-xs text-muted-foreground/70">{hint}</span>
+                      ) : null
+                    })()}
+                    <MetaCodeBlock label={message.isError ? "Error" : "Result"} copyText={resultText}>
+                      {resultText}
+                    </MetaCodeBlock>
+                  </>
                 )
               )}
             </div>
