@@ -385,6 +385,10 @@ export function normalizeSessionBootstrapErrorMessage(
     return "Preparing the merged session brief took too long. Try again with fewer sessions or a tighter goal."
   }
 
+  if (lower.includes("busy") || lower.includes("already running")) {
+    return "The target session is currently busy. Wait for it to finish or pick a different session."
+  }
+
   return normalized
 }
 
