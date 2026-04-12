@@ -147,6 +147,7 @@ export interface ChatCommandsArgs {
   submitPipeline: SubmitPipelineState
   submitPipelineRef: React.MutableRefObject<SubmitPipelineState>
   activeSessionsSubs: React.MutableRefObject<Map<string, () => void>>
+  pendingDeletedChatIdsRef: React.MutableRefObject<Set<string>>
 }
 
 export interface ChatCommandsReturn {
@@ -230,6 +231,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     submitPipeline,
     submitPipelineRef,
     activeSessionsSubs,
+    pendingDeletedChatIdsRef,
   } = args
 
   // --- State owned by command handlers ---
@@ -485,6 +487,8 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       ? getNewestRemainingChatId(sidebarData.workspaceGroups, chat.chatId)
       : null
 
+    // Track as pending-delete so incoming WS snapshots don't re-insert it.
+    pendingDeletedChatIdsRef.current.add(chat.chatId)
     setSidebarData((current) => removeChatFromSidebar(current, chat.chatId))
     useChatInputStore.getState().clearQueuedDraft(chat.chatId)
     deleteCachedChat(chat.chatId)
@@ -495,7 +499,11 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
     // Fire-and-forget: server delete runs in the background.
     // The server will push a fresh sidebar snapshot via WS on completion.
-    socket.command({ type: "chat.delete", chatId: chat.chatId }).catch((error) => {
+    socket.command({ type: "chat.delete", chatId: chat.chatId }).then(() => {
+      pendingDeletedChatIdsRef.current.delete(chat.chatId)
+    }).catch((error) => {
+      // Keep in pending set on failure — sidebar snapshot will be authoritative.
+      pendingDeletedChatIdsRef.current.delete(chat.chatId)
       console.warn("[useChatCommands] background chat.delete failed:", error instanceof Error ? error.message : String(error))
     })
   }

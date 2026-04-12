@@ -3,9 +3,11 @@ import {
   clearPendingSessionBootstrapAfterAttempt,
   enrichCommandError,
   fetchTranscriptRange,
+  filterPendingDeletedChats,
   MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
   normalizeSessionBootstrapErrorMessage,
   removeChatFromSidebar,
+  shouldPreserveMessagesOnResubscribe,
   shouldTriggerSnapshotRecovery,
   transitionPendingSessionBootstrapToError,
   type PendingSessionBootstrap,
@@ -338,5 +340,58 @@ describe("normalizeSessionBootstrapErrorMessage", () => {
   test("returns timeout hint for merge", () => {
     const result = normalizeSessionBootstrapErrorMessage("merge", "Operation timeout")
     expect(result).toBe("Preparing the merged session brief took too long. Try again with fewer sessions or a tighter goal.")
+  })
+})
+
+describe("shouldPreserveMessagesOnResubscribe", () => {
+  test("preserves messages when existing messages and not from cache", () => {
+    expect(shouldPreserveMessagesOnResubscribe({ hasExistingMessages: true, restoredFromCache: false })).toBe(true)
+  })
+
+  test("does not preserve when no existing messages", () => {
+    expect(shouldPreserveMessagesOnResubscribe({ hasExistingMessages: false, restoredFromCache: false })).toBe(false)
+  })
+
+  test("does not preserve when restored from cache (cache path handles its own logic)", () => {
+    expect(shouldPreserveMessagesOnResubscribe({ hasExistingMessages: true, restoredFromCache: true })).toBe(false)
+  })
+})
+
+describe("filterPendingDeletedChats", () => {
+  test("returns same reference when pending set is empty", () => {
+    const data = sidebarWith({ key: "p1", chats: [chatRow("chat-1"), chatRow("chat-2")] })
+    expect(filterPendingDeletedChats(data, new Set())).toBe(data)
+  })
+
+  test("filters out chats whose ids are in the pending set", () => {
+    const data = sidebarWith({ key: "p1", chats: [chatRow("chat-1"), chatRow("chat-2"), chatRow("chat-3")] })
+    const result = filterPendingDeletedChats(data, new Set(["chat-2"]))
+    const allChatIds = result.workspaceGroups.flatMap((g) => g.chats.map((c) => c.chatId))
+    expect(allChatIds).toEqual(["chat-1", "chat-3"])
+  })
+
+  test("removes empty groups after filtering", () => {
+    const data = sidebarWith(
+      { key: "solo", chats: [chatRow("chat-solo")] },
+      { key: "other", chats: [chatRow("chat-other")] },
+    )
+    const result = filterPendingDeletedChats(data, new Set(["chat-solo"]))
+    expect(result.workspaceGroups).toHaveLength(1)
+    expect(result.workspaceGroups[0].groupKey).toBe("other")
+  })
+
+  test("filters across multiple groups", () => {
+    const data = sidebarWith(
+      { key: "p1", chats: [chatRow("a"), chatRow("b")] },
+      { key: "p2", chats: [chatRow("c"), chatRow("d")] },
+    )
+    const result = filterPendingDeletedChats(data, new Set(["b", "c"]))
+    expect(result.workspaceGroups[0].chats.map((c) => c.chatId)).toEqual(["a"])
+    expect(result.workspaceGroups[1].chats.map((c) => c.chatId)).toEqual(["d"])
+  })
+
+  test("returns same reference when no chats match the pending set", () => {
+    const data = sidebarWith({ key: "p1", chats: [chatRow("chat-1")] })
+    expect(filterPendingDeletedChats(data, new Set(["nonexistent"]))).toBe(data)
   })
 })

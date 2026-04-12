@@ -29,6 +29,7 @@ import { useSubmitPipeline } from "./useSubmitPipeline"
 import { NatsSocket } from "./nats-socket"
 import type { AppTransport, SocketStatus } from "./socket-interface"
 import {
+  filterPendingDeletedChats,
   getActiveChatSnapshot,
   getSidebarChatRow,
   getUiUpdateRestartReconnectAction,
@@ -190,6 +191,7 @@ export function useAppState(activeChatId: string | null): AppState {
   }, [])
   const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
   const snapshotCallbackRef = useRef<(snapshot: ChatSnapshot) => void>(() => {})
+  const pendingDeletedChatIdsRef = useRef<Set<string>>(new Set())
 
   const { resumeRefreshNonce } = usePwaResume({
     socket,
@@ -208,7 +210,7 @@ export function useAppState(activeChatId: string | null): AppState {
 
   useEffect(() => {
     return socket.subscribe<SidebarData>({ type: "sidebar" }, (snapshot) => {
-      setSidebarData(snapshot)
+      setSidebarData(filterPendingDeletedChats(snapshot, pendingDeletedChatIdsRef.current))
       setProjectSelection((current) => transitionProjectSelection(current, {
         type: "sidebar.loaded",
         firstProjectId: snapshot.workspaceGroups[0]?.groupKey ?? null,
@@ -427,6 +429,7 @@ export function useAppState(activeChatId: string | null): AppState {
     submitPipeline,
     submitPipelineRef,
     activeSessionsSubs,
+    pendingDeletedChatIdsRef,
   })
 
   // Wire up the snapshot callback ref now that commands is available
