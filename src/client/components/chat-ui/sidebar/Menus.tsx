@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { Pencil, Trash2 } from "lucide-react"
+import { History, LayoutGrid, Merge, Pencil, SquarePen, Trash2 } from "lucide-react"
 import { createUiIdentityDescriptor } from "../../../lib/uiIdentityOverlay"
 import {
   ContextMenu,
@@ -22,10 +22,24 @@ const CHAT_ROW_MENU_DESCRIPTOR = createUiIdentityDescriptor({
 })
 
 export function ProjectSectionMenu({
+  onOpenSessions,
+  sessionsDisabled = false,
+  onMergeSession,
+  mergeDisabled = false,
+  onOpenCoordination,
+  onNewChat,
+  newChatDisabled = false,
   onRemove,
   children,
 }: {
-  onRemove: () => void
+  onOpenSessions?: () => void
+  sessionsDisabled?: boolean
+  onMergeSession?: () => void
+  mergeDisabled?: boolean
+  onOpenCoordination?: () => void
+  onNewChat?: () => void
+  newChatDisabled?: boolean
+  onRemove?: () => void
   children: ReactNode
 }) {
   return (
@@ -34,16 +48,65 @@ export function ProjectSectionMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent uiId={PROJECT_GROUP_MENU_DESCRIPTOR}>
-        <ContextMenuItem
-          onSelect={(event) => {
-            event.stopPropagation()
-            onRemove()
-          }}
-          className="text-destructive dark:text-red-400 hover:bg-destructive/10 focus:bg-destructive/10 dark:hover:bg-red-500/20 dark:focus:bg-red-500/20"
-        >
-          <Trash2 className="h-4 w-4" />
-          <span className="text-xs font-medium">Remove</span>
-        </ContextMenuItem>
+        {onOpenSessions ? (
+          <ContextMenuItem
+            disabled={sessionsDisabled}
+            onSelect={(event) => {
+              event.stopPropagation()
+              onOpenSessions()
+            }}
+          >
+            <History className="h-4 w-4" />
+            <span className="text-xs font-medium">Sessions</span>
+          </ContextMenuItem>
+        ) : null}
+        {onMergeSession ? (
+          <ContextMenuItem
+            disabled={mergeDisabled}
+            onSelect={(event) => {
+              event.stopPropagation()
+              onMergeSession()
+            }}
+          >
+            <Merge className="h-4 w-4" />
+            <span className="text-xs font-medium">Merge sessions</span>
+          </ContextMenuItem>
+        ) : null}
+        {onOpenCoordination ? (
+          <ContextMenuItem
+            onSelect={(event) => {
+              event.stopPropagation()
+              onOpenCoordination()
+            }}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            <span className="text-xs font-medium">Coordination board</span>
+          </ContextMenuItem>
+        ) : null}
+        {onNewChat ? (
+          <ContextMenuItem
+            disabled={newChatDisabled}
+            onSelect={(event) => {
+              event.stopPropagation()
+              onNewChat()
+            }}
+          >
+            <SquarePen className="h-4 w-4" />
+            <span className="text-xs font-medium">New chat</span>
+          </ContextMenuItem>
+        ) : null}
+        {onRemove ? (
+          <ContextMenuItem
+            onSelect={(event) => {
+              event.stopPropagation()
+              onRemove()
+            }}
+            className="text-destructive dark:text-red-400 hover:bg-destructive/10 focus:bg-destructive/10 dark:hover:bg-red-500/20 dark:focus:bg-red-500/20"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="text-xs font-medium">Remove</span>
+          </ContextMenuItem>
+        ) : null}
       </ContextMenuContent>
     </ContextMenu>
   )

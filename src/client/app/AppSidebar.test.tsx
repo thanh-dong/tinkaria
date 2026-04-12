@@ -138,6 +138,26 @@ describe("AppSidebar", () => {
     expect(html).toContain('title="Chat actions"')
   })
 
+  test("keeps project-group actions inside the hold menu instead of rendering inline buttons", () => {
+    const html = renderSidebar({
+      data: {
+        workspaceGroups: [
+          {
+            groupKey: "project-1",
+            localPath: "/tmp/demo",
+            chats: [],
+          },
+        ],
+      },
+      onMergeSession: () => {},
+    })
+
+    expect(html).toContain('data-ui-id="sidebar.project-group"')
+    expect(html).not.toContain('data-ui-id="sidebar.project-group.sessions.action"')
+    expect(html).not.toContain("aria-label=\"Coordination board\"")
+    expect(html).not.toContain("Merge sessions")
+  })
+
   test("ignores handler identity churn when sidebar data is unchanged", () => {
     const previous = createSidebarProps({
       data: {
