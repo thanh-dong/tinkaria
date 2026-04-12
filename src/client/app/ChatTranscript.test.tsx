@@ -226,6 +226,19 @@ describe("groupMessages", () => {
     expect(items[0].type).toBe("wip-block")
   })
 
+  test("live turn: trailing text after prior narration is suppressed to prevent flash", () => {
+    // Scenario: assistant sends narration text, then more text that looks like an answer.
+    // During loading, suppress the trailing text to prevent flash when tools arrive next tick.
+    const msgs = [text("Let me think about this"), text("Here is a table with results")]
+    const items = groupMessages(msgs, true)
+
+    expect(items).toHaveLength(1)
+    expect(items[0].type).toBe("wip-block")
+    if (items[0].type === "wip-block") {
+      expect(items[0].steps).toHaveLength(2)
+    }
+  })
+
   test("two narration texts (no tools) form wip-block", () => {
     const msgs = [text("First thought"), text("Second thought"), text("Answer")]
     const items = groupMessages(msgs, false)

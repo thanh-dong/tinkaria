@@ -88,7 +88,17 @@ export function useScrollSync(args: {
         lastScrollHeight = el.scrollHeight
         stableCount = 0
       }
-      if (stableCount >= 5 && el.scrollHeight > el.clientHeight) {
+      // Only declare stable when scrollHeight stopped changing AND we're
+      // actually within the bottom follow band. The virtualizer reports
+      // estimated heights for off-screen items; scrollHeight can stabilise
+      // at a value that doesn't represent the true bottom yet. Requiring
+      // the follow-band check prevents declaring "done" while stuck in the
+      // middle of the transcript.
+      const atBottom = isWithinBottomFollowBand(
+        el.scrollHeight - el.scrollTop - el.clientHeight,
+        el.clientHeight,
+      )
+      if (stableCount >= 5 && el.scrollHeight > el.clientHeight && atBottom) {
         window.clearInterval(interval)
         initialScrollCompletedRef.current = true
         handleInitialScrollDone("tail")

@@ -1,4 +1,4 @@
-import { UserRound, X, Check } from "lucide-react"
+import { UserRound, X, Check, CircleAlert } from "lucide-react"
 import type { ProcessedToolCall } from "./types"
 import { MetaRow, MetaLabel, MetaCodeBlock, ExpandableRow, VerticalLineContainer, getToolIcon, getToolLabel } from "./shared"
 import { memo, useMemo } from "react"
@@ -7,6 +7,22 @@ import { FileContentView } from "./FileContentView"
 import { ImageContentView } from "./ImageContentView"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { isReadFileImageResult } from "../../../shared/types"
+
+const SOFT_ERROR_PATTERNS = [
+  "no files found",
+  "no matches",
+  "no results",
+  "exit code 1",
+  "not found",
+  "no such file",
+]
+
+function isSoftError(result: unknown): boolean {
+  const text = typeof result === "string" ? result : ""
+  if (!text) return false
+  const lower = text.toLowerCase()
+  return SOFT_ERROR_PATTERNS.some((pattern) => lower.includes(pattern))
+}
 
 const TOOL_CALL_ITEM_DESCRIPTOR = createUiIdentityDescriptor({
   id: "message.tool-call.item",
@@ -128,6 +144,9 @@ export const ToolCallMessage = memo(function ToolCallMessage({ message, isLoadin
         <div className="w-5 h-5 relative flex items-center justify-center">
           {(() => {
             if (message.isError) {
+              if (isSoftError(message.result)) {
+                return <CircleAlert className="size-3.5 text-muted-foreground/50" />
+              }
               return <X className="size-4 text-destructive" />
             }
             if (showLoadingState) {
