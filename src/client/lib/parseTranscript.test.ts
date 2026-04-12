@@ -129,6 +129,39 @@ describe("processTranscriptMessages", () => {
     expect(messages[0].result).toEqual({ answers: { "Provider?": ["Codex"] } })
   })
 
+  test("preserves structured ask-user-question results when SDK echo lacks debugRaw", () => {
+    const messages = processTranscriptMessages([
+      entry({
+        kind: "tool_call",
+        tool: {
+          kind: "tool",
+          toolKind: "ask_user_question",
+          toolName: "AskUserQuestion",
+          toolId: "tool-no-debug",
+          input: {
+            questions: [{ question: "Provider?" }],
+          },
+        },
+      }),
+      // First: runner-published structured result
+      entry({
+        kind: "tool_result",
+        toolId: "tool-no-debug",
+        content: { answers: { "Provider?": ["Codex"] } },
+      }),
+      // Second: SDK-echoed result without debugRaw (production mode)
+      entry({
+        kind: "tool_result",
+        toolId: "tool-no-debug",
+        content: "User has answered your questions: \"Provider?\"=\"Codex\".",
+      }),
+    ])
+
+    expect(messages[0]?.kind).toBe("tool")
+    if (messages[0]?.kind !== "tool") throw new Error("unexpected message")
+    expect(messages[0].result).toEqual({ answers: { "Provider?": ["Codex"] } })
+  })
+
   test("hydrates present_content tool results as structured data", () => {
     const messages = processTranscriptMessages([
       entry({
