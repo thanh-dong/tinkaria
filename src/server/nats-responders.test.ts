@@ -147,6 +147,9 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
       dispose: () => {},
     },
     onStateChange: () => {},
+    directoryPolicy: null,
+    repoManager: null,
+    clonePolicy: null,
     ...overrides,
   }
 

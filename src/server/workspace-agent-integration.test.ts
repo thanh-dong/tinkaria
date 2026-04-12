@@ -50,7 +50,7 @@ function makeState(workspaceId: string): StoreState {
       unread: false, provider: "codex", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
   ])
-  return { workspacesById, workspaceIdsByPath, chatsById, coordinationByWorkspace: new Map() }
+  return { workspacesById, workspaceIdsByPath, chatsById, coordinationByWorkspace: new Map(), agentConfigsByWorkspace: new Map(), reposById: new Map(), reposByPath: new Map() }
 }
 
 describe("project agent integration", () => {

@@ -3,6 +3,7 @@ import type {
   ChatSnapshot,
   SessionStatus,
   LocalWorkspacesSnapshot,
+  RepoSummary,
   SessionsSnapshot,
   SidebarChatRow,
   SidebarData,
@@ -11,6 +12,7 @@ import type {
 import type { ChatRecord, StoreState, WorkspaceCoordinationState } from "./events"
 import { createEmptyCoordinationState } from "./events"
 import type { WorkspaceCoordinationSnapshot } from "../shared/workspace-types"
+import type { AgentConfigSnapshot } from "../shared/agent-config-types"
 import { resolveLocalPath } from "./paths"
 import { SERVER_PROVIDERS } from "./provider-catalog"
 
@@ -171,4 +173,36 @@ export function deriveWorkspaceCoordinationSnapshot(
   workspaceId: string,
 ): WorkspaceCoordinationSnapshot {
   return deriveCoordinationSnapshot(state, workspaceId)
+}
+
+/** Derive repo list snapshot for a workspace. */
+export function deriveRepoListSnapshot(state: StoreState, workspaceId: string): { workspaceId: string; repos: RepoSummary[] } {
+  const repos: RepoSummary[] = []
+  for (const repo of state.reposById.values()) {
+    if (repo.workspaceId === workspaceId) {
+      repos.push({
+        id: repo.id,
+        workspaceId: repo.workspaceId,
+        label: repo.label,
+        origin: repo.origin,
+        localPath: repo.localPath,
+        status: repo.status,
+        branch: repo.branch,
+      })
+    }
+  }
+  return { workspaceId, repos }
+}
+
+/** Derive agent config snapshot for a workspace. */
+export function deriveAgentConfigSnapshot(
+  state: StoreState,
+  workspaceId: string,
+): AgentConfigSnapshot {
+  const configMap = state.agentConfigsByWorkspace.get(workspaceId)
+  const configs = configMap ? [...configMap.values()] : []
+  const lastUpdated = configs.length > 0
+    ? new Date(Math.max(...configs.map((c) => c.updatedAt))).toISOString()
+    : new Date(0).toISOString()
+  return { workspaceId, configs, lastUpdated }
 }

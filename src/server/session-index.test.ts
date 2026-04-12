@@ -23,7 +23,7 @@ function createState(chats: ChatRecord[]): StoreState {
   for (const chat of chats) {
     chatsById.set(chat.id, chat)
   }
-  return { workspacesById, workspaceIdsByPath, chatsById, coordinationByWorkspace: new Map() }
+  return { workspacesById, workspaceIdsByPath, chatsById, coordinationByWorkspace: new Map(), agentConfigsByWorkspace: new Map(), reposById: new Map(), reposByPath: new Map() }
 }
 
 function makeChat(id: string, workspaceId = "p1", provider: "claude" | "codex" | null = "claude"): ChatRecord {

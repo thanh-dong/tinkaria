@@ -24,6 +24,10 @@ import { TranscriptSearchIndex } from "./transcript-search"
 import { WorkspaceAgent } from "./workspace-agent"
 import { createWorkspaceAgentRouter } from "./workspace-agent-routes"
 import { SkillCache } from "./skill-discovery"
+import { WorkspaceConfigManager } from "./workspace-config-manager"
+import { WorkspaceDirectoryPolicy } from "./workspace-directory-policy"
+import { RepoManager } from "./repo-manager"
+import { GitClonePolicy } from "./git-clone-policy"
 
 export interface StartServerOptions {
   port?: number
@@ -387,6 +391,13 @@ export async function startServer(options: StartServerOptions = {}) {
     updateManager,
     publisher,
     onStateChange: () => publisher.broadcastSnapshots(),
+    repoManager: new RepoManager(),
+    clonePolicy: new GitClonePolicy(store, new RepoManager(), () => publisher.broadcastSnapshots()),
+    directoryPolicy: new WorkspaceDirectoryPolicy(
+      store,
+      new WorkspaceConfigManager(path.join(store.dataDir, "workspaces")),
+      () => publisher.broadcastSnapshots(),
+    ),
   })
 
   const distDir = path.join(import.meta.dir, "..", "..", "dist", "client")

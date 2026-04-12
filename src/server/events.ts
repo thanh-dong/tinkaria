@@ -1,5 +1,6 @@
 import type { AgentProvider, WorkspaceSummary, TranscriptEntry } from "../shared/types"
 import type { WorkspaceTodo, WorkspaceClaim, WorkspaceWorktree, WorkspaceRule } from "../shared/workspace-types"
+import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
 
 export interface WorkspaceRecord extends WorkspaceSummary {
   deletedAt?: number
@@ -47,6 +48,9 @@ export interface StoreState {
   workspaceIdsByPath: Map<string, string>
   chatsById: Map<string, ChatRecord>
   coordinationByWorkspace: Map<string, WorkspaceCoordinationState>
+  agentConfigsByWorkspace: Map<string, Map<string, AgentConfigRecord>>
+  reposById: Map<string, RepoRecord>
+  reposByPath: Map<string, string>
 }
 
 export function createEmptyCoordinationState(): WorkspaceCoordinationState {
@@ -66,6 +70,8 @@ export interface SnapshotFile {
   chats: ChatRecord[]
   messages?: Array<{ chatId: string; entries: TranscriptEntry[] }>
   coordination?: Array<{ workspaceId: string; todos: WorkspaceTodo[]; claims: WorkspaceClaim[]; worktrees: WorkspaceWorktree[]; rules: WorkspaceRule[] }>
+  agentConfigs?: Array<{ workspaceId: string; records: AgentConfigRecord[] }>
+  repos?: RepoRecord[]
 }
 
 export type WorkspaceEvent = {
@@ -90,6 +96,7 @@ export type ChatEvent =
       chatId: string
       workspaceId: string
       title: string
+      repoId?: string
     }
   | {
       v: 3
@@ -189,7 +196,20 @@ export type CoordinationEvent =
   | { v: 3; type: "rule_set"; timestamp: number; workspaceId: string; ruleId: string; content: string; setBy: string }
   | { v: 3; type: "rule_removed"; timestamp: number; workspaceId: string; ruleId: string }
 
-export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent
+export type RepoEvent =
+  | { v: 3; type: "repo_added"; timestamp: number; id: string; workspaceId: string; localPath: string; origin: string | null; label: string | null; branch: string | null }
+  | { v: 3; type: "repo_clone_started"; timestamp: number; id: string; workspaceId: string; origin: string; targetPath: string; label: string | null }
+  | { v: 3; type: "repo_cloned"; timestamp: number; id: string; localPath: string; branch: string | null }
+  | { v: 3; type: "repo_clone_failed"; timestamp: number; id: string; error: string }
+  | { v: 3; type: "repo_removed"; timestamp: number; id: string; workspaceId: string }
+  | { v: 3; type: "repo_label_updated"; timestamp: number; id: string; label: string }
+
+export type AgentConfigEvent =
+  | { v: 3; type: "agent_config_saved"; timestamp: number; workspaceId: string; agentId: string; config: AgentConfig }
+  | { v: 3; type: "agent_config_committed"; timestamp: number; workspaceId: string; agentId: string; commitHash: string }
+  | { v: 3; type: "agent_config_removed"; timestamp: number; workspaceId: string; agentId: string }
+
+export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent | RepoEvent | AgentConfigEvent
 
 export function createEmptyState(): StoreState {
   return {
@@ -197,6 +217,9 @@ export function createEmptyState(): StoreState {
     workspaceIdsByPath: new Map(),
     chatsById: new Map(),
     coordinationByWorkspace: new Map(),
+    agentConfigsByWorkspace: new Map(),
+    reposById: new Map(),
+    reposByPath: new Map(),
   }
 }
 

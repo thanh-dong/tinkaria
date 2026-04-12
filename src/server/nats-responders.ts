@@ -17,7 +17,10 @@ import { readRepoStatus } from "./repo-status"
 import { generateForkPromptForChat } from "./generate-fork-context"
 import { generateMergePromptForChats as defaultGenerateMergePrompt } from "./generate-merge-context"
 import type { TranscriptEntry } from "../shared/types"
-import { deriveCoordinationSnapshot } from "./read-models"
+import { deriveCoordinationSnapshot, deriveAgentConfigSnapshot } from "./read-models"
+import type { WorkspaceDirectoryPolicy } from "./workspace-directory-policy"
+import type { RepoManager } from "./repo-manager"
+import type { GitClonePolicy } from "./git-clone-policy"
 
 /** Session coordinator interface — RunnerProxy delegates turn execution to the runner process */
 interface Coordinator {
@@ -49,6 +52,9 @@ export interface RegisterRespondersArgs {
   onStateChange: () => void
   generateForkPrompt?: (forkIntent: string, entries: TranscriptEntry[], cwd: string, preset?: string) => Promise<string>
   generateMergePrompt?: (mergeIntent: string, sessions: { chatId: string; entries: TranscriptEntry[] }[], cwd: string, preset?: string) => Promise<string>
+  directoryPolicy: WorkspaceDirectoryPolicy | null
+  repoManager: RepoManager | null
+  clonePolicy: GitClonePolicy | null
 }
 
 /** Command types that do NOT mutate state and should NOT trigger onStateChange */
@@ -69,6 +75,9 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "snapshot.unsubscribe",
   "sessions.refresh",
   "workspace.coordination.snapshot",
+  "workspace.agent.list",
+  "workspace.agent.get",
+  "workspace.repo.status",
 ])
 
 /** Commands handled by the Bun backend. */
@@ -113,6 +122,17 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "workspace.rule.set",
   "workspace.rule.remove",
   "workspace.coordination.snapshot",
+  "workspace.agent.save",
+  "workspace.agent.list",
+  "workspace.agent.get",
+  "workspace.agent.remove",
+  "workspace.repo.add",
+  "workspace.repo.clone",
+  "workspace.repo.remove",
+  "workspace.repo.label",
+  "workspace.repo.status",
+  "workspace.repo.pull",
+  "workspace.repo.push",
 ]
 
 export function registerCommandResponders(args: RegisterRespondersArgs): { dispose: () => void } {
@@ -189,6 +209,11 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         await ensureProjectDirectory(command.localPath)
         const project = await store.openProject(command.localPath)
         await refreshDiscovery()
+        if (args.directoryPolicy) {
+          args.directoryPolicy.onWorkspaceOpened(project.id).catch((err: unknown) => {
+            console.warn(`${LOG_PREFIX} workspace dir init error:`, err instanceof Error ? err.message : String(err))
+          })
+        }
         return { workspaceId: project.id }
       }
 
@@ -196,6 +221,11 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         await ensureProjectDirectory(command.localPath)
         const project = await store.openProject(command.localPath, command.title)
         await refreshDiscovery()
+        if (args.directoryPolicy) {
+          args.directoryPolicy.onWorkspaceOpened(project.id).catch((err: unknown) => {
+            console.warn(`${LOG_PREFIX} workspace dir init error:`, err instanceof Error ? err.message : String(err))
+          })
+        }
         return { workspaceId: project.id }
       }
 
@@ -220,7 +250,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         return readLocalFilePreview(command.localPath)
 
       case "chat.create": {
-        const chat = await store.createChat(command.workspaceId)
+        const chat = await store.createChat(command.workspaceId, command.repoId)
         return { chatId: chat.id }
       }
 
@@ -445,6 +475,84 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
 
       case "workspace.coordination.snapshot": {
         return deriveCoordinationSnapshot(store.state, command.workspaceId)
+      }
+
+      case "workspace.agent.save": {
+        await store.saveAgentConfig(command.workspaceId, command.config.id, command.config)
+        if (args.directoryPolicy) {
+          args.directoryPolicy.onAgentConfigSaved(command.workspaceId, command.config.id, command.config).catch((err: unknown) => {
+            console.warn(`${LOG_PREFIX} agent config save policy error:`, err instanceof Error ? err.message : String(err))
+          })
+        }
+        return { ok: true }
+      }
+      case "workspace.agent.list": {
+        return deriveAgentConfigSnapshot(store.state, command.workspaceId)
+      }
+      case "workspace.agent.get": {
+        return store.state.agentConfigsByWorkspace.get(command.workspaceId)?.get(command.agentId) ?? null
+      }
+      case "workspace.agent.remove": {
+        await store.removeAgentConfig(command.workspaceId, command.agentId)
+        if (args.directoryPolicy) {
+          args.directoryPolicy.onAgentConfigRemoved(command.workspaceId, command.agentId).catch((err: unknown) => {
+            console.warn(`${LOG_PREFIX} agent config remove policy error:`, err instanceof Error ? err.message : String(err))
+          })
+        }
+        return { ok: true }
+      }
+
+      case "workspace.repo.add": {
+        if (!args.repoManager) throw new Error("RepoManager not available")
+        const info = await args.repoManager.addLocal(command.localPath)
+        const repoId = crypto.randomUUID()
+        await store.addRepo(repoId, command.workspaceId, command.localPath, info.origin, command.label ?? null, info.branch)
+        return { id: repoId, origin: info.origin, branch: info.branch }
+      }
+
+      case "workspace.repo.clone": {
+        const repoId = crypto.randomUUID()
+        await store.startRepoClone(repoId, command.workspaceId, command.origin, command.targetPath, command.label ?? null)
+        if (args.clonePolicy) {
+          args.clonePolicy.onRepoCloneStarted(repoId, command.origin, command.targetPath).catch((err: unknown) => {
+            console.warn(`${LOG_PREFIX} clone policy error:`, err instanceof Error ? err.message : String(err))
+          })
+        }
+        return { id: repoId }
+      }
+
+      case "workspace.repo.remove": {
+        await store.removeRepo(command.repoId, command.workspaceId)
+        return { ok: true }
+      }
+
+      case "workspace.repo.label": {
+        await store.updateRepoLabel(command.repoId, command.label)
+        return { ok: true }
+      }
+
+      case "workspace.repo.status": {
+        if (!args.repoManager) throw new Error("RepoManager not available")
+        const repo = store.state.reposById.get(command.repoId)
+        if (!repo) throw new Error("Repo not found")
+        const statusResult = await args.repoManager.status(repo.localPath)
+        return statusResult
+      }
+
+      case "workspace.repo.pull": {
+        if (!args.repoManager) throw new Error("RepoManager not available")
+        const repo = store.state.reposById.get(command.repoId)
+        if (!repo) throw new Error("Repo not found")
+        const output = await args.repoManager.pull(repo.localPath, command.branch)
+        return { output }
+      }
+
+      case "workspace.repo.push": {
+        if (!args.repoManager) throw new Error("RepoManager not available")
+        const repo = store.state.reposById.get(command.repoId)
+        if (!repo) throw new Error("Repo not found")
+        const output = await args.repoManager.push(repo.localPath, command.branch)
+        return { output }
       }
 
       default: {

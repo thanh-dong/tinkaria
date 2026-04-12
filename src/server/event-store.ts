@@ -2,16 +2,20 @@ import { appendFile, mkdir, rename, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
 import { getDataDir, LOG_PREFIX } from "../shared/branding"
+import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
 import type { AgentProvider, TranscriptEntry } from "../shared/types"
 import { STORE_VERSION } from "../shared/types"
 import {
   type ChatEvent,
+  type AgentConfigEvent,
   type CoordinationEvent,
   type MessageEvent,
   type WorkspaceEvent,
   type SnapshotFile,
   type StoreEvent,
   type StoreState,
+  type RepoEvent,
+  type RepoRecord,
   type TurnEvent,
   cloneTranscriptEntries,
   createEmptyCoordinationState,
@@ -44,6 +48,8 @@ export class EventStore {
   private transcriptCache = new Map<string, TranscriptEntry[]>()
   private static readonly TRANSCRIPT_CACHE_MAX = 5
   private readonly coordinationLogPath: string
+  private readonly agentConfigsLogPath: string
+  private readonly reposLogPath: string
 
   constructor(dataDir = getDataDir(homedir())) {
     this.dataDir = dataDir
@@ -54,6 +60,8 @@ export class EventStore {
     this.turnsLogPath = path.join(this.dataDir, "turns.jsonl")
     this.transcriptsDir = path.join(this.dataDir, "transcripts")
     this.coordinationLogPath = path.join(this.dataDir, "coordination.jsonl")
+    this.agentConfigsLogPath = path.join(this.dataDir, "agent-configs.jsonl")
+    this.reposLogPath = path.join(this.dataDir, "repos.jsonl")
   }
 
   async initialize() {
@@ -64,6 +72,8 @@ export class EventStore {
     await this.ensureFile(this.messagesLogPath)
     await this.ensureFile(this.turnsLogPath)
     await this.ensureFile(this.coordinationLogPath)
+    await this.ensureFile(this.agentConfigsLogPath)
+    await this.ensureFile(this.reposLogPath)
     await this.loadSnapshot()
     await this.replayLogs()
     if (!(await this.hasLegacyTranscriptData()) && await this.shouldCompact()) {
@@ -90,6 +100,8 @@ export class EventStore {
       Bun.write(this.messagesLogPath, ""),
       Bun.write(this.turnsLogPath, ""),
       Bun.write(this.coordinationLogPath, ""),
+      Bun.write(this.agentConfigsLogPath, ""),
+      Bun.write(this.reposLogPath, ""),
     ])
   }
 
@@ -123,6 +135,19 @@ export class EventStore {
           this.state.coordinationByWorkspace.set(entry.workspaceId, coord)
         }
       }
+      if (parsed.agentConfigs?.length) {
+        for (const entry of parsed.agentConfigs) {
+          const configMap = new Map<string, AgentConfigRecord>()
+          for (const record of entry.records) configMap.set(record.id, record)
+          this.state.agentConfigsByWorkspace.set(entry.workspaceId, configMap)
+        }
+      }
+      if (parsed.repos?.length) {
+        for (const repo of parsed.repos) {
+          this.state.reposById.set(repo.id, { ...repo })
+          if (repo.localPath) this.state.reposByPath.set(repo.localPath, repo.id)
+        }
+      }
       if (parsed.messages?.length) {
         this.snapshotHasLegacyMessages = true
         for (const messageSet of parsed.messages) {
@@ -140,6 +165,9 @@ export class EventStore {
     this.state.workspaceIdsByPath.clear()
     this.state.chatsById.clear()
     this.state.coordinationByWorkspace.clear()
+    this.state.agentConfigsByWorkspace.clear()
+    this.state.reposById.clear()
+    this.state.reposByPath.clear()
     this.transcriptCache.clear()
   }
 
@@ -159,6 +187,10 @@ export class EventStore {
     await this.replayLog<TurnEvent>(this.turnsLogPath)
     if (this.storageReset) return
     await this.replayLog<CoordinationEvent>(this.coordinationLogPath)
+    if (this.storageReset) return
+    await this.replayLog<AgentConfigEvent>(this.agentConfigsLogPath)
+    if (this.storageReset) return
+    await this.replayLog<RepoEvent>(this.reposLogPath)
   }
 
   private async replayLog<TEvent extends StoreEvent>(filePath: string) {
@@ -226,7 +258,7 @@ export class EventStore {
         const chat = {
           id: event.chatId,
           workspaceId: event.workspaceId,
-          repoId: null,
+          repoId: event.repoId ?? null,
           title: event.title,
           createdAt: event.timestamp,
           updatedAt: event.timestamp,
@@ -450,6 +482,99 @@ export class EventStore {
         coord.lastUpdated = new Date(event.timestamp).toISOString()
         break
       }
+      case "agent_config_saved": {
+        const workspaceMap = this.state.agentConfigsByWorkspace.get(event.workspaceId) ?? new Map<string, AgentConfigRecord>()
+        const existing = workspaceMap.get(event.agentId)
+        workspaceMap.set(event.agentId, {
+          id: event.agentId,
+          workspaceId: event.workspaceId,
+          config: event.config,
+          createdAt: existing?.createdAt ?? event.timestamp,
+          updatedAt: event.timestamp,
+          lastCommitHash: existing?.lastCommitHash,
+        })
+        this.state.agentConfigsByWorkspace.set(event.workspaceId, workspaceMap)
+        break
+      }
+      case "agent_config_committed": {
+        const record = this.state.agentConfigsByWorkspace.get(event.workspaceId)?.get(event.agentId)
+        if (record) record.lastCommitHash = event.commitHash
+        break
+      }
+      case "agent_config_removed": {
+        this.state.agentConfigsByWorkspace.get(event.workspaceId)?.delete(event.agentId)
+        break
+      }
+      case "repo_added": {
+        const repo: RepoRecord = {
+          id: event.id,
+          workspaceId: event.workspaceId,
+          origin: event.origin,
+          localPath: event.localPath,
+          label: event.label,
+          status: "cloned",
+          branch: event.branch,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+        }
+        this.state.reposById.set(event.id, repo)
+        if (event.localPath) this.state.reposByPath.set(event.localPath, event.id)
+        break
+      }
+      case "repo_clone_started": {
+        const repo: RepoRecord = {
+          id: event.id,
+          workspaceId: event.workspaceId,
+          origin: event.origin,
+          localPath: event.targetPath,
+          label: event.label,
+          status: "pending",
+          branch: null,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+        }
+        this.state.reposById.set(event.id, repo)
+        this.state.reposByPath.set(event.targetPath, event.id)
+        break
+      }
+      case "repo_cloned": {
+        const repo = this.state.reposById.get(event.id)
+        if (!repo) break
+        repo.status = "cloned"
+        repo.localPath = event.localPath
+        repo.branch = event.branch
+        repo.updatedAt = event.timestamp
+        this.state.reposByPath.set(event.localPath, event.id)
+        break
+      }
+      case "repo_clone_failed": {
+        const repo = this.state.reposById.get(event.id)
+        if (!repo) break
+        repo.status = "error"
+        repo.updatedAt = event.timestamp
+        break
+      }
+      case "repo_removed": {
+        const repo = this.state.reposById.get(event.id)
+        if (repo) {
+          this.state.reposByPath.delete(repo.localPath)
+          this.state.reposById.delete(event.id)
+          // Re-parent orphaned chats
+          for (const chat of this.state.chatsById.values()) {
+            if (chat.repoId === event.id) {
+              chat.repoId = null
+            }
+          }
+        }
+        break
+      }
+      case "repo_label_updated": {
+        const repo = this.state.reposById.get(event.id)
+        if (!repo) break
+        repo.label = event.label
+        repo.updatedAt = event.timestamp
+        break
+      }
     }
   }
 
@@ -554,7 +679,7 @@ export class EventStore {
     await this.append(this.projectsLogPath, event)
   }
 
-  async createChat(workspaceId: string) {
+  async createChat(workspaceId: string, repoId?: string) {
     const project = this.state.workspacesById.get(workspaceId)
     if (!project || project.deletedAt) {
       throw new Error("Project not found")
@@ -567,6 +692,7 @@ export class EventStore {
       chatId,
       workspaceId,
       title: "New Chat",
+      ...(repoId ? { repoId } : {}),
     }
     await this.append(this.chatsLogPath, event)
     return this.state.chatsById.get(chatId)!
@@ -800,6 +926,55 @@ export class EventStore {
     await this.append<CoordinationEvent>(this.coordinationLogPath, event)
   }
 
+  // --- Agent config mutation methods ---
+
+  async saveAgentConfig(workspaceId: string, agentId: string, config: AgentConfig) {
+    const event: AgentConfigEvent = { v: STORE_VERSION, type: "agent_config_saved", timestamp: Date.now(), workspaceId, agentId, config }
+    await this.append<AgentConfigEvent>(this.agentConfigsLogPath, event)
+  }
+
+  async commitAgentConfig(workspaceId: string, agentId: string, commitHash: string) {
+    const event: AgentConfigEvent = { v: STORE_VERSION, type: "agent_config_committed", timestamp: Date.now(), workspaceId, agentId, commitHash }
+    await this.append<AgentConfigEvent>(this.agentConfigsLogPath, event)
+  }
+
+  async removeAgentConfig(workspaceId: string, agentId: string) {
+    const event: AgentConfigEvent = { v: STORE_VERSION, type: "agent_config_removed", timestamp: Date.now(), workspaceId, agentId }
+    await this.append<AgentConfigEvent>(this.agentConfigsLogPath, event)
+  }
+
+  // --- Repo mutation methods ---
+
+  async addRepo(id: string, workspaceId: string, localPath: string, origin: string | null, label: string | null, branch: string | null) {
+    const event: RepoEvent = { v: STORE_VERSION, type: "repo_added", timestamp: Date.now(), id, workspaceId, localPath, origin, label, branch }
+    await this.append<RepoEvent>(this.reposLogPath, event)
+  }
+
+  async startRepoClone(id: string, workspaceId: string, origin: string, targetPath: string, label: string | null) {
+    const event: RepoEvent = { v: STORE_VERSION, type: "repo_clone_started", timestamp: Date.now(), id, workspaceId, origin, targetPath, label }
+    await this.append<RepoEvent>(this.reposLogPath, event)
+  }
+
+  async markRepoCloned(id: string, localPath: string, branch: string | null) {
+    const event: RepoEvent = { v: STORE_VERSION, type: "repo_cloned", timestamp: Date.now(), id, localPath, branch }
+    await this.append<RepoEvent>(this.reposLogPath, event)
+  }
+
+  async markRepoCloneFailed(id: string, error: string) {
+    const event: RepoEvent = { v: STORE_VERSION, type: "repo_clone_failed", timestamp: Date.now(), id, error }
+    await this.append<RepoEvent>(this.reposLogPath, event)
+  }
+
+  async removeRepo(id: string, workspaceId: string) {
+    const event: RepoEvent = { v: STORE_VERSION, type: "repo_removed", timestamp: Date.now(), id, workspaceId }
+    await this.append<RepoEvent>(this.reposLogPath, event)
+  }
+
+  async updateRepoLabel(id: string, label: string) {
+    const event: RepoEvent = { v: STORE_VERSION, type: "repo_label_updated", timestamp: Date.now(), id, label }
+    await this.append<RepoEvent>(this.reposLogPath, event)
+  }
+
   getProject(workspaceId: string) {
     const project = this.state.workspacesById.get(workspaceId)
     if (!project || project.deletedAt) return null
@@ -913,6 +1088,12 @@ export class EventStore {
         rules: [...coord.rules.values()],
       })
     }
+    const agentConfigs: SnapshotFile["agentConfigs"] = []
+    for (const [workspaceId, configMap] of this.state.agentConfigsByWorkspace) {
+      if (configMap.size > 0) {
+        agentConfigs.push({ workspaceId, records: [...configMap.values()] })
+      }
+    }
     return {
       v: STORE_VERSION,
       generatedAt: Date.now(),
@@ -921,6 +1102,8 @@ export class EventStore {
         .filter((chat) => !chat.deletedAt)
         .map((chat) => ({ ...chat })),
       ...(coordination.length > 0 ? { coordination } : {}),
+      ...(agentConfigs.length > 0 ? { agentConfigs } : {}),
+      ...(this.state.reposById.size > 0 ? { repos: [...this.state.reposById.values()] } : {}),
     }
   }
 
@@ -933,6 +1116,8 @@ export class EventStore {
       Bun.write(this.messagesLogPath, ""),
       Bun.write(this.turnsLogPath, ""),
       Bun.write(this.coordinationLogPath, ""),
+      Bun.write(this.agentConfigsLogPath, ""),
+      Bun.write(this.reposLogPath, ""),
     ])
   }
 
@@ -974,6 +1159,8 @@ export class EventStore {
       Bun.file(this.messagesLogPath).size,
       Bun.file(this.turnsLogPath).size,
       Bun.file(this.coordinationLogPath).size,
+      Bun.file(this.agentConfigsLogPath).size,
+      Bun.file(this.reposLogPath).size,
     ])
     return sizes.reduce((total, size) => total + size, 0) >= COMPACTION_THRESHOLD_BYTES
   }

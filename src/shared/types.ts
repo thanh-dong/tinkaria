@@ -159,6 +159,16 @@ export type SessionStatus =
   | "waiting_for_user"
   | "failed"
 
+export interface RepoSummary {
+  id: string
+  workspaceId: string
+  label: string | null
+  origin: string | null
+  localPath: string
+  status: "cloned" | "pending" | "error"
+  branch: string | null
+}
+
 export interface WorkspaceSummary {
   id: string
   localPath: string

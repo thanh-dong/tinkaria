@@ -11,6 +11,8 @@ export function snapshotKvKey(topic: SubscriptionTopic): string {
     case "sessions": return `sessions.${topic.workspaceId}`
     case "orchestration": return `orchestration.${topic.chatId}`
     case "workspace": return `workspace.${topic.workspaceId}`
+    case "agent-config": return `agent-config.${topic.workspaceId}`
+    case "repos": return `repos.${topic.workspaceId}`
     default: return topic.type
   }
 }

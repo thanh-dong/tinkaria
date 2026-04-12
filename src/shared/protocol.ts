@@ -12,6 +12,8 @@ export type SubscriptionTopic =
   | { type: "sessions"; workspaceId: string }
   | { type: "orchestration"; chatId: string }
   | { type: "workspace"; workspaceId: string }
+  | { type: "agent-config"; workspaceId: string }
+  | { type: "repos"; workspaceId: string }
 
 export interface TerminalSnapshot {
   terminalId: string
@@ -47,7 +49,7 @@ export type ClientCommand =
       type: "system.readLocalFilePreview"
       localPath: string
     }
-  | { type: "chat.create"; workspaceId: string }
+  | { type: "chat.create"; workspaceId: string; repoId?: string }
   | { type: "chat.rename"; chatId: string; title: string }
   | { type: "chat.delete"; chatId: string }
   | { type: "chat.markRead"; chatId: string }
@@ -89,3 +91,14 @@ export type ClientCommand =
   | { type: "workspace.rule.set"; workspaceId: string; ruleId: string; content: string; setBy: string }
   | { type: "workspace.rule.remove"; workspaceId: string; ruleId: string }
   | { type: "workspace.coordination.snapshot"; workspaceId: string }
+  | { type: "workspace.agent.save"; workspaceId: string; config: import("./agent-config-types").AgentConfig }
+  | { type: "workspace.agent.list"; workspaceId: string }
+  | { type: "workspace.agent.get"; workspaceId: string; agentId: string }
+  | { type: "workspace.agent.remove"; workspaceId: string; agentId: string }
+  | { type: "workspace.repo.add"; workspaceId: string; localPath: string; label?: string }
+  | { type: "workspace.repo.clone"; workspaceId: string; origin: string; targetPath: string; label?: string }
+  | { type: "workspace.repo.remove"; workspaceId: string; repoId: string }
+  | { type: "workspace.repo.label"; repoId: string; label: string }
+  | { type: "workspace.repo.status"; repoId: string }
+  | { type: "workspace.repo.pull"; repoId: string; branch?: string }
+  | { type: "workspace.repo.push"; repoId: string; branch?: string }

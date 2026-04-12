@@ -57,6 +57,9 @@ describe("coordination MCP via runner NATS client", () => {
         dispose: () => {},
       } as never,
       onStateChange: () => {},
+      directoryPolicy: null,
+      repoManager: null,
+      clonePolicy: null,
     })
     dispose = d
     await serverNc.flush()
