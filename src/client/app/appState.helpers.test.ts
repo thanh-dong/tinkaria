@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import {
   clearPendingSessionBootstrapAfterAttempt,
+  enrichCommandError,
   fetchTranscriptRange,
   MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
   removeChatFromSidebar,
   shouldTriggerSnapshotRecovery,
   transitionPendingSessionBootstrapToError,
+  type EnrichedError,
   type PendingSessionBootstrap,
 } from "./appState.helpers"
 import type { SidebarData, SidebarChatRow } from "../../shared/types"
@@ -210,6 +212,46 @@ describe("shouldTriggerSnapshotRecovery", () => {
       initialFetchDone: false,
       fetchTriggered: true,
     })).toBe(false)
+  })
+})
+
+describe("enrichCommandError", () => {
+  test("enriches 'not connected' with server hint and dismiss action", () => {
+    const result = enrichCommandError("not connected")
+    expect(result.message).toBe("Can't reach the server")
+    expect(result.hint).toBe("Make sure Tinkaria is running on this machine.")
+    expect(result.actions).toEqual([
+      { label: "Dismiss", variant: "ghost", action: "dismiss" },
+    ])
+  })
+
+  test("enriches connection closed with reconnecting hint", () => {
+    const result = enrichCommandError("WebSocket connection closed unexpectedly")
+    expect(result.message).toBe("Connection dropped")
+    expect(result.hint).toBe("Reconnecting automatically...")
+    expect(result.actions).toEqual([
+      { label: "Dismiss", variant: "ghost", action: "dismiss" },
+    ])
+  })
+
+  test("enriches socket closed with reconnecting hint", () => {
+    const result = enrichCommandError("socket closed")
+    expect(result.message).toBe("Connection dropped")
+  })
+
+  test("enriches version mismatch with restart hint", () => {
+    const result = enrichCommandError("Unknown command type: system.readLocalFilePreview")
+    expect(result.message).toBe("Client is newer than server")
+    expect(result.hint).toBe("Restart Tinkaria to enable in-app file previews.")
+  })
+
+  test("passes through unknown errors with no hint", () => {
+    const result = enrichCommandError("Something weird happened")
+    expect(result.message).toBe("Something weird happened")
+    expect(result.hint).toBeUndefined()
+    expect(result.actions).toEqual([
+      { label: "Dismiss", variant: "ghost", action: "dismiss" },
+    ])
   })
 })
 

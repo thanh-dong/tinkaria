@@ -2,6 +2,53 @@ import { APP_NAME } from "../../shared/branding"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
 import type { AppTransport, SocketStatus } from "./socket-interface"
 
+export interface ErrorAction {
+  label: string
+  variant: "default" | "ghost" | "destructive"
+  action: string
+}
+
+export interface EnrichedError {
+  message: string
+  hint?: string
+  actions?: ErrorAction[]
+}
+
+const DISMISS_ACTION: ErrorAction = { label: "Dismiss", variant: "ghost", action: "dismiss" }
+
+export function enrichCommandError(raw: string): EnrichedError {
+  const lower = raw.toLowerCase().trim()
+
+  if (lower === "not connected") {
+    return {
+      message: "Can't reach the server",
+      hint: `Make sure ${APP_NAME} is running on this machine.`,
+      actions: [DISMISS_ACTION],
+    }
+  }
+
+  if (lower.includes("connection closed") || lower.includes("socket closed")) {
+    return {
+      message: "Connection dropped",
+      hint: "Reconnecting automatically...",
+      actions: [DISMISS_ACTION],
+    }
+  }
+
+  if (raw.includes("Unknown command type: system.readLocalFilePreview")) {
+    return {
+      message: "Client is newer than server",
+      hint: `Restart ${APP_NAME} to enable in-app file previews.`,
+      actions: [DISMISS_ACTION],
+    }
+  }
+
+  return {
+    message: raw.trim(),
+    actions: [DISMISS_ACTION],
+  }
+}
+
 export interface PendingSessionBootstrap {
   chatId: string
   kind: "fork" | "merge"
