@@ -715,6 +715,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     disabled: disabled || connectionStatus !== "connected",
     reconnectVisualState,
   })
+  const cancelActionDisabled = reconnectVisualState !== "idle" || connectionStatus !== "connected"
   const queueActionDisabled = getQueueActionDisabledState({ disabled: composerActionsDisabled, value })
   const submitActionDisabled = composerActionsDisabled || !value.trim()
   const showConnectionBadge = reconnectVisualState !== "idle"
@@ -810,7 +811,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                       event.preventDefault()
                       onCancel?.()
                     }}
-                    disabled={composerActionsDisabled}
+                    disabled={cancelActionDisabled}
                     size="icon"
                     className={cn(
                       "flex-shrink-0 rounded-full h-10 w-10 md:h-11 md:w-11 touch-manipulation transition-colors",
