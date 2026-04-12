@@ -10,6 +10,12 @@ import {
   getUiIdentityAttributeProps,
   type UiIdentityModifierState,
 } from "../lib/uiIdentityOverlay"
+import {
+  isTouchDevice,
+  findNearestUiIdentityElement,
+  shouldInterceptMobileTap,
+} from "../lib/uiIdentityMobile"
+import { UiIdentityFab } from "../components/ui/UiIdentityFab"
 import { AppDialogProvider } from "../components/ui/app-dialog"
 import {
   UiIdentityOverlay,
@@ -210,6 +216,51 @@ export function getUiIdentityOverlayAnchorRect(
   }
 }
 
+export interface MobileTapResult {
+  target: Element
+  clientX: number
+  clientY: number
+}
+
+export function handleMobileTapCapture(event: MouseEvent): MobileTapResult | null {
+  const target = event.target
+  if (!target || typeof (target as Element).closest !== "function") {
+    return null
+  }
+
+  if (!shouldInterceptMobileTap(target as Element)) {
+    return null
+  }
+
+  const nearestTagged = findNearestUiIdentityElement(target as Element)
+  if (!nearestTagged) {
+    return null
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  return {
+    target: nearestTagged,
+    clientX: event.clientX,
+    clientY: event.clientY,
+  }
+}
+
+export function getMobileTapAnchorRect(
+  clientX: number,
+  clientY: number,
+): UiIdentityOverlayAnchorRect {
+  return {
+    top: clientY,
+    left: clientX,
+    right: clientX,
+    bottom: clientY,
+    width: 0,
+    height: 0,
+  }
+}
+
 async function copyUiIdentityToClipboard(descriptor: UiIdentityDescriptor): Promise<boolean> {
   const clipboard = typeof navigator === "undefined" ? null : navigator.clipboard
   if (!clipboard?.writeText) {
@@ -228,12 +279,14 @@ function UiIdentityOverlayController() {
   const [pointerPosition, setPointerPosition] = useState<UiIdentityOverlayPointerPosition | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [mobileActive, setMobileActive] = useState(false)
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pointerClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeRef = useRef(false)
 
   const stack = useMemo(() => buildUiIdentityStack(pointerTarget, 3), [pointerTarget])
-  const active = isUiIdentityOverlayActive(modifiers)
+  const keyboardActive = isUiIdentityOverlayActive(modifiers)
+  const active = keyboardActive || mobileActive
   activeRef.current = active
   const anchorRect = useMemo<UiIdentityOverlayAnchorRect | null>(
     () => getUiIdentityOverlayAnchorRect(pointerPosition),
@@ -278,6 +331,24 @@ function UiIdentityOverlayController() {
   }, [])
 
   useEffect(() => {
+    if (!mobileActive) return
+
+    function onCapture(event: MouseEvent) {
+      const result = handleMobileTapCapture(event)
+      if (!result) return
+
+      setPointerTarget(result.target)
+      setPointerPosition({ clientX: result.clientX, clientY: result.clientY })
+      setHighlightedId(null)
+    }
+
+    window.addEventListener("click", onCapture, { capture: true })
+    return () => {
+      window.removeEventListener("click", onCapture, { capture: true })
+    }
+  }, [mobileActive])
+
+  useEffect(() => {
     return () => {
       if (copiedTimeoutRef.current !== null) {
         clearTimeout(copiedTimeoutRef.current)
@@ -305,17 +376,35 @@ function UiIdentityOverlayController() {
     })
   }
 
+  function handleToggleMobile() {
+    setMobileActive((prev) => {
+      if (prev) {
+        setPointerTarget(null)
+        setPointerPosition(null)
+        setHighlightedId(null)
+      }
+      return !prev
+    })
+  }
+
+  const showFab = isTouchDevice()
+
   return (
-    <UiIdentityOverlay
-      active={active}
-      anchorRect={anchorRect}
-      highlightRect={active ? highlightRect : null}
-      stack={active ? stack : []}
-      highlightedId={active ? effectiveHighlightedId : null}
-      copiedId={copiedId}
-      onCopy={handleCopy}
-      onHighlight={setHighlightedId}
-    />
+    <>
+      <UiIdentityOverlay
+        active={active}
+        anchorRect={anchorRect}
+        highlightRect={active ? highlightRect : null}
+        stack={active ? stack : []}
+        highlightedId={active ? effectiveHighlightedId : null}
+        copiedId={copiedId}
+        onCopy={handleCopy}
+        onHighlight={setHighlightedId}
+      />
+      {showFab ? (
+        <UiIdentityFab active={mobileActive} onToggle={handleToggleMobile} />
+      ) : null}
+    </>
   )
 }
 
