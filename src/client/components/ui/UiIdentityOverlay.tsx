@@ -3,10 +3,11 @@ import {
   formatCopiedUiIdentity,
   getUiIdentityDescriptorFromElement,
   type UiIdentityDescriptor,
+  UI_IDENTITY_OVERLAY_ROOT_ATTRIBUTE,
 } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 
-export const UI_IDENTITY_OVERLAY_ROOT_ATTRIBUTE = "data-ui-identity-overlay-root"
+export { UI_IDENTITY_OVERLAY_ROOT_ATTRIBUTE }
 const UI_IDENTITY_OVERLAY_PANEL_MIN_WIDTH_PX = 224
 const UI_IDENTITY_OVERLAY_PANEL_ROW_HEIGHT_PX = 34
 const UI_IDENTITY_OVERLAY_PANEL_PADDING_PX = 16

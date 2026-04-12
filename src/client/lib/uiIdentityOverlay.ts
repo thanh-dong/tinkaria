@@ -1,4 +1,5 @@
 export const UI_IDENTITY_ATTRIBUTE = "data-ui-id"
+export const UI_IDENTITY_OVERLAY_ROOT_ATTRIBUTE = "data-ui-identity-overlay-root"
 export const UI_IDENTITY_C3_ATTRIBUTE = "data-ui-c3"
 export const UI_IDENTITY_C3_LABEL_ATTRIBUTE = "data-ui-c3-label"
 
