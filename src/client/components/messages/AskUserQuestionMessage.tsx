@@ -63,7 +63,7 @@ function QuestionCard({
   return (
     <div className="rounded-2xl border border-border overflow-hidden">
       <div className="relative">
-        <h3 className="font-medium text-foreground text-sm p-3 px-4 bg-card border-b border-border text-foreground flex flex-row items-center gap-2">
+        <h3 className="font-medium text-foreground text-sm p-3 px-4 bg-card border-b border-border text-foreground flex flex-row items-center gap-2 min-w-0">
           {showBackButton ? (
             <Button
               variant="ghost"
@@ -76,7 +76,7 @@ function QuestionCard({
           ) : totalQuestions > 1 ? (
             <span className="font-bold text-muted-foreground whitespace-nowrap">{currentIndex + 1} of {totalQuestions}</span>
           ) : null}
-          {question}
+          <span className="truncate">{question}</span>
         </h3>
         {/* Progress bar */}
         {totalQuestions > 1 && (
@@ -96,9 +96,9 @@ function QuestionCard({
 function OptionContent({ label, description }: { label: string; description?: string }) {
   return (
     <>
-      <span className="text-foreground text-sm">{label}</span>
+      <span className="text-foreground text-sm truncate block">{label}</span>
       {description && (
-        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
       )}
     </>
   )
@@ -318,10 +318,10 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
                   !isLast && "border-b border-border"
                 )}
               >
-                <div className="text-sm text-pretty">{question.question}</div>
-                {answerValue.length > 0 && <div className="text-sm font-medium text-right max-w-[50%] text-pretty">{answerValue.join(", ")}</div>}
+                <div className="text-sm text-pretty flex-1 min-w-0 truncate">{question.question}</div>
+                {answerValue.length > 0 && <div className="text-sm font-medium text-right max-w-[50%] flex-shrink-0 truncate">{answerValue.join(", ")}</div>}
                 {answerValue.length === 0 && (
-                  <div className="text-sm font-medium text-right italic">
+                  <div className="text-sm font-medium text-right italic flex-shrink-0">
                     {isDiscarded ? "Discarded" : "No Response"}
                   </div>
                 )}
