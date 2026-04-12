@@ -96,9 +96,9 @@ function QuestionCard({
 function OptionContent({ label, description }: { label: string; description?: string }) {
   return (
     <>
-      <span className="text-foreground text-sm truncate block">{label}</span>
+      <span className="block text-sm text-foreground whitespace-normal break-words">{label}</span>
       {description && (
-        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground whitespace-normal break-words">{description}</p>
       )}
     </>
   )
@@ -383,7 +383,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
               onChange={(e) => handleCustomInputChange(currentQuestion, e.target.value)}
               onKeyDown={handleCustomInputEnter}
               placeholder="Other..."
-              className="flex-1 px-0 !py-1 min-h-[55px] min-w-0 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
+              className="min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 !py-1 text-sm text-foreground outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-0"
               {...getUiIdentityAttributeProps(ASK_USER_CUSTOM_INPUT_DESCRIPTOR)}
             />
           </div>
