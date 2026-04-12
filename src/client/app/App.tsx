@@ -25,6 +25,7 @@ import {
 import { TooltipProvider } from "../components/ui/tooltip"
 import { Toaster } from "sonner"
 import { AppSidebar } from "./AppSidebar"
+import { CreateWorkspaceModal } from "../components/CreateWorkspaceModal"
 import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalWorkspacesPage"
 import { WorkspacePage } from "./WorkspacePage"
@@ -455,6 +456,10 @@ function AppLayout() {
   const handleShowMoreSessions = useEventCallback((workspaceId: string) => {
     state.handleShowMoreSessions(workspaceId)
   })
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
+  const handleCreateWorkspace = useEventCallback((name: string) => {
+    void state.handleCreateWorkspace(name)
+  })
 
   return (
     <div
@@ -487,9 +492,15 @@ function AppLayout() {
           onRefreshSessions={handleRefreshSessions}
           onShowMoreSessions={handleShowMoreSessions}
           onMergeSession={handleMergeSession}
+          onCreateWorkspace={() => setCreateWorkspaceOpen(true)}
         />
         <Outlet context={state} />
       </div>
+      <CreateWorkspaceModal
+        open={createWorkspaceOpen}
+        onOpenChange={setCreateWorkspaceOpen}
+        onConfirm={handleCreateWorkspace}
+      />
     </div>
   )
 }

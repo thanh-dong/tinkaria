@@ -214,7 +214,7 @@ export function removeChatFromSidebar(data: SidebarData, chatId: string): Sideba
 
   return filtered.length === data.workspaceGroups.length && filtered.every((g, i) => g === data.workspaceGroups[i])
     ? data
-    : { workspaceGroups: filtered }
+    : { workspaceGroups: filtered, independentWorkspaces: data.independentWorkspaces }
 }
 
 export function filterPendingDeletedChats(data: SidebarData, pendingDeletedChatIds: ReadonlySet<string>): SidebarData {
@@ -228,7 +228,7 @@ export function filterPendingDeletedChats(data: SidebarData, pendingDeletedChatI
 
   return filtered.length === data.workspaceGroups.length && filtered.every((g, i) => g === data.workspaceGroups[i])
     ? data
-    : { workspaceGroups: filtered }
+    : { workspaceGroups: filtered, independentWorkspaces: data.independentWorkspaces }
 }
 
 export function getNewestRemainingChatId(workspaceGroups: SidebarData["workspaceGroups"], activeChatId: string): string | null {

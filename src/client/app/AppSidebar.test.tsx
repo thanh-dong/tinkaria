@@ -11,7 +11,7 @@ import type { SidebarData, UpdateSnapshot } from "../../shared/types"
 await import("../components/chat-ui/sidebar/LocalProjectsSection")
 
 function createSidebarData(): SidebarData {
-  return { workspaceGroups: [] }
+  return { workspaceGroups: [], independentWorkspaces: [] }
 }
 
 function renderSidebar(overrides: Partial<Parameters<typeof AppSidebar>[0]> = {}) {
@@ -111,6 +111,7 @@ describe("AppSidebar", () => {
   test("renders the chat model indicator and provider glyph without inline chat-row action buttons", () => {
     const html = renderSidebar({
       data: {
+        independentWorkspaces: [],
         workspaceGroups: [
           {
             groupKey: "project-1",
@@ -161,6 +162,7 @@ describe("AppSidebar", () => {
   test("ignores handler identity churn when sidebar data is unchanged", () => {
     const previous = createSidebarProps({
       data: {
+        independentWorkspaces: [],
         workspaceGroups: [
           {
             groupKey: "project-1",

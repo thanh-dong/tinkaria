@@ -174,6 +174,8 @@ export interface ChatCommandsReturn {
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
   handleRenameChat: (chatId: string, title: string) => Promise<void>
   handleRemoveProject: (workspaceId: string) => Promise<void>
+  handleCreateWorkspace: (name: string) => Promise<void>
+  handleDeleteWorkspace: (workspaceId: string) => Promise<void>
   handleOpenExternal: (action: "open_finder") => Promise<void>
   handleOpenExternalPath: (action: "open_finder", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
@@ -550,6 +552,40 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     }
   }
 
+  // --- Independent workspace commands ---
+
+  async function handleCreateWorkspace(name: string) {
+    try {
+      const result = await socket.command<{ workspaceId: string }>({ type: "independent-workspace.create", name })
+      if (result?.workspaceId) {
+        navigate(`/workspace/${result.workspaceId}`)
+      }
+      setCommandError(null)
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function handleDeleteWorkspace(workspaceId: string) {
+    const confirmed = await dialog.confirm({
+      title: "Delete Workspace",
+      description: "Delete this workspace? This cannot be undone.",
+      confirmLabel: "Delete",
+      confirmVariant: "destructive",
+    })
+    if (!confirmed) return
+
+    try {
+      await socket.command({ type: "independent-workspace.delete", workspaceId })
+      if (window.location.pathname === `/workspace/${workspaceId}`) {
+        navigate("/")
+      }
+      setCommandError(null)
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   // --- Update commands ---
 
   async function handleCheckForUpdates(options?: { force?: boolean }) {
@@ -915,6 +951,8 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     handleDeleteChat,
     handleRenameChat,
     handleRemoveProject,
+    handleCreateWorkspace,
+    handleDeleteWorkspace,
     handleOpenExternal,
     handleOpenExternalPath,
     handleOpenLocalLink,

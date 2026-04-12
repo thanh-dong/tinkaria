@@ -39,6 +39,8 @@ export type ClientCommand =
   | { type: "project.open"; localPath: string }
   | { type: "project.create"; localPath: string; title: string }
   | { type: "project.remove"; workspaceId: string }
+  | { type: "independent-workspace.create"; name: string }
+  | { type: "independent-workspace.delete"; workspaceId: string }
   | { type: "system.ping" }
   | { type: "update.check"; force?: boolean }
   | { type: "update.install" }

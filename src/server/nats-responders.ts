@@ -92,6 +92,8 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "project.open",
   "project.create",
   "project.remove",
+  "independent-workspace.create",
+  "independent-workspace.delete",
   "system.ping",
   "update.check",
   "update.install",
@@ -171,7 +173,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
     let command: ClientCommand
     try {
       command = msg.json<ClientCommand>()
-    } catch {
+    } catch (_err: unknown) {
       msg.respond(encode({ ok: false, error: "Invalid JSON payload" }))
       return
     }
@@ -254,6 +256,16 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
           terminals.closeByCwd(project.localPath)
         }
         await store.removeProject(command.workspaceId)
+        return undefined
+      }
+
+      case "independent-workspace.create": {
+        const workspace = await store.createIndependentWorkspace(command.name)
+        return { workspaceId: workspace.id }
+      }
+
+      case "independent-workspace.delete": {
+        await store.deleteIndependentWorkspace(command.workspaceId)
         return undefined
       }
 
@@ -705,7 +717,7 @@ async function readLocalFilePreview(localPath: string) {
       localPath: resolvedPath,
       content: await Bun.file(resolvedPath).text(),
     }
-  } catch {
-    throw new Error(`Failed to read file: ${resolvedPath}`)
+  } catch (error: unknown) {
+    throw new Error(`Failed to read file: ${resolvedPath}: ${error instanceof Error ? error.message : String(error)}`)
   }
 }

@@ -125,6 +125,8 @@ export interface AppState {
   restoreQueuedText: () => string
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
   handleRemoveProject: (workspaceId: string) => Promise<void>
+  handleCreateWorkspace: (name: string) => Promise<void>
+  handleDeleteWorkspace: (workspaceId: string) => Promise<void>
   handleOpenExternal: (action: "open_finder") => Promise<void>
   handleOpenExternalPath: (action: "open_finder", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
@@ -163,7 +165,7 @@ export function useAppState(activeChatId: string | null): AppState {
   const socket = useAppSocket()
   const dialog = useAppDialog()
 
-  const [sidebarData, setSidebarData] = useState<SidebarData>({ workspaceGroups: [] })
+  const [sidebarData, setSidebarData] = useState<SidebarData>({ workspaceGroups: [], independentWorkspaces: [] })
   const [localProjects, setLocalProjects] = useState<LocalWorkspacesSnapshot | null>(null)
   const [updateSnapshot, setUpdateSnapshot] = useState<UpdateSnapshot | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<SocketStatus>("connecting")
@@ -493,6 +495,8 @@ export function useAppState(activeChatId: string | null): AppState {
     handleDeleteChat: commands.handleDeleteChat,
     handleRenameChat: commands.handleRenameChat,
     handleRemoveProject: commands.handleRemoveProject,
+    handleCreateWorkspace: commands.handleCreateWorkspace,
+    handleDeleteWorkspace: commands.handleDeleteWorkspace,
     handleOpenExternal: commands.handleOpenExternal,
     handleOpenExternalPath: commands.handleOpenExternalPath,
     handleOpenLocalLink: commands.handleOpenLocalLink,

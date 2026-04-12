@@ -141,6 +141,7 @@ function chatRow(chatId: string, title = `Chat ${chatId}`): SidebarChatRow {
 
 function sidebarWith(...groups: Array<{ key: string; chats: SidebarChatRow[] }>): SidebarData {
   return {
+    independentWorkspaces: [],
     workspaceGroups: groups.map((g) => ({
       groupKey: g.key,
       localPath: `/tmp/${g.key}`,

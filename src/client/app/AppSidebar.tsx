@@ -8,6 +8,7 @@ import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../li
 import { cn } from "../lib/utils"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 const LocalProjectsSection = lazy(() => import("../components/chat-ui/sidebar/LocalProjectsSection").then(m => ({ default: m.LocalProjectsSection })))
+import { WorkspacesSection } from "../components/chat-ui/sidebar/WorkspacesSection"
 import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
 import type { SocketStatus } from "./socket-interface"
 import { shouldCloseMobileSidebarFromSwipe, type MobileSidebarSwipeState } from "./ChatPage"
@@ -37,6 +38,7 @@ interface AppSidebarProps {
   onRefreshSessions: (workspaceId: string) => void
   onShowMoreSessions: (workspaceId: string) => void
   onMergeSession?: (workspaceId: string) => void
+  onCreateWorkspace?: () => void
 }
 
 interface SidebarDialogNavigationState {
@@ -136,6 +138,7 @@ function AppSidebarInner({
   onRefreshSessions,
   onShowMoreSessions,
   onMergeSession,
+  onCreateWorkspace,
 }: AppSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -431,6 +434,16 @@ function AppSidebarInner({
               <p className="text-sm text-slate-400 p-2 mt-6 text-center">No conversations yet</p>
             ) : null}
 
+            <WorkspacesSection
+              workspaces={data.independentWorkspaces}
+              onSelect={(wsId) => {
+                navigate(`/workspace/${wsId}`)
+                onClose()
+              }}
+              onCreate={() => onCreateWorkspace?.()}
+              activeWorkspaceId={location.pathname.startsWith("/workspace/") ? location.pathname.split("/")[2] : null}
+            />
+
             <Suspense fallback={null}>
               <LocalProjectsSection
                 workspaceGroups={orderedProjectGroups}
@@ -459,10 +472,6 @@ function AppSidebarInner({
                 onRefreshSessions={onRefreshSessions}
                 onShowMoreSessions={onShowMoreSessions}
                 onMergeSession={onMergeSession}
-                onOpenCoordination={(workspaceId) => {
-                  navigate(`/workspace/${workspaceId}`)
-                  onClose()
-                }}
               />
             </Suspense>
           </div>

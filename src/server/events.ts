@@ -1,4 +1,4 @@
-import type { AgentProvider, WorkspaceSummary, TranscriptEntry } from "../shared/types"
+import type { AgentProvider, IndependentWorkspace, WorkspaceSummary, TranscriptEntry } from "../shared/types"
 import type { WorkspaceTodo, WorkspaceClaim, WorkspaceWorktree, WorkspaceRule } from "../shared/workspace-types"
 import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
 import type { WorkflowRunState } from "../shared/workflow-types"
@@ -48,6 +48,7 @@ export interface WorkspaceCoordinationState {
 export interface StoreState {
   workspacesById: Map<string, WorkspaceRecord>
   workspaceIdsByPath: Map<string, string>
+  independentWorkspacesById: Map<string, IndependentWorkspace>
   chatsById: Map<string, ChatRecord>
   coordinationByWorkspace: Map<string, WorkspaceCoordinationState>
   agentConfigsByWorkspace: Map<string, Map<string, AgentConfigRecord>>
@@ -71,6 +72,7 @@ export interface SnapshotFile {
   v: 2 | 3
   generatedAt: number
   workspaces: WorkspaceRecord[]
+  independentWorkspaces?: IndependentWorkspace[]
   chats: ChatRecord[]
   messages?: Array<{ chatId: string; entries: TranscriptEntry[] }>
   coordination?: Array<{ workspaceId: string; todos: WorkspaceTodo[]; claims: WorkspaceClaim[]; worktrees: WorkspaceWorktree[]; rules: WorkspaceRule[] }>
@@ -90,6 +92,17 @@ export type WorkspaceEvent = {
 } | {
   v: 3
   type: "workspace_removed"
+  timestamp: number
+  workspaceId: string
+} | {
+  v: 3
+  type: "independent_workspace_created"
+  timestamp: number
+  workspaceId: string
+  name: string
+} | {
+  v: 3
+  type: "independent_workspace_deleted"
   timestamp: number
   workspaceId: string
 }
@@ -238,6 +251,7 @@ export function createEmptyState(): StoreState {
   return {
     workspacesById: new Map(),
     workspaceIdsByPath: new Map(),
+    independentWorkspacesById: new Map(),
     chatsById: new Map(),
     coordinationByWorkspace: new Map(),
     agentConfigsByWorkspace: new Map(),
