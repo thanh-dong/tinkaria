@@ -470,3 +470,59 @@ describe("getMobileTapAnchorRect", () => {
     })
   })
 })
+
+describe("mobile tap cycle end-to-end", () => {
+  test("handleMobileTapCapture builds the correct result for a nested element", () => {
+    const grandparent = {
+      getAttribute: (name: string) => (name === "data-ui-id" ? "sidebar.project-group" : null),
+      closest: (selector: string) => {
+        if (selector === "[data-ui-id]") return grandparent
+        return null
+      },
+      parentElement: null,
+    }
+    const parent = {
+      getAttribute: (name: string) => (name === "data-ui-id" ? "sidebar.chat-row" : null),
+      closest: (selector: string) => {
+        if (selector === "[data-ui-id]") return parent
+        if (selector === '[data-ui-identity-overlay-root="true"]') return null
+        if (selector === '[data-ui-identity-fab="true"]') return null
+        return null
+      },
+      parentElement: grandparent,
+    }
+    const leaf = {
+      getAttribute: () => null,
+      closest: (selector: string) => {
+        if (selector === "[data-ui-id]") return parent
+        if (selector === '[data-ui-identity-overlay-root="true"]') return null
+        if (selector === '[data-ui-identity-fab="true"]') return null
+        return null
+      },
+      parentElement: parent,
+    }
+
+    let defaultPrevented = false
+    let propagationStopped = false
+    const event = {
+      target: leaf,
+      clientX: 150,
+      clientY: 400,
+      preventDefault: () => { defaultPrevented = true },
+      stopPropagation: () => { propagationStopped = true },
+    } as unknown as MouseEvent
+
+    const result = handleMobileTapCapture(event)
+
+    expect(defaultPrevented).toBe(true)
+    expect(propagationStopped).toBe(true)
+    expect(result).not.toBeNull()
+    expect(result!.target).toBe(parent)
+    expect(result!.clientX).toBe(150)
+    expect(result!.clientY).toBe(400)
+
+    const anchor = getMobileTapAnchorRect(result!.clientX, result!.clientY)
+    expect(anchor.top).toBe(400)
+    expect(anchor.left).toBe(150)
+  })
+})
