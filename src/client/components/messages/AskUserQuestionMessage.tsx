@@ -76,7 +76,7 @@ function QuestionCard({
           ) : totalQuestions > 1 ? (
             <span className="font-bold text-muted-foreground whitespace-nowrap">{currentIndex + 1} of {totalQuestions}</span>
           ) : null}
-          <span className="truncate">{question}</span>
+          <span className="text-pretty">{question}</span>
         </h3>
         {/* Progress bar */}
         {totalQuestions > 1 && (
@@ -155,11 +155,11 @@ function OptionRow({
         className={cn(baseClasses, borderClass, "transition-all cursor-pointer h-auto w-full justify-start rounded-none")}
         {...getUiIdentityAttributeProps(ASK_USER_OPTION_ACTION_DESCRIPTOR)}
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Checkbox selected={selected} multiSelect={multiSelect} />
           <div className="flex-1 min-w-0">
             <OptionContent label={option.label} description={option.description} />
           </div>
-          <Checkbox selected={selected} multiSelect={multiSelect} />
         </div>
       </Button>
     )
@@ -314,14 +314,14 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
               <div
                 key={getQuestionKey(question)}
                 className={cn(
-                  "w-full p-3 pt-2.5 pl-4 pr-5 bg-background flex items-center justify-between gap-3",
+                  "w-full p-3 pt-2.5 pl-4 pr-5 bg-background flex flex-col gap-1",
                   !isLast && "border-b border-border"
                 )}
               >
-                <div className="text-sm text-pretty flex-1 min-w-0 truncate">{question.question}</div>
-                {answerValue.length > 0 && <div className="text-sm font-medium text-right max-w-[50%] flex-shrink-0 truncate">{answerValue.join(", ")}</div>}
+                <div className="text-sm text-pretty">{question.question}</div>
+                {answerValue.length > 0 && <div className="text-sm font-medium text-muted-foreground max-w-full overflow-x-auto">{answerValue.join(", ")}</div>}
                 {answerValue.length === 0 && (
-                  <div className="text-sm font-medium text-right italic flex-shrink-0">
+                  <div className="text-sm font-medium italic text-muted-foreground">
                     {isDiscarded ? "Discarded" : "No Response"}
                   </div>
                 )}
@@ -371,20 +371,20 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
 
         {/* Custom input */}
         <div className="transition-all bg-background">
-          <div className="flex pr-5 items-center justify-between gap-3">
+          <div className="flex pl-4 pr-5 items-center gap-3">
+            <Checkbox
+              selected={!!customInput}
+              multiSelect={currentQuestion.multiSelect}
+              onClick={currentQuestion.multiSelect && customInput ? () => clearCustomInput(currentQuestion) : undefined}
+            />
             <Input
               type="text"
               value={customInput}
               onChange={(e) => handleCustomInputChange(currentQuestion, e.target.value)}
               onKeyDown={handleCustomInputEnter}
               placeholder="Other..."
-              className="flex-1 px-3 !py-1 pl-4 min-h-[55px] min-w-0 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
+              className="flex-1 px-0 !py-1 min-h-[55px] min-w-0 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
               {...getUiIdentityAttributeProps(ASK_USER_CUSTOM_INPUT_DESCRIPTOR)}
-            />
-            <Checkbox
-              selected={!!customInput}
-              multiSelect={currentQuestion.multiSelect}
-              onClick={currentQuestion.multiSelect && customInput ? () => clearCustomInput(currentQuestion) : undefined}
             />
           </div>
         </div>
