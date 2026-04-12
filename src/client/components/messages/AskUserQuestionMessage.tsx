@@ -122,7 +122,7 @@ function Checkbox({
         multiSelect ? "rounded" : "rounded-full",
         selected
           ? "border-slate-500/0 bg-foreground"
-          : "border-muted-foreground/50 bg-background",
+          : "border-muted-foreground bg-background",
         onClick && selected && "cursor-pointer"
       )}
     >
@@ -297,7 +297,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
 
   // Completed state
   if (isSubmitted || isComplete) {
-    const displayAnswers = savedAnswers || submittedAnswers || {}
+    const displayAnswers = submittedAnswers || savedAnswers || {}
 
     return (
       <div className="w-full" {...getUiIdentityAttributeProps(ASK_USER_AREA_DESCRIPTOR)}>
