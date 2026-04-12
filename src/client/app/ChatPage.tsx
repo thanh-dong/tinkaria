@@ -30,6 +30,8 @@ import {
 import { useSkillCompositionStore } from "../stores/skillCompositionStore"
 import { useRightSidebarToggleAnimation } from "./useRightSidebarToggleAnimation"
 import type { AppState } from "./useAppState"
+import { TranscriptActionsContext } from "./TranscriptActionsContext"
+import { enrichCommandError } from "./appState.helpers"
 import { ChatTranscript } from "./ChatTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
 import type { HydratedTranscriptMessage } from "../../shared/types"
@@ -356,6 +358,29 @@ export function ChatPage() {
     chatHasKnownMessages: state.chatHasKnownMessages,
   })
 
+  const transcriptActions = useMemo(() => {
+    const findGroupForActiveChat = () =>
+      state.sidebarData.workspaceGroups.find((g) =>
+        g.chats.some((c) => c.chatId === state.activeChatId)
+      )
+
+    return {
+      onRetryChat: () => {
+        const group = findGroupForActiveChat()
+        if (group) void state.handleCreateChat(group.groupKey)
+      },
+      onNewChat: () => {
+        const group = findGroupForActiveChat()
+        if (group) void state.handleCreateChat(group.groupKey)
+      },
+      onResumeSession: null,
+      onDismissError: () => {
+        state.clearCommandError()
+      },
+      onRetryBootstrap: null,
+    }
+  }, [state.sidebarData.workspaceGroups, state.activeChatId, state.handleCreateChat, state.clearCommandError])
+
   useEffect(() => {
     if (state.pendingMergeProjectId) {
       setMergeDialogOpen(true)
@@ -576,7 +601,7 @@ export function ChatPage() {
           >
             {transcriptVisibility !== "transcript" ? <div style={{ height: effectiveTranscriptPaddingBottom }} aria-hidden="true" /> : null}
             {transcriptVisibility === "transcript" ? (
-              <>
+              <TranscriptActionsContext.Provider value={transcriptActions}>
                 <div className="animate-fade-in space-y-5 pt-[72px] max-w-[800px] mx-auto">
                   <ChatTranscript
                     messages={state.messages}
@@ -593,14 +618,30 @@ export function ChatPage() {
                   {shouldRenderTranscriptCommandError({
                     commandError: state.commandError,
                     connectionStatus: state.connectionStatus,
-                  }) ? (
-                    <div className="text-sm text-destructive border border-destructive/20 bg-destructive/5 rounded-xl px-4 py-3">
-                      {state.commandError}
-                    </div>
-                  ) : null}
+                  }) ? (() => {
+                    const enriched = enrichCommandError(state.commandError!)
+                    return (
+                      <div className="text-sm text-destructive border border-destructive/20 bg-destructive/5 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
+                        <div className="flex-1 space-y-1">
+                          <span className="font-medium">{enriched.message}</span>
+                          {enriched.hint ? (
+                            <p className="text-muted-foreground text-xs">{enriched.hint}</p>
+                          ) : null}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 -mt-1 -mr-2 text-destructive/70 hover:text-destructive"
+                          onClick={state.clearCommandError}
+                        >
+                          Dismiss
+                        </Button>
+                      </div>
+                    )
+                  })() : null}
                 </div>
                 <TranscriptTailBoundary hasMessages={true} sentinelRef={state.sentinelRef} />
-              </>
+              </TranscriptActionsContext.Provider>
             ) : null}
             {transcriptVisibility !== "transcript" ? <TranscriptTailBoundary hasMessages={false} sentinelRef={state.sentinelRef} /> : null}
           </ScrollArea>

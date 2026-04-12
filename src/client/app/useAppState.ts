@@ -154,6 +154,7 @@ export interface AppState {
     clearContext?: boolean,
     message?: string
   ) => Promise<void>
+  clearCommandError: () => void
 }
 
 export function useAppState(activeChatId: string | null): AppState {
@@ -509,5 +510,6 @@ export function useAppState(activeChatId: string | null): AppState {
     clearMergeRequest: commands.clearMergeRequest,
     handleAskUserQuestion: commands.handleAskUserQuestion,
     handleExitPlanMode: commands.handleExitPlanMode,
+    clearCommandError: useCallback(() => setCommandError(null), []),
   }
 }
