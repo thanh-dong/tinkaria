@@ -73,11 +73,19 @@ function StatusDot({ status }: { status: string }) {
 function statusLabel(status: string): string {
   switch (status) {
     case "connected": return "Connected"
-    case "failed": return "Failed"
-    case "needs-auth": return "Needs auth"
+    case "failed": return "Connection failed"
+    case "needs-auth": return "Needs authentication"
     case "pending": return "Connecting..."
     case "disabled": return "Disabled"
     default: return status
+  }
+}
+
+function statusHint(status: string): string | null {
+  switch (status) {
+    case "failed": return "Check the MCP server process."
+    case "needs-auth": return "Re-authenticate to reconnect."
+    default: return null
   }
 }
 
@@ -108,6 +116,12 @@ function ExpandableMcpServer({ server }: { server: McpServerWithTools }) {
       {!isConnected && server.error && (
         <span className="text-destructive ml-5">{server.error}</span>
       )}
+      {!isConnected && !server.error && (() => {
+        const hint = statusHint(server.status)
+        return hint ? (
+          <span className="text-xs text-muted-foreground/60 ml-5">{hint}</span>
+        ) : null
+      })()}
       {open && server.tools.length > 0 && (
         <div className="flex flex-wrap gap-1.5 ml-5">
           {server.tools.map((tool) => (
