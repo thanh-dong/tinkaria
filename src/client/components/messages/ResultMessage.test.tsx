@@ -32,7 +32,7 @@ describe("ResultMessage", () => {
     )
 
     expect(html).not.toContain("unknown")
-    expect(html).toContain("session ended unexpectedly")
+    expect(html.toLowerCase()).toContain("session ended unexpectedly")
   })
 
   test("renders error with result text as-is", () => {

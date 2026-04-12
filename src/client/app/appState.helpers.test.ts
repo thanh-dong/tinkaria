@@ -4,10 +4,10 @@ import {
   enrichCommandError,
   fetchTranscriptRange,
   MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
+  normalizeSessionBootstrapErrorMessage,
   removeChatFromSidebar,
   shouldTriggerSnapshotRecovery,
   transitionPendingSessionBootstrapToError,
-  type EnrichedError,
   type PendingSessionBootstrap,
 } from "./appState.helpers"
 import type { SidebarData, SidebarChatRow } from "../../shared/types"
@@ -316,5 +316,27 @@ describe("fetchTranscriptRange", () => {
       offset: 0,
       limit: MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
     })).rejects.toThrow(/max_payload/i)
+  })
+})
+
+describe("normalizeSessionBootstrapErrorMessage", () => {
+  test("returns busy hint when error contains 'busy'", () => {
+    const result = normalizeSessionBootstrapErrorMessage("fork", "Target chat is busy")
+    expect(result).toBe("The target session is currently busy. Wait for it to finish or pick a different session.")
+  })
+
+  test("returns busy hint when error contains 'already running'", () => {
+    const result = normalizeSessionBootstrapErrorMessage("merge", "Session already running")
+    expect(result).toBe("The target session is currently busy. Wait for it to finish or pick a different session.")
+  })
+
+  test("returns timeout hint for fork", () => {
+    const result = normalizeSessionBootstrapErrorMessage("fork", "Request timed out")
+    expect(result).toBe("Preparing the fork brief took too long. Try again with a tighter focus or a smaller source context.")
+  })
+
+  test("returns timeout hint for merge", () => {
+    const result = normalizeSessionBootstrapErrorMessage("merge", "Operation timeout")
+    expect(result).toBe("Preparing the merged session brief took too long. Try again with fewer sessions or a tighter goal.")
   })
 })
