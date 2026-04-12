@@ -27,6 +27,8 @@ interface Props {
   activeChatId: string | null
   nowMs: number
   onSelectChat: (chatId: string) => void
+  onForkChat?: (chatId: string) => void
+  onMergeWithChat?: (chatId: string) => void
   onDeleteChat: (chatId: string) => void
   onRenameChat: (chatId: string, title: string) => void
 }
@@ -57,6 +59,8 @@ function ChatRowInner({
   activeChatId,
   nowMs,
   onSelectChat,
+  onForkChat,
+  onMergeWithChat,
   onDeleteChat,
   onRenameChat,
 }: Props) {
@@ -77,6 +81,12 @@ function ChatRowInner({
   })
   const handleRename = useEventCallback((title: string) => {
     onRenameChat(chat.chatId, title)
+  })
+  const handleFork = useEventCallback(() => {
+    onForkChat?.(chat.chatId)
+  })
+  const handleMergeWith = useEventCallback(() => {
+    onMergeWithChat?.(chat.chatId)
   })
 
   useEffect(() => {
@@ -102,7 +112,12 @@ function ChatRowInner({
   }
 
   return (
-    <ChatRowMenu onRename={startEditing} onDelete={handleDelete}>
+    <ChatRowMenu
+      onFork={handleFork}
+      onMergeWith={handleMergeWith}
+      onRename={startEditing}
+      onDelete={handleDelete}
+    >
       <div
         data-chat-id={normalizedChatId}
         {...getUiIdentityAttributeProps(CHAT_ROW_DESCRIPTOR)}

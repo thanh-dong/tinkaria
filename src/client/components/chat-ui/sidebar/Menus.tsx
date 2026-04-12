@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { History, LayoutGrid, Merge, Pencil, SquarePen, Trash2 } from "lucide-react"
+import { GitBranchPlus, History, LayoutGrid, Merge, Pencil, SquarePen, Trash2 } from "lucide-react"
 import { createUiIdentityDescriptor } from "../../../lib/uiIdentityOverlay"
 import {
   ContextMenu,
@@ -113,10 +113,14 @@ export function ProjectSectionMenu({
 }
 
 export function ChatRowMenu({
+  onFork,
+  onMergeWith,
   onRename,
   onDelete,
   children,
 }: {
+  onFork?: () => void
+  onMergeWith?: () => void
   onRename: () => void
   onDelete: () => void
   children: ReactNode
@@ -127,6 +131,28 @@ export function ChatRowMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent uiId={CHAT_ROW_MENU_DESCRIPTOR}>
+        {onFork ? (
+          <ContextMenuItem
+            onSelect={(event) => {
+              event.stopPropagation()
+              onFork()
+            }}
+          >
+            <GitBranchPlus className="h-4 w-4" />
+            <span className="text-xs font-medium">Fork</span>
+          </ContextMenuItem>
+        ) : null}
+        {onMergeWith ? (
+          <ContextMenuItem
+            onSelect={(event) => {
+              event.stopPropagation()
+              onMergeWith()
+            }}
+          >
+            <Merge className="h-4 w-4" />
+            <span className="text-xs font-medium">Merge with</span>
+          </ContextMenuItem>
+        ) : null}
         <ContextMenuItem
           onSelect={(event) => {
             event.stopPropagation()

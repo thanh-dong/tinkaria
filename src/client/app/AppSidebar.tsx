@@ -39,6 +39,10 @@ interface AppSidebarProps {
   onMergeSession?: (workspaceId: string) => void
 }
 
+interface SidebarDialogNavigationState {
+  sidebarDialog?: "fork" | "merge"
+}
+
 function areDiscoveredSessionsEqual(
   previous: ReturnType<AppSidebarProps["sessionsForProject"]>,
   next: ReturnType<AppSidebarProps["sessionsForProject"]>,
@@ -222,6 +226,14 @@ function AppSidebarInner({
       nowMs={nowMs}
       onSelectChat={(chatId) => {
         navigate(`/chat/${chatId}`)
+        onClose()
+      }}
+      onForkChat={(chatId) => {
+        navigate(`/chat/${chatId}`, { state: { sidebarDialog: "fork" } satisfies SidebarDialogNavigationState })
+        onClose()
+      }}
+      onMergeWithChat={(chatId) => {
+        navigate(`/chat/${chatId}`, { state: { sidebarDialog: "merge" } satisfies SidebarDialogNavigationState })
         onClose()
       }}
       onDeleteChat={() => onDeleteChat(chat)}

@@ -14,6 +14,7 @@ import {
   getComposerLiftPx,
   getEmptyStateTypingDurationMs,
   getPendingSessionBootstrapStatusLabel,
+  getRequestedSidebarDialog,
   getScrollButtonBottomPx,
   getTranscriptAreaVisibility,
   TranscriptTailBoundary,
@@ -102,6 +103,20 @@ describe("getAvailableSkillsFromMessages", () => {
 
   test("returns an empty list when no messages exist (snapshot fallback precondition)", () => {
     expect(getAvailableSkillsFromMessages([])).toEqual([])
+  })
+})
+
+describe("getRequestedSidebarDialog", () => {
+  test("returns fork and merge requests from route state", () => {
+    expect(getRequestedSidebarDialog({ sidebarDialog: "fork" })).toBe("fork")
+    expect(getRequestedSidebarDialog({ sidebarDialog: "merge" })).toBe("merge")
+  })
+
+  test("ignores invalid route state payloads", () => {
+    expect(getRequestedSidebarDialog(null)).toBeNull()
+    expect(getRequestedSidebarDialog({})).toBeNull()
+    expect(getRequestedSidebarDialog({ sidebarDialog: "rename" })).toBeNull()
+    expect(getRequestedSidebarDialog("fork")).toBeNull()
   })
 })
 
