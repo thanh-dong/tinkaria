@@ -113,7 +113,7 @@ describe("parseArgs", () => {
         host: "127.0.0.1",
         openBrowser: false,
         share: false,
-        strictPort: false,
+        strictPort: false, sandbox: false,
       },
     })
   })
@@ -127,6 +127,7 @@ describe("parseArgs", () => {
         openBrowser: true,
         share: false,
         strictPort: true,
+        sandbox: false,
       },
     })
   })
@@ -139,7 +140,7 @@ describe("parseArgs", () => {
         host: "0.0.0.0",
         openBrowser: true,
         share: false,
-        strictPort: false,
+        strictPort: false, sandbox: false,
       },
     })
   })
@@ -152,7 +153,7 @@ describe("parseArgs", () => {
         host: "127.0.0.1",
         openBrowser: true,
         share: true,
-        strictPort: false,
+        strictPort: false, sandbox: false,
       },
     })
   })
@@ -165,7 +166,7 @@ describe("parseArgs", () => {
         host: "100.64.0.1",
         openBrowser: true,
         share: false,
-        strictPort: false,
+        strictPort: false, sandbox: false,
       },
     })
   })
@@ -178,7 +179,7 @@ describe("parseArgs", () => {
         host: "dev-box",
         openBrowser: true,
         share: false,
-        strictPort: false,
+        strictPort: false, sandbox: false,
       },
     })
   })
@@ -252,7 +253,7 @@ describe("runCli", () => {
       host: "127.0.0.1",
       openBrowser: false,
       share: false,
-      strictPort: false,
+      strictPort: false, sandbox: false,
       update: {
         version: "0.3.0",
         argv: ["--port", "4000", "--no-open"],

@@ -1,6 +1,8 @@
 import type { AgentProvider, WorkspaceSummary, TranscriptEntry } from "../shared/types"
 import type { WorkspaceTodo, WorkspaceClaim, WorkspaceWorktree, WorkspaceRule } from "../shared/workspace-types"
 import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
+import type { WorkflowRunState } from "../shared/workflow-types"
+import type { SandboxRecord, SandboxHealthReport, ResourceLimits } from "../shared/sandbox-types"
 
 export interface WorkspaceRecord extends WorkspaceSummary {
   deletedAt?: number
@@ -51,6 +53,8 @@ export interface StoreState {
   agentConfigsByWorkspace: Map<string, Map<string, AgentConfigRecord>>
   reposById: Map<string, RepoRecord>
   reposByPath: Map<string, string>
+  workflowRunsByWorkspace: Map<string, Map<string, WorkflowRunState>>
+  sandboxByWorkspace: Map<string, SandboxRecord>
 }
 
 export function createEmptyCoordinationState(): WorkspaceCoordinationState {
@@ -72,6 +76,8 @@ export interface SnapshotFile {
   coordination?: Array<{ workspaceId: string; todos: WorkspaceTodo[]; claims: WorkspaceClaim[]; worktrees: WorkspaceWorktree[]; rules: WorkspaceRule[] }>
   agentConfigs?: Array<{ workspaceId: string; records: AgentConfigRecord[] }>
   repos?: RepoRecord[]
+  workflowRuns?: Array<{ workspaceId: string; runs: WorkflowRunState[] }>
+  sandboxes?: SandboxRecord[]
 }
 
 export type WorkspaceEvent = {
@@ -209,7 +215,24 @@ export type AgentConfigEvent =
   | { v: 3; type: "agent_config_committed"; timestamp: number; workspaceId: string; agentId: string; commitHash: string }
   | { v: 3; type: "agent_config_removed"; timestamp: number; workspaceId: string; agentId: string }
 
-export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent | RepoEvent | AgentConfigEvent
+export type WorkflowEvent =
+  | { v: 3; type: "workflow_started"; timestamp: number; runId: string; workflowId: string; workspaceId: string; targetRepoIds: string[]; triggeredBy: string }
+  | { v: 3; type: "workflow_step_started"; timestamp: number; runId: string; workspaceId: string; stepIndex: number; mcp_tool: string; repoId?: string }
+  | { v: 3; type: "workflow_step_completed"; timestamp: number; runId: string; workspaceId: string; stepIndex: number; repoId?: string; output: string }
+  | { v: 3; type: "workflow_step_failed"; timestamp: number; runId: string; workspaceId: string; stepIndex: number; repoId?: string; error: string }
+  | { v: 3; type: "workflow_completed"; timestamp: number; runId: string; workspaceId: string }
+  | { v: 3; type: "workflow_failed"; timestamp: number; runId: string; workspaceId: string; error: string; failedStep: number }
+  | { v: 3; type: "workflow_cancelled"; timestamp: number; runId: string; workspaceId: string }
+
+export type SandboxEvent =
+  | { v: 3; type: "sandbox_created"; timestamp: number; id: string; workspaceId: string; resourceLimits: ResourceLimits }
+  | { v: 3; type: "sandbox_started"; timestamp: number; id: string; containerId: string; natsUrl: string }
+  | { v: 3; type: "sandbox_stopped"; timestamp: number; id: string; reason: string }
+  | { v: 3; type: "sandbox_destroyed"; timestamp: number; id: string }
+  | { v: 3; type: "sandbox_error"; timestamp: number; id: string; error: string }
+  | { v: 3; type: "sandbox_health_updated"; timestamp: number; id: string; health: SandboxHealthReport }
+
+export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent | RepoEvent | AgentConfigEvent | WorkflowEvent | SandboxEvent
 
 export function createEmptyState(): StoreState {
   return {
@@ -220,6 +243,8 @@ export function createEmptyState(): StoreState {
     agentConfigsByWorkspace: new Map(),
     reposById: new Map(),
     reposByPath: new Map(),
+    workflowRunsByWorkspace: new Map(),
+    sandboxByWorkspace: new Map(),
   }
 }
 

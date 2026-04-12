@@ -1,6 +1,6 @@
 import { jetstreamManager, RetentionPolicy, StorageType } from "@nats-io/jetstream"
 import type { NatsConnection } from "@nats-io/transport-node"
-import { ALL_TERMINAL_EVENTS, ALL_CHAT_MESSAGE_EVENTS, CHAT_MESSAGE_EVENTS_STREAM_NAME, ALL_WORKSPACE_COORDINATION_EVENTS, WORKSPACE_COORDINATION_EVENTS_STREAM_NAME } from "../shared/nats-subjects"
+import { ALL_TERMINAL_EVENTS, ALL_CHAT_MESSAGE_EVENTS, CHAT_MESSAGE_EVENTS_STREAM_NAME, ALL_WORKSPACE_COORDINATION_EVENTS, WORKSPACE_COORDINATION_EVENTS_STREAM_NAME, ALL_SANDBOX_EVENTS, SANDBOX_EVENTS_STREAM_NAME } from "../shared/nats-subjects"
 import { RUNNER_EVENTS_STREAM, ALL_RUNNER_EVENTS } from "../shared/runner-protocol"
 import { LOG_PREFIX } from "../shared/branding"
 
@@ -87,5 +87,16 @@ export function ensureWorkspaceCoordinationStream(nc: NatsConnection): Promise<v
     max_msgs: 100_000,
     max_bytes: 256 * 1024 * 1024,
     storage: StorageType.File,
+  })
+}
+
+/** Creates or updates the JetStream stream for sandbox events (memory-backed, 5 min / 5K msg retention). */
+export function ensureSandboxEventsStream(nc: NatsConnection): Promise<void> {
+  return ensureStream(nc, {
+    name: SANDBOX_EVENTS_STREAM_NAME,
+    subjects: [ALL_SANDBOX_EVENTS],
+    max_age_ns: FIVE_MINUTES_NS,
+    max_msgs: 5_000,
+    max_bytes: 10 * 1024 * 1024,
   })
 }

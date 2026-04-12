@@ -13,6 +13,8 @@ export function snapshotKvKey(topic: SubscriptionTopic): string {
     case "workspace": return `workspace.${topic.workspaceId}`
     case "agent-config": return `agent-config.${topic.workspaceId}`
     case "repos": return `repos.${topic.workspaceId}`
+    case "workflow-runs": return `workflow-runs.${topic.workspaceId}`
+    case "sandbox-status": return `sandbox-status.${topic.workspaceId}`
     default: return topic.type
   }
 }
@@ -61,3 +63,25 @@ export function workspaceCoordinationEventSubject(workspaceId: string): string {
 
 /** Wildcard: all workspace coordination events */
 export const ALL_WORKSPACE_COORDINATION_EVENTS = `${PREFIX}.evt.workspace.>`
+
+/** JetStream stream name for workflow run events */
+export const WORKFLOW_RUN_EVENTS_STREAM_NAME = "KANNA_WORKFLOW_RUN_EVENTS"
+
+/** Subject for workflow run events */
+export function workflowRunEventSubject(workspaceId: string): string {
+  return `${PREFIX}.evt.workflow.${workspaceId}`
+}
+
+/** Wildcard: all workflow run events */
+export const ALL_WORKFLOW_RUN_EVENTS = `${PREFIX}.evt.workflow.>`
+
+/** JetStream stream name for sandbox events */
+export const SANDBOX_EVENTS_STREAM_NAME = "KANNA_SANDBOX_EVENTS"
+
+/** Subject for sandbox events */
+export function sandboxEventSubject(workspaceId: string): string {
+  return `${PREFIX}.evt.sandbox.${workspaceId}`
+}
+
+/** Wildcard: all sandbox events */
+export const ALL_SANDBOX_EVENTS = `${PREFIX}.evt.sandbox.>`

@@ -13,6 +13,7 @@ export interface CliOptions {
   openBrowser: boolean
   share: boolean
   strictPort: boolean
+  sandbox: boolean
 }
 
 export interface CliUpdateOptions {
@@ -83,6 +84,7 @@ Options:
   --share              Create a public Cloudflare share URL with terminal QR
   --strict-port        Fail instead of trying another port
   --no-open            Don't open browser automatically
+  --sandbox            Enable Docker sandbox isolation for workspaces
   --version            Print version and exit
   --help               Show this help message`)
 }
@@ -95,6 +97,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let sawHost = false
   let sawRemote = false
   let strictPort = false
+  let sandbox = false
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -142,6 +145,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
       strictPort = true
       continue
     }
+    if (arg === "--sandbox") {
+      sandbox = true
+      continue
+    }
     if (!arg.startsWith("-")) throw new Error(`Unexpected positional argument: ${arg}`)
   }
 
@@ -153,6 +160,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       openBrowser,
       share,
       strictPort,
+      sandbox,
     },
   }
 }

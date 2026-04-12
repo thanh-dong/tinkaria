@@ -11,6 +11,8 @@ import {
   type CoordinationEvent,
   type MessageEvent,
   type WorkspaceEvent,
+  type SandboxEvent,
+  type WorkflowEvent,
   type SnapshotFile,
   type StoreEvent,
   type StoreState,
@@ -21,6 +23,8 @@ import {
   createEmptyCoordinationState,
   createEmptyState,
 } from "./events"
+import type { WorkflowRunState } from "../shared/workflow-types"
+import type { SandboxRecord } from "../shared/sandbox-types"
 import { resolveLocalPath } from "./paths"
 
 const COMPACTION_THRESHOLD_BYTES = 2 * 1024 * 1024
@@ -50,6 +54,8 @@ export class EventStore {
   private readonly coordinationLogPath: string
   private readonly agentConfigsLogPath: string
   private readonly reposLogPath: string
+  private readonly workflowsLogPath: string
+  private readonly sandboxLogPath: string
 
   constructor(dataDir = getDataDir(homedir())) {
     this.dataDir = dataDir
@@ -62,6 +68,8 @@ export class EventStore {
     this.coordinationLogPath = path.join(this.dataDir, "coordination.jsonl")
     this.agentConfigsLogPath = path.join(this.dataDir, "agent-configs.jsonl")
     this.reposLogPath = path.join(this.dataDir, "repos.jsonl")
+    this.workflowsLogPath = path.join(this.dataDir, "workflows.jsonl")
+    this.sandboxLogPath = path.join(this.dataDir, "sandbox.jsonl")
   }
 
   async initialize() {
@@ -74,6 +82,8 @@ export class EventStore {
     await this.ensureFile(this.coordinationLogPath)
     await this.ensureFile(this.agentConfigsLogPath)
     await this.ensureFile(this.reposLogPath)
+    await this.ensureFile(this.workflowsLogPath)
+    await this.ensureFile(this.sandboxLogPath)
     await this.loadSnapshot()
     await this.replayLogs()
     if (!(await this.hasLegacyTranscriptData()) && await this.shouldCompact()) {
@@ -102,6 +112,8 @@ export class EventStore {
       Bun.write(this.coordinationLogPath, ""),
       Bun.write(this.agentConfigsLogPath, ""),
       Bun.write(this.reposLogPath, ""),
+      Bun.write(this.workflowsLogPath, ""),
+      Bun.write(this.sandboxLogPath, ""),
     ])
   }
 
@@ -148,6 +160,18 @@ export class EventStore {
           if (repo.localPath) this.state.reposByPath.set(repo.localPath, repo.id)
         }
       }
+      if (parsed.workflowRuns?.length) {
+        for (const entry of parsed.workflowRuns) {
+          const runsMap = new Map<string, import("../shared/workflow-types").WorkflowRunState>()
+          for (const run of entry.runs) runsMap.set(run.runId, run)
+          this.state.workflowRunsByWorkspace.set(entry.workspaceId, runsMap)
+        }
+      }
+      if (parsed.sandboxes?.length) {
+        for (const sandbox of parsed.sandboxes) {
+          this.state.sandboxByWorkspace.set(sandbox.workspaceId, sandbox)
+        }
+      }
       if (parsed.messages?.length) {
         this.snapshotHasLegacyMessages = true
         for (const messageSet of parsed.messages) {
@@ -168,6 +192,8 @@ export class EventStore {
     this.state.agentConfigsByWorkspace.clear()
     this.state.reposById.clear()
     this.state.reposByPath.clear()
+    this.state.workflowRunsByWorkspace.clear()
+    this.state.sandboxByWorkspace.clear()
     this.transcriptCache.clear()
   }
 
@@ -191,6 +217,10 @@ export class EventStore {
     await this.replayLog<AgentConfigEvent>(this.agentConfigsLogPath)
     if (this.storageReset) return
     await this.replayLog<RepoEvent>(this.reposLogPath)
+    if (this.storageReset) return
+    await this.replayLog<WorkflowEvent>(this.workflowsLogPath)
+    if (this.storageReset) return
+    await this.replayLog<SandboxEvent>(this.sandboxLogPath)
   }
 
   private async replayLog<TEvent extends StoreEvent>(filePath: string) {
@@ -575,7 +605,143 @@ export class EventStore {
         repo.updatedAt = event.timestamp
         break
       }
+      case "workflow_started": {
+        const runsMap = this.state.workflowRunsByWorkspace.get(event.workspaceId) ?? new Map<string, WorkflowRunState>()
+        runsMap.set(event.runId, {
+          runId: event.runId,
+          workflowId: event.workflowId,
+          workspaceId: event.workspaceId,
+          targetRepoIds: event.targetRepoIds,
+          status: "running",
+          steps: [],
+          startedAt: event.timestamp,
+          triggeredBy: event.triggeredBy,
+        })
+        this.state.workflowRunsByWorkspace.set(event.workspaceId, runsMap)
+        break
+      }
+      case "workflow_step_started": {
+        const run = this.state.workflowRunsByWorkspace.get(event.workspaceId)?.get(event.runId)
+        if (!run) break
+        run.steps.push({
+          stepIndex: event.stepIndex,
+          mcp_tool: event.mcp_tool,
+          repoId: event.repoId,
+          status: "running",
+          startedAt: event.timestamp,
+        })
+        break
+      }
+      case "workflow_step_completed": {
+        const run = this.state.workflowRunsByWorkspace.get(event.workspaceId)?.get(event.runId)
+        if (!run) break
+        const step = run.steps.find((s) => s.stepIndex === event.stepIndex && s.repoId === event.repoId)
+        if (step) {
+          step.status = "completed"
+          step.output = event.output
+          step.completedAt = event.timestamp
+        }
+        break
+      }
+      case "workflow_step_failed": {
+        const run = this.state.workflowRunsByWorkspace.get(event.workspaceId)?.get(event.runId)
+        if (!run) break
+        const step = run.steps.find((s) => s.stepIndex === event.stepIndex && s.repoId === event.repoId)
+        if (step) {
+          step.status = "failed"
+          step.error = event.error
+          step.completedAt = event.timestamp
+        }
+        break
+      }
+      case "workflow_completed": {
+        const run = this.state.workflowRunsByWorkspace.get(event.workspaceId)?.get(event.runId)
+        if (!run) break
+        run.status = "completed"
+        run.completedAt = event.timestamp
+        break
+      }
+      case "workflow_failed": {
+        const run = this.state.workflowRunsByWorkspace.get(event.workspaceId)?.get(event.runId)
+        if (!run) break
+        run.status = "failed"
+        run.error = event.error
+        run.failedStep = event.failedStep
+        run.completedAt = event.timestamp
+        break
+      }
+      case "workflow_cancelled": {
+        const run = this.state.workflowRunsByWorkspace.get(event.workspaceId)?.get(event.runId)
+        if (!run) break
+        run.status = "cancelled"
+        run.completedAt = event.timestamp
+        break
+      }
+      case "sandbox_created": {
+        const record: SandboxRecord = {
+          id: event.id,
+          workspaceId: event.workspaceId,
+          containerId: null,
+          status: "creating",
+          resourceLimits: event.resourceLimits,
+          natsUrl: "",
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+          lastHealthCheck: null,
+          error: null,
+        }
+        this.state.sandboxByWorkspace.set(event.workspaceId, record)
+        break
+      }
+      case "sandbox_started": {
+        const existing = this.findSandboxById(event.id)
+        if (existing) {
+          existing.containerId = event.containerId
+          existing.natsUrl = event.natsUrl
+          existing.status = "running"
+          existing.updatedAt = event.timestamp
+        }
+        break
+      }
+      case "sandbox_stopped": {
+        const existing = this.findSandboxById(event.id)
+        if (existing) {
+          existing.status = "stopped"
+          existing.updatedAt = event.timestamp
+        }
+        break
+      }
+      case "sandbox_destroyed": {
+        for (const [key, sb] of this.state.sandboxByWorkspace) {
+          if (sb.id === event.id) { this.state.sandboxByWorkspace.delete(key); break }
+        }
+        break
+      }
+      case "sandbox_error": {
+        const existing = this.findSandboxById(event.id)
+        if (existing) {
+          existing.status = "error"
+          existing.error = event.error
+          existing.updatedAt = event.timestamp
+        }
+        break
+      }
+      case "sandbox_health_updated": {
+        const existing = this.findSandboxById(event.id)
+        if (existing) {
+          existing.lastHealthCheck = event.timestamp
+          existing.updatedAt = event.timestamp
+        }
+        break
+      }
     }
+  }
+
+  private findSandboxById(id: string): SandboxRecord | undefined {
+    for (const sb of this.state.sandboxByWorkspace.values()) {
+      if (sb.id === id) return sb
+    }
+    return undefined
   }
 
   private getOrCreateCoordination(workspaceId: string) {
@@ -975,6 +1141,69 @@ export class EventStore {
     await this.append<RepoEvent>(this.reposLogPath, event)
   }
 
+  // --- Workflow mutation methods ---
+
+  async emitWorkflowStarted(runId: string, workflowId: string, workspaceId: string, targetRepoIds: string[], triggeredBy: string) {
+    const event: WorkflowEvent = { v: STORE_VERSION, type: "workflow_started", timestamp: Date.now(), runId, workflowId, workspaceId, targetRepoIds, triggeredBy }
+    await this.append<WorkflowEvent>(this.workflowsLogPath, event)
+  }
+
+  async emitWorkflowStepStarted(runId: string, workspaceId: string, stepIndex: number, mcpTool: string, repoId?: string) {
+    const event: WorkflowEvent = { v: STORE_VERSION, type: "workflow_step_started", timestamp: Date.now(), runId, workspaceId, stepIndex, mcp_tool: mcpTool, ...(repoId !== undefined ? { repoId } : {}) }
+    await this.append<WorkflowEvent>(this.workflowsLogPath, event)
+  }
+
+  async emitWorkflowStepCompleted(runId: string, workspaceId: string, stepIndex: number, output: string, repoId?: string) {
+    const event: WorkflowEvent = { v: STORE_VERSION, type: "workflow_step_completed", timestamp: Date.now(), runId, workspaceId, stepIndex, output, ...(repoId !== undefined ? { repoId } : {}) }
+    await this.append<WorkflowEvent>(this.workflowsLogPath, event)
+  }
+
+  async emitWorkflowStepFailed(runId: string, workspaceId: string, stepIndex: number, error: string, repoId?: string) {
+    const event: WorkflowEvent = { v: STORE_VERSION, type: "workflow_step_failed", timestamp: Date.now(), runId, workspaceId, stepIndex, error, ...(repoId !== undefined ? { repoId } : {}) }
+    await this.append<WorkflowEvent>(this.workflowsLogPath, event)
+  }
+
+  async emitWorkflowCompleted(runId: string, workspaceId: string) {
+    const event: WorkflowEvent = { v: STORE_VERSION, type: "workflow_completed", timestamp: Date.now(), runId, workspaceId }
+    await this.append<WorkflowEvent>(this.workflowsLogPath, event)
+  }
+
+  async emitWorkflowFailed(runId: string, workspaceId: string, error: string, failedStep: number) {
+    const event: WorkflowEvent = { v: STORE_VERSION, type: "workflow_failed", timestamp: Date.now(), runId, workspaceId, error, failedStep }
+    await this.append<WorkflowEvent>(this.workflowsLogPath, event)
+  }
+
+  async emitWorkflowCancelled(runId: string, workspaceId: string) {
+    const event: WorkflowEvent = { v: STORE_VERSION, type: "workflow_cancelled", timestamp: Date.now(), runId, workspaceId }
+    await this.append<WorkflowEvent>(this.workflowsLogPath, event)
+  }
+
+  // --- Sandbox mutation methods ---
+
+  async emitSandboxCreated(id: string, workspaceId: string, resourceLimits: import("../shared/sandbox-types").ResourceLimits) {
+    await this.append<SandboxEvent>(this.sandboxLogPath, { v: 3, type: "sandbox_created", timestamp: Date.now(), id, workspaceId, resourceLimits })
+  }
+
+  async emitSandboxStarted(id: string, containerId: string, natsUrl: string) {
+    await this.append<SandboxEvent>(this.sandboxLogPath, { v: 3, type: "sandbox_started", timestamp: Date.now(), id, containerId, natsUrl })
+  }
+
+  async emitSandboxStopped(id: string, reason: string) {
+    await this.append<SandboxEvent>(this.sandboxLogPath, { v: 3, type: "sandbox_stopped", timestamp: Date.now(), id, reason })
+  }
+
+  async emitSandboxDestroyed(id: string) {
+    await this.append<SandboxEvent>(this.sandboxLogPath, { v: 3, type: "sandbox_destroyed", timestamp: Date.now(), id })
+  }
+
+  async emitSandboxError(id: string, error: string) {
+    await this.append<SandboxEvent>(this.sandboxLogPath, { v: 3, type: "sandbox_error", timestamp: Date.now(), id, error })
+  }
+
+  async emitSandboxHealthUpdated(id: string, health: import("../shared/sandbox-types").SandboxHealthReport) {
+    await this.append<SandboxEvent>(this.sandboxLogPath, { v: 3, type: "sandbox_health_updated", timestamp: Date.now(), id, health })
+  }
+
   getProject(workspaceId: string) {
     const project = this.state.workspacesById.get(workspaceId)
     if (!project || project.deletedAt) return null
@@ -1104,6 +1333,15 @@ export class EventStore {
       ...(coordination.length > 0 ? { coordination } : {}),
       ...(agentConfigs.length > 0 ? { agentConfigs } : {}),
       ...(this.state.reposById.size > 0 ? { repos: [...this.state.reposById.values()] } : {}),
+      ...(this.state.workflowRunsByWorkspace.size > 0 ? {
+        workflowRuns: [...this.state.workflowRunsByWorkspace.entries()].map(([workspaceId, runsMap]) => ({
+          workspaceId,
+          runs: [...runsMap.values()],
+        })),
+      } : {}),
+      ...(this.state.sandboxByWorkspace.size > 0 ? {
+        sandboxes: [...this.state.sandboxByWorkspace.values()],
+      } : {}),
     }
   }
 
@@ -1118,6 +1356,8 @@ export class EventStore {
       Bun.write(this.coordinationLogPath, ""),
       Bun.write(this.agentConfigsLogPath, ""),
       Bun.write(this.reposLogPath, ""),
+      Bun.write(this.workflowsLogPath, ""),
+      Bun.write(this.sandboxLogPath, ""),
     ])
   }
 
@@ -1161,6 +1401,8 @@ export class EventStore {
       Bun.file(this.coordinationLogPath).size,
       Bun.file(this.agentConfigsLogPath).size,
       Bun.file(this.reposLogPath).size,
+      Bun.file(this.workflowsLogPath).size,
+      Bun.file(this.sandboxLogPath).size,
     ])
     return sizes.reduce((total, size) => total + size, 0) >= COMPACTION_THRESHOLD_BYTES
   }

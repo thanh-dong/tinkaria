@@ -13,6 +13,7 @@ import type { ChatRecord, StoreState, WorkspaceCoordinationState } from "./event
 import { createEmptyCoordinationState } from "./events"
 import type { WorkspaceCoordinationSnapshot } from "../shared/workspace-types"
 import type { AgentConfigSnapshot } from "../shared/agent-config-types"
+import type { WorkflowRunsSnapshot } from "../shared/workflow-types"
 import { resolveLocalPath } from "./paths"
 import { SERVER_PROVIDERS } from "./provider-catalog"
 
@@ -205,4 +206,27 @@ export function deriveAgentConfigSnapshot(
     ? new Date(Math.max(...configs.map((c) => c.updatedAt))).toISOString()
     : new Date(0).toISOString()
   return { workspaceId, configs, lastUpdated }
+}
+
+/** Derive workflow runs snapshot for a workspace. */
+export function deriveWorkflowRunsSnapshot(
+  state: StoreState,
+  workspaceId: string,
+): WorkflowRunsSnapshot {
+  const runsMap = state.workflowRunsByWorkspace.get(workspaceId) ?? new Map()
+  const runs = [...runsMap.values()]
+    .sort((a, b) => b.startedAt - a.startedAt)
+    .slice(0, 50)
+  const activeRunIds = runs
+    .filter((r) => r.status === "running")
+    .map((r) => r.runId)
+  return { workspaceId, runs, activeRunIds }
+}
+
+export function deriveSandboxSnapshot(
+  state: StoreState,
+  workspaceId: string,
+): import("../shared/sandbox-types").SandboxSnapshot {
+  const sandbox = state.sandboxByWorkspace.get(workspaceId) ?? null
+  return { workspaceId, sandbox, health: null }
 }

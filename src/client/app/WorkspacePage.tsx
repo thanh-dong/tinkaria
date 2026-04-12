@@ -6,6 +6,8 @@ import type { AgentConfig } from "../../shared/agent-config-types"
 import { useWorkspaceSubscription } from "./useWorkspaceSubscription"
 import { useAgentConfigSubscription } from "./useAgentConfigSubscription"
 import { useRepoSubscription } from "./useRepoSubscription"
+import { useWorkflowRunsSubscription } from "./useWorkflowRunsSubscription"
+import { useSandboxSubscription } from "./useSandboxSubscription"
 import { PageHeader } from "./PageHeader"
 import { TodosPanel } from "../components/coordination/TodosPanel"
 import { ClaimsPanel } from "../components/coordination/ClaimsPanel"
@@ -13,6 +15,8 @@ import { WorktreesPanel } from "../components/coordination/WorktreesPanel"
 import { RulesPanel } from "../components/coordination/RulesPanel"
 import { AgentConfigPanel } from "../components/coordination/AgentConfigPanel"
 import { RepoPanel } from "../components/coordination/RepoPanel"
+import { WorkflowPanel } from "../components/coordination/WorkflowPanel"
+import { SandboxPanel } from "../components/coordination/SandboxPanel"
 import type { AppState } from "./useAppState"
 import { getPathBasename } from "../lib/formatters"
 import { toastCommand } from "../lib/toast"
@@ -27,6 +31,8 @@ export function WorkspacePage() {
   const snapshot = useWorkspaceSubscription(state.socket, workspaceId ?? null)
   const agentSnap = useAgentConfigSubscription(state.socket, workspaceId ?? null)
   const repoSnap = useRepoSubscription(state.socket, workspaceId ?? null)
+  const workflowSnap = useWorkflowRunsSubscription(state.socket, workspaceId ?? null)
+  const sandboxSnap = useSandboxSubscription(state.socket, workspaceId ?? null)
 
   const sessionsSnap = workspaceId ? state.sessionsSnapshots.get(workspaceId) : undefined
   const sessionOptions = useMemo(() => {
@@ -254,6 +260,18 @@ export function WorkspacePage() {
     [state.socket]
   )
 
+  const handleCancelWorkflow = useCallback(
+    (runId: string) => {
+      if (!workspaceId) return
+      toastCommand(state.socket.command({
+        type: "workspace.workflow.cancel",
+        workspaceId,
+        runId,
+      }), "Workflow cancelled")
+    },
+    [workspaceId, state.socket]
+  )
+
   const handlePushRepo = useCallback(
     (repoId: string) => {
       toastCommand(state.socket.command({
@@ -334,6 +352,22 @@ export function WorkspacePage() {
             onRemove={handleRemoveAgent}
           />
         </div>
+        <div className="bg-background overflow-hidden">
+          <WorkflowPanel
+            runs={workflowSnap?.runs ?? []}
+            activeRunIds={workflowSnap?.activeRunIds ?? []}
+            onCancelRun={handleCancelWorkflow}
+          />
+        </div>
+        {workspaceId && (
+          <div className="bg-background overflow-hidden">
+            <SandboxPanel
+              snapshot={sandboxSnap}
+              onCommand={(cmd) => { void state.socket.command(cmd) }}
+              workspaceId={workspaceId}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

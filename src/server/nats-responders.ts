@@ -13,6 +13,7 @@ import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
 import { findSessionFile, importCliTranscript } from "./session-discovery"
 import { inspectSessionRuntime } from "./session-discovery"
+import { DEFAULT_RESOURCE_LIMITS } from "../shared/sandbox-types"
 import { readRepoStatus } from "./repo-status"
 import { generateForkPromptForChat } from "./generate-fork-context"
 import { generateMergePromptForChats as defaultGenerateMergePrompt } from "./generate-merge-context"
@@ -55,6 +56,9 @@ export interface RegisterRespondersArgs {
   directoryPolicy: WorkspaceDirectoryPolicy | null
   repoManager: RepoManager | null
   clonePolicy: GitClonePolicy | null
+  workflowEngine: import("./workflow-engine").WorkflowEngine | null
+  workflowStore: import("./workflow-store").WorkflowStore | null
+  sandboxManager: import("./sandbox-manager").SandboxManager | null
 }
 
 /** Command types that do NOT mutate state and should NOT trigger onStateChange */
@@ -78,6 +82,9 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "workspace.agent.list",
   "workspace.agent.get",
   "workspace.repo.status",
+  "workspace.workflow.list",
+  "workspace.sandbox.logs",
+  "workspace.sandbox.status",
 ])
 
 /** Commands handled by the Bun backend. */
@@ -133,6 +140,15 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "workspace.repo.status",
   "workspace.repo.pull",
   "workspace.repo.push",
+  "workspace.workflow.run",
+  "workspace.workflow.cancel",
+  "workspace.workflow.list",
+  "workspace.sandbox.create",
+  "workspace.sandbox.start",
+  "workspace.sandbox.stop",
+  "workspace.sandbox.destroy",
+  "workspace.sandbox.logs",
+  "workspace.sandbox.status",
 ]
 
 export function registerCommandResponders(args: RegisterRespondersArgs): { dispose: () => void } {
@@ -553,6 +569,92 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (!repo) throw new Error("Repo not found")
         const output = await args.repoManager.push(repo.localPath, command.branch)
         return { output }
+      }
+
+      case "workspace.workflow.run": {
+        if (!args.workflowStore || !args.workflowEngine) throw new Error("Workflow engine not available")
+        const def = await args.workflowStore.get(command.workflowId)
+        if (!def) throw new Error(`Workflow ${command.workflowId} not found`)
+        const runId = await args.workflowEngine.start(command.workflowId, command.workspaceId, def, command.triggeredBy ?? "user")
+        return { status: "started", runId }
+      }
+
+      case "workspace.workflow.cancel": {
+        if (!args.workflowEngine) throw new Error("Workflow engine not available")
+        await args.workflowEngine.cancel(command.runId, command.workspaceId)
+        return { ok: true }
+      }
+
+      case "workspace.workflow.list": {
+        if (!args.workflowStore) return { workflows: [] }
+        const workflows = await args.workflowStore.list()
+        return { workflows }
+      }
+
+      case "workspace.sandbox.create": {
+        if (!args.sandboxManager) throw new Error("Sandbox manager not available")
+        const workspace = store.state.workspacesById.get(command.workspaceId)
+        if (!workspace) throw new Error(`Workspace ${command.workspaceId} not found`)
+        const sandboxId = `sb-${command.workspaceId.slice(0, 12)}-${Date.now()}`
+        const limits = command.resourceLimits ?? DEFAULT_RESOURCE_LIMITS
+        const repos = [...store.state.reposById.values()].filter(r => r.workspaceId === command.workspaceId)
+        const containerId = await args.sandboxManager.create(command.workspaceId, {
+          repos: repos.map(r => ({ id: r.id, localPath: r.localPath })),
+          limits,
+        })
+        await store.emitSandboxCreated(sandboxId, command.workspaceId, limits)
+        try {
+          await args.sandboxManager.start(containerId)
+          await store.emitSandboxStarted(sandboxId, containerId, args.sandboxManager.getNatsUrl())
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err)
+          await store.emitSandboxError(sandboxId, msg)
+          throw err
+        }
+        return { status: "created", sandboxId, containerId }
+      }
+
+      case "workspace.sandbox.start": {
+        if (!args.sandboxManager) throw new Error("Sandbox manager not available")
+        const sandbox = store.state.sandboxByWorkspace.get(command.workspaceId)
+        if (!sandbox?.containerId) throw new Error("No sandbox found for workspace")
+        await args.sandboxManager.start(sandbox.containerId)
+        await store.emitSandboxStarted(sandbox.id, sandbox.containerId, sandbox.natsUrl)
+        return { status: "started" }
+      }
+
+      case "workspace.sandbox.stop": {
+        if (!args.sandboxManager) throw new Error("Sandbox manager not available")
+        const sandbox = store.state.sandboxByWorkspace.get(command.workspaceId)
+        if (!sandbox?.containerId) throw new Error("No sandbox found for workspace")
+        await args.sandboxManager.stop(sandbox.containerId, command.reason)
+        await store.emitSandboxStopped(sandbox.id, command.reason ?? "user_request")
+        return { status: "stopped" }
+      }
+
+      case "workspace.sandbox.destroy": {
+        if (!args.sandboxManager) throw new Error("Sandbox manager not available")
+        const sandbox = store.state.sandboxByWorkspace.get(command.workspaceId)
+        if (!sandbox?.containerId) throw new Error("No sandbox found for workspace")
+        await args.sandboxManager.destroy(sandbox.containerId)
+        await store.emitSandboxDestroyed(sandbox.id)
+        return { status: "destroyed" }
+      }
+
+      case "workspace.sandbox.logs": {
+        if (!args.sandboxManager) throw new Error("Sandbox manager not available")
+        const sandbox = store.state.sandboxByWorkspace.get(command.workspaceId)
+        if (!sandbox?.containerId) throw new Error("No sandbox found for workspace")
+        const logs = await args.sandboxManager.logs(sandbox.containerId, command.tail)
+        return { logs }
+      }
+
+      case "workspace.sandbox.status": {
+        if (!args.sandboxManager) throw new Error("Sandbox manager not available")
+        const sandbox = store.state.sandboxByWorkspace.get(command.workspaceId)
+        if (!sandbox?.containerId) throw new Error("No sandbox found for workspace")
+        const inspect = await args.sandboxManager.inspect(sandbox.containerId)
+        return { inspect }
       }
 
       default: {

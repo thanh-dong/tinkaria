@@ -5,6 +5,7 @@ import {
 import { cn } from "../lib/utils"
 import { useTheme, type ThemePreference } from "../hooks/useTheme"
 import { useChatPreferencesStore, type DefaultProviderPreference } from "../stores/chatPreferencesStore"
+import { NotificationToggle } from "./NotificationToggle"
 
 const PREFERENCES_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
   id: "home.preferences",
@@ -78,6 +79,7 @@ export function HomepagePreferences() {
         onChange={setDefaultProvider}
         formatLabel={(value) => PROVIDER_LABELS[value]}
       />
+      <NotificationToggle />
     </div>
   )
 }

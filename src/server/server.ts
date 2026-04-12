@@ -12,7 +12,7 @@ import { generateAuthToken } from "./nats-auth"
 import { readToken } from "../nats/nats-token"
 import { createNatsPublisher } from "./nats-publisher"
 import { registerCommandResponders } from "./nats-responders"
-import { ensureTerminalEventsStream, ensureChatMessageStream, ensureRunnerEventsStream, ensureWorkspaceCoordinationStream } from "./nats-streams"
+import { ensureTerminalEventsStream, ensureChatMessageStream, ensureRunnerEventsStream, ensureWorkspaceCoordinationStream, ensureSandboxEventsStream } from "./nats-streams"
 import { RunnerManager, type RunnerReadiness } from "./runner-manager"
 import { RunnerProxy } from "./runner-proxy"
 import { TranscriptConsumer } from "./transcript-consumer"
@@ -28,11 +28,16 @@ import { WorkspaceConfigManager } from "./workspace-config-manager"
 import { WorkspaceDirectoryPolicy } from "./workspace-directory-policy"
 import { RepoManager } from "./repo-manager"
 import { GitClonePolicy } from "./git-clone-policy"
+import { WorkflowStore } from "./workflow-store"
+import { WorkflowEngine } from "./workflow-engine"
+import { initVapid, PushSubscriptionStore, createPushRouter, sendPushToAll } from "./push-notifications"
+import { BunDockerClient, SandboxManager } from "./sandbox-manager"
 
 export interface StartServerOptions {
   port?: number
   host?: string
   strictPort?: boolean
+  sandbox?: boolean
   onMigrationProgress?: (message: string) => void
   update?: {
     version: string
@@ -259,6 +264,12 @@ export async function startServer(options: StartServerOptions = {}) {
     daemonInfo = info
   }
 
+  // Push notifications
+  initVapid()
+  const pushStore = new PushSubscriptionStore(path.join(store.dataDir, "push-subscriptions.json"))
+  await pushStore.load()
+  const pushRouter = createPushRouter(pushStore)
+
   const natsConnector = await NatsConnector.connect({
     natsUrl: daemonInfo.url,
     natsWsUrl: daemonInfo.wsUrl,
@@ -270,6 +281,7 @@ export async function startServer(options: StartServerOptions = {}) {
     ensureChatMessageStream(natsConnector.nc),
     ensureRunnerEventsStream(natsConnector.nc),
     ensureWorkspaceCoordinationStream(natsConnector.nc),
+    ensureSandboxEventsStream(natsConnector.nc),
   ])
 
   const getHealthcheck = (): ServerHealthcheck => {
@@ -344,10 +356,55 @@ export async function startServer(options: StartServerOptions = {}) {
   const runnerId = await runnerManager.ensureRunner()
 
   const chatSidebarTypes = new Set(["chat", "sidebar", "orchestration"])
+  const previousStatuses = new Map<string, string>()
   const transcriptConsumer = new TranscriptConsumer({
     nc: natsConnector.nc,
     store,
-    onStateChange: () => broadcast(chatSidebarTypes),
+    onStateChange: () => {
+      broadcast(chatSidebarTypes)
+      // Push notification triggers
+      const currentActive = transcriptConsumer.getActiveStatuses()
+      // Check for newly waiting_for_user
+      for (const [chatId, status] of currentActive) {
+        const prev = previousStatuses.get(chatId)
+        if (status === "waiting_for_user" && prev !== "waiting_for_user") {
+          const chat = store.state.chatsById.get(chatId)
+          void sendPushToAll(pushStore, {
+            title: "Input needed",
+            body: chat?.title || chatId,
+            url: `/chat/${chatId}`,
+            tag: `waiting-${chatId}`,
+          })
+        }
+      }
+      // Check for chats that were active but are now gone (turn ended)
+      for (const [chatId, prevStatus] of previousStatuses) {
+        if (!currentActive.has(chatId) && prevStatus !== "waiting_for_user") {
+          const chat = store.state.chatsById.get(chatId)
+          const outcome = chat?.lastTurnOutcome
+          if (outcome === "success") {
+            void sendPushToAll(pushStore, {
+              title: "Agent finished",
+              body: chat?.title || chatId,
+              url: `/chat/${chatId}`,
+              tag: `turn-${chatId}`,
+            })
+          } else if (outcome === "failed") {
+            void sendPushToAll(pushStore, {
+              title: "Agent failed",
+              body: chat?.title || chatId,
+              url: `/chat/${chatId}`,
+              tag: `turn-${chatId}`,
+            })
+          }
+        }
+      }
+      // Sync previousStatuses
+      previousStatuses.clear()
+      for (const [chatId, status] of currentActive) {
+        previousStatuses.set(chatId, status)
+      }
+    },
     onMessageAppended,
   })
   await transcriptConsumer.start()
@@ -398,6 +455,18 @@ export async function startServer(options: StartServerOptions = {}) {
       new WorkspaceConfigManager(path.join(store.dataDir, "workspaces")),
       () => publisher.broadcastSnapshots(),
     ),
+    workflowStore: new WorkflowStore(path.join(store.dataDir, "workflows")),
+    workflowEngine: new WorkflowEngine({
+      emitter: store,
+      dispatcher: { dispatch: async () => "" },
+      resolveRepos: async (workspaceId: string) => {
+        return [...store.state.reposById.values()]
+          .filter((r) => r.workspaceId === workspaceId)
+          .map((r) => r.id)
+      },
+      onProgress: () => publisher.broadcastSnapshots(),
+    }),
+    sandboxManager: options.sandbox ? new SandboxManager(new BunDockerClient(), "nats://host.docker.internal:4222") : null,
   })
 
   const distDir = path.join(import.meta.dir, "..", "..", "dist", "client")
@@ -459,6 +528,10 @@ export async function startServer(options: StartServerOptions = {}) {
 
           if (url.pathname.startsWith("/api/workspace/")) {
             return projectAgentRouter(req)
+          }
+
+          if (url.pathname.startsWith("/api/push/")) {
+            return pushRouter(req)
           }
 
           return serveStatic(distDir, url.pathname)

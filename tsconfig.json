@@ -24,6 +24,7 @@
     "src/index.css",
     "src/shared/**/*.ts",
     "src/server/**/*.ts",
+    "src/sandbox/**/*.ts",
     "src/client/app/**/*.ts",
     "src/client/app/**/*.tsx",
     "src/client/hooks/useTheme.tsx",
@@ -73,6 +74,8 @@
     "src/client/components/rich-content/RichContentBlock.tsx",
     "src/client/components/rich-content/EmbedRenderer.tsx",
     "src/client/components/rich-content/remarkRichContentHint.ts",
-    "src/client/components/messages/FileContentView.tsx"
+    "src/client/components/messages/FileContentView.tsx",
+    "src/client/components/coordination/SandboxPanel.tsx",
+    "src/client/app/useSandboxSubscription.ts"
   ]
 }

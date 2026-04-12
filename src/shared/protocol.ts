@@ -14,6 +14,8 @@ export type SubscriptionTopic =
   | { type: "workspace"; workspaceId: string }
   | { type: "agent-config"; workspaceId: string }
   | { type: "repos"; workspaceId: string }
+  | { type: "workflow-runs"; workspaceId: string }
+  | { type: "sandbox-status"; workspaceId: string }
 
 export interface TerminalSnapshot {
   terminalId: string
@@ -102,3 +104,12 @@ export type ClientCommand =
   | { type: "workspace.repo.status"; repoId: string }
   | { type: "workspace.repo.pull"; repoId: string; branch?: string }
   | { type: "workspace.repo.push"; repoId: string; branch?: string }
+  | { type: "workspace.workflow.run"; workspaceId: string; workflowId: string; triggeredBy?: string }
+  | { type: "workspace.workflow.cancel"; workspaceId: string; runId: string }
+  | { type: "workspace.workflow.list"; workspaceId: string }
+  | { type: "workspace.sandbox.create"; workspaceId: string; resourceLimits?: import("./sandbox-types").ResourceLimits }
+  | { type: "workspace.sandbox.start"; workspaceId: string }
+  | { type: "workspace.sandbox.stop"; workspaceId: string; reason?: string }
+  | { type: "workspace.sandbox.destroy"; workspaceId: string }
+  | { type: "workspace.sandbox.logs"; workspaceId: string; tail?: number }
+  | { type: "workspace.sandbox.status"; workspaceId: string }

@@ -150,6 +150,9 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
     directoryPolicy: null,
     repoManager: null,
     clonePolicy: null,
+    workflowEngine: null,
+    workflowStore: null,
+    sandboxManager: null,
     ...overrides,
   }
 
