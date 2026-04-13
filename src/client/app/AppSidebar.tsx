@@ -1,5 +1,5 @@
 import { lazy, Suspense, memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
-import { Home, Loader2, Menu, PanelLeft, X } from "lucide-react"
+import { Home, Loader2, Menu, PanelLeft, Settings, X } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import { Button } from "../components/ui/button"
@@ -411,6 +411,13 @@ function AppSidebarInner({
         </div>
 
         <div className="border-t border-border p-2">
+          <button
+            onClick={() => navigate("/settings")}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 w-full"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </button>
           <div className="w-full rounded-xl border border-border/0 px-3 py-2 text-left">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-muted-foreground">Connection</span>

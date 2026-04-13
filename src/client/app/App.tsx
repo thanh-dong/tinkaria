@@ -1,5 +1,8 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react"
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom"
+import { SettingsPage } from "./SettingsPage"
+import { ProvidersTab } from "./ProvidersTab"
+import { ProfilesTab } from "./ProfilesTab"
 import {
   buildUiIdentityStack,
   createC3UiIdentityDescriptor,
@@ -551,7 +554,11 @@ function AppInner() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<LocalProjectsPage />} />
-          <Route path="/settings/*" element={<Navigate to="/" replace />} />
+          <Route path="/settings" element={<SettingsPage />}>
+            <Route index element={<Navigate to="providers" replace />} />
+            <Route path="providers" element={<ProvidersTab />} />
+            <Route path="profiles" element={<ProfilesTab />} />
+          </Route>
           <Route path="/chat/:chatId" element={<ChatPage />} />
           <Route path="/workspace/:id" element={<WorkspacePage />} />
         </Route>
