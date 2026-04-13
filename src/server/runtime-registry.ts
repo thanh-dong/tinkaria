@@ -12,6 +12,18 @@ interface DetectOptions {
   versionParser: (stdout: string) => string
 }
 
+interface InstallOptions {
+  packageName: string
+  version: string
+  binaryName: string
+}
+
+interface InstallResult {
+  success: boolean
+  entry?: RuntimeEntry
+  error?: string
+}
+
 export class RuntimeRegistry {
   private state: RuntimeRegistryState = { entries: [], defaults: {} }
   private healthCache = new Map<string, RuntimeHealthStatus>()
@@ -128,6 +140,64 @@ export class RuntimeRegistry {
         },
       })),
     }
+  }
+
+  async installManaged(
+    provider: "claude" | "codex",
+    options: InstallOptions,
+  ): Promise<InstallResult> {
+    const installDir = join(this.runtimesDir, provider, options.version)
+    await mkdir(installDir, { recursive: true })
+
+    const install = spawnSync(
+      "bun",
+      ["install", `${options.packageName}@${options.version}`, "--no-save"],
+      { cwd: installDir, encoding: "utf-8", timeout: 120_000 },
+    )
+
+    if (install.status !== 0) {
+      return {
+        success: false,
+        error: install.stderr || `Install exited with code ${install.status}`,
+      }
+    }
+
+    const binaryPath = join(installDir, "node_modules", ".bin", options.binaryName)
+    const entry: RuntimeEntry = {
+      provider,
+      version: options.version,
+      source: "managed",
+      binaryPath,
+      installedAt: Date.now(),
+      packageName: options.packageName,
+    }
+
+    this.upsertEntry(entry)
+    await this.persist()
+    console.warn(LOG_PREFIX, `Installed ${provider}@${options.version} at ${binaryPath}`)
+
+    return { success: true, entry }
+  }
+
+  async removeManaged(provider: string, version: string): Promise<boolean> {
+    const installDir = join(this.runtimesDir, provider, version)
+    try {
+      const { rm } = await import("node:fs/promises")
+      await rm(installDir, { recursive: true, force: true })
+    } catch (err) {
+      console.warn(LOG_PREFIX, `Failed to remove ${provider}@${version}:`, err instanceof Error ? err.message : String(err))
+      return false
+    }
+    this.state.entries = this.state.entries.filter(
+      (e) => !(e.provider === provider && e.version === version && e.source === "managed"),
+    )
+    if (this.state.defaults[provider] === version) {
+      const remaining = this.state.entries.filter((e) => e.provider === provider)
+      this.state.defaults[provider] = remaining[0]?.version ?? ""
+    }
+    await this.persist()
+    console.warn(LOG_PREFIX, `Removed ${provider}@${version}`)
+    return true
   }
 
   private upsertEntry(entry: RuntimeEntry): void {

@@ -110,6 +110,41 @@ describe("RuntimeRegistry", () => {
     })
   })
 
+  describe("installManaged", () => {
+    test("installs npm package into versioned directory", async () => {
+      const dir = await createTempDir()
+      const registry = new RuntimeRegistry(dir)
+      await registry.initialize()
+
+      // Use a small, fast package for testing
+      const result = await registry.installManaged("claude", {
+        packageName: "is-odd",
+        version: "3.0.1",
+        binaryName: "is-odd",
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.entry).toBeDefined()
+      expect(result.entry!.source).toBe("managed")
+      expect(result.entry!.version).toBe("3.0.1")
+    }, 30_000)
+
+    test("returns failure for invalid package", async () => {
+      const dir = await createTempDir()
+      const registry = new RuntimeRegistry(dir)
+      await registry.initialize()
+
+      const result = await registry.installManaged("claude", {
+        packageName: "@definitely-not-real/package-xyzzy-999",
+        version: "0.0.0",
+        binaryName: "xyzzy",
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBeDefined()
+    }, 30_000)
+  })
+
   describe("persistence", () => {
     test("persists and reloads entries across instances", async () => {
       const dir = await createTempDir()
