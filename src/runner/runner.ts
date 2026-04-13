@@ -30,10 +30,10 @@ console.warn(LOG_PREFIX, `Runner ${runnerId} connected to NATS at ${natsUrl}`)
 
 const createTurn: TurnFactory = async (args) => {
   if (args.provider === "claude") {
-    return startClaudeTurn(args)
+    return startClaudeTurn({ ...args, binaryPath: args.binaryPath, extraEnv: args.extraEnv })
   }
   if (args.provider === "codex") {
-    return startCodexTurn(args)
+    return startCodexTurn({ ...args, binaryPath: args.binaryPath, extraEnv: args.extraEnv })
   }
   throw new Error(`Provider ${args.provider} not supported in runner`)
 }

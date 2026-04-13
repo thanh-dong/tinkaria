@@ -1,9 +1,12 @@
 import type { NatsConnection } from "@nats-io/transport-node"
 import type { ClientCommand } from "../shared/protocol"
+import type { ProviderProfileRecord } from "../shared/profile-types"
+import { resolveProfile } from "../shared/profile-types"
 import type { AgentProvider, SessionStatus, PendingToolSnapshot } from "../shared/types"
 import { resolveClaudeApiModelId } from "../shared/types"
 import { runnerCmdSubject, type StartTurnCommand } from "../shared/runner-protocol"
 import type { EventStore } from "./event-store"
+import type { RuntimeRegistry } from "./runtime-registry"
 import {
   getServerProviderCatalog,
   normalizeClaudeModelOptions,
@@ -19,6 +22,7 @@ export interface RunnerProxyOptions {
   runnerId: string
   getActiveStatuses: () => Map<string, SessionStatus>
   getPendingTool?: (chatId: string) => PendingToolSnapshot | null
+  runtimeRegistry?: RuntimeRegistry | null
 }
 
 export class RunnerProxy {
@@ -26,6 +30,7 @@ export class RunnerProxy {
   private readonly store: EventStore
   private readonly runnerId: string
   private readonly _getActiveStatuses: () => Map<string, SessionStatus>
+  private readonly runtimeRegistry: RuntimeRegistry | null
 
   /** Orchestration compatibility: check if a chat has an active turn */
   readonly activeTurns: { has(chatId: string): boolean }
@@ -35,8 +40,36 @@ export class RunnerProxy {
     this.store = options.store
     this.runnerId = options.runnerId
     this._getActiveStatuses = options.getActiveStatuses
+    this.runtimeRegistry = options.runtimeRegistry ?? null
     this.activeTurns = {
       has: (chatId: string) => this._getActiveStatuses().has(chatId),
+    }
+  }
+
+  /** Resolve profile overrides for a workspace+provider into binaryPath and extraEnv */
+  private resolveProfileOverrides(workspaceId: string, provider: AgentProvider): { binaryPath?: string; extraEnv?: Record<string, string> } {
+    // Find all profiles for this provider
+    const profiles = [...this.store.state.providerProfiles.values()]
+      .filter((r: ProviderProfileRecord) => r.profile.provider === provider)
+
+    if (profiles.length === 0) return {}
+
+    // Use the first matching profile (TODO: workspace-level default selection)
+    const record = profiles[0]
+    const wsOverrides = this.store.state.workspaceProfileOverrides.get(workspaceId)
+    const override = wsOverrides?.get(record.id)
+    const resolved = resolveProfile(record.profile, override?.overrides)
+
+    // Resolve binary path from runtime spec
+    let binaryPath: string | undefined
+    if (resolved.runtime !== "system" && this.runtimeRegistry) {
+      const entry = this.runtimeRegistry.resolve(provider, resolved.runtime.version)
+      if (entry) binaryPath = entry.binaryPath
+    }
+
+    return {
+      binaryPath,
+      extraEnv: resolved.env,
     }
   }
 
@@ -85,6 +118,7 @@ export class RunnerProxy {
     if (!project) throw new Error("Project not found")
 
     const existingMessages = await this.store.getMessages(chatId)
+    const profileOverrides = this.resolveProfileOverrides(chat.workspaceId, provider)
 
     const startCmd: StartTurnCommand = {
       chatId,
@@ -98,6 +132,7 @@ export class RunnerProxy {
       chatTitle: chat.title,
       existingMessageCount: existingMessages.length,
       workspaceId: chat.workspaceId,
+      ...profileOverrides,
     }
 
     if (chat.provider !== provider) {
@@ -139,6 +174,7 @@ export class RunnerProxy {
     await this.store.setChatModel(args.chatId, args.model)
     await this.store.setPlanMode(args.chatId, args.planMode)
 
+    const profileOverrides = this.resolveProfileOverrides(chat.workspaceId, args.provider)
     const startCmd: StartTurnCommand = {
       chatId: args.chatId,
       provider: args.provider,
@@ -153,6 +189,7 @@ export class RunnerProxy {
       chatTitle: chat.title,
       existingMessageCount: (await this.store.getMessages(args.chatId)).length,
       workspaceId: chat.workspaceId,
+      ...profileOverrides,
     }
     await this.sendCommand("start_turn", startCmd)
   }
@@ -172,7 +209,7 @@ export class RunnerProxy {
   async disposeChat(chatId: string): Promise<void> {
     try {
       await this.cancel(chatId)
-    } catch {
+    } catch (_error) {
       // Chat might not be running — swallow
     }
   }

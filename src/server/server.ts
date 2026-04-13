@@ -543,11 +543,15 @@ export async function startServer(options: StartServerOptions = {}) {
   })
   await transcriptConsumer.start()
 
+  const runtimeRegistry = new RuntimeRegistry(path.join(store.dataDir, "runtimes"))
+  await runtimeRegistry.initialize()
+
   const coordinator: SessionCoordinator = new RunnerProxy({
     nc: natsConnector.nc,
     store,
     runnerId,
     getActiveStatuses: () => transcriptConsumer.getActiveStatuses(),
+    runtimeRegistry,
   })
 
   console.warn(LOG_PREFIX, "Runner process handles turn execution")
@@ -556,9 +560,6 @@ export async function startServer(options: StartServerOptions = {}) {
     store,
     coordinator,
   })
-
-  const runtimeRegistry = new RuntimeRegistry(path.join(store.dataDir, "runtimes"))
-  await runtimeRegistry.initialize()
 
   const publisher = await createNatsPublisher({
     nc: natsConnector.nc,

@@ -33,6 +33,8 @@ export type TurnFactory = (args: {
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
   chatId: string
   store?: CoordinationStore
+  binaryPath?: string
+  extraEnv?: Record<string, string>
 }) => Promise<HarnessTurn>
 
 function buildHarnessInput(cmd: StartTurnCommand): string {
@@ -176,6 +178,8 @@ export class RunnerAgent {
       onToolRequest,
       chatId: cmd.chatId,
       store: this.coordinationStore,
+      binaryPath: cmd.binaryPath,
+      extraEnv: cmd.extraEnv,
     })
 
     const active: ActiveTurn = {
@@ -236,7 +240,7 @@ export class RunnerAgent {
 
     try {
       await active.turn.interrupt()
-    } catch {
+    } catch (_error) {
       active.turn.close()
     }
 
@@ -295,7 +299,7 @@ export class RunnerAgent {
       const title = await this.generateTitle(content, cwd)
       if (!title) return
       this.publishEvent(chatId, { type: "title_generated", chatId, title })
-    } catch {
+    } catch (_error) {
       // Ignore background title generation failures
     }
   }
