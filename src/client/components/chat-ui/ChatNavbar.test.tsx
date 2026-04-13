@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
+import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { TooltipProvider } from "../ui/tooltip"
-import { ChatNavbar, getContextBarColor, getContextPercentTextColor } from "./ChatNavbar"
+import {
+  ChatNavbar,
+  getChatNavbarUiIdentityDescriptors,
+  getContextBarColor,
+  getContextPercentTextColor,
+} from "./ChatNavbar"
 
 function renderNavbar(props: Parameters<typeof ChatNavbar>[0]) {
   return renderToStaticMarkup(
@@ -48,6 +54,31 @@ const cleanRepoStatus = {
 } as const
 
 describe("ChatNavbar", () => {
+  test("backs navbar grab targets with C3-owned descriptors", () => {
+    const descriptors = getChatNavbarUiIdentityDescriptors()
+
+    expect(getUiIdentityAttributeProps(descriptors.root)).toEqual({
+      "data-ui-id": "chat.navbar",
+      "data-ui-c3": "c3-112",
+      "data-ui-c3-label": "chat-input",
+    })
+    expect(getUiIdentityAttributeProps(descriptors.area)).toEqual({
+      "data-ui-id": "chat.navbar.area",
+      "data-ui-c3": "c3-112",
+      "data-ui-c3-label": "chat-input",
+    })
+    expect(getUiIdentityAttributeProps(descriptors.forkSessionAction)).toEqual({
+      "data-ui-id": "chat.navbar.fork-session.action",
+      "data-ui-c3": "c3-112",
+      "data-ui-c3-label": "chat-input",
+    })
+    expect(getUiIdentityAttributeProps(descriptors.mergeSessionAction)).toEqual({
+      "data-ui-id": "chat.navbar.merge-session.action",
+      "data-ui-c3": "c3-112",
+      "data-ui-c3-label": "chat-input",
+    })
+  })
+
   test("pill has no branding mark — consistent width regardless of sidebar state", () => {
     const collapsed = renderNavbar({ sidebarCollapsed: true, ...defaultProps })
     const expanded = renderNavbar({ sidebarCollapsed: false, ...defaultProps })
@@ -59,6 +90,7 @@ describe("ChatNavbar", () => {
   test("renders a fork-session button", () => {
     const html = renderNavbar({ sidebarCollapsed: false, ...defaultProps })
 
+    expect(html).toContain('data-ui-c3="c3-112"')
     expect(html).toContain('title="Fork session"')
   })
 

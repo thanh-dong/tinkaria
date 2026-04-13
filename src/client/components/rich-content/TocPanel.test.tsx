@@ -15,6 +15,10 @@ describe("TocPanel", () => {
       { level: 3, text: "Prerequisites", id: "prerequisites" },
     ]
     const html = renderToStaticMarkup(<TocPanel headings={headings} onSelect={() => {}} />)
+    expect(html).toContain('data-ui-id="rich-content.toc.area"')
+    expect(html).toContain('data-ui-c3="c3-107"')
+    expect(html).toContain('data-ui-c3-label="rich-content"')
+    expect(html).toContain('data-ui-id="rich-content.toc.item"')
     expect(html).toContain("Introduction")
     expect(html).toContain("Getting Started")
     expect(html).toContain("Prerequisites")

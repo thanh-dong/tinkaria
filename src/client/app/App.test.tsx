@@ -357,7 +357,9 @@ describe("sidebar ui identity coverage", () => {
     )
 
     expect(chatRowHtml).toContain('data-ui-id="sidebar.chat-row"')
+    expect(chatRowHtml).toContain('data-ui-c3="c3-113"')
     expect(localProjectsHtml).toContain('data-ui-id="sidebar.project-group"')
+    expect(localProjectsHtml).toContain('data-ui-c3="c3-113"')
     expect(localProjectsHtml).not.toContain("cursor-grab")
   })
 })
@@ -373,7 +375,7 @@ describe("handleMobileTapCapture", () => {
       },
       getAttribute: (name: string) => (name === "data-ui-id" ? "chat.page" : null),
       parentElement: null,
-    }
+    } as unknown as Element
 
     let defaultPrevented = false
     let propagationStopped = false
@@ -480,7 +482,7 @@ describe("mobile tap cycle end-to-end", () => {
         return null
       },
       parentElement: null,
-    }
+    } as unknown as Element
     const parent = {
       getAttribute: (name: string) => (name === "data-ui-id" ? "sidebar.chat-row" : null),
       closest: (selector: string) => {
@@ -490,7 +492,7 @@ describe("mobile tap cycle end-to-end", () => {
         return null
       },
       parentElement: grandparent,
-    }
+    } as unknown as Element
     const leaf = {
       getAttribute: () => null,
       closest: (selector: string) => {
@@ -500,7 +502,7 @@ describe("mobile tap cycle end-to-end", () => {
         return null
       },
       parentElement: parent,
-    }
+    } as unknown as Element
 
     let defaultPrevented = false
     let propagationStopped = false

@@ -1,6 +1,6 @@
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { ContentOverlay } from "../rich-content/ContentOverlay"
 import { remarkRichContentHint } from "../rich-content/remarkRichContentHint"
 import type { RichContentType } from "../rich-content/types"
@@ -14,10 +14,10 @@ export interface LocalFilePreview {
 }
 
 const LOCAL_FILE_PREVIEW_DIALOG_UI_ID = "content-preview.dialog"
-const LOCAL_FILE_PREVIEW_DIALOG_UI_DESCRIPTOR = createUiIdentityDescriptor({
+const LOCAL_FILE_PREVIEW_DIALOG_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
   id: LOCAL_FILE_PREVIEW_DIALOG_UI_ID,
   c3ComponentId: "c3-111",
-  c3ComponentLabel: "transcript-surfaces",
+  c3ComponentLabel: "messages",
 })
 
 function isMarkdownFile(path: string): boolean {

@@ -63,6 +63,11 @@ describe("SessionPickerContent", () => {
       "data-ui-c3": "c3-113",
       "data-ui-c3-label": "sidebar",
     })
+    expect(getUiIdentityAttributeProps(descriptors.triggerAction)).toEqual({
+      "data-ui-id": "sidebar.project-group.sessions.action",
+      "data-ui-c3": "c3-113",
+      "data-ui-c3-label": "sidebar",
+    })
     expect(getUiIdentityAttributeProps(descriptors.list)).toEqual({
       "data-ui-id": "sidebar.project-group.sessions.list",
       "data-ui-c3": "c3-113",
@@ -205,6 +210,7 @@ describe("SessionPicker", () => {
 
     expect(getSessionPickerTriggerClassName()).toBe("opacity-100 md:opacity-0 md:group-hover/section:opacity-100 transition-opacity")
     expect(html).toContain('data-ui-id="sidebar.project-group.sessions.action"')
+    expect(html).toContain('data-ui-c3="c3-113"')
     expect(html).toContain("md:group-hover/section:opacity-100")
   })
 })
