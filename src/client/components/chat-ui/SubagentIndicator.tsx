@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject
 import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react"
 import { Button } from "../ui/button"
 import { ChatTranscript } from "../../app/ChatTranscript"
-import { fetchTranscriptRange } from "../../app/appState.helpers"
+import { fetchTranscriptMessageCount, fetchTranscriptRange } from "../../app/appState.helpers"
 import { getLatestToolIds } from "../../app/derived"
 import type { AppTransport } from "../../app/socket-interface"
 import { createIncrementalHydrator } from "../../lib/parseTranscript"
@@ -344,16 +344,24 @@ export const SubagentIndicator = memo(function SubagentIndicator({
     const hydrator = createIncrementalHydrator()
     let cancelled = false
     let initialFetchDone = false
+    let initialFetchRequested = false
     let pendingRaf: number | null = null
     const bufferedEntries: TranscriptEntry[] = []
 
-    async function fetchAllMessages(messageCount: number) {
+    async function fetchAllMessages(messageCount: number | null) {
+      if (initialFetchRequested) return
+      initialFetchRequested = true
       try {
+        const resolvedMessageCount = messageCount ?? await fetchTranscriptMessageCount({
+          socket,
+          chatId,
+          timeoutMs: 120_000,
+        })
         const entries = await fetchTranscriptRange({
           socket,
           chatId,
           offset: 0,
-          limit: Math.max(messageCount, 1),
+          limit: Math.max(resolvedMessageCount, 1),
           timeoutMs: 120_000,
         })
         if (cancelled) return
@@ -370,6 +378,7 @@ export const SubagentIndicator = memo(function SubagentIndicator({
         }))
       } catch (error) {
         if (cancelled) return
+        initialFetchRequested = false
         setSession((current) => ({
           ...current,
           messages: [],
@@ -384,8 +393,8 @@ export const SubagentIndicator = memo(function SubagentIndicator({
       (snapshot) => {
         if (cancelled) return
         setSession((current) => ({ ...current, snapshot }))
-        if (snapshot && !initialFetchDone) {
-          void fetchAllMessages(snapshot.messageCount)
+        if (!initialFetchDone && !initialFetchRequested) {
+          void fetchAllMessages(snapshot?.messageCount ?? null)
         }
       },
       (event) => {

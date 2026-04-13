@@ -40,6 +40,7 @@ function createMockStore() {
     deleteChat: async () => {},
     listChatsByProject: () => [{ id: "chat-1" }],
     getMessages: () => [],
+    getMessageCount: async () => 0,
   }
 }
 
@@ -692,6 +693,23 @@ describe("nats-responders", () => {
     expect(res.result).toEqual({ mock: "snapshot" })
     expect(addCalled).toBe(true)
     expect(addedId).toBe("sub-1")
+  })
+
+  test("chat.getMessageCount returns the persisted transcript length", async () => {
+    const { clientNc } = await setup({
+      store: {
+        ...createMockStore(),
+        getMessageCount: async (chatId: string) => (chatId === "chat-1" ? 3 : 0),
+      } as never,
+    })
+
+    const res = await sendCommand(clientNc, {
+      type: "chat.getMessageCount",
+      chatId: "chat-1",
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual({ messageCount: 3 })
   })
 
   test("snapshot.unsubscribe removes subscription", async () => {

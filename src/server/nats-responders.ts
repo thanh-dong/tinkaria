@@ -74,6 +74,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "chat.generateMergePrompt",
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
+  "chat.getMessageCount",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
   "workspace.coordination.snapshot",
@@ -108,6 +109,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.generateMergePrompt",
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
+  "chat.getMessageCount",
   "terminal.create",
   "terminal.input",
   "terminal.resize",
@@ -406,6 +408,12 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         }
         return {
           repoStatus: await readRepoStatus(project.localPath),
+        }
+      }
+
+      case "chat.getMessageCount": {
+        return {
+          messageCount: await store.getMessageCount(command.chatId),
         }
       }
 

@@ -73,6 +73,7 @@ export type ClientCommand =
   | { type: "chat.generateMergePrompt"; chatIds: string[]; intent: string; preset?: string }
   | { type: "chat.getSessionRuntime"; chatId: string }
   | { type: "chat.getRepoStatus"; chatId: string }
+  | { type: "chat.getMessageCount"; chatId: string }
   | { type: "terminal.create"; workspaceId: string; terminalId: string; cols: number; rows: number; scrollback: number }
   | { type: "terminal.input"; terminalId: string; data: string }
   | { type: "terminal.resize"; terminalId: string; cols: number; rows: number }

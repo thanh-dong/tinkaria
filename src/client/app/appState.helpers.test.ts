@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   clearPendingSessionBootstrapAfterAttempt,
   enrichCommandError,
+  fetchTranscriptMessageCount,
   fetchTranscriptRange,
   filterPendingDeletedChats,
   MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
@@ -32,6 +33,17 @@ function createMockGetMessagesCommand(
 ): AppTransport["command"] {
   return async <TResult = unknown>(command: Parameters<AppTransport["command"]>[0]) => {
     if (command.type !== "chat.getMessages") {
+      throw new Error(`Unexpected command ${command.type}`)
+    }
+    return await handler(command) as TResult
+  }
+}
+
+function createMockGetMessageCountCommand(
+  handler: (command: Extract<Parameters<AppTransport["command"]>[0], { type: "chat.getMessageCount" }>) => Promise<unknown>
+): AppTransport["command"] {
+  return async <TResult = unknown>(command: Parameters<AppTransport["command"]>[0]) => {
+    if (command.type !== "chat.getMessageCount") {
       throw new Error(`Unexpected command ${command.type}`)
     }
     return await handler(command) as TResult
@@ -319,6 +331,20 @@ describe("fetchTranscriptRange", () => {
       offset: 0,
       limit: MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
     })).rejects.toThrow(/max_payload/i)
+  })
+})
+
+describe("fetchTranscriptMessageCount", () => {
+  test("returns the message count for chats without an active snapshot", async () => {
+    const socket = createTransportWithCommand(createMockGetMessageCountCommand(async (command) => {
+      expect(command.chatId).toBe("chat-1")
+      return { messageCount: 7 }
+    }))
+
+    await expect(fetchTranscriptMessageCount({
+      socket,
+      chatId: "chat-1",
+    })).resolves.toBe(7)
   })
 })
 

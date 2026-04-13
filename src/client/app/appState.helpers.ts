@@ -204,6 +204,19 @@ export async function fetchTranscriptRange(args: {
   return entries
 }
 
+export async function fetchTranscriptMessageCount(args: {
+  socket: AppTransport
+  chatId: string
+  timeoutMs?: number
+}): Promise<number> {
+  const result = await args.socket.command<{ messageCount: number }>({
+    type: "chat.getMessageCount",
+    chatId: args.chatId,
+  }, args.timeoutMs ? { timeoutMs: args.timeoutMs } : undefined)
+
+  return result.messageCount
+}
+
 export function removeChatFromSidebar(data: SidebarData, chatId: string): SidebarData {
   const filtered = data.workspaceGroups
     .map((group) => {
