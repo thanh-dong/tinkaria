@@ -32,6 +32,10 @@ import { WorkspacePage } from "./WorkspacePage"
 import { AppStateContext } from "./AppStateContext"
 import { useAppState } from "./useAppState"
 import { useEventCallback } from "../hooks/useEventCallback"
+import { useShortcuts, type ShortcutRegistration } from "../hooks/useShortcuts"
+import { ShortcutHelpOverlay } from "../components/ui/ShortcutHelpOverlay"
+import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
+import { PROVIDERS } from "../../shared/types"
 
 const UI_IDENTITY_OVERLAY_COPY_DURATION_MS = 1200
 const UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS = 320
@@ -505,6 +509,59 @@ function AppLayout() {
   )
 }
 
+function getNextModel(provider: "claude" | "codex", currentModel: string, direction: 1 | -1): string {
+  const catalog = PROVIDERS.find((p) => p.id === provider)
+  if (!catalog) return currentModel
+  const models = catalog.models
+  const currentIndex = models.findIndex((m) => m.id === currentModel)
+  if (currentIndex === -1) return currentModel
+  const nextIndex = (currentIndex + direction + models.length) % models.length
+  return models[nextIndex].id
+}
+
+function ShortcutController() {
+  const state = useContext(AppStateContext)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const composerState = useChatPreferencesStore((s) => s.composerState)
+  const setComposerModel = useChatPreferencesStore((s) => s.setComposerModel)
+
+  const isNewChat = state ? !state.chatHasKnownMessages : false
+  const activeScope = isNewChat ? "new-chat" as const : "global" as const
+
+  const registrations = useMemo((): ShortcutRegistration[] => {
+    const createNewChat = () => {
+      if (!state) return
+      const workspaceId = state.runtime?.workspaceId
+        ?? state.sidebarData.workspaceGroups[0]?.groupKey
+      if (workspaceId) {
+        void state.handleCreateChat(workspaceId)
+      }
+    }
+
+    const cycleModel = (direction: 1 | -1) => {
+      const nextModel = getNextModel(composerState.provider, composerState.model, direction)
+      setComposerModel(nextModel)
+    }
+
+    return [
+      { key: "?", alt: true, label: "Show shortcuts", scope: "global", handler: () => setHelpOpen((v) => !v) },
+      { key: "n", alt: true, label: "New chat", description: "Same project", scope: "global", handler: createNewChat },
+      { key: "ArrowLeft", alt: true, label: "Previous model", scope: "new-chat", handler: () => cycleModel(-1) },
+      { key: "ArrowRight", alt: true, label: "Next model", scope: "new-chat", handler: () => cycleModel(1) },
+    ]
+  }, [state, composerState.provider, composerState.model, setComposerModel])
+
+  const definitions = useShortcuts(registrations, activeScope)
+
+  return (
+    <ShortcutHelpOverlay
+      open={helpOpen}
+      onClose={() => setHelpOpen(false)}
+      shortcuts={definitions}
+    />
+  )
+}
+
 function AppInner() {
   const location = useLocation()
   const activeChatId = location.pathname.startsWith("/chat/")
@@ -514,6 +571,7 @@ function AppInner() {
 
   return (
     <AppStateContext.Provider value={state}>
+      <ShortcutController />
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<LocalProjectsPage />} />

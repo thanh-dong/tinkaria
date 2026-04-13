@@ -60,6 +60,7 @@ export function InputPopover({
   disabled = false,
   triggerUiId,
   contentUiId,
+  onDoubleTap,
   children,
 }: {
   trigger: React.ReactNode
@@ -67,6 +68,7 @@ export function InputPopover({
   disabled?: boolean
   triggerUiId?: string | UiIdentityDescriptor
   contentUiId?: string | UiIdentityDescriptor
+  onDoubleTap?: () => void
   children: React.ReactNode | ((close: () => void) => React.ReactNode)
 }) {
   const [open, setOpen] = useState(false)
@@ -93,6 +95,11 @@ export function InputPopover({
         <Button
           variant="ghost"
           {...(triggerUiId ? getUiIdentityAttributeProps(triggerUiId) : {})}
+          onDoubleClick={onDoubleTap ? (e) => {
+            e.preventDefault()
+            setOpen(false)
+            onDoubleTap()
+          } : undefined}
           className={cn(
             "flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground [&>svg]:shrink-0 [&>span]:whitespace-nowrap h-auto",
             triggerClassName
@@ -127,6 +134,7 @@ interface ChatPreferenceControlsProps {
   modelOptions: ClaudeModelOptions | CodexModelOptions
   onProviderChange?: (provider: AgentProvider) => void
   onModelChange: (provider: AgentProvider, model: string) => void
+  onModelDoubleTap?: () => void
   onModelOptionChange: (change: ModelOptionChange) => void
   planMode?: boolean
   onPlanModeChange?: (planMode: boolean) => void
@@ -146,6 +154,7 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
   modelOptions,
   onProviderChange,
   onModelChange,
+  onModelDoubleTap,
   onModelOptionChange,
   planMode = false,
   onPlanModeChange,
@@ -265,6 +274,7 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
       <InputPopover
         triggerUiId={modelActionDescriptor}
         contentUiId={modelPopoverDescriptor}
+        onDoubleTap={onModelDoubleTap}
         trigger={(
           <>
             <ModelIcon className="h-3.5 w-3.5" />

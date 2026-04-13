@@ -407,6 +407,16 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
     setPlanMode: handlePlanModeChange,
   }), [resolved.selectedProvider, resolved.providerPrefs, showPlanMode, handlePlanModeChange])
 
+  const handleModelDoubleTap = useCallback(() => {
+    const provider = resolved.selectedProvider
+    const catalog = PROVIDERS.find((p) => p.id === provider)
+    if (!catalog) return
+    const models = catalog.models
+    const currentIndex = models.findIndex((m) => m.id === resolved.providerPrefs.model)
+    const nextIndex = (currentIndex + 1) % models.length
+    handleModelChange(provider, models[nextIndex].id)
+  }, [resolved.selectedProvider, resolved.providerPrefs.model, handleModelChange])
+
   return (
     <ChatPreferenceControls
       availableProviders={availableProviders}
@@ -416,6 +426,7 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
       modelOptions={resolved.providerPrefs.modelOptions}
       onProviderChange={handleProviderChange}
       onModelChange={handleModelChange}
+      onModelDoubleTap={handleModelDoubleTap}
       onModelOptionChange={handleModelOptionChange}
       planMode={resolved.providerPrefs.planMode}
       onPlanModeChange={handlePlanModeChange}
