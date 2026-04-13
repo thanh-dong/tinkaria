@@ -153,6 +153,22 @@ export interface AppState {
   clearCommandError: () => void
 }
 
+export function shouldMarkActiveChatRead(args: {
+  activeChatId: string | null
+  sidebarReady: boolean
+  chatUnread: boolean
+  visibilityState: DocumentVisibilityState
+  hasFocus: boolean
+}): boolean {
+  return Boolean(
+    args.activeChatId
+    && args.sidebarReady
+    && args.chatUnread
+    && args.visibilityState === "visible"
+    && args.hasFocus
+  )
+}
+
 export function useAppState(activeChatId: string | null): AppState {
   const navigate = useNavigate()
   const socket = useAppSocket()
@@ -178,7 +194,6 @@ export function useAppState(activeChatId: string | null): AppState {
     clearQueuedText,
     restoreQueuedText,
   } = useSubmitPipeline({ activeChatId })
-  const [focusEpoch, setFocusEpoch] = useState(0)
 
   const inputRef = useRef<HTMLDivElement>(null)
   const setNormalizedCommandError = useCallback((error: unknown) => {
@@ -375,18 +390,32 @@ export function useAppState(activeChatId: string | null): AppState {
   })
 
   // Mark active chat as read when navigating to it (tab must be visible + focused)
-  useEffect(() => {
-    if (!activeChatId || !sidebarReady) return
-    if (document.visibilityState !== "visible" || !document.hasFocus()) return
+  const markActiveChatRead = useCallback(() => {
+    const chatId = activeChatId
+    if (!chatId) {
+      return
+    }
     const chat = getSidebarChatRow(sidebarData.workspaceGroups, activeChatId)
-    if (!chat?.unread) return
-    void socket.command({ type: "chat.markRead", chatId: activeChatId }).catch(setNormalizedCommandError)
-  }, [activeChatId, focusEpoch, sidebarData.workspaceGroups, sidebarReady, socket, setNormalizedCommandError])
+    if (!shouldMarkActiveChatRead({
+      activeChatId: chatId,
+      sidebarReady,
+      chatUnread: chat?.unread === true,
+      visibilityState: document.visibilityState,
+      hasFocus: document.hasFocus(),
+    })) {
+      return
+    }
+    void socket.command({ type: "chat.markRead", chatId }).catch(setNormalizedCommandError)
+  }, [activeChatId, sidebarData.workspaceGroups, sidebarReady, socket, setNormalizedCommandError])
 
-  // Re-trigger mark-read when window regains focus
+  useEffect(() => {
+    markActiveChatRead()
+  }, [markActiveChatRead])
+
+  // Re-trigger mark-read when the tab becomes active again without forcing a full app rerender.
   useEffect(() => {
     function handleFocusChange() {
-      setFocusEpoch((value) => value + 1)
+      markActiveChatRead()
     }
     window.addEventListener("focus", handleFocusChange)
     document.addEventListener("visibilitychange", handleFocusChange)
@@ -394,7 +423,7 @@ export function useAppState(activeChatId: string | null): AppState {
       window.removeEventListener("focus", handleFocusChange)
       document.removeEventListener("visibilitychange", handleFocusChange)
     }
-  }, [])
+  }, [markActiveChatRead])
 
   const commands = useChatCommands({
     socket,

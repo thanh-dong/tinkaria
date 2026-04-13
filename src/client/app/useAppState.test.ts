@@ -27,6 +27,7 @@ import {
   PWA_RESUME_STALE_AFTER_MS,
   TRANSCRIPT_TAIL_SIZE,
 } from "./appState.helpers"
+import { shouldMarkActiveChatRead } from "./useAppState"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarData } from "../../shared/types"
 import { createIncrementalHydrator } from "../lib/parseTranscript"
 
@@ -166,6 +167,44 @@ describe("shouldRefreshStaleSessionOnResume", () => {
       hiddenAt: 100,
       resumedAt: 100 + PWA_RESUME_STALE_AFTER_MS - 1,
       connectionStatus: "connected",
+    })).toBe(false)
+  })
+})
+
+describe("shouldMarkActiveChatRead", () => {
+  test("returns true only for a visible focused unread chat route", () => {
+    expect(shouldMarkActiveChatRead({
+      activeChatId: "chat-1",
+      sidebarReady: true,
+      chatUnread: true,
+      visibilityState: "visible",
+      hasFocus: true,
+    })).toBe(true)
+  })
+
+  test("returns false when the tab is hidden, unfocused, or already read", () => {
+    expect(shouldMarkActiveChatRead({
+      activeChatId: "chat-1",
+      sidebarReady: true,
+      chatUnread: true,
+      visibilityState: "hidden",
+      hasFocus: true,
+    })).toBe(false)
+
+    expect(shouldMarkActiveChatRead({
+      activeChatId: "chat-1",
+      sidebarReady: true,
+      chatUnread: true,
+      visibilityState: "visible",
+      hasFocus: false,
+    })).toBe(false)
+
+    expect(shouldMarkActiveChatRead({
+      activeChatId: "chat-1",
+      sidebarReady: true,
+      chatUnread: false,
+      visibilityState: "visible",
+      hasFocus: true,
     })).toBe(false)
   })
 })
