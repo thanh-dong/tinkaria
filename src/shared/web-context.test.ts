@@ -21,11 +21,16 @@ describe("getWebContextPrompt", () => {
     expect(getWebContextPrompt("codex")).not.toContain("Claude Code")
   })
 
-  test("includes rich content and plan mode context", () => {
+  test("includes the current rich-content viewer contract and plan mode context", () => {
     for (const provider of ["claude", "codex"] as const) {
       const prompt = getWebContextPrompt(provider)
-      expect(prompt).toContain("Rich content")
-      expect(prompt).toContain("Use rich transcript formatting proactively")
+      expect(prompt).toContain("The transcript supports rich markdown natively")
+      expect(prompt).toContain("rich-content cards")
+      expect(prompt).toContain("collapse/expand, copy, and opening the content in a larger overlay viewer")
+      expect(prompt).toContain("`html` for rendered embeds")
+      expect(prompt).toContain("`d2` for source-only previews")
+      expect(prompt).toContain("table of contents")
+      expect(prompt).toContain("render/source toggle and zoom controls")
       expect(prompt).toContain("Prefer direct rich embeds or structured artifact cards over bare links")
       expect(prompt).toContain("Plan mode")
     }
@@ -69,8 +74,8 @@ describe("getWebContextPrompt", () => {
     expect(enabledPrompt).toContain("comparison tables")
     expect(enabledPrompt).toContain("concise status summaries")
     expect(enabledPrompt).toContain("direct embeds")
-    expect(enabledPrompt).toContain("Diashort artifact")
-    expect(enabledPrompt).toContain("`/e/...`")
+    expect(enabledPrompt).toContain("dedicated artifact card")
+    expect(enabledPrompt).toContain("easier to scan or interact with")
     expect(disabledPrompt).not.toContain("present_content")
   })
 
