@@ -202,19 +202,17 @@ export function ProfilesTab({ state }: { state: AppState }) {
   const profiles = snapshot?.profiles ?? []
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Profiles</h1>
-          <p className="text-sm text-muted-foreground mt-1">Saved provider configurations for quick reuse.</p>
-        </div>
+    <div className="space-y-4 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Saved provider configurations for quick reuse.</p>
         <Button
           variant="outline"
           size="sm"
+          className="shrink-0"
           onClick={() => setShowAddForm(!showAddForm)}
         >
           <Plus className="size-3.5 mr-1.5" />
-          New profile
+          New
         </Button>
       </div>
 

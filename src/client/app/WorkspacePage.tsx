@@ -1,12 +1,11 @@
 import { useCallback, useMemo, useState } from "react"
-import { useOutletContext, useParams } from "react-router-dom"
-import { Bot, FolderGit2, Zap, Box } from "lucide-react"
+import { useNavigate, useOutletContext, useParams } from "react-router-dom"
+import { ArrowLeft, Bot, Boxes, FolderGit2, Zap, Box } from "lucide-react"
 import type { AgentConfig } from "../../shared/agent-config-types"
 import { useAgentConfigSubscription } from "./useAgentConfigSubscription"
 import { useRepoSubscription } from "./useRepoSubscription"
 import { useWorkflowRunsSubscription } from "./useWorkflowRunsSubscription"
 import { useSandboxSubscription } from "./useSandboxSubscription"
-import { PageHeader } from "./PageHeader"
 import { AgentConfigPanel } from "../components/coordination/AgentConfigPanel"
 import { RepoPanel } from "../components/coordination/RepoPanel"
 import { WorkflowPanel } from "../components/coordination/WorkflowPanel"
@@ -142,9 +141,20 @@ export function WorkspacePage() {
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("agents")
 
+  const navigate = useNavigate()
+
   return (
     <div className="flex-1 flex flex-col min-w-0 relative">
-      <PageHeader title={workspaceName ?? "Workspace"} />
+      <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3">
+        <button
+          onClick={() => navigate("/")}
+          className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 md:hidden"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
+        <Boxes className="size-4 text-muted-foreground hidden md:block" />
+        <h1 className="text-base font-semibold text-foreground md:text-lg truncate">{workspaceName ?? "Workspace"}</h1>
+      </div>
       <div className="px-4 mb-3">
         <SegmentedControl
           value={activeTab}

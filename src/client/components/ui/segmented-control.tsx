@@ -20,6 +20,8 @@ interface SegmentedControlProps<T extends string> {
   size?: SegmentedSize
   className?: string
   optionClassName?: string
+  /** Always show labels even on mobile when icons are present */
+  alwaysShowLabels?: boolean
 }
 
 const sizeClasses: Record<SegmentedSize, string> = {
@@ -34,6 +36,7 @@ export function SegmentedControl<T extends string>({
   size = "md",
   className,
   optionClassName,
+  alwaysShowLabels = false,
 }: SegmentedControlProps<T>) {
   return (
     <div
@@ -70,7 +73,7 @@ export function SegmentedControl<T extends string>({
             )}
           >
             {iconElement}
-            <span className={icon ? "hidden md:inline" : undefined}>{option.label}</span>
+            <span className={icon && !alwaysShowLabels ? "hidden md:inline" : undefined}>{option.label}</span>
           </button>
         )
 

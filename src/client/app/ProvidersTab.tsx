@@ -114,11 +114,8 @@ export function ProvidersTab({ state }: { state: AppState }) {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Providers</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage runtime binaries for Claude and Codex.</p>
-      </div>
+    <div className="space-y-4 max-w-2xl">
+      <p className="text-sm text-muted-foreground">Manage runtime binaries for Claude and Codex.</p>
 
       <div className="flex items-center gap-2">
         <Button
