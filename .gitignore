@@ -34,6 +34,7 @@ public/icon-*.png
 
 # worktrees
 .worktrees/
+.claude/worktrees/
 
 # local tooling state
 .superpowers/
