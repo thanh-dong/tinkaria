@@ -302,8 +302,8 @@ function AppSidebarInner({
       {collapsed && isUtilityPageActive && (
         <div className="hidden md:flex fixed left-0 top-0 h-full z-40 items-start pt-4 pl-5 border-l border-border/0">
           <div className="group/desktop-collapsed-shell flex items-center gap-1 rounded-full bg-background/80 pr-1 backdrop-blur-sm">
-            <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
-              <TinkariaSidebarMark className="absolute inset-0 size-full" imageClassName="size-5" />
+            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center">
+              <TinkariaSidebarMark className="absolute inset-0 size-full" imageClassName="size-6" />
               <Button
                 variant="ghost"
                 size="icon"
@@ -334,10 +334,10 @@ function AppSidebarInner({
         onPointerUp={handleSwipePointerEnd}
         onPointerCancel={handleSwipePointerEnd}
       >
-        <div className=" pl-3 pr-[7px] h-[64px] max-h-[64px] md:h-[55px] md:max-h-[55px] border-b flex items-center justify-between">
+        <div className="pl-2 pr-[7px] h-[64px] max-h-[64px] md:h-[55px] md:max-h-[55px] border-b flex items-center justify-between">
           <Button
             variant="ghost"
-            className="group/sidebar-shell flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:text-foreground"
+            className="group/sidebar-shell flex min-w-0 items-center gap-2 px-2 rounded-lg text-left transition-colors hover:text-foreground"
             onClick={() => {
               navigate("/")
               onClose()
@@ -345,13 +345,13 @@ function AppSidebarInner({
             title="Home"
             aria-label="Go to homepage"
           >
-            <div className="relative hidden md:flex h-8 w-8 shrink-0 items-center justify-center">
+            <div className="relative hidden md:flex h-9 w-9 shrink-0 items-center justify-center">
               <TinkariaSidebarMark
                 className="absolute inset-0 size-full"
-                imageClassName="h-5 w-5"
+                imageClassName="h-6 w-6"
               />
             </div>
-            <TinkariaSidebarMark className="h-5 w-5 sm:h-6 sm:w-6 md:hidden" imageClassName="h-4 w-4 sm:h-5 sm:w-5" />
+            <TinkariaSidebarMark className="h-6 w-6 sm:h-7 sm:w-7 md:hidden" imageClassName="h-5 w-5 sm:h-5.5 sm:w-5.5" />
             <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">
               {APP_NAME}
             </span>
