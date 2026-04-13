@@ -1,4 +1,3 @@
-import { useOutletContext } from "react-router-dom"
 import { Activity, RefreshCw, Trash2, Box } from "lucide-react"
 import { cn } from "../lib/utils"
 import { useRuntimeSubscription } from "./useRuntimeSubscription"
@@ -99,8 +98,7 @@ function RuntimeCard({ runtime, onHealthCheck, onRemove, onDetect }: RuntimeCard
   )
 }
 
-export function ProvidersTab() {
-  const state = useOutletContext<AppState>()
+export function ProvidersTab({ state }: { state: AppState }) {
   const snapshot = useRuntimeSubscription(state.socket)
 
   function handleDetect(provider: "claude" | "codex") {

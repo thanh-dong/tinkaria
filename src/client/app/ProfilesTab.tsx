@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { useOutletContext } from "react-router-dom"
 import { Plus, Edit3, Trash2, User, Bot } from "lucide-react"
 import { cn } from "../lib/utils"
 import { useProfileSubscription } from "./useProfileSubscription"
@@ -181,8 +180,7 @@ function ProfileCard({
   )
 }
 
-export function ProfilesTab() {
-  const state = useOutletContext<AppState>()
+export function ProfilesTab({ state }: { state: AppState }) {
   const snapshot = useProfileSubscription(state.socket)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
