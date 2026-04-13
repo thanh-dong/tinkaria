@@ -375,7 +375,7 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
 
         {/* Custom input */}
         <div className="transition-all bg-background">
-          <div className="flex pl-4 pr-5 items-center gap-3">
+          <div className="flex min-h-[55px] items-center gap-3 pl-4 pr-5">
             <Checkbox
               selected={!!customInput}
               multiSelect={currentQuestion.multiSelect}

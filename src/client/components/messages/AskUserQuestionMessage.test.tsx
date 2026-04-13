@@ -60,6 +60,18 @@ describe("AskUserQuestionMessage", () => {
     expect(html).toContain("focus-visible:ring-0")
   })
 
+  test("keeps the custom Other row at the same small-layout height as option rows", () => {
+    const html = renderToStaticMarkup(
+      <AskUserQuestionMessage
+        message={createMessage()}
+        onSubmit={() => {}}
+        isLatest
+      />
+    )
+
+    expect(html).toContain("min-h-[55px]")
+  })
+
   test("renders action options with only the intended bottom separator border", () => {
     const html = renderToStaticMarkup(
       <AskUserQuestionMessage
