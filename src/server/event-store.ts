@@ -3,6 +3,7 @@ import { homedir } from "node:os"
 import path from "node:path"
 import { getDataDir, LOG_PREFIX } from "../shared/branding"
 import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
+import type { ProviderProfile, ProviderProfileRecord, WorkspaceProfileOverride } from "../shared/profile-types"
 import type { AgentProvider, TranscriptEntry } from "../shared/types"
 import { STORE_VERSION } from "../shared/types"
 import {
@@ -11,6 +12,7 @@ import {
   type CoordinationEvent,
   type MessageEvent,
   type WorkspaceEvent,
+  type ProviderProfileEvent,
   type SandboxEvent,
   type WorkflowEvent,
   type SnapshotFile,
@@ -56,6 +58,7 @@ export class EventStore {
   private readonly reposLogPath: string
   private readonly workflowsLogPath: string
   private readonly sandboxLogPath: string
+  private readonly profilesLogPath: string
 
   constructor(dataDir = getDataDir(homedir())) {
     this.dataDir = dataDir
@@ -70,6 +73,7 @@ export class EventStore {
     this.reposLogPath = path.join(this.dataDir, "repos.jsonl")
     this.workflowsLogPath = path.join(this.dataDir, "workflows.jsonl")
     this.sandboxLogPath = path.join(this.dataDir, "sandbox.jsonl")
+    this.profilesLogPath = path.join(this.dataDir, "profiles.jsonl")
   }
 
   async initialize() {
@@ -84,6 +88,7 @@ export class EventStore {
     await this.ensureFile(this.reposLogPath)
     await this.ensureFile(this.workflowsLogPath)
     await this.ensureFile(this.sandboxLogPath)
+    await this.ensureFile(this.profilesLogPath)
     await this.loadSnapshot()
     await this.replayLogs()
     if (!(await this.hasLegacyTranscriptData()) && await this.shouldCompact()) {
@@ -114,6 +119,7 @@ export class EventStore {
       Bun.write(this.reposLogPath, ""),
       Bun.write(this.workflowsLogPath, ""),
       Bun.write(this.sandboxLogPath, ""),
+      Bun.write(this.profilesLogPath, ""),
     ])
   }
 
@@ -177,6 +183,18 @@ export class EventStore {
           this.state.sandboxByWorkspace.set(sandbox.workspaceId, sandbox)
         }
       }
+      if (parsed.providerProfiles?.length) {
+        for (const record of parsed.providerProfiles) {
+          this.state.providerProfiles.set(record.id, { ...record })
+        }
+      }
+      if (parsed.workspaceProfileOverrides?.length) {
+        for (const override of parsed.workspaceProfileOverrides) {
+          const wsMap = this.state.workspaceProfileOverrides.get(override.workspaceId) ?? new Map<string, WorkspaceProfileOverride>()
+          wsMap.set(override.profileId, { ...override })
+          this.state.workspaceProfileOverrides.set(override.workspaceId, wsMap)
+        }
+      }
       if (parsed.messages?.length) {
         this.snapshotHasLegacyMessages = true
         for (const messageSet of parsed.messages) {
@@ -199,6 +217,8 @@ export class EventStore {
     this.state.reposByPath.clear()
     this.state.workflowRunsByWorkspace.clear()
     this.state.sandboxByWorkspace.clear()
+    this.state.providerProfiles.clear()
+    this.state.workspaceProfileOverrides.clear()
     this.transcriptCache.clear()
   }
 
@@ -226,6 +246,8 @@ export class EventStore {
     await this.replayLog<WorkflowEvent>(this.workflowsLogPath)
     if (this.storageReset) return
     await this.replayLog<SandboxEvent>(this.sandboxLogPath)
+    if (this.storageReset) return
+    await this.replayLog<ProviderProfileEvent>(this.profilesLogPath)
   }
 
   private async replayLog<TEvent extends StoreEvent>(filePath: string) {
@@ -752,6 +774,38 @@ export class EventStore {
         }
         break
       }
+      case "provider_profile_saved": {
+        const existingProfile = this.state.providerProfiles.get(event.profileId)
+        this.state.providerProfiles.set(event.profileId, {
+          id: event.profileId,
+          profile: event.profile,
+          createdAt: existingProfile?.createdAt ?? event.timestamp,
+          updatedAt: event.timestamp,
+        })
+        break
+      }
+      case "provider_profile_removed": {
+        this.state.providerProfiles.delete(event.profileId)
+        for (const [, overrides] of this.state.workspaceProfileOverrides) {
+          overrides.delete(event.profileId)
+        }
+        break
+      }
+      case "workspace_profile_override_set": {
+        const wsOverrides = this.state.workspaceProfileOverrides.get(event.workspaceId) ?? new Map<string, WorkspaceProfileOverride>()
+        wsOverrides.set(event.profileId, {
+          profileId: event.profileId,
+          workspaceId: event.workspaceId,
+          overrides: event.overrides,
+          updatedAt: event.timestamp,
+        })
+        this.state.workspaceProfileOverrides.set(event.workspaceId, wsOverrides)
+        break
+      }
+      case "workspace_profile_override_removed": {
+        this.state.workspaceProfileOverrides.get(event.workspaceId)?.delete(event.profileId)
+        break
+      }
     }
   }
 
@@ -1158,6 +1212,28 @@ export class EventStore {
     await this.append<AgentConfigEvent>(this.agentConfigsLogPath, event)
   }
 
+  // --- Provider profile mutation methods ---
+
+  async saveProviderProfile(profileId: string, profile: ProviderProfile) {
+    const event: ProviderProfileEvent = { v: STORE_VERSION, type: "provider_profile_saved", timestamp: Date.now(), profileId, profile }
+    await this.append<ProviderProfileEvent>(this.profilesLogPath, event)
+  }
+
+  async removeProviderProfile(profileId: string) {
+    const event: ProviderProfileEvent = { v: STORE_VERSION, type: "provider_profile_removed", timestamp: Date.now(), profileId }
+    await this.append<ProviderProfileEvent>(this.profilesLogPath, event)
+  }
+
+  async setWorkspaceProfileOverride(workspaceId: string, profileId: string, overrides: Partial<Omit<ProviderProfile, "id" | "provider">>) {
+    const event: ProviderProfileEvent = { v: STORE_VERSION, type: "workspace_profile_override_set", timestamp: Date.now(), workspaceId, profileId, overrides }
+    await this.append<ProviderProfileEvent>(this.profilesLogPath, event)
+  }
+
+  async removeWorkspaceProfileOverride(workspaceId: string, profileId: string) {
+    const event: ProviderProfileEvent = { v: STORE_VERSION, type: "workspace_profile_override_removed", timestamp: Date.now(), workspaceId, profileId }
+    await this.append<ProviderProfileEvent>(this.profilesLogPath, event)
+  }
+
   // --- Repo mutation methods ---
 
   async addRepo(id: string, workspaceId: string, localPath: string, origin: string | null, label: string | null, branch: string | null) {
@@ -1392,6 +1468,14 @@ export class EventStore {
       ...(this.state.sandboxByWorkspace.size > 0 ? {
         sandboxes: [...this.state.sandboxByWorkspace.values()],
       } : {}),
+      ...(this.state.providerProfiles.size > 0 ? {
+        providerProfiles: [...this.state.providerProfiles.values()],
+      } : {}),
+      ...(this.state.workspaceProfileOverrides.size > 0 ? {
+        workspaceProfileOverrides: [...this.state.workspaceProfileOverrides.values()].flatMap(
+          (wsMap) => [...wsMap.values()],
+        ),
+      } : {}),
     }
   }
 
@@ -1408,6 +1492,7 @@ export class EventStore {
       Bun.write(this.reposLogPath, ""),
       Bun.write(this.workflowsLogPath, ""),
       Bun.write(this.sandboxLogPath, ""),
+      Bun.write(this.profilesLogPath, ""),
     ])
   }
 
@@ -1453,6 +1538,7 @@ export class EventStore {
       Bun.file(this.reposLogPath).size,
       Bun.file(this.workflowsLogPath).size,
       Bun.file(this.sandboxLogPath).size,
+      Bun.file(this.profilesLogPath).size,
     ])
     return sizes.reduce((total, size) => total + size, 0) >= COMPACTION_THRESHOLD_BYTES
   }

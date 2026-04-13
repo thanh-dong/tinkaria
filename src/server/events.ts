@@ -1,6 +1,7 @@
 import type { AgentProvider, IndependentWorkspace, WorkspaceSummary, TranscriptEntry } from "../shared/types"
 import type { WorkspaceTodo, WorkspaceClaim, WorkspaceWorktree, WorkspaceRule } from "../shared/workspace-types"
 import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
+import type { ProviderProfile, ProviderProfileRecord, WorkspaceProfileOverride } from "../shared/profile-types"
 import type { WorkflowRunState } from "../shared/workflow-types"
 import type { SandboxRecord, SandboxHealthReport, ResourceLimits } from "../shared/sandbox-types"
 
@@ -56,6 +57,8 @@ export interface StoreState {
   reposByPath: Map<string, string>
   workflowRunsByWorkspace: Map<string, Map<string, WorkflowRunState>>
   sandboxByWorkspace: Map<string, SandboxRecord>
+  providerProfiles: Map<string, ProviderProfileRecord>
+  workspaceProfileOverrides: Map<string, Map<string, WorkspaceProfileOverride>>
 }
 
 export function createEmptyCoordinationState(): WorkspaceCoordinationState {
@@ -80,6 +83,8 @@ export interface SnapshotFile {
   repos?: RepoRecord[]
   workflowRuns?: Array<{ workspaceId: string; runs: WorkflowRunState[] }>
   sandboxes?: SandboxRecord[]
+  providerProfiles?: ProviderProfileRecord[]
+  workspaceProfileOverrides?: WorkspaceProfileOverride[]
 }
 
 export type WorkspaceEvent = {
@@ -245,7 +250,13 @@ export type SandboxEvent =
   | { v: 3; type: "sandbox_error"; timestamp: number; id: string; error: string }
   | { v: 3; type: "sandbox_health_updated"; timestamp: number; id: string; health: SandboxHealthReport }
 
-export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent | RepoEvent | AgentConfigEvent | WorkflowEvent | SandboxEvent
+export type ProviderProfileEvent =
+  | { v: 3; type: "provider_profile_saved"; timestamp: number; profileId: string; profile: ProviderProfile }
+  | { v: 3; type: "provider_profile_removed"; timestamp: number; profileId: string }
+  | { v: 3; type: "workspace_profile_override_set"; timestamp: number; workspaceId: string; profileId: string; overrides: Partial<Omit<ProviderProfile, "id" | "provider">> }
+  | { v: 3; type: "workspace_profile_override_removed"; timestamp: number; workspaceId: string; profileId: string }
+
+export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent | RepoEvent | AgentConfigEvent | WorkflowEvent | SandboxEvent | ProviderProfileEvent
 
 export function createEmptyState(): StoreState {
   return {
@@ -259,6 +270,8 @@ export function createEmptyState(): StoreState {
     reposByPath: new Map(),
     workflowRunsByWorkspace: new Map(),
     sandboxByWorkspace: new Map(),
+    providerProfiles: new Map(),
+    workspaceProfileOverrides: new Map(),
   }
 }
 
