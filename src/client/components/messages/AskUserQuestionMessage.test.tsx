@@ -116,4 +116,18 @@ describe("AskUserQuestionMessage", () => {
     expect(html).not.toContain(">Questions<")
     expect(html).not.toContain(">Answers<")
   })
+
+  test("renders completed questions inside one bordered container without nested bordered cards", () => {
+    const html = renderToStaticMarkup(
+      <AskUserQuestionMessage
+        message={createCompletedMessage()}
+        onSubmit={() => {}}
+        isLatest
+      />
+    )
+
+    expect(html).toContain("divide-y")
+    expect(html).toContain("overflow-hidden")
+    expect(html).not.toContain("rounded-xl border border-border bg-background")
+  })
 })

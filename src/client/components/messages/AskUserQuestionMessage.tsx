@@ -305,44 +305,44 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
 
     return (
       <div className="w-full" {...getUiIdentityAttributeProps(ASK_USER_AREA_DESCRIPTOR)}>
-        <div className="rounded-2xl border border-border bg-card p-3 sm:p-4">
-          <dl className="space-y-3">
+        <div className="rounded-2xl border border-border overflow-hidden bg-card">
+          <dl className="divide-y divide-border">
             {questions.map((question) => {
-            const answerValue = displayAnswers[getQuestionKey(question)] || displayAnswers[question.question] || []
+              const answerValue = displayAnswers[getQuestionKey(question)] || displayAnswers[question.question] || []
 
-            return (
-              <div
-                key={getQuestionKey(question)}
-                className={cn("space-y-3 rounded-xl border border-border bg-background p-3 sm:p-4")}
-              >
-                <div className="space-y-1">
-                  <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                    Question
-                  </dt>
-                  <p className="text-sm text-foreground text-pretty">{question.question}</p>
-                </div>
-                {answerValue.length > 0 && (
+              return (
+                <div
+                  key={getQuestionKey(question)}
+                  className="space-y-3 bg-background p-3 sm:p-4"
+                >
                   <div className="space-y-1">
                     <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      {isDiscarded ? "Status" : "Answer"}
+                      Question
                     </dt>
-                    <dd className="text-sm font-medium text-foreground">
-                      {answerValue.join(", ")}
-                    </dd>
+                    <p className="text-sm text-foreground text-pretty">{question.question}</p>
                   </div>
-                )}
-                {answerValue.length === 0 && (
-                  <div className="space-y-1">
-                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      {isDiscarded ? "Status" : "Answer"}
-                    </dt>
-                    <dd className="text-sm font-medium italic text-muted-foreground">
-                      {isDiscarded ? "Discarded" : "No Response"}
-                    </dd>
+                  {answerValue.length > 0 && (
+                    <div className="space-y-1">
+                      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                        {isDiscarded ? "Status" : "Answer"}
+                      </dt>
+                      <dd className="text-sm font-medium text-foreground">
+                        {answerValue.join(", ")}
+                      </dd>
+                    </div>
+                  )}
+                  {answerValue.length === 0 && (
+                    <div className="space-y-1">
+                      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                        {isDiscarded ? "Status" : "Answer"}
+                      </dt>
+                      <dd className="text-sm font-medium italic text-muted-foreground">
+                        {isDiscarded ? "Discarded" : "No Response"}
+                      </dd>
+                    </div>
+                  )}
                   </div>
-                )}
-              </div>
-            )
+              )
             })}
           </dl>
         </div>
