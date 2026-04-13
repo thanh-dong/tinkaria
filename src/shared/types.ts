@@ -705,6 +705,7 @@ export type OrchestrationChildStatus =
 
 export interface OrchestrationChildNode {
   chatId: string
+  externalSessionId?: string
   status: OrchestrationChildStatus
   spawnedAt: number
   lastStatusAt: number

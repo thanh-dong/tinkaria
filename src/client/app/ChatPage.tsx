@@ -832,6 +832,7 @@ export function ChatPage() {
           <div className="px-3 pb-2">
             <div className="max-w-[840px] mx-auto flex justify-end">
               <SubagentIndicator
+                parentChatId={state.activeChatId}
                 hierarchy={state.orchestrationHierarchy}
                 socket={state.socket}
                 localPath={state.runtime?.localPath ?? undefined}

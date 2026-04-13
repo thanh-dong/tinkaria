@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject
 import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react"
 import { Button } from "../ui/button"
 import { ChatTranscript } from "../../app/ChatTranscript"
-import { fetchTranscriptMessageCount, fetchTranscriptRange } from "../../app/appState.helpers"
+import { fetchExternalSessionTranscript, fetchTranscriptMessageCount, fetchTranscriptRange } from "../../app/appState.helpers"
 import { getLatestToolIds } from "../../app/derived"
 import type { AppTransport } from "../../app/socket-interface"
 import { createIncrementalHydrator } from "../../lib/parseTranscript"
@@ -274,6 +274,7 @@ export function SubagentInspectorTranscript({
 }
 
 interface SubagentIndicatorProps {
+  parentChatId: string | null
   hierarchy: OrchestrationHierarchySnapshot | null
   socket: AppTransport
   localPath?: string
@@ -284,6 +285,7 @@ interface SubagentIndicatorProps {
 }
 
 export const SubagentIndicator = memo(function SubagentIndicator({
+  parentChatId,
   hierarchy,
   socket,
   localPath,
@@ -340,6 +342,41 @@ export const SubagentIndicator = memo(function SubagentIndicator({
       isLoading: true,
       error: null,
     })
+
+    if (selectedNode?.externalSessionId) {
+      let cancelled = false
+
+      void fetchExternalSessionTranscript({
+        socket,
+        parentChatId: parentChatId ?? "",
+        sessionId: selectedNode.externalSessionId,
+        timeoutMs: 120_000,
+      }).then((entries) => {
+        if (cancelled) return
+        const hydrator = createIncrementalHydrator()
+        for (const entry of entries) {
+          hydrator.hydrate(entry)
+        }
+        setSession({
+          snapshot: null,
+          messages: hydrator.getMessages(),
+          isLoading: false,
+          error: null,
+        })
+      }).catch((error) => {
+        if (cancelled) return
+        setSession({
+          snapshot: null,
+          messages: [],
+          isLoading: false,
+          error: describeTranscriptError(error),
+        })
+      })
+
+      return () => {
+        cancelled = true
+      }
+    }
 
     const hydrator = createIncrementalHydrator()
     let cancelled = false
@@ -423,7 +460,7 @@ export const SubagentIndicator = memo(function SubagentIndicator({
       if (pendingRaf !== null) cancelAnimationFrame(pendingRaf)
       unsubscribe()
     }
-  }, [open, selectedChatId, socket])
+  }, [open, parentChatId, selectedChatId, selectedNode?.externalSessionId, socket])
 
   useEffect(() => refreshSelectedSession(), [refreshSelectedSession])
 

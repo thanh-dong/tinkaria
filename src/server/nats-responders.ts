@@ -11,7 +11,7 @@ import type { NatsPublisher } from "./nats-publisher"
 import { commandSubject } from "../shared/nats-subjects"
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
-import { inspectSessionRuntime } from "./session-discovery"
+import { inspectSessionRuntime, readSessionTranscript } from "./session-discovery"
 import { DEFAULT_RESOURCE_LIMITS } from "../shared/sandbox-types"
 import { readRepoStatus } from "./repo-status"
 import { generateForkPromptForChat } from "./generate-fork-context"
@@ -75,6 +75,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
   "chat.getMessageCount",
+  "chat.getExternalSessionMessages",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
   "workspace.coordination.snapshot",
@@ -110,6 +111,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
   "chat.getMessageCount",
+  "chat.getExternalSessionMessages",
   "terminal.create",
   "terminal.input",
   "terminal.resize",
@@ -415,6 +417,18 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         return {
           messageCount: await store.getMessageCount(command.chatId),
         }
+      }
+
+      case "chat.getExternalSessionMessages": {
+        const chat = store.getChat(command.parentChatId)
+        if (!chat?.provider) {
+          return []
+        }
+        const project = store.getProject(chat.workspaceId)
+        if (!project) {
+          return []
+        }
+        return await readSessionTranscript(command.sessionId, chat.provider, project.localPath)
       }
 
       case "snapshot.subscribe": {

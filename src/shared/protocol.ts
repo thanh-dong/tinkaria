@@ -74,6 +74,7 @@ export type ClientCommand =
   | { type: "chat.getSessionRuntime"; chatId: string }
   | { type: "chat.getRepoStatus"; chatId: string }
   | { type: "chat.getMessageCount"; chatId: string }
+  | { type: "chat.getExternalSessionMessages"; parentChatId: string; sessionId: string }
   | { type: "terminal.create"; workspaceId: string; terminalId: string; cols: number; rows: number; scrollback: number }
   | { type: "terminal.input"; terminalId: string; data: string }
   | { type: "terminal.resize"; terminalId: string; cols: number; rows: number }

@@ -117,6 +117,7 @@ describe("SubagentInspectorTranscript", () => {
 describe("SubagentIndicator", () => {
   test("renders nothing when no hierarchy is available", () => {
     const html = renderToStaticMarkup(createElement(SubagentIndicator, {
+      parentChatId: "parent-chat",
       hierarchy: null,
       socket: createSocket(),
       onOpenLocalLink: () => {},
@@ -129,6 +130,7 @@ describe("SubagentIndicator", () => {
   test("renders the trigger summary when agents are present", () => {
     const html = renderToStaticMarkup(
       createElement(SubagentIndicator, {
+        parentChatId: "parent-chat",
         hierarchy: {
           children: [
             makeNode({ chatId: "agent-1", status: "running", instruction: "Inspect regression" }),

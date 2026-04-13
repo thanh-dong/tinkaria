@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   clearPendingSessionBootstrapAfterAttempt,
   enrichCommandError,
+  fetchExternalSessionTranscript,
   fetchTranscriptMessageCount,
   fetchTranscriptRange,
   filterPendingDeletedChats,
@@ -44,6 +45,17 @@ function createMockGetMessageCountCommand(
 ): AppTransport["command"] {
   return async <TResult = unknown>(command: Parameters<AppTransport["command"]>[0]) => {
     if (command.type !== "chat.getMessageCount") {
+      throw new Error(`Unexpected command ${command.type}`)
+    }
+    return await handler(command) as TResult
+  }
+}
+
+function createMockGetExternalSessionMessagesCommand(
+  handler: (command: Extract<Parameters<AppTransport["command"]>[0], { type: "chat.getExternalSessionMessages" }>) => Promise<unknown>
+): AppTransport["command"] {
+  return async <TResult = unknown>(command: Parameters<AppTransport["command"]>[0]) => {
+    if (command.type !== "chat.getExternalSessionMessages") {
       throw new Error(`Unexpected command ${command.type}`)
     }
     return await handler(command) as TResult
@@ -345,6 +357,24 @@ describe("fetchTranscriptMessageCount", () => {
       socket,
       chatId: "chat-1",
     })).resolves.toBe(7)
+  })
+})
+
+describe("fetchExternalSessionTranscript", () => {
+  test("returns transcript entries for an external provider session", async () => {
+    const socket = createTransportWithCommand(createMockGetExternalSessionMessagesCommand(async (command) => {
+      expect(command.parentChatId).toBe("chat-1")
+      expect(command.sessionId).toBe("thread-2")
+      return [{ _id: "entry-1", kind: "assistant_text", createdAt: 1, messageId: "m1", text: "done" }]
+    }))
+
+    await expect(fetchExternalSessionTranscript({
+      socket,
+      parentChatId: "chat-1",
+      sessionId: "thread-2",
+    })).resolves.toEqual([
+      { _id: "entry-1", kind: "assistant_text", createdAt: 1, messageId: "m1", text: "done" },
+    ])
   })
 })
 

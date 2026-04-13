@@ -307,6 +307,7 @@ export class SessionOrchestrator {
           .filter((child) => !seenIds.has(child.chatId))
           .map((child) => ({
             chatId: child.chatId,
+            externalSessionId: child.chatId,
             status: child.status,
             spawnedAt: child.spawnedAt,
             lastStatusAt: child.lastStatusAt,
@@ -408,7 +409,8 @@ export class SessionOrchestrator {
         if (status === "spawning" || status === "running" || status === "waiting") {
           count += 1
         }
-      } catch {
+      } catch (error) {
+        void (error instanceof Error ? error.message : String(error))
         // Chat may have been disposed — skip
       }
     }

@@ -1,5 +1,5 @@
 import { afterEach, describe, test, expect } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { NatsServer } from "@lagz0ne/nats-embedded"
@@ -710,6 +710,28 @@ describe("nats-responders", () => {
 
     expect(res.ok).toBe(true)
     expect(res.result).toEqual({ messageCount: 3 })
+  })
+
+  test("chat.getExternalSessionMessages returns transcript entries for a provider session", async () => {
+    const sessionId = `responders-codex-${Date.now()}`
+    const codexSessionsDir = path.join(process.env.HOME ?? "", ".codex", "sessions")
+    await mkdir(codexSessionsDir, { recursive: true })
+    await writeFile(path.join(codexSessionsDir, `${sessionId}.jsonl`), [
+      JSON.stringify({ type: "session_meta", payload: { id: sessionId, cwd: "/tmp/test-project" } }),
+      JSON.stringify({ timestamp: "2026-04-13T12:00:00.000Z", type: "event_msg", payload: { type: "agent_message", message: "Loaded external transcript" } }),
+    ].join("\n") + "\n")
+
+    const { clientNc } = await setup()
+    const res = await sendCommand(clientNc, {
+      type: "chat.getExternalSessionMessages",
+      parentChatId: "chat-1",
+      sessionId,
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual([
+      expect.objectContaining({ kind: "assistant_text", text: "Loaded external transcript" }),
+    ])
   })
 
   test("snapshot.unsubscribe removes subscription", async () => {

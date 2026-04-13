@@ -792,6 +792,7 @@ describe("SessionOrchestrator", () => {
 
       expect(hierarchy.children).toHaveLength(1)
       expect(hierarchy.children[0]!.chatId).toBe("thread-2")
+      expect(hierarchy.children[0]!.externalSessionId).toBe("thread-2")
       expect(hierarchy.children[0]!.instruction).toBe("Inspect tests")
       expect(hierarchy.children[0]!.status).toBe("running")
     })

@@ -6,7 +6,9 @@ import type {
   DiscoveredSessionRuntime,
   DiscoveredSessionTokenUsage,
   DiscoveredSessionUsageBucket,
+  TranscriptEntry,
 } from "../shared/types"
+import { timestamped } from "../shared/transcript-entries"
 
 const TAIL_BYTES = 32 * 1024
 
@@ -312,4 +314,153 @@ export async function inspectSessionRuntime(
   const filePath = await findSessionFile(sessionId, provider, workspacePath)
   if (!filePath) return null
   return inspectSessionRuntimeFile(filePath, provider)
+}
+
+function sessionEntryTimestamp(record: Record<string, unknown>): number {
+  const rawTimestamp = normalizeString(record.timestamp)
+  const parsed = rawTimestamp ? Date.parse(rawTimestamp) : Number.NaN
+  return Number.isFinite(parsed) ? parsed : Date.now()
+}
+
+function pushSessionEntry(entries: TranscriptEntry[], entry: TranscriptEntry): void {
+  const previous = entries.at(-1)
+  if (!previous) {
+    entries.push(entry)
+    return
+  }
+
+  if (previous.kind !== entry.kind) {
+    entries.push(entry)
+    return
+  }
+
+  const previousText = previous.kind === "assistant_text"
+    ? previous.text
+    : previous.kind === "user_prompt"
+      ? previous.content
+      : null
+  const nextText = entry.kind === "assistant_text"
+    ? entry.text
+    : entry.kind === "user_prompt"
+      ? entry.content
+      : null
+
+  if (previousText !== null && previousText === nextText) {
+    return
+  }
+
+  entries.push(entry)
+}
+
+function parseClaudeSessionTranscript(lines: string[]): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = []
+
+  for (const line of lines) {
+    const parsed = parseJsonLine(line)
+    if (!parsed) continue
+
+    const type = normalizeString(parsed.type)
+    const message = isRecord(parsed.message) ? parsed.message : null
+    if (type === "user") {
+      const content = extractContentText(message?.content ?? message, 100_000)
+      if (!content) continue
+      pushSessionEntry(entries, timestamped({
+        kind: "user_prompt",
+        content,
+      }, sessionEntryTimestamp(parsed)))
+      continue
+    }
+
+    if (type === "assistant") {
+      const text = extractContentText(message?.content ?? message, 100_000)
+      if (!text) continue
+      pushSessionEntry(entries, timestamped({
+        kind: "assistant_text",
+        text,
+      }, sessionEntryTimestamp(parsed)))
+    }
+  }
+
+  return entries
+}
+
+function parseCodexSessionTranscript(lines: string[]): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = []
+
+  for (const line of lines) {
+    const parsed = parseJsonLine(line)
+    if (!parsed) continue
+
+    const lineType = normalizeString(parsed.type)
+    if (lineType === "event_msg") {
+      const payload = isRecord(parsed.payload) ? parsed.payload : null
+      const payloadType = normalizeString(payload?.type)
+      if (payloadType === "user_message") {
+        const content = extractContentText(payload?.message, 100_000)
+        if (!content) continue
+        pushSessionEntry(entries, timestamped({
+          kind: "user_prompt",
+          content,
+        }, sessionEntryTimestamp(parsed)))
+        continue
+      }
+
+      if (payloadType === "agent_message") {
+        const text = extractContentText(payload?.message, 100_000)
+        if (!text) continue
+        pushSessionEntry(entries, timestamped({
+          kind: "assistant_text",
+          text,
+        }, sessionEntryTimestamp(parsed)))
+      }
+      continue
+    }
+
+    if (lineType !== "response_item") continue
+    const payload = isRecord(parsed.payload) ? parsed.payload : null
+    if (normalizeString(payload?.type) !== "message") continue
+
+    const role = normalizeString(payload?.role)
+    const content = extractContentText(payload?.content, 100_000)
+    if (!content) continue
+
+    if (role === "user") {
+      pushSessionEntry(entries, timestamped({
+        kind: "user_prompt",
+        content,
+      }, sessionEntryTimestamp(parsed)))
+      continue
+    }
+
+    if (role === "assistant") {
+      pushSessionEntry(entries, timestamped({
+        kind: "assistant_text",
+        text: content,
+      }, sessionEntryTimestamp(parsed)))
+    }
+  }
+
+  return entries
+}
+
+export async function readSessionTranscript(
+  sessionId: string,
+  provider: AgentProvider,
+  workspacePath: string
+): Promise<TranscriptEntry[]> {
+  const filePath = await findSessionFile(sessionId, provider, workspacePath)
+  if (!filePath) return []
+
+  const raw = await Bun.file(filePath).text()
+  const lines = raw.split("\n").filter(Boolean)
+
+  if (provider === "claude") {
+    return parseClaudeSessionTranscript(lines)
+  }
+
+  if (provider === "codex") {
+    return parseCodexSessionTranscript(lines)
+  }
+
+  return []
 }

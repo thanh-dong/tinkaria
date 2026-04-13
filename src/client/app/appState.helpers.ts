@@ -217,6 +217,19 @@ export async function fetchTranscriptMessageCount(args: {
   return result.messageCount
 }
 
+export async function fetchExternalSessionTranscript(args: {
+  socket: AppTransport
+  parentChatId: string
+  sessionId: string
+  timeoutMs?: number
+}): Promise<TranscriptEntry[]> {
+  return await args.socket.command<TranscriptEntry[]>({
+    type: "chat.getExternalSessionMessages",
+    parentChatId: args.parentChatId,
+    sessionId: args.sessionId,
+  }, args.timeoutMs ? { timeoutMs: args.timeoutMs } : undefined)
+}
+
 export function removeChatFromSidebar(data: SidebarData, chatId: string): SidebarData {
   const filtered = data.workspaceGroups
     .map((group) => {

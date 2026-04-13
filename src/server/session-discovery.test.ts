@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, writeFile, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { homedir } from "node:os"
-import { findSessionFile, inspectSessionRuntime } from "./session-discovery"
+import { findSessionFile, inspectSessionRuntime, readSessionTranscript } from "./session-discovery"
 
 const tempDirs: string[] = []
 
@@ -104,5 +104,26 @@ describe("inspectSessionRuntime", () => {
     expect(runtime).not.toBeNull()
     expect(runtime?.model).toBe("gpt-5.4")
     expect(runtime?.tokenUsage?.totalTokens).toBe(4312)
+  })
+})
+
+describe("readSessionTranscript", () => {
+  test("reads codex session files into transcript entries", async () => {
+    const sessionId = `transcript-codex-${Date.now()}`
+    const codexSessionsDir = join(homedir(), ".codex", "sessions")
+    await mkdir(codexSessionsDir, { recursive: true })
+
+    const sessionFile = join(codexSessionsDir, `${sessionId}.jsonl`)
+    await writeFile(sessionFile, [
+      JSON.stringify({ type: "session_meta", payload: { id: sessionId, cwd: "/some/path" } }),
+      JSON.stringify({ timestamp: "2026-04-13T12:00:00.000Z", type: "event_msg", payload: { type: "user_message", message: "Check child transcript" } }),
+      JSON.stringify({ timestamp: "2026-04-13T12:00:01.000Z", type: "event_msg", payload: { type: "agent_message", message: "Found the issue." } }),
+    ].join("\n") + "\n")
+    tempDirs.push(sessionFile)
+
+    await expect(readSessionTranscript(sessionId, "codex", "/some/path")).resolves.toEqual([
+      expect.objectContaining({ kind: "user_prompt", content: "Check child transcript" }),
+      expect.objectContaining({ kind: "assistant_text", text: "Found the issue." }),
+    ])
   })
 })
