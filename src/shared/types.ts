@@ -209,17 +209,6 @@ export interface IndependentWorkspace {
   updatedAt: number
 }
 
-export interface DiscoveredSession {
-  sessionId: string
-  provider: AgentProvider
-  source: "tinkaria" | "cli"
-  title: string
-  lastExchange: { question: string; answer: string } | null
-  modifiedAt: number
-  chatId: string | null
-  runtime?: DiscoveredSessionRuntime
-}
-
 export interface DiscoveredSessionRuntime {
   model?: string
   tokenUsage?: DiscoveredSessionTokenUsage
@@ -236,12 +225,6 @@ export interface DiscoveredSessionTokenUsage {
 export interface DiscoveredSessionUsageBucket {
   label: string
   usedPercent: number
-}
-
-export interface SessionsSnapshot {
-  workspaceId: string
-  workspacePath: string
-  sessions: DiscoveredSession[]
 }
 
 export interface LocalWorkspaceSummary {

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useState } from "react"
 import type { useNavigate } from "react-router-dom"
 import { APP_NAME } from "../../shared/branding"
 import type {
@@ -9,7 +9,6 @@ import type {
   ClaudeModelOptions,
   CodexModelOptions,
   ModelOptions,
-  SessionsSnapshot,
   UpdateInstallResult,
   UpdateSnapshot,
 } from "../../shared/types"
@@ -146,7 +145,6 @@ export interface ChatCommandsArgs {
   updateSubmitPipeline: (updater: (current: SubmitPipelineState) => SubmitPipelineState) => SubmitPipelineState
   submitPipeline: SubmitPipelineState
   submitPipelineRef: React.MutableRefObject<SubmitPipelineState>
-  activeSessionsSubs: React.MutableRefObject<Map<string, () => void>>
   pendingDeletedChatIdsRef: React.MutableRefObject<Set<string>>
 }
 
@@ -156,9 +154,6 @@ export interface ChatCommandsReturn {
   startingLocalPath: string | null
   pendingSessionBootstrap: PendingSessionBootstrap | null
   pendingMergeProjectId: string | null
-  sessionsSnapshots: Map<string, SessionsSnapshot>
-  sessionsWindowDays: Map<string, number>
-
   // Handlers
   handleCreateChat: (workspaceId: string) => Promise<void>
   handleOpenLocalProject: (localPath: string) => Promise<void>
@@ -181,10 +176,6 @@ export interface ChatCommandsReturn {
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
   handleOpenExternalLink: (href: string) => boolean
   closeLocalFilePreview: () => void
-  handleOpenSessionPicker: (workspaceId: string, open: boolean) => void
-  handleResumeSession: (workspaceId: string, sessionId: string, provider: AgentProvider) => Promise<void>
-  handleRefreshSessions: (workspaceId: string) => void
-  handleShowMoreSessions: (workspaceId: string) => void
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
@@ -232,7 +223,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     updateSubmitPipeline,
     submitPipeline,
     submitPipelineRef,
-    activeSessionsSubs,
     pendingDeletedChatIdsRef,
   } = args
 
@@ -242,9 +232,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
   const [startingLocalPath, setStartingLocalPath] = useState<string | null>(null)
   const [pendingMergeProjectId, setPendingMergeProjectId] = useState<string | null>(null)
   const [pendingSessionBootstrap, setPendingSessionBootstrap] = useState<PendingSessionBootstrap | null>(null)
-  const [sessionsSnapshots, setSessionsSnapshots] = useState<Map<string, SessionsSnapshot>>(new Map())
-  const [sessionsWindowDays, setSessionsWindowDays] = useState<Map<string, number>>(new Map())
-
   // --- Internal helpers ---
 
   function maybeFlushQueuedSubmit(chatId: string, chatIsProcessing: boolean) {
@@ -675,68 +662,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     return false
   }
 
-  // --- Session commands ---
-
-  const handleOpenSessionPicker = useCallback(
-    (workspaceId: string, open: boolean) => {
-      if (open) {
-        if (activeSessionsSubs.current.has(workspaceId)) return
-        const unsub = socket.subscribe<SessionsSnapshot>(
-          { type: "sessions", workspaceId },
-          (snapshot) => {
-            setSessionsSnapshots((prev) => new Map(prev).set(workspaceId, snapshot))
-          }
-        )
-        activeSessionsSubs.current.set(workspaceId, unsub)
-      } else {
-        const unsub = activeSessionsSubs.current.get(workspaceId)
-        unsub?.()
-        activeSessionsSubs.current.delete(workspaceId)
-      }
-    },
-    [socket]
-  )
-
-  const handleResumeSession = useCallback(
-    async (workspaceId: string, sessionId: string, provider: AgentProvider) => {
-      try {
-        const result = await socket.command<{ chatId: string }>({
-          type: "sessions.resume",
-          workspaceId,
-          sessionId,
-          provider,
-        })
-        if (result?.chatId) {
-          setPendingChatId(result.chatId)
-          navigate(`/chat/${result.chatId}`)
-        }
-        setCommandError(null)
-      } catch (error) {
-        setCommandError(error instanceof Error ? error.message : String(error))
-      }
-    },
-    [navigate, setPendingChatId, setCommandError, socket]
-  )
-
-  const handleRefreshSessions = useCallback(
-    (workspaceId: string) => {
-      void socket.command({ type: "sessions.refresh", workspaceId }).catch((error) => {
-        setCommandError(error instanceof Error ? error.message : String(error))
-      })
-    },
-    [setCommandError, socket]
-  )
-
-  const handleShowMoreSessions = useCallback(
-    (workspaceId: string) => {
-      setSessionsWindowDays((prev) => {
-        const current = prev.get(workspaceId) ?? 7
-        return new Map(prev).set(workspaceId, current + 7)
-      })
-    },
-    []
-  )
-
   // --- Fork/merge commands ---
 
   async function handleForkSession(
@@ -936,9 +861,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     startingLocalPath,
     pendingSessionBootstrap,
     pendingMergeProjectId,
-    sessionsSnapshots,
-    sessionsWindowDays,
-
     // Handlers
     handleCreateChat,
     handleOpenLocalProject,
@@ -958,10 +880,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     handleOpenLocalLink,
     handleOpenExternalLink,
     closeLocalFilePreview: () => setLocalFilePreview(null),
-    handleOpenSessionPicker,
-    handleResumeSession,
-    handleRefreshSessions,
-    handleShowMoreSessions,
     handleCompose,
     handleForkSession,
     handleMergeSession,

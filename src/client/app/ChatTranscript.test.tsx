@@ -226,6 +226,17 @@ describe("groupMessages", () => {
     expect(items[3].type).toBe("single") // special tool
   })
 
+  test("all-text wip before special tool ejects everything as singles", () => {
+    const msgs = [text("Context"), text("Pick one:"), specialTool()]
+    const items = groupMessages(msgs, true)
+
+    // Both texts ejected, nothing left for wip-block
+    expect(items).toHaveLength(3)
+    expect(items[0].type).toBe("single") // "Context"
+    expect(items[1].type).toBe("single") // "Pick one:"
+    expect(items[2].type).toBe("single") // special tool
+  })
+
   test("tool-only groups outside narration context use tool-group", () => {
     const msgs = [text("Answer"), tool(), tool()]
     // "Answer" is the last text (answer), then 2 tools follow
@@ -301,23 +312,6 @@ describe("groupMessages", () => {
     if (items[1].type === "single") {
       expect(items[1].message.kind).toBe("tool")
     }
-  })
-
-  test("assistant_text → special tool → more content terminates and preserves order", () => {
-    // Same as above but with content after the special tool to verify `index` ends
-    // up in the right place.
-    const msgs = [
-      text("Rationale"), specialTool(), text("After answer"),
-      text("More narration"), specialTool(), text("Final answer"),
-    ]
-    const items = groupMessages(msgs, false)
-    // Rationale→single, special→single, (After answer + More narration) ejected from wip,
-    // special→single, Final answer→single (it's the answer)
-    expect(items.length).toBeGreaterThanOrEqual(5)
-    // First two items: rationale text, then special tool
-    expect(items[0].type).toBe("single")
-    expect(items[1].type).toBe("single")
-    if (items[1].type === "single") expect(items[1].message.kind).toBe("tool")
   })
 
   test("user_prompt resets context — no cross-turn grouping", () => {

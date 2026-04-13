@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { shouldRefreshStaleSessionOnResume, getResumeRefreshSessionProjectIds } from "./appState.helpers"
+import { shouldRefreshStaleSessionOnResume } from "./appState.helpers"
 import type { AppTransport, SocketStatus } from "./socket-interface"
 
 const RESUME_REFRESH_DEDUP_WINDOW_MS = 1_000
@@ -16,12 +16,11 @@ export function usePwaResume(args: {
   socket: AppTransport
   activeChatId: string | null
   connectionStatus: SocketStatus
-  openSessionProjectIds: Iterable<string>
   setNormalizedCommandError: (error: unknown) => void
 }): {
   resumeRefreshNonce: number
 } {
-  const { socket, activeChatId, connectionStatus, openSessionProjectIds, setNormalizedCommandError } = args
+  const { socket, activeChatId, connectionStatus } = args
 
   const backgroundedAtRef = useRef<number | null>(null)
   const lastResumeRefreshAtRef = useRef(0)
@@ -84,16 +83,6 @@ export function usePwaResume(args: {
       window.removeEventListener("pageshow", handlePageShow)
     }
   }, [activeChatId, connectionStatus, socket])
-
-  useEffect(() => {
-    if (resumeRefreshNonce === 0) return
-
-    for (const workspaceId of getResumeRefreshSessionProjectIds(openSessionProjectIds)) {
-      void socket.command({ type: "sessions.refresh", workspaceId }).catch((error) => {
-        setNormalizedCommandError(error)
-      })
-    }
-  }, [resumeRefreshNonce, setNormalizedCommandError, socket])
 
   return { resumeRefreshNonce }
 }

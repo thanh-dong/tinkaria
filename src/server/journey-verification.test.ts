@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import process from "node:process"
@@ -11,7 +11,6 @@ import {
   HOME_TO_FORK_DIALOG_JOURNEY,
   HOME_TO_MERGE_DIALOG_JOURNEY,
   HOME_TO_NEW_CHAT_JOURNEY,
-  HOME_TO_SESSION_PICKER_JOURNEY,
   matchesJourneyRoute,
   type StageProbeResult,
 } from "./journey-verification"
@@ -44,8 +43,6 @@ interface FixtureEnvironment {
   fixtureProjectDir: string
   fixtureProjectTitle: string
   dataDir: string
-  cliSessionId: string
-  cliSessionPrompt: string
 }
 
 const activeServers: RunningDevServer[] = []
@@ -160,50 +157,17 @@ async function createFixtureEnvironment(): Promise<FixtureEnvironment> {
   const fixtureProjectDir = path.join(homeDir, "workspace", fixtureProjectTitle)
   const codexDir = path.join(homeDir, ".codex")
   const configPath = path.join(codexDir, "config.toml")
-  const sessionDir = path.join(codexDir, "sessions", "2026", "04", "09")
-  const cliSessionId = crypto.randomUUID()
-  const cliSessionPrompt = "resume investigation of deterministic browser journeys"
 
   await mkdir(fixtureProjectDir, { recursive: true })
   await mkdir(codexDir, { recursive: true })
-  await mkdir(sessionDir, { recursive: true })
   await writeFile(path.join(fixtureProjectDir, "README.md"), "# journey fixture\n")
   await writeFile(configPath, `[projects."${fixtureProjectDir}"]\n`)
-  await writeFile(
-    path.join(sessionDir, `${cliSessionId}.jsonl`),
-    [
-      JSON.stringify({
-        type: "session_meta",
-        payload: {
-          id: cliSessionId,
-          cwd: fixtureProjectDir,
-          timestamp: "2026-04-09T12:00:00.000Z",
-        },
-      }),
-      JSON.stringify({
-        type: "user",
-        timestamp: "2026-04-09T12:00:01.000Z",
-        message: {
-          content: cliSessionPrompt,
-        },
-      }),
-      JSON.stringify({
-        type: "assistant",
-        timestamp: "2026-04-09T12:00:02.000Z",
-        message: {
-          content: "Latest state captured for restart-safe session picker coverage.",
-        },
-      }),
-    ].join("\n") + "\n",
-  )
 
   return {
     homeDir,
     fixtureProjectDir,
     fixtureProjectTitle,
     dataDir: getDataDir(homeDir, { TINKARIA_RUNTIME_PROFILE: "dev" }),
-    cliSessionId,
-    cliSessionPrompt,
   }
 }
 
@@ -495,24 +459,6 @@ describe("journey verification inventory", () => {
         },
       ],
     })
-    expect(structuredClone(HOME_TO_SESSION_PICKER_JOURNEY)).toMatchObject({
-      id: "homepage-to-session-picker",
-      stages: [
-        expect.anything(),
-        expect.anything(),
-        {
-          id: "session-picker.open",
-          owners: ["c3-113"],
-          route: { kind: "prefix", value: "/chat/" },
-          requiredUiIds: expect.arrayContaining([
-            "sidebar.project-group.sessions.action",
-            "sidebar.project-group.sessions.popover",
-            "sidebar.project-group.sessions.search.input",
-            "sidebar.project-group.sessions.list",
-          ]),
-        },
-      ],
-    })
   })
 
   describe.serial("browser integration", () => {
@@ -576,73 +522,6 @@ describe("journey verification inventory", () => {
     expect(mergeStage.probe.missing).toEqual([])
     expect(mergeStage.probe.c3ByUiId["chat.merge-session.dialog"]).toBe("c3-110")
   }, 90_000)
-
-  test("verifies the session picker journey and persisted chat after restart", async () => {
-    closeAllAgentBrowsers()
-    const session = `journey-${crypto.randomUUID()}`
-    activeAgentBrowserSessions.add(session)
-
-    const fixture = await createFixtureEnvironment()
-    activeHomes.push(fixture.homeDir)
-
-    const firstServer = await startIsolatedDevServer(fixture.homeDir)
-    setBrowserOffline(session, false)
-    runAgentBrowserJson<Record<string, unknown>>(session, ["open", `http://127.0.0.1:${firstServer.clientPort}/`])
-
-    const { persistedState } = await openNewChatFromHomepage(session, fixture)
-
-    evalBrowser<{ clicked: boolean }>(session, `(() => {
-      const button = document.querySelector('[data-ui-id="sidebar.project-group.sessions.action"]');
-      if (!(button instanceof HTMLElement)) return { clicked: false };
-      button.click();
-      return { clicked: true };
-    })()`)
-
-    const sessionPickerStage = await waitForStage(session, "session-picker.open")
-    expect(sessionPickerStage.probe.missing).toEqual([])
-    expect(sessionPickerStage.probe.c3ByUiId["sidebar.project-group.sessions.popover"]).toBe("c3-113")
-    // The session picker shows sessions from a NATS subscription that fires asynchronously.
-    // Poll until the session list populates with the fixture's CLI session prompt.
-    // Poll the session list content. The sessions subscription delivers data asynchronously
-    // via NATS, so the list may initially show "No sessions found" until the snapshot arrives.
-    // If still empty after a short wait, close and reopen the picker to re-trigger the subscription.
-    const foundSessions = await waitFor("session-picker sessions loaded", async () => {
-      const details = evalBrowser<{ listText: string }>(session, `(() => {
-        const list = document.querySelector('[data-ui-id="sidebar.project-group.sessions.list"]');
-        return { listText: list?.textContent?.trim() ?? "" };
-      })()`)
-      if (details.listText.includes(fixture.cliSessionPrompt)) return details
-      // Toggle the picker to re-trigger the subscription
-      evalBrowser<void>(session, `(() => {
-        const btn = document.querySelector('[data-ui-id="sidebar.project-group.sessions.action"]');
-        if (btn instanceof HTMLElement) { btn.click(); setTimeout(() => btn.click(), 200); }
-      })()`)
-      return false
-    }, 15_000)
-    expect(foundSessions.listText).toContain(fixture.cliSessionPrompt)
-
-    await stopServer(firstServer)
-    activeServers.splice(activeServers.indexOf(firstServer), 1)
-
-    const restartedServer = await startIsolatedDevServer(fixture.homeDir)
-    setBrowserOffline(session, false)
-    runAgentBrowserJson<Record<string, unknown>>(session, ["open", `http://127.0.0.1:${restartedServer.clientPort}/chat/${persistedState.chatId}`])
-
-    const restartedChatStage = await waitForStage(session, "chat.ready")
-    expect(extractPathname(restartedChatStage.url)).toBe(`/chat/${persistedState.chatId}`)
-
-    const chatRows = evalBrowser<{ rowCount: number; hasCreatedChat: boolean }>(session, `(() => {
-      const rows = Array.from(document.querySelectorAll('[data-ui-id="sidebar.chat-row"]'));
-      return {
-        rowCount: rows.length,
-        hasCreatedChat: rows.some((row) => row.getAttribute('data-chat-id') === ${JSON.stringify(persistedState.chatId)}),
-      };
-    })()`)
-    expect(chatRows).toEqual({
-      rowCount: 1,
-      hasCreatedChat: true,
-    })
-  }, 120_000)
 
   test("creates a new project from the homepage modal and lands in chat", async () => {
     closeAllAgentBrowsers()

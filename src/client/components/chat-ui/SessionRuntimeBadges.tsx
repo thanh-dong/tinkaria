@@ -1,4 +1,4 @@
-import type { DiscoveredSession, DiscoveredSessionRuntime } from "../../../shared/types"
+import type { DiscoveredSessionRuntime } from "../../../shared/types"
 
 function formatCompactNumber(value: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -34,12 +34,12 @@ export function getRuntimeLabels(runtime: DiscoveredSessionRuntime | null | unde
 }
 
 interface SessionRuntimeBadgesProps {
-  session: DiscoveredSession
+  runtime: DiscoveredSessionRuntime | undefined
   className?: string
 }
 
-export function SessionRuntimeBadges({ session, className }: SessionRuntimeBadgesProps) {
-  const labels = getRuntimeLabels(session.runtime)
+export function SessionRuntimeBadges({ runtime, className }: SessionRuntimeBadgesProps) {
+  const labels = getRuntimeLabels(runtime)
   if (labels.length === 0) return null
 
   return (

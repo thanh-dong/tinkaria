@@ -143,7 +143,6 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
       getSnapshot: async () => null,
       broadcastSnapshots: async () => {},
       publishChatMessage: () => {},
-      refreshSessions: async () => {},
       dispose: () => {},
     },
     onStateChange: () => {},

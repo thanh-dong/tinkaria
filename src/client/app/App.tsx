@@ -439,26 +439,8 @@ function AppLayout() {
   const handleInstallUpdate = useEventCallback(() => {
     void state.handleInstallUpdate()
   })
-  const sessionsForProject = useEventCallback((workspaceId: string) =>
-    state.sessionsSnapshots.get(workspaceId)?.sessions ?? []
-  )
-  const sessionsWindowDaysForProject = useEventCallback((workspaceId: string) =>
-    state.sessionsWindowDays.get(workspaceId) ?? 7
-  )
-  const handleResumeSession = useEventCallback((workspaceId: string, sessionId: string, provider: Parameters<typeof state.handleResumeSession>[2]) => {
-    void state.handleResumeSession(workspaceId, sessionId, provider)
-  })
   const handleMergeSession = useEventCallback((workspaceId: string) => {
     state.requestMerge(workspaceId)
-  })
-  const handleOpenSessionPicker = useEventCallback((workspaceId: string, open: boolean) => {
-    state.handleOpenSessionPicker(workspaceId, open)
-  })
-  const handleRefreshSessions = useEventCallback((workspaceId: string) => {
-    state.handleRefreshSessions(workspaceId)
-  })
-  const handleShowMoreSessions = useEventCallback((workspaceId: string) => {
-    state.handleShowMoreSessions(workspaceId)
   })
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
   const handleCreateWorkspace = useEventCallback((name: string) => {
@@ -489,12 +471,6 @@ function AppLayout() {
           onRemoveProject={handleRemoveProject}
           updateSnapshot={state.updateSnapshot}
           onInstallUpdate={handleInstallUpdate}
-          sessionsForProject={sessionsForProject}
-          sessionsWindowDaysForProject={sessionsWindowDaysForProject}
-          onOpenSessionPicker={handleOpenSessionPicker}
-          onResumeSession={handleResumeSession}
-          onRefreshSessions={handleRefreshSessions}
-          onShowMoreSessions={handleShowMoreSessions}
           onMergeSession={handleMergeSession}
           onCreateWorkspace={() => setCreateWorkspaceOpen(true)}
         />

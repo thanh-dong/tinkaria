@@ -11,7 +11,6 @@ import type { NatsPublisher } from "./nats-publisher"
 import { commandSubject } from "../shared/nats-subjects"
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
-import { findSessionFile, importCliTranscript } from "./session-discovery"
 import { inspectSessionRuntime } from "./session-discovery"
 import { DEFAULT_RESOURCE_LIMITS } from "../shared/sandbox-types"
 import { readRepoStatus } from "./repo-status"
@@ -77,7 +76,6 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "chat.getRepoStatus",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
-  "sessions.refresh",
   "workspace.coordination.snapshot",
   "workspace.agent.list",
   "workspace.agent.get",
@@ -117,8 +115,6 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.getMessages",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
-  "sessions.resume",
-  "sessions.refresh",
   "workspace.todo.add",
   "workspace.todo.claim",
   "workspace.todo.complete",
@@ -424,36 +420,6 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
       case "snapshot.unsubscribe": {
         publisher.removeSubscription(command.subscriptionId)
         return undefined
-      }
-
-      case "sessions.refresh": {
-        const project = store.getProject(command.workspaceId)
-        if (project) {
-          publisher.refreshSessions(command.workspaceId, project.localPath)
-        }
-        return undefined
-      }
-
-      case "sessions.resume": {
-        const chat = await store.createChat(command.workspaceId)
-        await store.setSessionToken(chat.id, command.sessionId)
-        await store.setChatProvider(chat.id, command.provider)
-
-        // Import CLI transcript in background (don't block response)
-        const project = store.getProject(command.workspaceId)
-        if (project) {
-          findSessionFile(command.sessionId, command.provider, project.localPath)
-            .then((filePath) => {
-              if (filePath) {
-                return importCliTranscript(filePath, store, chat.id, 50)
-              }
-            })
-            .catch((err) =>
-              console.warn(LOG_PREFIX, "transcript import failed:", err instanceof Error ? err.message : String(err))
-            )
-        }
-
-        return { chatId: chat.id }
       }
 
       case "workspace.todo.add": {

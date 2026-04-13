@@ -35,12 +35,6 @@ function renderSidebar(overrides: Partial<Parameters<typeof AppSidebar>[0]> = {}
         onRemoveProject: () => {},
         updateSnapshot: null as UpdateSnapshot | null,
         onInstallUpdate: () => {},
-        sessionsForProject: () => [],
-        sessionsWindowDaysForProject: () => 7,
-        onOpenSessionPicker: () => {},
-        onResumeSession: () => {},
-        onRefreshSessions: () => {},
-        onShowMoreSessions: () => {},
         ...overrides,
       }))
     )
@@ -66,12 +60,6 @@ function createSidebarProps(overrides: Partial<Parameters<typeof AppSidebar>[0]>
     onRemoveProject: () => {},
     updateSnapshot: null as UpdateSnapshot | null,
     onInstallUpdate: () => {},
-    sessionsForProject: () => [],
-    sessionsWindowDaysForProject: () => 7,
-    onOpenSessionPicker: () => {},
-    onResumeSession: () => {},
-    onRefreshSessions: () => {},
-    onShowMoreSessions: () => {},
     ...overrides,
   }
 }
@@ -142,6 +130,7 @@ describe("AppSidebar", () => {
   test("keeps project-group actions inside the hold menu instead of rendering inline buttons", () => {
     const html = renderSidebar({
       data: {
+        independentWorkspaces: [],
         workspaceGroups: [
           {
             groupKey: "project-1",
@@ -171,16 +160,6 @@ describe("AppSidebar", () => {
           },
         ],
       },
-      sessionsForProject: () => [{
-        sessionId: "session-1",
-        provider: "codex",
-        source: "cli",
-        title: "Demo session",
-        lastExchange: null,
-        modifiedAt: 1,
-        chatId: null,
-        runtime: { model: "gpt-5.4" },
-      }],
     })
     const next = createSidebarProps({
       ...previous,
@@ -191,21 +170,7 @@ describe("AppSidebar", () => {
       onRenameChat: () => {},
       onRemoveProject: () => {},
       onInstallUpdate: () => {},
-      onOpenSessionPicker: () => {},
-      onResumeSession: () => {},
-      onRefreshSessions: () => {},
-      onShowMoreSessions: () => {},
       onMergeSession: () => {},
-      sessionsForProject: () => [{
-        sessionId: "session-1",
-        provider: "codex",
-        source: "cli",
-        title: "Demo session",
-        lastExchange: null,
-        modifiedAt: 1,
-        chatId: null,
-        runtime: { model: "gpt-5.4" },
-      }],
     })
 
     expect(areAppSidebarPropsEqual(previous, next)).toBe(true)

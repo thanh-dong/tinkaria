@@ -1,31 +1,14 @@
-import { readdir, readFile, stat, open } from "node:fs/promises"
-import { join, basename, extname } from "node:path"
-import { randomUUID } from "node:crypto"
+import { readdir, stat, open } from "node:fs/promises"
+import { join, extname } from "node:path"
 import { homedir } from "node:os"
 import type {
   AgentProvider,
-  AssistantTextEntry,
-  DiscoveredSession,
+  DiscoveredSessionRuntime,
   DiscoveredSessionTokenUsage,
   DiscoveredSessionUsageBucket,
-  SessionsSnapshot,
-  TranscriptEntry,
-  UserPromptEntry,
 } from "../shared/types"
-import type { EventStore } from "./event-store"
 
 const TAIL_BYTES = 32 * 1024
-const TITLE_SCAN_LINES = 5
-const INTERNAL_WORKFLOW_PROMPT_PREFIXES = [
-  "write the first user message for a new independent forked coding session.",
-  "write the first user message for a new session that merges context from",
-  "generate a short, descriptive title (under 30 chars) for a conversation that starts with this message.",
-] as const
-
-interface LastExchange {
-  question: string
-  answer: string
-}
 
 function joinSnippetParts(parts: Array<string | null>, maxLength: number): string | null {
   const combined = parts
@@ -49,25 +32,17 @@ function normalizeNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined
 }
 
-function normalizeTimestamp(value: unknown): number | undefined {
-  const numberValue = normalizeNumber(value)
-  if (numberValue !== undefined) return numberValue
-  if (typeof value !== "string") return undefined
-
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) ? parsed : undefined
-}
 
 function parseJsonLine(line: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(line)
     return isRecord(parsed) ? parsed : null
-  } catch {
+  } catch (_error: unknown) {
     return null
   }
 }
 
-function extractContentText(value: unknown, maxLength: number): string | null {
+export function extractContentText(value: unknown, maxLength: number): string | null {
   if (typeof value === "string") {
     const trimmed = value.trim()
     return trimmed ? trimmed.slice(0, maxLength) : null
@@ -97,29 +72,13 @@ function extractContentText(value: unknown, maxLength: number): string | null {
   return null
 }
 
-function normalizePromptSignature(value: string | null | undefined): string {
-  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase()
-}
-
-function isInternalWorkflowPrompt(value: string | null | undefined): boolean {
-  const normalized = normalizePromptSignature(value)
-  return INTERNAL_WORKFLOW_PROMPT_PREFIXES.some((prefix) => normalized.startsWith(prefix))
-}
-
-function shouldExcludeInternalWorkflowSession(args: {
-  titleCandidate: string | null
-  lastExchange: LastExchange | null
-}): boolean {
-  return isInternalWorkflowPrompt(args.titleCandidate) || isInternalWorkflowPrompt(args.lastExchange?.question)
-}
-
 function formatUsageBucketLabel(windowMinutes: number, fallback: string): string {
   if (windowMinutes % (60 * 24) === 0) return `${windowMinutes / (60 * 24)}d`
   if (windowMinutes % 60 === 0) return `${windowMinutes / 60}h`
   return fallback
 }
 
-function extractClaudeRuntime(tailContent: string): DiscoveredSession["runtime"] | undefined {
+function extractClaudeRuntime(tailContent: string): DiscoveredSessionRuntime | undefined {
   const lines = tailContent.split("\n").filter(Boolean)
   let model: string | undefined
   let tokenUsage: DiscoveredSessionTokenUsage | undefined
@@ -158,7 +117,7 @@ function extractClaudeRuntime(tailContent: string): DiscoveredSession["runtime"]
   }
 }
 
-function extractCodexRuntime(tailContent: string): DiscoveredSession["runtime"] | undefined {
+function extractCodexRuntime(tailContent: string): DiscoveredSessionRuntime | undefined {
   const lines = tailContent.split("\n").filter(Boolean)
   let model: string | undefined
   let tokenUsage: DiscoveredSessionTokenUsage | undefined
@@ -229,87 +188,6 @@ function extractCodexRuntime(tailContent: string): DiscoveredSession["runtime"] 
   }
 }
 
-function extractLastExchange(tailContent: string): LastExchange | null {
-  const lines = tailContent.split("\n").filter(Boolean)
-  let lastUser: string | null = null
-  let lastAssistant: string | null = null
-
-  for (const line of lines) {
-    try {
-      const parsed = JSON.parse(line)
-      const content = extractContentText(parsed.message?.content, 200)
-      if (!content) continue
-      if (parsed.type === "user") {
-        lastUser = content
-      } else if (parsed.type === "assistant") {
-        lastAssistant = content
-      }
-    } catch {
-      // skip malformed lines
-    }
-  }
-
-  if (lastUser) {
-    return { question: lastUser, answer: lastAssistant ?? "" }
-  }
-  return null
-}
-
-function extractTitleCandidate(headLines: string[]): string | null {
-  for (const line of headLines.slice(0, TITLE_SCAN_LINES)) {
-    try {
-      const parsed = JSON.parse(line)
-      const content = parsed.type === "user"
-        ? extractContentText(parsed.message?.content, 80)
-        : null
-      if (content) {
-        return content
-      }
-    } catch {
-      // skip malformed lines
-    }
-  }
-  return null
-}
-
-export function parseCliTranscript(
-  fileContent: string,
-  limit: number
-): TranscriptEntry[] {
-  const entries: TranscriptEntry[] = []
-  const lines = fileContent.split("\n").filter(Boolean)
-
-  for (const line of lines) {
-    if (entries.length >= limit) break
-
-    try {
-      const parsed = JSON.parse(line)
-      const content = extractContentText(parsed.message?.content, 20_000)
-      if (parsed.type === "user" && content) {
-        const entry: UserPromptEntry = {
-          _id: randomUUID(),
-          kind: "user_prompt",
-          content,
-          createdAt: parsed.timestamp ?? Date.now(),
-        }
-        entries.push(entry)
-      } else if (parsed.type === "assistant" && content) {
-        const entry: AssistantTextEntry = {
-          _id: randomUUID(),
-          kind: "assistant_text",
-          text: content,
-          createdAt: parsed.timestamp ?? Date.now(),
-        }
-        entries.push(entry)
-      }
-    } catch {
-      // skip malformed lines
-    }
-  }
-
-  return entries
-}
-
 async function readTail(filePath: string, bytes: number): Promise<string> {
   const fh = await open(filePath, "r")
   try {
@@ -328,7 +206,7 @@ async function readTail(filePath: string, bytes: number): Promise<string> {
 async function inspectSessionRuntimeFile(
   filePath: string,
   provider: AgentProvider
-): Promise<DiscoveredSession["runtime"] | null> {
+): Promise<DiscoveredSessionRuntime | null> {
   const tailContent = await readTail(filePath, TAIL_BYTES)
   if (provider === "claude") {
     return extractClaudeRuntime(tailContent) ?? null
@@ -367,58 +245,12 @@ async function readHead(filePath: string, lineCount: number): Promise<string[]> 
   }
 }
 
-export async function scanClaudeSessions(
-  claudeProjectDir: string
-): Promise<DiscoveredSession[]> {
-  let entries: string[]
-  try {
-    entries = await readdir(claudeProjectDir)
-  } catch {
-    return []
-  }
-
-  const sessions: DiscoveredSession[] = []
-
-  for (const entry of entries) {
-    if (extname(entry) !== ".jsonl") continue
-    const filePath = join(claudeProjectDir, entry)
-    const fileStat = await stat(filePath).catch(() => null)
-    if (!fileStat || !fileStat.isFile()) continue
-
-    const sessionId = basename(entry, ".jsonl")
-    const modifiedAt = fileStat.mtimeMs
-
-    const [headLines, tailContent] = await Promise.all([
-      readHead(filePath, TITLE_SCAN_LINES),
-      readTail(filePath, TAIL_BYTES),
-    ])
-
-    const titleCandidate = extractTitleCandidate(headLines)
-    const lastExchange = extractLastExchange(tailContent)
-    const runtime = extractClaudeRuntime(tailContent)
-    if (shouldExcludeInternalWorkflowSession({ titleCandidate, lastExchange })) continue
-
-    sessions.push({
-      sessionId,
-      provider: "claude" as AgentProvider,
-      source: "cli",
-      title: titleCandidate ?? formatDateTitle(modifiedAt),
-      lastExchange,
-      modifiedAt,
-      chatId: null,
-      ...(runtime ? { runtime } : {}),
-    })
-  }
-
-  return sessions
-}
-
 async function collectJsonlFiles(dir: string): Promise<string[]> {
   const result: string[] = []
   let dirEntries: import("node:fs").Dirent[]
   try {
     dirEntries = await readdir(dir, { withFileTypes: true })
-  } catch {
+  } catch (_error: unknown) {
     return []
   }
 
@@ -431,151 +263,6 @@ async function collectJsonlFiles(dir: string): Promise<string[]> {
     }
   }
   return result
-}
-
-export async function scanCodexSessions(
-  codexSessionsDir: string,
-  workspacePath: string
-): Promise<DiscoveredSession[]> {
-  const files = await collectJsonlFiles(codexSessionsDir)
-  const sessions: DiscoveredSession[] = []
-
-  for (const filePath of files) {
-    const headLines = await readHead(filePath, 1)
-    if (headLines.length === 0) continue
-
-    let meta: { id: string; cwd: string; timestamp?: number }
-    try {
-      const parsed = JSON.parse(headLines[0])
-      if (!isRecord(parsed) || normalizeString(parsed.type) !== "session_meta") continue
-      const payload = isRecord(parsed.payload) ? parsed.payload : null
-      const sessionId = normalizeString(payload?.id)
-      const cwd = normalizeString(payload?.cwd)
-      if (!sessionId || !cwd) continue
-      meta = {
-        id: sessionId,
-        cwd,
-        timestamp: normalizeTimestamp(payload?.timestamp),
-      }
-    } catch {
-      continue
-    }
-
-    if (meta.cwd !== workspacePath) continue
-
-    const fileStat = await stat(filePath).catch(() => null)
-    if (!fileStat) continue
-
-    const modifiedAt = meta.timestamp ?? fileStat.mtimeMs
-    const tailContent = await readTail(filePath, TAIL_BYTES)
-    const lastExchange = extractLastExchange(tailContent)
-    const runtime = extractCodexRuntime(tailContent)
-
-    const titleLines = await readHead(filePath, TITLE_SCAN_LINES + 1)
-    const titleCandidate = extractTitleCandidate(titleLines.slice(1))
-    if (shouldExcludeInternalWorkflowSession({ titleCandidate, lastExchange })) continue
-
-    sessions.push({
-      sessionId: meta.id,
-      provider: "codex" as AgentProvider,
-      source: "cli",
-      title: titleCandidate ?? formatDateTitle(modifiedAt),
-      lastExchange,
-      modifiedAt,
-      chatId: null,
-      ...(runtime ? { runtime } : {}),
-    })
-  }
-
-  return sessions
-}
-
-export function formatDateTitle(ms: number): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(ms))
-}
-
-export function resolveTitle(
-  rawTitle: string,
-  source: "tinkaria" | "cli",
-  lastExchange: LastExchange | null,
-  modifiedAt: number
-): string {
-  if (source === "tinkaria" && rawTitle !== "New Chat" && rawTitle.trim() !== "") {
-    return rawTitle
-  }
-
-  if (lastExchange?.question) {
-    return lastExchange.question.slice(0, 80)
-  }
-
-  return formatDateTitle(modifiedAt)
-}
-
-export function mergeSessions(
-  cliSessions: DiscoveredSession[],
-  tinkariaSessions: DiscoveredSession[]
-): DiscoveredSession[] {
-  const bySessionId = new Map<string, DiscoveredSession>()
-
-  for (const session of cliSessions) {
-    bySessionId.set(session.sessionId, session)
-  }
-
-  for (const session of tinkariaSessions) {
-    const existing = bySessionId.get(session.sessionId)
-    bySessionId.set(session.sessionId, {
-      ...session,
-      ...(existing?.lastExchange && !session.lastExchange ? { lastExchange: existing.lastExchange } : {}),
-      ...(existing?.runtime && !session.runtime ? { runtime: existing.runtime } : {}),
-    })
-  }
-
-  return [...bySessionId.values()].sort((a, b) => b.modifiedAt - a.modifiedAt)
-}
-
-interface DiscoverSessionsOptions {
-  workspaceId: string
-  workspacePath: string
-  store: EventStore
-  claudeProjectDir: string | null
-  codexSessionsDir: string | null
-}
-
-export async function discoverSessions(
-  options: DiscoverSessionsOptions
-): Promise<SessionsSnapshot> {
-  const { workspaceId, workspacePath, store, claudeProjectDir, codexSessionsDir } = options
-
-  // 1. Scan CLI sessions in parallel
-  const [claudeCliSessions, codexCliSessions] = await Promise.all([
-    claudeProjectDir ? scanClaudeSessions(claudeProjectDir) : Promise.resolve([]),
-    codexSessionsDir ? scanCodexSessions(codexSessionsDir, workspacePath) : Promise.resolve([]),
-  ])
-
-  // 2. Collect Tinkaria chats with sessionToken
-  const tinkariaChats = store.listChatsByProject(workspaceId)
-  const tinkariaSessions: DiscoveredSession[] = tinkariaChats
-    .filter((chat) => chat.sessionToken !== null)
-    .map((chat) => ({
-      sessionId: chat.sessionToken!,
-      provider: (chat.provider ?? "claude") as AgentProvider,
-      source: "tinkaria" as const,
-      title: resolveTitle(chat.title, "tinkaria", null, chat.lastMessageAt ?? chat.updatedAt),
-      lastExchange: null,
-      modifiedAt: chat.lastMessageAt ?? chat.updatedAt,
-      chatId: chat.id,
-    }))
-
-  // 3. Merge + dedup (Tinkaria wins over CLI)
-  const allCliSessions = [...claudeCliSessions, ...codexCliSessions]
-  const sessions = mergeSessions(allCliSessions, tinkariaSessions)
-
-  return { workspaceId, workspacePath, sessions }
 }
 
 function encodeClaudeProjectDir(workspacePath: string): string {
@@ -593,7 +280,7 @@ export async function findSessionFile(
     try {
       await stat(filePath)
       return filePath
-    } catch {
+    } catch (_error: unknown) {
       return null
     }
   }
@@ -608,7 +295,7 @@ export async function findSessionFile(
         if (parsed.type === "session_meta" && parsed.payload?.id === sessionId) {
           return filePath
         }
-      } catch {
+      } catch (_error: unknown) {
         continue
       }
     }
@@ -621,28 +308,8 @@ export async function inspectSessionRuntime(
   sessionId: string,
   provider: AgentProvider,
   workspacePath: string
-): Promise<DiscoveredSession["runtime"] | null> {
+): Promise<DiscoveredSessionRuntime | null> {
   const filePath = await findSessionFile(sessionId, provider, workspacePath)
   if (!filePath) return null
   return inspectSessionRuntimeFile(filePath, provider)
-}
-
-export async function importCliTranscript(
-  sessionFilePath: string,
-  store: EventStore,
-  chatId: string,
-  limit = 50
-): Promise<number> {
-  // Idempotent: skip if chat already has messages
-  const existing = await store.getMessages(chatId)
-  if (existing.length > 0) return 0
-
-  const content = await readFile(sessionFilePath, "utf-8")
-  const entries = parseCliTranscript(content, limit)
-
-  for (const entry of entries) {
-    await store.appendMessage(chatId, entry)
-  }
-
-  return entries.length
 }

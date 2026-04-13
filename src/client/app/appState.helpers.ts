@@ -357,10 +357,6 @@ export function shouldRefreshStaleSessionOnResume(args: {
   return Math.max(0, args.resumedAt - args.hiddenAt) >= PWA_RESUME_STALE_AFTER_MS
 }
 
-export function getResumeRefreshSessionProjectIds(openSessionProjectIds: Iterable<string>): string[] {
-  return [...new Set(openSessionProjectIds)]
-}
-
 export function normalizeLocalFilePreviewErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   if (message.includes("Unknown command type: system.readLocalFilePreview")) {

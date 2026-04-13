@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { GitBranchPlus, History, LayoutGrid, Merge, Pencil, SquarePen, Trash2 } from "lucide-react"
+import { GitBranchPlus, LayoutGrid, Merge, Pencil, SquarePen, Trash2 } from "lucide-react"
 import { createUiIdentityDescriptor } from "../../../lib/uiIdentityOverlay"
 import {
   ContextMenu,
@@ -22,8 +22,6 @@ const CHAT_ROW_MENU_DESCRIPTOR = createUiIdentityDescriptor({
 })
 
 export function ProjectSectionMenu({
-  onOpenSessions,
-  sessionsDisabled = false,
   onMergeSession,
   mergeDisabled = false,
   onOpenCoordination,
@@ -32,8 +30,6 @@ export function ProjectSectionMenu({
   onRemove,
   children,
 }: {
-  onOpenSessions?: () => void
-  sessionsDisabled?: boolean
   onMergeSession?: () => void
   mergeDisabled?: boolean
   onOpenCoordination?: () => void
@@ -48,18 +44,6 @@ export function ProjectSectionMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent uiId={PROJECT_GROUP_MENU_DESCRIPTOR}>
-        {onOpenSessions ? (
-          <ContextMenuItem
-            disabled={sessionsDisabled}
-            onSelect={(event) => {
-              event.stopPropagation()
-              onOpenSessions()
-            }}
-          >
-            <History className="h-4 w-4" />
-            <span className="text-xs font-medium">Sessions</span>
-          </ContextMenuItem>
-        ) : null}
         {onMergeSession ? (
           <ContextMenuItem
             disabled={mergeDisabled}

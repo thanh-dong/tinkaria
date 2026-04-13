@@ -122,7 +122,7 @@ function ChatRowInner({
         data-chat-id={normalizedChatId}
         {...getUiIdentityAttributeProps(CHAT_ROW_DESCRIPTOR)}
         className={cn(
-          "group flex items-center gap-2 pl-2.5 pr-0.5 py-0.5 rounded-lg cursor-pointer border hover:bg-muted/20 active:scale-[0.985] transition-all",
+          "group flex min-h-8 items-center gap-2 pl-2.5 pr-0.5 py-0.5 rounded-lg cursor-pointer border hover:bg-muted/20 active:scale-[0.985] transition-all",
           isActive
             ? "bg-primary/[0.07] hover:bg-primary/[0.1] border-primary/20 dark:bg-primary/[0.12] dark:hover:bg-primary/[0.16] dark:border-primary/15"
             : "border-border/0 hover:border-border dark:hover:border-slate-400/10"

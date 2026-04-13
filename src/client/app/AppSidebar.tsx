@@ -9,7 +9,7 @@ import { cn } from "../lib/utils"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 const LocalProjectsSection = lazy(() => import("../components/chat-ui/sidebar/LocalProjectsSection").then(m => ({ default: m.LocalProjectsSection })))
 import { WorkspacesSection } from "../components/chat-ui/sidebar/WorkspacesSection"
-import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
+import type { SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
 import type { SocketStatus } from "./socket-interface"
 import { shouldCloseMobileSidebarFromSwipe, type MobileSidebarSwipeState } from "./ChatPage"
 
@@ -31,12 +31,6 @@ interface AppSidebarProps {
   onRemoveProject: (workspaceId: string) => void
   updateSnapshot: UpdateSnapshot | null
   onInstallUpdate: () => void
-  sessionsForProject: (workspaceId: string) => DiscoveredSession[]
-  sessionsWindowDaysForProject: (workspaceId: string) => number
-  onOpenSessionPicker: (workspaceId: string, open: boolean) => void
-  onResumeSession: (workspaceId: string, sessionId: string, provider: AgentProvider) => void
-  onRefreshSessions: (workspaceId: string) => void
-  onShowMoreSessions: (workspaceId: string) => void
   onMergeSession?: (workspaceId: string) => void
   onCreateWorkspace?: () => void
 }
@@ -45,62 +39,17 @@ interface SidebarDialogNavigationState {
   sidebarDialog?: "fork" | "merge"
 }
 
-function areDiscoveredSessionsEqual(
-  previous: ReturnType<AppSidebarProps["sessionsForProject"]>,
-  next: ReturnType<AppSidebarProps["sessionsForProject"]>,
-): boolean {
-  if (previous.length !== next.length) return false
-  for (let index = 0; index < previous.length; index += 1) {
-    const previousSession = previous[index]
-    const nextSession = next[index]
-    if (
-      previousSession.sessionId !== nextSession.sessionId
-      || previousSession.chatId !== nextSession.chatId
-      || previousSession.provider !== nextSession.provider
-      || previousSession.source !== nextSession.source
-      || previousSession.title !== nextSession.title
-      || previousSession.modifiedAt !== nextSession.modifiedAt
-      || previousSession.lastExchange?.question !== nextSession.lastExchange?.question
-      || previousSession.lastExchange?.answer !== nextSession.lastExchange?.answer
-      || previousSession.runtime?.model !== nextSession.runtime?.model
-      || previousSession.runtime?.tokenUsage?.totalTokens !== nextSession.runtime?.tokenUsage?.totalTokens
-      || previousSession.runtime?.tokenUsage?.contextWindow !== nextSession.runtime?.tokenUsage?.contextWindow
-      || previousSession.runtime?.tokenUsage?.contextLeft !== nextSession.runtime?.tokenUsage?.contextLeft
-      || previousSession.runtime?.tokenUsage?.estimatedContextPercent !== nextSession.runtime?.tokenUsage?.estimatedContextPercent
-    ) {
-      return false
-    }
-  }
-  return true
-}
-
 export function areAppSidebarPropsEqual(previous: AppSidebarProps, next: AppSidebarProps): boolean {
-  if (
-    previous.data !== next.data
-    || previous.activeChatId !== next.activeChatId
-    || previous.connectionStatus !== next.connectionStatus
-    || previous.ready !== next.ready
-    || previous.open !== next.open
-    || previous.collapsed !== next.collapsed
-    || previous.showMobileOpenButton !== next.showMobileOpenButton
-    || previous.updateSnapshot !== next.updateSnapshot
-  ) {
-    return false
-  }
-
-  for (const group of next.data.workspaceGroups) {
-    if (
-      previous.sessionsWindowDaysForProject(group.groupKey) !== next.sessionsWindowDaysForProject(group.groupKey)
-      || !areDiscoveredSessionsEqual(
-        previous.sessionsForProject(group.groupKey),
-        next.sessionsForProject(group.groupKey),
-      )
-    ) {
-      return false
-    }
-  }
-
-  return true
+  return (
+    previous.data === next.data
+    && previous.activeChatId === next.activeChatId
+    && previous.connectionStatus === next.connectionStatus
+    && previous.ready === next.ready
+    && previous.open === next.open
+    && previous.collapsed === next.collapsed
+    && previous.showMobileOpenButton === next.showMobileOpenButton
+    && previous.updateSnapshot === next.updateSnapshot
+  )
 }
 
 const SIDEBAR_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
@@ -131,12 +80,6 @@ function AppSidebarInner({
   onRemoveProject,
   updateSnapshot,
   onInstallUpdate,
-  sessionsForProject,
-  sessionsWindowDaysForProject,
-  onOpenSessionPicker,
-  onResumeSession,
-  onRefreshSessions,
-  onShowMoreSessions,
   onMergeSession,
   onCreateWorkspace,
 }: AppSidebarProps) {
@@ -461,16 +404,6 @@ function AppSidebarInner({
                 }}
                 onRemoveProject={onRemoveProject}
                 isConnected={connectionStatus === "connected"}
-                sessionsForProject={sessionsForProject}
-                sessionsWindowDaysForProject={sessionsWindowDaysForProject}
-                onOpenSessionPicker={onOpenSessionPicker}
-                onNavigateToChat={(chatId) => {
-                  navigate(`/chat/${chatId}`)
-                  onClose()
-                }}
-                onResumeSession={onResumeSession}
-                onRefreshSessions={onRefreshSessions}
-                onShowMoreSessions={onShowMoreSessions}
                 onMergeSession={onMergeSession}
               />
             </Suspense>

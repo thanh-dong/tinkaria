@@ -92,18 +92,12 @@ export function groupMessages(messages: HydratedTranscriptMessage[], isLoading: 
       }
 
       // Eject trailing assistant_text when followed by a special tool (AskUserQuestion, ExitPlanMode)
-      // so the rationale/context text renders visibly above the interactive block.
-      //
-      // The previous revision rewound `index` for each popped entry and relied on the
-      // outer loop to re-process them. That spun forever when the only remaining step
-      // WAS the starting assistant_text: pop → steps empty → fall through → continue →
-      // re-enter the same branch at the same `index` → repeat. Instead, push the
-      // ejected entries directly as singles here and leave `index` pointing at the
-      // special tool for the next outer-loop iteration.
-      const ejected: HydratedTranscriptMessage[] = []
+      // so the rationale/context text renders visibly above the interactive block
+      const ejected: { message: HydratedTranscriptMessage; index: number }[] = []
       if (index < messages.length && isSpecialToolCall(messages[index])) {
         while (steps.length > 0 && steps[steps.length - 1].kind === "assistant_text") {
-          ejected.unshift(steps.pop() as HydratedTranscriptMessage)
+          const ejectedMsg = steps.pop()!
+          ejected.unshift({ message: ejectedMsg, index: startIndex + steps.length })
         }
       }
 
@@ -112,8 +106,8 @@ export function groupMessages(messages: HydratedTranscriptMessage[], isLoading: 
       } else if (steps.length === 1) {
         result.push({ type: "single", message: steps[0], index: startIndex })
       }
-      for (let k = 0; k < ejected.length; k++) {
-        result.push({ type: "single", message: ejected[k], index: startIndex + steps.length + k })
+      for (const e of ejected) {
+        result.push({ type: "single", message: e.message, index: e.index })
       }
       continue
     }

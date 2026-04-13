@@ -13,7 +13,6 @@ import {
 } from "lucide-react"
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
 import type {
-  DiscoveredSession,
   IndependentWorkspace,
   LocalWorkspacesSnapshot,
 } from "../../shared/types"
@@ -26,7 +25,6 @@ import {
   getUiIdentityIdMap,
 } from "../lib/uiIdentityOverlay"
 import { cn } from "../lib/utils"
-import { SessionRuntimeBadges } from "./chat-ui/SessionRuntimeBadges"
 import { HomepagePreferences } from "./HomepagePreferences"
 import { NewProjectModal } from "./NewWorkspaceModal"
 import { Button } from "./ui/button"
@@ -39,17 +37,9 @@ interface LocalDevProps {
   commandError: string | null
   onOpenProject: (localPath: string) => Promise<void>
   onCreateProject: (project: { mode: "new" | "existing"; localPath: string; title: string }) => Promise<void>
-  sessionsForProject?: (workspaceId: string) => DiscoveredSession[]
-  onResumeSession?: (workspaceId: string, session: DiscoveredSession) => Promise<void>
   independentWorkspaces?: IndependentWorkspace[]
   onCreateWorkspace?: () => void
   onOpenWorkspace?: (workspaceId: string) => void
-}
-
-interface HomepageRecentSession {
-  workspaceId: string
-  projectTitle: string
-  session: DiscoveredSession
 }
 
 const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
@@ -70,11 +60,6 @@ const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
   }),
   setup: createC3UiIdentityDescriptor({
     id: "home.setup",
-    c3ComponentId: "c3-117",
-    c3ComponentLabel: "projects",
-  }),
-  recentSessions: createC3UiIdentityDescriptor({
-    id: "home.recent-sessions",
     c3ComponentId: "c3-117",
     c3ComponentLabel: "projects",
   }),
@@ -108,11 +93,6 @@ const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
     c3ComponentId: "c3-117",
     c3ComponentLabel: "projects",
   }),
-  recentSessionCard: createC3UiIdentityDescriptor({
-    id: "home.recent-session-card",
-    c3ComponentId: "c3-117",
-    c3ComponentLabel: "projects",
-  }),
   newProjectDialog: createC3UiIdentityDescriptor({
     id: "home.add-project.dialog",
     c3ComponentId: "c3-117",
@@ -134,123 +114,26 @@ export function getLocalProjectsPageUiIdentityDescriptors() {
   return LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS
 }
 
-export interface ProjectSessionStats {
-  totalTokens: number
-  dominantModel: string | null
-  avgContextPercent: number | null
-  sessionCount: number
-}
-
-export function getProjectSessionStats(sessions: DiscoveredSession[]): ProjectSessionStats {
-  if (sessions.length === 0) {
-    return { totalTokens: 0, dominantModel: null, avgContextPercent: null, sessionCount: 0 }
-  }
-
-  let totalTokens = 0
-  const modelCounts = new Map<string, number>()
-  const contextPercents: number[] = []
-
-  for (const session of sessions) {
-    const rt = session.runtime
-    if (rt?.tokenUsage?.totalTokens !== undefined) {
-      totalTokens += rt.tokenUsage.totalTokens
-    }
-    if (rt?.tokenUsage?.estimatedContextPercent !== undefined) {
-      contextPercents.push(rt.tokenUsage.estimatedContextPercent)
-    }
-    if (rt?.model) {
-      modelCounts.set(rt.model, (modelCounts.get(rt.model) ?? 0) + 1)
-    }
-  }
-
-  let dominantModel: string | null = null
-  let maxCount = 0
-  for (const [model, count] of modelCounts) {
-    if (count > maxCount) { dominantModel = model; maxCount = count }
-  }
-
-  const avgContextPercent = contextPercents.length > 0
-    ? Math.round(contextPercents.reduce((a, b) => a + b, 0) / contextPercents.length)
-    : null
-
-  return { totalTokens, dominantModel, avgContextPercent, sessionCount: sessions.length }
-}
-
-const ONE_DAY_MS = 86_400_000
-const SEVEN_DAYS_MS = 7 * ONE_DAY_MS
-
-export function getSessionStatus(sessions: DiscoveredSession[], now?: number): string {
-  if (sessions.length === 0) return "No sessions"
-
-  const latest = sessions.reduce((a, b) => a.modifiedAt > b.modifiedAt ? a : b)
-  const elapsed = (now ?? Date.now()) - latest.modifiedAt
-
-  if (latest.runtime?.tokenUsage?.estimatedContextPercent !== undefined &&
-      latest.runtime.tokenUsage.estimatedContextPercent > 80) {
-    return "Context near limit"
-  }
-
-  if (elapsed > SEVEN_DAYS_MS) return "Stale"
-  return "Active"
-}
-
-function getSessionDisplayTitle(session: DiscoveredSession): string {
-  if (session.title) return session.title
-  if (session.lastExchange?.question) return session.lastExchange.question
-  return session.sessionId
-}
-
-function truncateLabel(value: string, maxLength = 34): string {
-  if (value.length <= maxLength) return value
-  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
-}
-
 function getProjectTitle(project: LocalWorkspacesSnapshot["workspaces"][number]) {
   return project.title || getPathBasename(project.localPath)
 }
 
-function getProjectPrimaryLabel(session: DiscoveredSession | null) {
-  if (!session) return "Open Project"
-  return `Continue ${truncateLabel(getSessionDisplayTitle(session), 28)}`
+function getProjectPrimaryLabel() {
+  return "Open Project"
 }
 
-function getProjectSecondaryLabel(session: DiscoveredSession | null) {
-  return session ? "Start Fresh Task" : "Start First Task"
+function getProjectSecondaryLabel() {
+  return "Start First Task"
 }
 
 function getProjectOverviewSummary(
   project: LocalWorkspacesSnapshot["workspaces"][number],
-  session: DiscoveredSession | null,
 ) {
   const projectTitle = getProjectTitle(project)
-  if (session) {
-    return `Last active ${formatRelativeTime(session.modifiedAt)}.`
-  }
   if (project.source === "saved") {
-    return `${projectTitle} — pinned workspace, no recent sessions.`
+    return `${projectTitle} — pinned workspace.`
   }
   return `${projectTitle} — discovered from recent activity.`
-}
-
-
-export function getHomepageRecentSessions(
-  snapshot: LocalWorkspacesSnapshot | null,
-  sessionsForProject?: (workspaceId: string) => DiscoveredSession[],
-): HomepageRecentSession[] {
-  if (!snapshot || !sessionsForProject) {
-    return []
-  }
-
-  return snapshot.workspaces
-    .flatMap((project) =>
-      sessionsForProject(project.localPath).map((session) => ({
-        workspaceId: project.localPath,
-        projectTitle: getProjectTitle(project),
-        session,
-      }))
-    )
-    .sort((left, right) => right.session.modifiedAt - left.session.modifiedAt)
-    .slice(0, 5)
 }
 
 export function getSortedHomepageProjects(snapshot: LocalWorkspacesSnapshot | null) {
@@ -264,17 +147,6 @@ export function getSortedHomepageProjects(snapshot: LocalWorkspacesSnapshot | nu
 
     return left.title.localeCompare(right.title)
   })
-}
-
-function getProjectSessions(
-  workspaceLocalPath: string,
-  sessionsForProject?: (workspaceId: string) => DiscoveredSession[],
-) {
-  if (!sessionsForProject) {
-    return []
-  }
-
-  return [...sessionsForProject(workspaceLocalPath)].sort((left, right) => right.modifiedAt - left.modifiedAt)
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -375,7 +247,7 @@ function ConnectionStatusCard({
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {isConnecting
-                ? `Loading workspaces and recent sessions from this machine.`
+                ? `Loading workspaces from this machine.`
                 : `This browser tab can't reach the local ${APP_NAME} server yet. Start it on this machine and the page will reconnect automatically.`}
             </p>
           </div>
@@ -387,35 +259,6 @@ function ConnectionStatusCard({
         ) : null}
       </div>
     </InfoCard>
-  )
-}
-
-function RecentSessionRow({
-  item,
-  onResume,
-}: {
-  item: HomepageRecentSession
-  onResume: () => void
-}) {
-  return (
-    <button
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/50 transition-colors text-left group"
-      onClick={onResume}
-      {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.recentSessionCard)}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="font-medium text-sm text-foreground truncate">
-          {getSessionDisplayTitle(item.session)}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-muted-foreground truncate">{item.projectTitle}</span>
-          <span className="text-xs text-muted-foreground/50">·</span>
-          <span className="text-xs text-muted-foreground shrink-0">{formatRelativeTime(item.session.modifiedAt)}</span>
-        </div>
-        <SessionRuntimeBadges session={item.session} className="mt-1.5 flex flex-wrap gap-1.5" />
-      </div>
-      <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-    </button>
   )
 }
 
@@ -451,7 +294,6 @@ function ProjectCard({
   projectTitle,
   localPath,
   chatCount,
-  sessions,
   loading,
   selected,
   onSelect,
@@ -462,7 +304,6 @@ function ProjectCard({
   projectTitle: string
   localPath: string
   chatCount: number
-  sessions: DiscoveredSession[]
   loading: boolean
   selected: boolean
   onSelect: () => void
@@ -470,9 +311,8 @@ function ProjectCard({
   onStartTask: () => void
   index: number
 }) {
-  const latestSession = sessions[0] ?? null
-  const primaryLabel = getProjectPrimaryLabel(latestSession)
-  const secondaryLabel = getProjectSecondaryLabel(latestSession)
+  const primaryLabel = getProjectPrimaryLabel()
+  const secondaryLabel = getProjectSecondaryLabel()
 
   return (
     <div
@@ -498,9 +338,7 @@ function ProjectCard({
       </div>
 
       <div className="mt-2 text-xs text-muted-foreground">
-        {latestSession
-          ? `Last active ${formatRelativeTime(latestSession.modifiedAt)} · ${chatCount} ${chatCount === 1 ? "chat" : "chats"}`
-          : `${chatCount} ${chatCount === 1 ? "chat" : "chats"}`}
+        {`${chatCount} ${chatCount === 1 ? "chat" : "chats"}`}
       </div>
 
       <div className={cn(
@@ -534,24 +372,19 @@ function ProjectCard({
 
 function ProjectOverviewPanel({
   project,
-  sessions,
   loading,
   onContinue,
   onStartTask,
 }: {
   project: LocalWorkspacesSnapshot["workspaces"][number]
-  sessions: DiscoveredSession[]
   loading: boolean
   onContinue: () => void
   onStartTask: () => void
 }) {
-  const latestSession = sessions[0] ?? null
   const projectTitle = getProjectTitle(project)
-  const primaryLabel = getProjectPrimaryLabel(latestSession)
-  const secondaryLabel = getProjectSecondaryLabel(latestSession)
-  const summary = getProjectOverviewSummary(project, latestSession)
-  const status = getSessionStatus(sessions)
-  const stats = getProjectSessionStats(sessions)
+  const primaryLabel = getProjectPrimaryLabel()
+  const secondaryLabel = getProjectSecondaryLabel()
+  const summary = getProjectOverviewSummary(project)
 
   return (
     <div
@@ -565,32 +398,10 @@ function ProjectOverviewPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="rounded-full bg-muted px-2.5 py-1">{status}</span>
           <span className="rounded-full bg-muted px-2.5 py-1">
             {project.chatCount} {project.chatCount === 1 ? "chat" : "chats"}
           </span>
-          {stats.dominantModel ? (
-            <span className="rounded-full bg-muted px-2.5 py-1">{stats.dominantModel}</span>
-          ) : null}
-          {stats.avgContextPercent !== null ? (
-            <span className="rounded-full bg-muted px-2.5 py-1">~{stats.avgContextPercent}% avg ctx</span>
-          ) : null}
         </div>
-
-        {sessions.length > 0 ? (
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Recent sessions</div>
-            {sessions.slice(0, 3).map((session) => (
-              <div key={session.sessionId} className="flex items-start gap-2 py-1.5">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-foreground truncate">{getSessionDisplayTitle(session)}</div>
-                  <div className="text-xs text-muted-foreground">{formatRelativeTime(session.modifiedAt)}</div>
-                  <SessionRuntimeBadges session={session} className="mt-1 flex flex-wrap gap-1" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
 
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
@@ -630,8 +441,6 @@ export function LocalDev({
   commandError,
   onOpenProject,
   onCreateProject,
-  sessionsForProject,
-  onResumeSession,
   independentWorkspaces,
   onCreateWorkspace,
   onOpenWorkspace,
@@ -641,15 +450,7 @@ export function LocalDev({
   const [showAllProjects, setShowAllProjects] = useState(false)
 
   const projects = useMemo(() => getSortedHomepageProjects(snapshot), [snapshot])
-  const recentSessions = useMemo(
-    () => getHomepageRecentSessions(snapshot, sessionsForProject),
-    [snapshot, sessionsForProject]
-  )
   const selectedProject = projects.find((project) => project.localPath === selectedProjectPath) ?? projects[0] ?? null
-  const selectedProjectSessions = useMemo(
-    () => selectedProject ? getProjectSessions(selectedProject.localPath, sessionsForProject) : [],
-    [selectedProject, sessionsForProject]
-  )
   const isConnecting = connectionStatus === "connecting" || (connectionStatus === "connected" && !ready)
   const isConnected = connectionStatus === "connected" && ready
 
@@ -717,7 +518,7 @@ export function LocalDev({
           <PageHeader
             uiId={LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.header}
             title={snapshot?.machine.displayName ?? "Local Projects"}
-            subtitle="Your workspaces and recent sessions."
+            subtitle="Your workspaces and projects."
           />
 
           <div className="px-6 mb-4">
@@ -725,23 +526,6 @@ export function LocalDev({
           </div>
 
           <div className="w-full px-6 mb-10">
-            {recentSessions.length > 0 ? (
-              <div className="mb-6" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.recentSessions)}>
-                <SectionHeader>Recent Sessions</SectionHeader>
-                <div className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden">
-                  {recentSessions.map((item) => (
-                    <RecentSessionRow
-                      key={`${item.workspaceId}:${item.session.sessionId}`}
-                      item={item}
-                      onResume={() => {
-                        void onResumeSession?.(item.workspaceId, item.session)
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
             {(independentWorkspaces?.length ?? 0) > 0 || onCreateWorkspace ? (
               <div className="mb-6">
                 <div className="mb-2 flex items-baseline justify-between gap-4">
@@ -793,8 +577,6 @@ export function LocalDev({
                   {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.workspaceGrid)}
                 >
                   {(showAllProjects ? projects : projects.slice(0, 6)).map((project, index) => {
-                    const projectSessions = getProjectSessions(project.localPath, sessionsForProject)
-                    const latestSession = projectSessions[0] ?? null
                     const projectTitle = getProjectTitle(project)
 
                     return (
@@ -804,18 +586,12 @@ export function LocalDev({
                         projectTitle={projectTitle}
                         localPath={project.localPath}
                         chatCount={project.chatCount}
-                        sessions={projectSessions}
                         loading={startingLocalPath === project.localPath}
                         selected={selectedProject?.localPath === project.localPath}
                         onSelect={() => {
                           setSelectedProjectPath(project.localPath)
                         }}
                         onContinue={() => {
-                          if (latestSession) {
-                            void onResumeSession?.(project.localPath, latestSession)
-                            return
-                          }
-
                           void onOpenProject(project.localPath)
                         }}
                         onStartTask={() => {
@@ -836,15 +612,8 @@ export function LocalDev({
                 {selectedProject ? (
                   <ProjectOverviewPanel
                     project={selectedProject}
-                    sessions={selectedProjectSessions}
                     loading={startingLocalPath === selectedProject.localPath}
                     onContinue={() => {
-                      const latestSession = selectedProjectSessions[0] ?? null
-                      if (latestSession) {
-                        void onResumeSession?.(selectedProject.localPath, latestSession)
-                        return
-                      }
-
                       void onOpenProject(selectedProject.localPath)
                     }}
                     onStartTask={() => {

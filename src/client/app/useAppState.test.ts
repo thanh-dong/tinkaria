@@ -13,7 +13,6 @@ import {
   deriveMergeSessionPreviewTitle,
   getActiveChatSnapshot,
   getNewestRemainingChatId,
-  getResumeRefreshSessionProjectIds,
   normalizeLocalFilePreviewErrorMessage,
   normalizeCommandErrorMessage,
   normalizeSessionBootstrapErrorMessage,
@@ -168,14 +167,6 @@ describe("shouldRefreshStaleSessionOnResume", () => {
       resumedAt: 100 + PWA_RESUME_STALE_AFTER_MS - 1,
       connectionStatus: "connected",
     })).toBe(false)
-  })
-})
-
-describe("getResumeRefreshSessionProjectIds", () => {
-  test("deduplicates open session picker project ids while preserving first-seen order", () => {
-    expect(
-      getResumeRefreshSessionProjectIds(["project-2", "project-1", "project-2", "project-3", "project-1"])
-    ).toEqual(["project-2", "project-1", "project-3"])
   })
 })
 

@@ -1,18 +1,15 @@
 import type { NatsConnection } from "@nats-io/transport-node"
 import { jetstream } from "@nats-io/jetstream"
 import { Kvm } from "@nats-io/kv"
-import { homedir } from "node:os"
-import { join } from "node:path"
 import type { SubscriptionTopic } from "../shared/protocol"
 import { snapshotSubject, snapshotKvKey, terminalEventSubject, chatMessageSubject, KV_BUCKET } from "../shared/nats-subjects"
 import { LOG_PREFIX } from "../shared/branding"
 import { compressPayload } from "../shared/compression"
-import type { ChatMessageEvent, SessionsSnapshot, TranscriptEntry } from "../shared/types"
+import type { ChatMessageEvent, TranscriptEntry } from "../shared/types"
 import type { SessionStatus } from "../shared/types"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
-import { deriveChatSnapshot, deriveLocalWorkspacesSnapshot, deriveWorkspaceCoordinationSnapshot, deriveSessionsSnapshot, deriveSidebarData, deriveAgentConfigSnapshot, deriveRepoListSnapshot, deriveWorkflowRunsSnapshot, deriveSandboxSnapshot } from "./read-models"
-import { discoverSessions } from "./session-discovery"
+import { deriveChatSnapshot, deriveLocalWorkspacesSnapshot, deriveWorkspaceCoordinationSnapshot, deriveSidebarData, deriveAgentConfigSnapshot, deriveRepoListSnapshot, deriveWorkflowRunsSnapshot, deriveSandboxSnapshot } from "./read-models"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
 import type { SkillCache } from "./skill-discovery"
@@ -66,41 +63,6 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
 
   const activeSubscriptions = new Map<string, SubscriptionTopic>()
   const lastJsonByKey = new Map<string, string>()
-  const sessionsCache = new Map<string, SessionsSnapshot>()
-  const sessionsPollTimers = new Map<string, ReturnType<typeof setInterval>>()
-
-  function encodeClaudeProjectDir(workspacePath: string): string {
-    return join(homedir(), ".claude", "projects", workspacePath.replace(/\//g, "-"))
-  }
-
-  async function refreshSessions(workspaceId: string, workspacePath: string): Promise<void> {
-    const home = homedir()
-    const claudeProjectDir = encodeClaudeProjectDir(workspacePath)
-    const codexSessionsDir = join(home, ".codex", "sessions")
-
-    const snapshot = await discoverSessions({
-      workspaceId,
-      workspacePath,
-      store,
-      claudeProjectDir,
-      codexSessionsDir,
-    })
-
-    sessionsCache.set(workspaceId, snapshot)
-    const topic = { type: "sessions" as const, workspaceId }
-    publishSnapshot(topic, snapshot)
-  }
-
-  async function getOrRefreshSessionsSnapshot(workspaceId: string): Promise<SessionsSnapshot | null> {
-    const cached = sessionsCache.get(workspaceId)
-    if (cached) return cached
-
-    const project = store.state.workspacesById.get(workspaceId)
-    if (!project) return null
-
-    await refreshSessions(workspaceId, project.localPath)
-    return sessionsCache.get(workspaceId) ?? null
-  }
 
   function publishSnapshot(topic: SubscriptionTopic, data: unknown): void {
     const kvKey = snapshotKvKey(topic)
@@ -144,8 +106,6 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
       }
       case "terminal":
         return terminals.getSnapshot(topic.terminalId)
-      case "sessions":
-        return deriveSessionsSnapshot(await getOrRefreshSessionsSnapshot(topic.workspaceId))
       case "orchestration":
         return orchestrator?.getHierarchy(topic.chatId) ?? { children: [] }
       case "workspace":
@@ -167,20 +127,6 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
 
   function addSubscription(subscriptionId: string, topic: SubscriptionTopic): void {
     activeSubscriptions.set(subscriptionId, topic)
-
-    if (topic.type === "sessions" && !sessionsPollTimers.has(topic.workspaceId)) {
-      const workspaceId = topic.workspaceId
-      const project = store.state.workspacesById.get(workspaceId)
-      if (project) {
-        const workspacePath = project.localPath
-        const timer = setInterval(() => {
-          refreshSessions(workspaceId, workspacePath).catch((err) =>
-            console.warn(LOG_PREFIX, "sessions scan failed:", err instanceof Error ? err.message : String(err))
-          )
-        }, 60_000)
-        sessionsPollTimers.set(workspaceId, timer)
-      }
-    }
   }
 
   function removeSubscription(subscriptionId: string): void {
@@ -193,22 +139,6 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
       const stillTracked = [...activeSubscriptions.values()].some((t) => snapshotKvKey(t) === key)
       if (!stillTracked) {
         lastJsonByKey.delete(key)
-      }
-
-      // Clean up sessions poll timer if no remaining sessions subscriptions for this workspaceId
-      if (topic.type === "sessions") {
-        const workspaceId = topic.workspaceId
-        const hasOtherSessionsSub = [...activeSubscriptions.values()].some(
-          (t) => t.type === "sessions" && t.workspaceId === workspaceId
-        )
-        if (!hasOtherSessionsSub) {
-          const timer = sessionsPollTimers.get(workspaceId)
-          if (timer) {
-            clearInterval(timer)
-            sessionsPollTimers.delete(workspaceId)
-          }
-          sessionsCache.delete(workspaceId)
-        }
       }
     }
   }
@@ -258,14 +188,9 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     getSnapshot,
     broadcastSnapshots,
     publishChatMessage,
-    refreshSessions,
     dispose() {
       disposeTerminalEvents()
       disposeUpdateEvents()
-      for (const timer of sessionsPollTimers.values()) {
-        clearInterval(timer)
-      }
-      sessionsPollTimers.clear()
     },
   }
 }

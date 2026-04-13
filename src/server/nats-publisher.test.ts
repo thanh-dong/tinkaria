@@ -1,20 +1,14 @@
 import { afterEach, describe, test, expect, mock } from "bun:test"
 import { NatsServer } from "@lagz0ne/nats-embedded"
 import { connect, type NatsConnection, type Subscription } from "@nats-io/transport-node"
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises"
-import { join } from "node:path"
-import { homedir, tmpdir } from "node:os"
 import { createNatsPublisher, type CreateNatsPublisherArgs } from "./nats-publisher"
 import { snapshotSubject, snapshotKvKey, KV_BUCKET } from "../shared/nats-subjects"
 import { createEmptyState } from "./events"
 import { Kvm } from "@nats-io/kv"
 import type { SubscriptionTopic } from "../shared/protocol"
-import { EventStore } from "./event-store"
 
 let server: NatsServer | null = null
 let nc: NatsConnection | null = null
-const tempDirs: string[] = []
-const originalHome = process.env.HOME
 
 afterEach(async () => {
   if (nc) {
@@ -25,19 +19,7 @@ afterEach(async () => {
     await server.stop()
     server = null
   }
-  process.env.HOME = originalHome
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
-
-async function makeTempDir(prefix = "tinkaria-nats-publisher-") {
-  const dir = await mkdtemp(join(tmpdir(), prefix))
-  tempDirs.push(dir)
-  return dir
-}
-
-function encodeClaudeProjectDir(workspacePath: string, homeDir: string) {
-  return join(homeDir, ".claude", "projects", workspacePath.replace(/\//g, "-"))
-}
 
 function mockArgs(overrides: Partial<CreateNatsPublisherArgs> = {}): CreateNatsPublisherArgs {
   return {
@@ -299,73 +281,6 @@ describe("createNatsPublisher", () => {
     publisher.dispose()
 
     expect(disposeFn).toHaveBeenCalledTimes(1)
-  })
-
-  test("refreshSessions discovers Claude CLI history from the shared encoded project path", async () => {
-    server = await NatsServer.start({ jetstream: true })
-    nc = await connect({ servers: server.url })
-
-    const storeDir = await makeTempDir("tinkaria-store-")
-    const store = new EventStore(storeDir)
-    await store.initialize()
-
-    const workspacePath = `/home/user/dev/kanna-refresh-${Date.now()}`
-    const project = await store.openProject(workspacePath, "kanna")
-
-    const claudeDir = encodeClaudeProjectDir(workspacePath, homedir())
-    tempDirs.push(claudeDir)
-    await mkdir(claudeDir, { recursive: true })
-    await writeFile(
-      join(claudeDir, "cli-session.jsonl"),
-      [
-        JSON.stringify({ type: "user", message: { content: "Audit the old session history" } }),
-        JSON.stringify({ type: "assistant", message: { content: "Found the bug." } }),
-      ].join("\n") + "\n"
-    )
-
-    const publisher = await createNatsPublisher(mockArgs({ store }))
-    await publisher.refreshSessions(project.id, workspacePath)
-
-    const snapshot = await publisher.getSnapshot({ type: "sessions", workspaceId: project.id }) as {
-      sessions: Array<{ sessionId: string, source: string }>
-    }
-
-    expect(snapshot.sessions).toHaveLength(1)
-    expect(snapshot.sessions[0]).toMatchObject({
-      sessionId: "cli-session",
-      source: "cli",
-    })
-
-    publisher.dispose()
-  })
-
-  test("getSnapshot hydrates sessions before the first subscribe response", async () => {
-    server = await NatsServer.start({ jetstream: true })
-    nc = await connect({ servers: server.url })
-
-    const storeDir = await makeTempDir("tinkaria-store-")
-    const store = new EventStore(storeDir)
-    await store.initialize()
-
-    const workspacePath = `/home/user/dev/kanna-initial-${Date.now()}`
-    const project = await store.openProject(workspacePath, "kanna")
-
-    const claudeDir = encodeClaudeProjectDir(workspacePath, homedir())
-    tempDirs.push(claudeDir)
-    await mkdir(claudeDir, { recursive: true })
-    await writeFile(
-      join(claudeDir, "initial-session.jsonl"),
-      JSON.stringify({ type: "user", message: { content: "Initial session snapshot" } }) + "\n"
-    )
-
-    const publisher = await createNatsPublisher(mockArgs({ store }))
-    const snapshot = await publisher.getSnapshot({ type: "sessions", workspaceId: project.id }) as {
-      sessions: Array<{ sessionId: string }>
-    }
-
-    expect(snapshot.sessions.map((session) => session.sessionId)).toEqual(["initial-session"])
-
-    publisher.dispose()
   })
 
   test("broadcastSnapshots publishes orchestration snapshots without throwing", async () => {

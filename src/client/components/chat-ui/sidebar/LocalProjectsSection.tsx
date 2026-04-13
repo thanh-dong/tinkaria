@@ -1,25 +1,12 @@
-import { type ReactNode, useMemo, useState } from "react"
+import { type ReactNode } from "react"
 import { ChevronRight, FolderOpen } from "lucide-react"
-import type { AgentProvider, DiscoveredSession } from "../../../../shared/types"
-import { SessionPickerContent, getSessionPickerUiIdentityDescriptors } from "../SessionPicker"
+import type { SidebarChatRow, SidebarWorkspaceGroup } from "../../../../shared/types"
 import { Button } from "../../ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
-import type { SidebarChatRow, SidebarWorkspaceGroup } from "../../../../shared/types"
 import { getPathBasename } from "../../../lib/formatters"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../../lib/uiIdentityOverlay"
 import { cn } from "../../../lib/utils"
 import { ProjectSectionMenu } from "./Menus"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogGhostButton,
-  DialogHeader,
-  DialogTitle,
-  RESPONSIVE_MODAL_CONTENT_CLASS_NAME,
-  RESPONSIVE_MODAL_FOOTER_CLASS_NAME,
-  RESPONSIVE_MODAL_HEADER_CLASS_NAME,
-} from "../../ui/dialog"
 
 const PROJECT_GROUP_UI_ID = "sidebar.project-group"
 const PROJECT_GROUP_DESCRIPTOR = createUiIdentityDescriptor({
@@ -40,13 +27,6 @@ interface Props {
   onRemoveProject?: (workspaceId: string) => void
   isConnected?: boolean
   startingLocalPath?: string | null
-  sessionsForProject?: (workspaceId: string) => DiscoveredSession[]
-  sessionsWindowDaysForProject?: (workspaceId: string) => number
-  onOpenSessionPicker?: (workspaceId: string, open: boolean) => void
-  onNavigateToChat?: (chatId: string) => void
-  onResumeSession?: (workspaceId: string, sessionId: string, provider: AgentProvider) => void
-  onRefreshSessions?: (workspaceId: string) => void
-  onShowMoreSessions?: (workspaceId: string) => void
   onMergeSession?: (workspaceId: string) => void
   onOpenCoordination?: (workspaceId: string) => void
 }
@@ -63,13 +43,6 @@ interface ProjectGroupSectionProps {
   onRemoveProject?: (workspaceId: string) => void
   isConnected?: boolean
   startingLocalPath?: string | null
-  sessions?: DiscoveredSession[]
-  sessionsWindowDays?: number
-  onOpenSessionPicker?: (workspaceId: string, open: boolean) => void
-  onNavigateToChat?: (chatId: string) => void
-  onResumeSession?: (workspaceId: string, sessionId: string, provider: AgentProvider) => void
-  onRefreshSessions?: (workspaceId: string) => void
-  onShowMoreSessions?: (workspaceId: string) => void
   onMergeSession?: (workspaceId: string) => void
   onOpenCoordination?: (workspaceId: string) => void
 }
@@ -86,55 +59,22 @@ function ProjectGroupSection({
   onRemoveProject,
   isConnected,
   startingLocalPath,
-  sessions,
-  sessionsWindowDays,
-  onOpenSessionPicker,
-  onNavigateToChat,
-  onResumeSession,
-  onRefreshSessions,
-  onShowMoreSessions,
   onMergeSession,
   onOpenCoordination,
 }: ProjectGroupSectionProps) {
   const { groupKey, localPath, chats: pathChats } = group
-  const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false)
-  const [sessionSearchQuery, setSessionSearchQuery] = useState("")
-
-  const sidebarChatIds = useMemo(
-    () => new Set(pathChats.map((chat) => chat.chatId)),
-    [pathChats]
-  )
 
   const isExpanded = expandedGroups.has(groupKey)
   const displayChats = isExpanded ? pathChats : pathChats.slice(0, chatsPerProject)
   const hasMore = pathChats.length > chatsPerProject
   const isConnectedDisabled = isConnected === false
   const isStartingCurrentPath = startingLocalPath === localPath
-  const sessionPickerUiDescriptors = getSessionPickerUiIdentityDescriptors()
   const hasMenuActions = Boolean(
-    onOpenSessionPicker
-    || onMergeSession
+    onMergeSession
     || onOpenCoordination
     || onNewLocalChat
     || onRemoveProject
   )
-
-  function handleSessionDialogOpenChange(next: boolean) {
-    setIsSessionDialogOpen(next)
-    if (!next) {
-      setSessionSearchQuery("")
-    }
-    onOpenSessionPicker?.(groupKey, next)
-  }
-
-  function handleSelectSession(session: DiscoveredSession) {
-    if (session.chatId) {
-      onNavigateToChat?.(session.chatId)
-    } else {
-      onResumeSession?.(groupKey, session.sessionId, session.provider)
-    }
-    handleSessionDialogOpenChange(false)
-  }
 
   const header = (
     <div
@@ -175,8 +115,6 @@ function ProjectGroupSection({
     >
       {hasMenuActions ? (
         <ProjectSectionMenu
-          onOpenSessions={onOpenSessionPicker ? () => handleSessionDialogOpenChange(true) : undefined}
-          sessionsDisabled={isConnectedDisabled}
           onMergeSession={onMergeSession ? () => onMergeSession(groupKey) : undefined}
           mergeDisabled={isConnectedDisabled}
           onOpenCoordination={onOpenCoordination ? () => onOpenCoordination(groupKey) : undefined}
@@ -187,35 +125,6 @@ function ProjectGroupSection({
           {header}
         </ProjectSectionMenu>
       ) : header}
-      <Dialog open={isSessionDialogOpen} onOpenChange={handleSessionDialogOpenChange}>
-        <DialogContent
-          size="sm"
-          className={RESPONSIVE_MODAL_CONTENT_CLASS_NAME}
-          {...getUiIdentityAttributeProps(sessionPickerUiDescriptors.dialog)}
-        >
-          <DialogHeader className={RESPONSIVE_MODAL_HEADER_CLASS_NAME}>
-            <DialogTitle>Sessions</DialogTitle>
-          </DialogHeader>
-          <div className="px-4 pb-4 pt-3.5 flex min-h-0 flex-1 flex-col overflow-hidden">
-            <SessionPickerContent
-              sessions={sessions ?? []}
-              windowDays={sessionsWindowDays ?? 7}
-              searchQuery={sessionSearchQuery}
-              onSelectSession={handleSelectSession}
-              onRefresh={() => onRefreshSessions?.(groupKey)}
-              onSearchChange={setSessionSearchQuery}
-              onShowMore={() => onShowMoreSessions?.(groupKey)}
-              isRefreshing={false}
-              sidebarChatIds={sidebarChatIds}
-            />
-          </div>
-          <DialogFooter className={RESPONSIVE_MODAL_FOOTER_CLASS_NAME}>
-            <DialogGhostButton onClick={() => handleSessionDialogOpenChange(false)}>
-              Close
-            </DialogGhostButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {!collapsedSections.has(groupKey) && (displayChats.length > 0 || hasMore) && (
         <div className="space-y-[2px] mb-2 ">
@@ -248,13 +157,6 @@ export function LocalProjectsSection({
   onRemoveProject,
   isConnected,
   startingLocalPath,
-  sessionsForProject,
-  sessionsWindowDaysForProject,
-  onOpenSessionPicker,
-  onNavigateToChat,
-  onResumeSession,
-  onRefreshSessions,
-  onShowMoreSessions,
   onMergeSession,
   onOpenCoordination,
 }: Props) {
@@ -274,13 +176,6 @@ export function LocalProjectsSection({
           onRemoveProject={onRemoveProject}
           isConnected={isConnected}
           startingLocalPath={startingLocalPath}
-          sessions={sessionsForProject?.(group.groupKey)}
-          sessionsWindowDays={sessionsWindowDaysForProject?.(group.groupKey)}
-          onOpenSessionPicker={onOpenSessionPicker}
-          onNavigateToChat={onNavigateToChat}
-          onResumeSession={onResumeSession}
-          onRefreshSessions={onRefreshSessions}
-          onShowMoreSessions={onShowMoreSessions}
           onMergeSession={onMergeSession}
           onOpenCoordination={onOpenCoordination}
         />

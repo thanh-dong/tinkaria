@@ -4,7 +4,6 @@ import type {
   SessionStatus,
   LocalWorkspacesSnapshot,
   RepoSummary,
-  SessionsSnapshot,
   SidebarChatRow,
   SidebarData,
   SidebarWorkspaceGroup,
@@ -135,12 +134,6 @@ export function deriveChatSnapshot(
     availableProviders: [...SERVER_PROVIDERS],
     availableSkills: availableSkills ?? [],
   }
-}
-
-export function deriveSessionsSnapshot(
-  cachedSnapshot: SessionsSnapshot | null
-): SessionsSnapshot | null {
-  return cachedSnapshot
 }
 
 /** Derive a coordination snapshot from any state with coordinationByWorkspace. */

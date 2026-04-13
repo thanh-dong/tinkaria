@@ -10,7 +10,6 @@ import {
   type ModelOptions,
   type OrchestrationHierarchySnapshot,
   type ProviderCatalogEntry,
-  type SessionsSnapshot,
   type UpdateSnapshot,
 } from "../../shared/types"
 import { useChatInputStore } from "../stores/chatInputStore"
@@ -132,12 +131,6 @@ export interface AppState {
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
   handleOpenExternalLink: (href: string) => boolean
   handleRenameChat: (chatId: string, title: string) => Promise<void>
-  sessionsSnapshots: Map<string, SessionsSnapshot>
-  sessionsWindowDays: Map<string, number>
-  handleOpenSessionPicker: (workspaceId: string, open: boolean) => void
-  handleResumeSession: (workspaceId: string, sessionId: string, provider: AgentProvider) => Promise<void>
-  handleRefreshSessions: (workspaceId: string) => void
-  handleShowMoreSessions: (workspaceId: string) => void
   handleCompose: () => void
   handleForkSession: (intent: string, provider: AgentProvider, model: string, preset?: string) => Promise<void>
   handleMergeSession: (chatIds: string[], intent: string, provider: AgentProvider, model: string, preset?: string, closeSources?: boolean) => Promise<void>
@@ -191,7 +184,6 @@ export function useAppState(activeChatId: string | null): AppState {
   const setNormalizedCommandError = useCallback((error: unknown) => {
     setCommandError(normalizeCommandErrorMessage(error))
   }, [])
-  const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
   const snapshotCallbackRef = useRef<(snapshot: ChatSnapshot) => void>(() => {})
   const pendingDeletedChatIdsRef = useRef<Set<string>>(new Set())
 
@@ -199,7 +191,6 @@ export function useAppState(activeChatId: string | null): AppState {
     socket,
     activeChatId,
     connectionStatus,
-    openSessionProjectIds: activeSessionsSubs.current.keys(),
     setNormalizedCommandError,
   })
 
@@ -430,7 +421,6 @@ export function useAppState(activeChatId: string | null): AppState {
     updateSubmitPipeline,
     submitPipeline,
     submitPipelineRef,
-    activeSessionsSubs,
     pendingDeletedChatIdsRef,
   })
 
@@ -501,12 +491,6 @@ export function useAppState(activeChatId: string | null): AppState {
     handleOpenExternalPath: commands.handleOpenExternalPath,
     handleOpenLocalLink: commands.handleOpenLocalLink,
     handleOpenExternalLink: commands.handleOpenExternalLink,
-    sessionsSnapshots: commands.sessionsSnapshots,
-    sessionsWindowDays: commands.sessionsWindowDays,
-    handleOpenSessionPicker: commands.handleOpenSessionPicker,
-    handleResumeSession: commands.handleResumeSession,
-    handleRefreshSessions: commands.handleRefreshSessions,
-    handleShowMoreSessions: commands.handleShowMoreSessions,
     handleCompose: commands.handleCompose,
     handleForkSession: commands.handleForkSession,
     handleMergeSession: commands.handleMergeSession,

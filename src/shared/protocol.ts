@@ -9,7 +9,6 @@ export type SubscriptionTopic =
   | { type: "update" }
   | { type: "chat"; chatId: string }
   | { type: "terminal"; terminalId: string }
-  | { type: "sessions"; workspaceId: string }
   | { type: "orchestration"; chatId: string }
   | { type: "workspace"; workspaceId: string }
   | { type: "agent-config"; workspaceId: string }
@@ -81,8 +80,6 @@ export type ClientCommand =
   | { type: "chat.getMessages"; chatId: string; offset?: number; limit?: number }
   | { type: "snapshot.subscribe"; subscriptionId: string; topic: SubscriptionTopic }
   | { type: "snapshot.unsubscribe"; subscriptionId: string }
-  | { type: "sessions.resume"; workspaceId: string; sessionId: string; provider: AgentProvider }
-  | { type: "sessions.refresh"; workspaceId: string }
   | { type: "workspace.todo.add"; workspaceId: string; todoId: string; description: string; priority?: "high" | "normal" | "low"; createdBy?: string }
   | { type: "workspace.todo.claim"; workspaceId: string; todoId: string; sessionId: string }
   | { type: "workspace.todo.complete"; workspaceId: string; todoId: string; outputs: string[] }

@@ -8,7 +8,6 @@ export function snapshotKvKey(topic: SubscriptionTopic): string {
   switch (topic.type) {
     case "chat": return `chat.${topic.chatId}`
     case "terminal": return `terminal.${topic.terminalId}`
-    case "sessions": return `sessions.${topic.workspaceId}`
     case "orchestration": return `orchestration.${topic.chatId}`
     case "workspace": return `workspace.${topic.workspaceId}`
     case "agent-config": return `agent-config.${topic.workspaceId}`

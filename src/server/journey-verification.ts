@@ -62,20 +62,6 @@ const CHAT_READY_STAGE: JourneyStageSpec = {
   expectedText: [],
 }
 
-const SESSION_PICKER_STAGE: JourneyStageSpec = {
-  id: "session-picker.open",
-  label: "Session picker opened from the sidebar project group",
-  owners: ["c3-113"],
-  route: { kind: "prefix", value: "/chat/" },
-  requiredUiIds: [
-    "sidebar.project-group.sessions.action",
-    "sidebar.project-group.sessions.popover",
-    "sidebar.project-group.sessions.search.input",
-    "sidebar.project-group.sessions.list",
-  ],
-  expectedText: [],
-}
-
 const FORK_DIALOG_STAGE: JourneyStageSpec = {
   id: "fork-dialog.open",
   label: "Fork session dialog opened from the chat navbar",
@@ -127,13 +113,6 @@ export const HOME_TO_MERGE_DIALOG_JOURNEY: JourneySpec = {
   persistenceChecks: true,
 }
 
-export const HOME_TO_SESSION_PICKER_JOURNEY: JourneySpec = {
-  id: "homepage-to-session-picker",
-  label: "Homepage project overview -> Start First Task -> session picker",
-  stages: [HOME_READY_STAGE, CHAT_READY_STAGE, SESSION_PICKER_STAGE],
-  persistenceChecks: true,
-}
-
 export function matchesJourneyRoute(pathname: string, expectation: JourneyRouteExpectation): boolean {
   if (expectation.kind === "exact") {
     return pathname === expectation.value
@@ -174,7 +153,6 @@ export function getJourneyStage(id: JourneyStageSpec["id"]): JourneyStageSpec {
     ...HOME_TO_NEW_CHAT_JOURNEY.stages,
     ...HOME_TO_FORK_DIALOG_JOURNEY.stages,
     ...HOME_TO_MERGE_DIALOG_JOURNEY.stages,
-    ...HOME_TO_SESSION_PICKER_JOURNEY.stages,
   ].find((candidate) => candidate.id === id)
   if (!stage) {
     throw new Error(`Unknown journey stage: ${id}`)
@@ -191,8 +169,6 @@ export function getJourneySpec(id: string): JourneySpec {
       return structuredClone(HOME_TO_FORK_DIALOG_JOURNEY)
     case HOME_TO_MERGE_DIALOG_JOURNEY.id:
       return structuredClone(HOME_TO_MERGE_DIALOG_JOURNEY)
-    case HOME_TO_SESSION_PICKER_JOURNEY.id:
-      return structuredClone(HOME_TO_SESSION_PICKER_JOURNEY)
     default:
       throw new Error(`Unknown journey: ${id}`)
   }
