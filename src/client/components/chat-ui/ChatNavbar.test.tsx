@@ -324,10 +324,12 @@ describe("ChatNavbar", () => {
     expect(htmlBefore(html, 'data-testid="context-bar"')).toContain("hidden md:")
   })
 
-  test("renders mobile info row with repo label and context bar", () => {
+  test("renders mobile info strip with md:hidden", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,
       ...defaultProps,
+      chatTitle: "Some title",
+      chatStatus: "idle",
       localPath: "/workspace/kanna",
       currentRepoStatus: cleanRepoStatus,
       currentSessionRuntime: {
@@ -336,53 +338,59 @@ describe("ChatNavbar", () => {
       },
     })
 
-    expect(html).toContain('data-testid="mobile-info-row"')
-    const mobileRow = htmlElementForMarker(html, 'data-testid="mobile-info-row"')
-    expect(mobileRow).toContain("md:hidden")
+    expect(html).toContain('data-testid="mobile-info-strip"')
+    const strip = htmlElementForMarker(html, 'data-testid="mobile-info-strip"')
+    expect(strip).toContain("md:hidden")
   })
 
-  test("mobile info row shows repo label", () => {
+  test("mobile info strip combines provider icon, title, repo label, and context", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,
       ...defaultProps,
+      chatTitle: "Fix auth bug",
+      chatStatus: "running",
       localPath: "/workspace/kanna",
       currentRepoStatus: {
         ...cleanRepoStatus,
         branch: "feat/mobile",
         ahead: 2,
       },
-    })
-
-    expect(html).toContain('data-testid="mobile-info-row"')
-    // The mobile row should contain the compact label
-    const afterMobileRow = html.slice(html.indexOf('data-testid="mobile-info-row"'))
-    expect(afterMobileRow).toContain("kanna")
-    expect(afterMobileRow).toContain("feat/mobile +2")
-  })
-
-  test("mobile info row shows context percentage", () => {
-    const html = renderNavbar({
-      sidebarCollapsed: false,
-      ...defaultProps,
-      localPath: "/workspace/kanna",
-      currentRepoStatus: cleanRepoStatus,
       currentSessionRuntime: {
         model: "claude-sonnet-4-5",
         tokenUsage: { totalTokens: 5000, estimatedContextPercent: 72 },
       },
     })
 
-    const afterMobileRow = html.slice(html.indexOf('data-testid="mobile-info-row"'))
-    expect(afterMobileRow).toContain("72%")
+    const afterStrip = html.slice(html.indexOf('data-testid="mobile-info-strip"'))
+    expect(afterStrip).toContain('data-testid="mobile-provider-icon"')
+    expect(afterStrip).toContain('data-testid="mobile-title-row"')
+    expect(afterStrip).toContain("Fix auth bug")
+    expect(afterStrip).toContain('data-testid="mobile-repo-label"')
+    expect(afterStrip).toContain("kanna")
+    expect(afterStrip).toContain("feat/mobile +2")
+    expect(afterStrip).toContain("72%")
   })
 
-  test("mobile info row is hidden when no right content", () => {
+  test("mobile info strip has transparent default with hover/active bg", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      chatTitle: "Title",
+      chatStatus: "idle",
+    })
+
+    const strip = htmlElementForMarker(html, 'data-testid="mobile-info-strip"')
+    expect(strip).toContain("bg-transparent")
+    expect(strip).toContain("active:bg-background")
+  })
+
+  test("mobile info strip is hidden when no title and no right content", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,
       ...defaultProps,
     })
 
-    expect(html).not.toContain('data-testid="mobile-info-row"')
+    expect(html).not.toContain('data-testid="mobile-info-strip"')
   })
 
   test("uses no text smaller than 12px", () => {
@@ -426,7 +434,7 @@ describe("ChatNavbar", () => {
     expect(html).toContain('title="A very long session title that will be truncated"')
   })
 
-  test("session title renders in dedicated mobile row", () => {
+  test("session title renders inside mobile info strip", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,
       ...defaultProps,
@@ -435,8 +443,8 @@ describe("ChatNavbar", () => {
     })
 
     expect(html).toContain('data-testid="mobile-title-row"')
-    const mobileTitle = htmlElementForMarker(html, 'data-testid="mobile-title-row"')
-    expect(mobileTitle).toContain("md:hidden")
+    const afterStrip = html.slice(html.indexOf('data-testid="mobile-info-strip"'))
+    expect(afterStrip).toContain('data-testid="mobile-title-row"')
   })
 
   test("model indicator is always visible (not hidden on mobile)", () => {

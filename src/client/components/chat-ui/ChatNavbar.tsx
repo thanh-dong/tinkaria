@@ -364,34 +364,44 @@ export function ChatNavbar({
         </div>
       </div>
 
-      {/* Mobile row 2: session title */}
-      {chatTitle ? (
+      {/* Mobile combined strip: provider + title + stats — transparent, frosted on touch */}
+      {(chatTitle || hasRightContent) ? (
         <div
-          className="md:hidden flex items-center gap-1.5 w-full px-1 mt-1"
-          data-testid="mobile-title-row"
+          className={cn(
+            "md:hidden flex items-center gap-2 w-full min-w-0 px-2 py-1 mt-1 rounded-full",
+            "transition-all duration-200",
+            "bg-transparent",
+            "active:bg-background/80 active:backdrop-blur-xl active:border-border/60 active:shadow-sm",
+            "[&:hover]:bg-background/80 [&:hover]:backdrop-blur-xl [&:hover]:border-border/60 [&:hover]:shadow-sm",
+            "border border-transparent"
+          )}
+          data-testid="mobile-info-strip"
         >
-          <span className={cn("size-2 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
-          <span
-            className="truncate text-xs leading-none text-muted-foreground"
-            title={chatTitle}
-          >
-            {chatTitle}
-          </span>
-        </div>
-      ) : null}
+          {ProviderIcon && modelName ? (
+            <div className="shrink-0 text-muted-foreground" data-testid="mobile-provider-icon">
+              <ProviderIcon className="size-3.5" />
+            </div>
+          ) : null}
 
-      {/* Mobile row 3: dir(branch) + context bar */}
-      {hasRightContent ? (
-        <div
-          className="md:hidden flex items-center justify-between gap-2 w-full px-1 mt-1"
-          data-testid="mobile-info-row"
-        >
+          {chatTitle ? (
+            <div
+              className="flex items-center gap-1.5 min-w-0 flex-1"
+              data-testid="mobile-title-row"
+            >
+              <span className={cn("size-2 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
+              <span
+                className="truncate text-xs leading-none text-muted-foreground"
+                title={chatTitle}
+              >
+                {chatTitle}
+              </span>
+            </div>
+          ) : <div className="flex-1" />}
+
           {compactRepoLabel ? (
-            <RepoDetailPopover
-              localPath={localPath}
-              repoStatus={currentRepoStatus}
-              compactLabel={compactRepoLabel}
-            />
+            <span className="shrink-0 truncate text-xs leading-none text-muted-foreground" data-testid="mobile-repo-label">
+              {compactRepoLabel}
+            </span>
           ) : null}
 
           {contextPercent !== undefined ? (
