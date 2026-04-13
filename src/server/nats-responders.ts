@@ -21,6 +21,8 @@ import { deriveCoordinationSnapshot, deriveAgentConfigSnapshot } from "./read-mo
 import type { WorkspaceDirectoryPolicy } from "./workspace-directory-policy"
 import type { RepoManager } from "./repo-manager"
 import type { GitClonePolicy } from "./git-clone-policy"
+import type { RuntimeRegistry } from "./runtime-registry"
+import { resolveProfile } from "../shared/profile-types"
 
 /** Session coordinator interface — RunnerProxy delegates turn execution to the runner process */
 interface Coordinator {
@@ -58,6 +60,7 @@ export interface RegisterRespondersArgs {
   workflowEngine: import("./workflow-engine").WorkflowEngine | null
   workflowStore: import("./workflow-store").WorkflowStore | null
   sandboxManager: import("./sandbox-manager").SandboxManager | null
+  runtimeRegistry: RuntimeRegistry | null
 }
 
 /** Command types that do NOT mutate state and should NOT trigger onStateChange */
@@ -85,6 +88,10 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "workspace.workflow.list",
   "workspace.sandbox.logs",
   "workspace.sandbox.status",
+  "runtime.list",
+  "runtime.health",
+  "profile.list",
+  "profile.resolve",
 ])
 
 /** Commands handled by the Bun backend. */
@@ -151,7 +158,36 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "workspace.sandbox.destroy",
   "workspace.sandbox.logs",
   "workspace.sandbox.status",
+  "runtime.list",
+  "runtime.detect",
+  "runtime.install",
+  "runtime.remove",
+  "runtime.health",
+  "profile.list",
+  "profile.save",
+  "profile.remove",
+  "profile.resolve",
+  "workspace.profile.override.set",
+  "workspace.profile.override.remove",
 ]
+
+const DETECT_OPTIONS: Record<string, { binaryName: string; packageName: string; versionParser: (stdout: string) => string }> = {
+  claude: {
+    binaryName: "claude",
+    packageName: "@anthropic-ai/claude-code",
+    versionParser: (stdout: string) => stdout.replace(/[^0-9.]/g, "").trim() || "unknown",
+  },
+  codex: {
+    binaryName: "codex",
+    packageName: "@openai/codex",
+    versionParser: (stdout: string) => stdout.replace(/[^0-9.]/g, "").trim() || "unknown",
+  },
+}
+
+const INSTALL_OPTIONS: Record<string, { packageName: string; binaryName: string }> = {
+  claude: { packageName: "@anthropic-ai/claude-code", binaryName: "claude" },
+  codex: { packageName: "@openai/codex", binaryName: "codex" },
+}
 
 export function registerCommandResponders(args: RegisterRespondersArgs): { dispose: () => void } {
   const {
@@ -655,6 +691,75 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (!sandbox?.containerId) throw new Error("No sandbox found for workspace")
         const inspect = await args.sandboxManager.inspect(sandbox.containerId)
         return { inspect }
+      }
+
+      // --- Runtime management ---
+
+      case "runtime.list": {
+        if (!args.runtimeRegistry) throw new Error("Runtime registry not available")
+        return args.runtimeRegistry.getSnapshot()
+      }
+
+      case "runtime.detect": {
+        if (!args.runtimeRegistry) throw new Error("Runtime registry not available")
+        const detectOpts = DETECT_OPTIONS[command.provider]
+        if (!detectOpts) throw new Error(`Unknown provider: ${command.provider}`)
+        return args.runtimeRegistry.detectSystemRuntime(command.provider, detectOpts)
+      }
+
+      case "runtime.install": {
+        if (!args.runtimeRegistry) throw new Error("Runtime registry not available")
+        const installOpts = INSTALL_OPTIONS[command.provider]
+        if (!installOpts) throw new Error(`Unknown provider: ${command.provider}`)
+        return args.runtimeRegistry.installManaged(command.provider, {
+          ...installOpts,
+          version: command.version,
+        })
+      }
+
+      case "runtime.remove": {
+        if (!args.runtimeRegistry) throw new Error("Runtime registry not available")
+        return args.runtimeRegistry.removeManaged(command.provider, command.version)
+      }
+
+      case "runtime.health": {
+        if (!args.runtimeRegistry) throw new Error("Runtime registry not available")
+        return args.runtimeRegistry.healthCheck(command.provider, command.version)
+      }
+
+      // --- Provider profiles ---
+
+      case "profile.list": {
+        return {
+          profiles: [...store.state.providerProfiles.values()],
+        }
+      }
+
+      case "profile.save": {
+        await store.saveProviderProfile(command.profile.id, command.profile)
+        return { ok: true }
+      }
+
+      case "profile.remove": {
+        await store.removeProviderProfile(command.profileId)
+        return { ok: true }
+      }
+
+      case "profile.resolve": {
+        const record = store.state.providerProfiles.get(command.profileId)
+        if (!record) throw new Error(`Profile not found: ${command.profileId}`)
+        const override = store.state.workspaceProfileOverrides.get(command.workspaceId)?.get(command.profileId)
+        return { profile: resolveProfile(record.profile, override?.overrides) }
+      }
+
+      case "workspace.profile.override.set": {
+        await store.setWorkspaceProfileOverride(command.workspaceId, command.profileId, command.overrides)
+        return { ok: true }
+      }
+
+      case "workspace.profile.override.remove": {
+        await store.removeWorkspaceProfileOverride(command.workspaceId, command.profileId)
+        return { ok: true }
       }
 
       default: {

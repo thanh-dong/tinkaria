@@ -15,6 +15,8 @@ export type SubscriptionTopic =
   | { type: "repos"; workspaceId: string }
   | { type: "workflow-runs"; workspaceId: string }
   | { type: "sandbox-status"; workspaceId: string }
+  | { type: "runtime-status" }
+  | { type: "profiles" }
 
 export interface TerminalSnapshot {
   terminalId: string
@@ -114,3 +116,14 @@ export type ClientCommand =
   | { type: "workspace.sandbox.destroy"; workspaceId: string }
   | { type: "workspace.sandbox.logs"; workspaceId: string; tail?: number }
   | { type: "workspace.sandbox.status"; workspaceId: string }
+  | { type: "runtime.list" }
+  | { type: "runtime.detect"; provider: "claude" | "codex" }
+  | { type: "runtime.install"; provider: "claude" | "codex"; version: string }
+  | { type: "runtime.remove"; provider: "claude" | "codex"; version: string }
+  | { type: "runtime.health"; provider: "claude" | "codex"; version?: string }
+  | { type: "profile.list" }
+  | { type: "profile.save"; profile: import("./profile-types").ProviderProfile }
+  | { type: "profile.remove"; profileId: string }
+  | { type: "profile.resolve"; workspaceId: string; profileId: string }
+  | { type: "workspace.profile.override.set"; workspaceId: string; profileId: string; overrides: Partial<Omit<import("./profile-types").ProviderProfile, "id" | "provider">> }
+  | { type: "workspace.profile.override.remove"; workspaceId: string; profileId: string }

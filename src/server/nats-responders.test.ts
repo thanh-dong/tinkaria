@@ -153,6 +153,7 @@ async function setup(overrides?: Partial<RegisterRespondersArgs>) {
     workflowEngine: null,
     workflowStore: null,
     sandboxManager: null,
+    runtimeRegistry: null,
     ...overrides,
   }
 

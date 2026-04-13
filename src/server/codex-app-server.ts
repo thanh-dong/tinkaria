@@ -813,12 +813,12 @@ export class CodexAppServerManager {
   private readonly sessions = new Map<string, SessionContext>()
   private readonly spawnProcess: SpawnCodexAppServer
 
-  constructor(args: { spawnProcess?: SpawnCodexAppServer } = {}) {
+  constructor(args: { spawnProcess?: SpawnCodexAppServer; binaryPath?: string; extraEnv?: Record<string, string> } = {}) {
     this.spawnProcess = args.spawnProcess ?? ((cwd) =>
-      spawn("codex", ["app-server"], {
+      spawn(args.binaryPath ?? "codex", ["app-server"], {
         cwd,
         stdio: ["pipe", "pipe", "pipe"],
-        env: process.env,
+        env: { ...process.env, ...args.extraEnv },
       }) as unknown as CodexAppServerProcess)
   }
 

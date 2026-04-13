@@ -43,6 +43,10 @@ export interface StartTurnCommand {
   chatTitle: string
   existingMessageCount: number
   workspaceId: string
+  /** Resolved binary path from profile/runtime registry */
+  binaryPath?: string
+  /** Extra env vars from profile */
+  extraEnv?: Record<string, string>
 }
 
 export interface CancelTurnCommand {

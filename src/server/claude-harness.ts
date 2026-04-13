@@ -122,6 +122,8 @@ function createClaudeOptions(args: {
   orchestrator?: SessionOrchestrator
   chatId?: string
   store?: CoordinationStore
+  binaryPath?: string
+  extraEnv?: Record<string, string>
 }): ClaudeOptions {
   const mcpServers: Record<string, McpServerConfig> = {}
 
@@ -150,8 +152,9 @@ function createClaudeOptions(args: {
     settingSources: ["user", "project", "local"],
     env: (() => {
       const { CLAUDECODE: _, ...env } = process.env
-      return env
+      return { ...env, ...args.extraEnv }
     })(),
+    pathToClaudeCodeExecutable: args.binaryPath,
   } satisfies ClaudeOptions
 }
 
@@ -295,6 +298,8 @@ export async function startClaudeTurn(args: {
   chatId?: string
   store?: CoordinationStore
   sdk?: ClaudeSdkBinding
+  binaryPath?: string
+  extraEnv?: Record<string, string>
 }): Promise<HarnessTurn> {
   const options = createClaudeOptions(args)
   const sdk = args.sdk ?? (ClaudeAgentSdk as ClaudeSdkBinding)

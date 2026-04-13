@@ -14,6 +14,8 @@ import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
 import type { SkillCache } from "./skill-discovery"
 import type { SessionOrchestrator } from "./orchestration"
+import type { RuntimeRegistry } from "./runtime-registry"
+import type { ProfileSnapshot } from "../shared/profile-types"
 
 const encoder = new TextEncoder()
 
@@ -42,6 +44,16 @@ export interface CreateNatsPublisherArgs {
   updateManager: UpdateManager | null
   skillCache?: SkillCache
   orchestrator?: SessionOrchestrator
+  runtimeRegistry?: RuntimeRegistry
+}
+
+function deriveProfileSnapshot(store: EventStore): ProfileSnapshot {
+  return {
+    profiles: [...store.state.providerProfiles.values()],
+    workspaceOverrides: [...store.state.workspaceProfileOverrides.values()].flatMap(
+      (wsMap) => [...wsMap.values()],
+    ),
+  }
 }
 
 export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
@@ -55,6 +67,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     updateManager,
     skillCache,
     orchestrator,
+    runtimeRegistry,
   } = args
 
   const js = jetstream(nc)
@@ -118,6 +131,10 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         return deriveWorkflowRunsSnapshot(store.state, topic.workspaceId)
       case "sandbox-status":
         return deriveSandboxSnapshot(store.state, topic.workspaceId)
+      case "runtime-status":
+        return runtimeRegistry?.getSnapshot() ?? { runtimes: [] }
+      case "profiles":
+        return deriveProfileSnapshot(store)
       default: {
         const _exhaustive: never = topic
         throw new Error(`Unknown topic type: ${(_exhaustive as SubscriptionTopic).type}`)
@@ -182,6 +199,20 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     publishSnapshot({ type: "update" }, updateManager.getSnapshot())
   }) ?? (() => {})
 
+  // Periodic runtime health checks — updates runtime-status snapshot
+  const healthCheckInterval = runtimeRegistry
+    ? setInterval(async () => {
+        try {
+          for (const provider of ["claude", "codex"] as const) {
+            await runtimeRegistry.healthCheck(provider)
+          }
+          publishSnapshot({ type: "runtime-status" }, runtimeRegistry.getSnapshot())
+        } catch (error) {
+          console.warn(LOG_PREFIX, `Runtime health check failed: ${errorMessage(error)}`)
+        }
+      }, 60_000)
+    : null
+
   return {
     addSubscription,
     removeSubscription,
@@ -191,6 +222,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     dispose() {
       disposeTerminalEvents()
       disposeUpdateEvents()
+      if (healthCheckInterval) clearInterval(healthCheckInterval)
     },
   }
 }

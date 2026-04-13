@@ -12,7 +12,14 @@ import type { HarnessToolRequest, HarnessTurn } from "../shared/harness-types"
 import type { CodexReasoningEffort, ServiceTier } from "../shared/types"
 
 // Singleton: one CodexAppServerManager per runner process, manages all Codex child processes.
-const codexManager = new CodexAppServerManager()
+let codexManager: CodexAppServerManager | null = null
+
+function getCodexManager(binaryPath?: string, extraEnv?: Record<string, string>): CodexAppServerManager {
+  if (!codexManager) {
+    codexManager = new CodexAppServerManager({ binaryPath, extraEnv })
+  }
+  return codexManager
+}
 
 export async function startCodexTurn(args: {
   chatId: string
@@ -24,8 +31,12 @@ export async function startCodexTurn(args: {
   planMode: boolean
   sessionToken: string | null
   onToolRequest: (request: HarnessToolRequest) => Promise<unknown>
+  binaryPath?: string
+  extraEnv?: Record<string, string>
 }): Promise<HarnessTurn> {
-  await codexManager.startSession({
+  const manager = getCodexManager(args.binaryPath, args.extraEnv)
+
+  await manager.startSession({
     chatId: args.chatId,
     cwd: args.localPath,
     model: args.model,
@@ -33,7 +44,7 @@ export async function startCodexTurn(args: {
     sessionToken: args.sessionToken,
   })
 
-  return await codexManager.startTurn({
+  return await manager.startTurn({
     chatId: args.chatId,
     content: args.content,
     model: args.model,
@@ -45,9 +56,9 @@ export async function startCodexTurn(args: {
 }
 
 export function stopCodexSession(chatId: string): void {
-  codexManager.stopSession(chatId)
+  codexManager?.stopSession(chatId)
 }
 
 export function stopAllCodexSessions(): void {
-  codexManager.stopAll()
+  codexManager?.stopAll()
 }

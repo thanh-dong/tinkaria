@@ -63,6 +63,10 @@ function createMockStore() {
     setSessionToken: async (chatId: string, token: string | null) => {
       calls.push({ method: "setSessionToken", args: [chatId, token] })
     },
+    state: {
+      providerProfiles: new Map(),
+      workspaceProfileOverrides: new Map(),
+    },
     _calls: calls,
   } as unknown as RunnerProxyOptions["store"] & { _calls: typeof calls }
   return store
