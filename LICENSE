@@ -1,22 +1,84 @@
-MIT License
+Tinkaria Private Use License v1.1
 
-Copyright (c) 2025 Jake Mor
+Copyright (c) 2026 Tinkaria
+All rights reserved.
 
-Permission is hereby granted, free of charge, to any person other than Jacob
-Eiting and RevenueCat, Inc. obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This repository and all associated source code, assets, documentation, and
+other materials (the "Software") are proprietary to Tinkaria.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This license is source-available only. It is not an open-source license.
+
+For purposes of this license, "Tinkaria" means the copyright holder or any
+authorized licensor of the Software.
+
+1. Limited Permission
+
+Permission is granted to use, copy, modify, and run the Software only for
+strictly private, personal, internal, research, or evaluation purposes that
+are non-commercial in nature.
+
+This limited permission is revocable, non-exclusive, non-transferable, and
+non-sublicensable. You must retain this license and all copyright,
+proprietary, and attribution notices on every permitted copy.
+
+2. Commercial Use Prohibited
+
+You may not use the Software, or any modified version of it, for any
+commercial purpose without prior written permission from Tinkaria.
+
+Commercial use includes, without limitation:
+
+- selling, licensing, sublicensing, leasing, or monetizing the Software;
+- offering the Software as part of a paid or revenue-generating product or
+  service;
+- making the Software available to third parties as a hosted or networked
+  service;
+- providing hosted, managed, SaaS, consulting, or support services based on
+  the Software;
+- using the Software in a business workflow, client project, or other activity
+  intended for commercial advantage or monetary compensation.
+
+3. No Redistribution or Third-Party Access
+
+You may not publish, distribute, sublicense, transfer, assign, or otherwise
+make the Software available to any third party, whether in original or
+modified form, without prior written permission from Tinkaria.
+
+For clarity, you may not provide any third party with access to the Software
+except as separately authorized in writing by Tinkaria.
+
+4. No Patent or Other IP License
+
+Except for the limited permission expressly stated in this license, no patent,
+trade secret, trademark, publicity, or other intellectual-property rights are
+granted, whether by implication, estoppel, or otherwise.
+
+5. No Trademark or Branding Rights
+
+This license does not grant any right to use the Tinkaria name, branding,
+logos, trade dress, or other identifying marks.
+
+6. Reservation of Rights
+
+All rights not expressly granted under this license are reserved by Tinkaria.
+Any use beyond the limited private, non-commercial permission above requires
+prior written authorization from Tinkaria.
+
+7. Termination
+
+Any breach of this license immediately terminates your rights under it. Upon
+termination, you must stop using the Software and destroy all copies in your
+possession or control, including modified copies.
+
+8. Disclaimer
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NONINFRINGEMENT.
+
+9. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, TINKARIA SHALL NOT BE LIABLE FOR ANY
+CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+OTHERWISE, ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF THE
 SOFTWARE.
