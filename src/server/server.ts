@@ -56,6 +56,11 @@ export type NatsWsProxyCounters = {
   sendOnConnecting: number
   bufferedFrames: number
   bufferDrops: number
+  // Lazy-mode visibility: number of clients we replayed cached INFO to,
+  // and number of duplicate INFO frames we suppressed from the real upstream.
+  cacheReplay: number
+  firstUpstreamDropped: number
+  lazyHelloDeferred: number
 }
 
 // Strings or owned ArrayBuffers — never Bun's recv Buffer slices, which get
@@ -70,6 +75,14 @@ export type NatsWsProxyData = {
   buffer: NatsWsBufferedFrame[]
   droppedSinceLastLog: number
   openedAt: number
+  // Lazy mode: true between proxy.open and the first client frame.
+  // While true, we have NOT opened the upstream yet — the browser sees a
+  // synthetic INFO replayed from cache and is waiting to send its CONNECT.
+  awaitingHello: boolean
+  // Lazy mode: drop the first frame the upstream sends us once it opens.
+  // That frame is NATS's own INFO, which would be a duplicate of what the
+  // browser already received from cache.
+  skipFirstUpstreamFrame: boolean
 }
 
 type IncomingWsMessage = string | Buffer<ArrayBuffer>
@@ -81,6 +94,61 @@ function toBufferedFrame(message: IncomingWsMessage): NatsWsBufferedFrame {
   return copy
 }
 
+export interface CachedNatsInfo {
+  bytes: Uint8Array
+  isBinary: boolean
+}
+
+// Warmup helper: opens a one-shot WebSocket to NATS and captures the very
+// first frame (the INFO line) raw. We need this so the proxy can replay INFO
+// to browser clients WITHOUT having to open an upstream connection first —
+// which is what causes NATS's 2-second auth-timeout clock to start before
+// the browser has had time to send CONNECT over a high-latency path.
+export async function warmupCachedNatsInfo(
+  natsWsUrl: string,
+  timeoutMs: number = 5000,
+): Promise<CachedNatsInfo | null> {
+  return await new Promise<CachedNatsInfo | null>((resolve) => {
+    let settled = false
+    let ws: WebSocket
+    const finish = (result: CachedNatsInfo | null) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      try { ws?.close() } catch { /* ignore */ }
+      resolve(result)
+    }
+    const timer = setTimeout(() => {
+      console.warn(LOG_PREFIX, `nats-ws INFO warmup timed out after ${timeoutMs}ms`)
+      finish(null)
+    }, timeoutMs)
+    try {
+      ws = new WebSocket(natsWsUrl)
+    } catch (err) {
+      console.warn(LOG_PREFIX, `nats-ws INFO warmup failed to open: ${err instanceof Error ? err.message : String(err)}`)
+      finish(null)
+      return
+    }
+    ws.binaryType = "arraybuffer"
+    ws.onmessage = (event) => {
+      if (settled) return
+      if (typeof event.data === "string") {
+        finish({ bytes: new TextEncoder().encode(event.data), isBinary: false })
+      } else {
+        const ab = event.data as ArrayBuffer
+        const bytes = new Uint8Array(ab.byteLength)
+        bytes.set(new Uint8Array(ab))
+        finish({ bytes, isBinary: true })
+      }
+    }
+    ws.onerror = () => {
+      console.warn(LOG_PREFIX, "nats-ws INFO warmup WebSocket error")
+      finish(null)
+    }
+    ws.onclose = () => finish(null)
+  })
+}
+
 export function createNatsWsProxyHandlers(
   counters: NatsWsProxyCounters = {
     upgrades: 0,
@@ -90,8 +158,72 @@ export function createNatsWsProxyHandlers(
     sendOnConnecting: 0,
     bufferedFrames: 0,
     bufferDrops: 0,
+    cacheReplay: 0,
+    firstUpstreamDropped: 0,
+    lazyHelloDeferred: 0,
   },
+  cachedInfo: CachedNatsInfo | null = null,
 ) {
+  const lazyMode = cachedInfo !== null
+
+  function openUpstream(ws: import("bun").ServerWebSocket<NatsWsProxyData>) {
+    const upstream = new WebSocket(`ws://127.0.0.1:${ws.data.wsPort}`)
+    upstream.binaryType = "arraybuffer"
+    ws.data.upstream = upstream
+
+    upstream.onopen = () => {
+      if (ws.data.closed) {
+        upstream.close()
+        return
+      }
+      const elapsed = Date.now() - ws.data.openedAt
+      ws.data.ready = true
+      counters.upstreamOpen += 1
+      console.warn(LOG_PREFIX, `nats-ws proxy upstream open t=${elapsed}ms`)
+
+      const pending = ws.data.buffer
+      ws.data.buffer = []
+      for (const frame of pending) {
+        upstream.send(frame)
+      }
+    }
+
+    upstream.onmessage = (event) => {
+      if (ws.readyState !== WebSocket.OPEN) return
+      // Lazy mode: drop the very first frame from the upstream — it's NATS's
+      // own INFO, which the browser already received from the cache replay at
+      // proxy.open. Forwarding it would give the browser a second INFO with a
+      // different client_id mid-handshake, which nats-core would treat as a
+      // cluster update and could cause it to second-guess the active inbox sub.
+      if (ws.data.skipFirstUpstreamFrame) {
+        ws.data.skipFirstUpstreamFrame = false
+        counters.firstUpstreamDropped += 1
+        return
+      }
+      if (typeof event.data === "string") {
+        ws.sendText(event.data)
+      } else {
+        ws.sendBinary(new Uint8Array(event.data as ArrayBuffer))
+      }
+    }
+
+    upstream.onclose = (event) => {
+      counters.upstreamClose += 1
+      const duration = Date.now() - ws.data.openedAt
+      console.warn(
+        LOG_PREFIX,
+        `nats-ws proxy upstream close code=${event.code} duration=${duration}ms`,
+      )
+      if (ws.readyState === WebSocket.OPEN) ws.close()
+    }
+
+    upstream.onerror = () => {
+      counters.upstreamError += 1
+      console.warn(LOG_PREFIX, "nats-ws proxy upstream error")
+      if (ws.readyState === WebSocket.OPEN) ws.close()
+    }
+  }
+
   const handlers = {
     open(ws: import("bun").ServerWebSocket<NatsWsProxyData>) {
       counters.upgrades += 1
@@ -100,55 +232,55 @@ export function createNatsWsProxyHandlers(
       ws.data.closed = false
       ws.data.buffer = []
       ws.data.droppedSinceLastLog = 0
-      console.warn(LOG_PREFIX, "nats-ws proxy upgrade accepted")
+      ws.data.awaitingHello = false
+      ws.data.skipFirstUpstreamFrame = false
 
-      const upstream = new WebSocket(`ws://127.0.0.1:${ws.data.wsPort}`)
-      upstream.binaryType = "arraybuffer"
-      ws.data.upstream = upstream
-
-      upstream.onopen = () => {
-        if (ws.data.closed) {
-          upstream.close()
-          return
+      if (lazyMode && cachedInfo) {
+        // Lazy path: replay cached INFO so the browser's nats-core advances
+        // its state machine and prepares to send CONNECT. Defer opening the
+        // upstream until the browser actually sends its first frame, so
+        // NATS's auth-timeout clock starts only when CONNECT is in our hand.
+        console.warn(LOG_PREFIX, "nats-ws proxy upgrade accepted (lazy)")
+        ws.data.awaitingHello = true
+        ws.data.skipFirstUpstreamFrame = true
+        counters.lazyHelloDeferred += 1
+        try {
+          if (cachedInfo.isBinary) {
+            ws.sendBinary(cachedInfo.bytes)
+          } else {
+            ws.sendText(new TextDecoder().decode(cachedInfo.bytes))
+          }
+          counters.cacheReplay += 1
+        } catch (err) {
+          console.warn(
+            LOG_PREFIX,
+            `nats-ws proxy failed to replay cached INFO: ${err instanceof Error ? err.message : String(err)}`,
+          )
+          ws.close()
         }
-        const elapsed = Date.now() - ws.data.openedAt
-        ws.data.ready = true
-        counters.upstreamOpen += 1
-        console.warn(LOG_PREFIX, `nats-ws proxy upstream open t=${elapsed}ms`)
-
-        const pending = ws.data.buffer
-        ws.data.buffer = []
-        for (const frame of pending) {
-          upstream.send(frame)
-        }
+        return
       }
 
-      upstream.onmessage = (event) => {
-        if (ws.readyState !== WebSocket.OPEN) return
-        if (typeof event.data === "string") {
-          ws.sendText(event.data)
-        } else {
-          ws.sendBinary(new Uint8Array(event.data as ArrayBuffer))
-        }
-      }
-
-      upstream.onclose = (event) => {
-        counters.upstreamClose += 1
-        const duration = Date.now() - ws.data.openedAt
-        console.warn(
-          LOG_PREFIX,
-          `nats-ws proxy upstream close code=${event.code} duration=${duration}ms`,
-        )
-        if (ws.readyState === WebSocket.OPEN) ws.close()
-      }
-
-      upstream.onerror = () => {
-        counters.upstreamError += 1
-        console.warn(LOG_PREFIX, "nats-ws proxy upstream error")
-        if (ws.readyState === WebSocket.OPEN) ws.close()
-      }
+      // Eager fallback: original behavior used when warmup didn't produce a
+      // cache. Logs loudly so the operator knows the auth-race protection is
+      // disabled for this run.
+      console.warn(LOG_PREFIX, "nats-ws proxy upgrade accepted (eager — no INFO cache)")
+      openUpstream(ws)
     },
+
     message(ws: import("bun").ServerWebSocket<NatsWsProxyData>, message: IncomingWsMessage) {
+      if (ws.data.awaitingHello) {
+        // First client frame in lazy mode. Open the upstream NOW and put this
+        // frame at the head of the buffer — it'll be the first thing flushed
+        // when upstream's onopen fires, so NATS receives CONNECT within one
+        // localhost roundtrip of starting its auth clock.
+        ws.data.awaitingHello = false
+        counters.bufferedFrames += 1
+        ws.data.buffer.push(toBufferedFrame(message))
+        openUpstream(ws)
+        return
+      }
+
       const upstream = ws.data.upstream
       if (ws.data.ready && upstream && upstream.readyState === WebSocket.OPEN) {
         upstream.send(message)
@@ -180,6 +312,7 @@ export function createNatsWsProxyHandlers(
       ws.data.upstream?.close()
       ws.data.upstream = null
       ws.data.ready = false
+      ws.data.awaitingHello = false
     },
   }
   return { handlers, counters }
@@ -471,7 +604,24 @@ export async function startServer(options: StartServerOptions = {}) {
 
   const distDir = path.join(import.meta.dir, "..", "..", "dist", "client")
 
-  const { handlers: natsWsHandlers, counters: natsWsCounters } = createNatsWsProxyHandlers()
+  // Warm up the synthetic INFO cache used by the lazy-upstream proxy path.
+  // See createNatsWsProxyHandlers / warmupCachedNatsInfo for why this exists.
+  // If warmup fails we fall back to eager mode (the legacy auth-race path).
+  const warmupUrl = `ws://127.0.0.1:${natsConnector.natsWsPort}`
+  const cachedNatsInfo = await warmupCachedNatsInfo(warmupUrl)
+  if (cachedNatsInfo) {
+    console.warn(
+      LOG_PREFIX,
+      `nats-ws INFO cache warmed (${cachedNatsInfo.bytes.length} bytes, ${cachedNatsInfo.isBinary ? "binary" : "text"})`,
+    )
+  } else {
+    console.warn(
+      LOG_PREFIX,
+      "nats-ws INFO cache UNAVAILABLE — proxy will fall back to eager upstream (auth-race risk on slow networks)",
+    )
+  }
+
+  const { handlers: natsWsHandlers, counters: natsWsCounters } = createNatsWsProxyHandlers(undefined, cachedNatsInfo)
   const natsWsCounterInterval = setInterval(() => {
     const hasActivity = Object.values(natsWsCounters).some((v) => v > 0)
     if (!hasActivity) return
@@ -502,6 +652,8 @@ export async function startServer(options: StartServerOptions = {}) {
                 buffer: [],
                 droppedSinceLastLog: 0,
                 openedAt: 0,
+                awaitingHello: false,
+                skipFirstUpstreamFrame: false,
               },
             })
             if (upgraded) return undefined

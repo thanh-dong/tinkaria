@@ -110,6 +110,8 @@ function startProxyHarness(upstream: UpstreamHarness): ProxyHarness {
             buffer: [],
             droppedSinceLastLog: 0,
             openedAt: 0,
+            awaitingHello: false,
+            skipFirstUpstreamFrame: false,
           },
         })
         if (upgraded) return undefined
