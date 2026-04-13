@@ -32,6 +32,7 @@ import { WorkflowStore } from "./workflow-store"
 import { WorkflowEngine } from "./workflow-engine"
 import { initVapid, PushSubscriptionStore, createPushRouter, sendPushToAll } from "./push-notifications"
 import { BunDockerClient, SandboxManager } from "./sandbox-manager"
+import { RuntimeRegistry } from "./runtime-registry"
 
 export interface StartServerOptions {
   port?: number
@@ -115,7 +116,7 @@ export async function warmupCachedNatsInfo(
       if (settled) return
       settled = true
       clearTimeout(timer)
-      try { ws?.close() } catch { /* ignore */ }
+      try { ws?.close() } catch (_err: unknown) { /* ignore close errors */ }
       resolve(result)
     }
     const timer = setTimeout(() => {
@@ -556,6 +557,9 @@ export async function startServer(options: StartServerOptions = {}) {
     coordinator,
   })
 
+  const runtimeRegistry = new RuntimeRegistry(path.join(store.dataDir, "runtimes"))
+  await runtimeRegistry.initialize()
+
   const publisher = await createNatsPublisher({
     nc: natsConnector.nc,
     store,
@@ -567,6 +571,7 @@ export async function startServer(options: StartServerOptions = {}) {
     updateManager,
     skillCache,
     orchestrator,
+    runtimeRegistry,
   })
 
   broadcastFn = (types) => publisher.broadcastSnapshots(types)
@@ -600,6 +605,7 @@ export async function startServer(options: StartServerOptions = {}) {
       onProgress: () => publisher.broadcastSnapshots(),
     }),
     sandboxManager: options.sandbox ? new SandboxManager(new BunDockerClient(), "nats://host.docker.internal:4222") : null,
+    runtimeRegistry,
   })
 
   const distDir = path.join(import.meta.dir, "..", "..", "dist", "client")
