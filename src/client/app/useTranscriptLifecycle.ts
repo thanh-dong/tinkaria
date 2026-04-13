@@ -177,9 +177,18 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
         flushTail(entries, "fetched")
         setChatReady(true)
       } catch (error) {
-        log("snapshot recovery fetch failed", {
-          chatId, error: error instanceof Error ? error.message : String(error),
-        })
+        const message = error instanceof Error ? error.message : String(error)
+        log("snapshot recovery fetch failed", { chatId, error: message })
+        // If the socket simply wasn't ready yet (e.g. NATS still doing its
+        // WebSocket handshake through Cloudflare on a fresh page load), do
+        // NOT give up — release the guard so the real snapshot subscription
+        // can re-trigger fetchTail when the connection comes up a moment later.
+        // Without this, the recovery timer races the connect and locks the
+        // chat into an empty "known-but-unloaded" spinner state.
+        if (message.includes("Not connected")) {
+          fetchTriggered = false
+          return
+        }
         flushTail([], "fallback_empty")
         setChatReady(true)
       }
