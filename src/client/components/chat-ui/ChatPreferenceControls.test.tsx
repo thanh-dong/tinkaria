@@ -18,6 +18,9 @@ describe("ChatPreferenceControls", () => {
       />
     )
 
+    expect(html).toContain('data-ui-id="chat.composer.provider.action"')
+    expect(html).toContain('data-ui-c3="c3-112"')
+    expect(html).toContain('data-ui-c3-label="chat-input"')
     expect(html).toContain("Codex")
     expect(html).toContain("GPT-5.3 Codex")
     expect(html).toContain("XHigh")

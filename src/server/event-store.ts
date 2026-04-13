@@ -134,6 +134,11 @@ export class EventStore {
         this.state.workspacesById.set(project.id, { ...project })
         this.state.workspaceIdsByPath.set(project.localPath, project.id)
       }
+      if (parsed.independentWorkspaces?.length) {
+        for (const ws of parsed.independentWorkspaces) {
+          this.state.independentWorkspacesById.set(ws.id, { ...ws })
+        }
+      }
       for (const chat of parsed.chats) {
         this.state.chatsById.set(chat.id, { ...chat, unread: chat.unread ?? false, model: chat.model ?? null })
       }
@@ -282,6 +287,19 @@ export class EventStore {
         project.deletedAt = event.timestamp
         project.updatedAt = event.timestamp
         this.state.workspaceIdsByPath.delete(project.localPath)
+        break
+      }
+      case "independent_workspace_created": {
+        this.state.independentWorkspacesById.set(event.workspaceId, {
+          id: event.workspaceId,
+          name: event.name,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+        })
+        break
+      }
+      case "independent_workspace_deleted": {
+        this.state.independentWorkspacesById.delete(event.workspaceId)
         break
       }
       case "chat_created": {
@@ -791,7 +809,7 @@ export class EventStore {
       if (!line) continue
       try {
         entries.push(JSON.parse(line) as TranscriptEntry)
-      } catch {
+      } catch (_err: unknown) {
         // Skip malformed JSONL lines — one bad line must not crash transcript loading
       }
     }
@@ -843,6 +861,37 @@ export class EventStore {
       workspaceId,
     }
     await this.append(this.projectsLogPath, event)
+  }
+
+  async createIndependentWorkspace(name: string) {
+    const workspaceId = crypto.randomUUID()
+    const event: WorkspaceEvent = {
+      v: STORE_VERSION,
+      type: "independent_workspace_created",
+      timestamp: Date.now(),
+      workspaceId,
+      name: name.trim(),
+    }
+    await this.append(this.projectsLogPath, event)
+    return this.state.independentWorkspacesById.get(workspaceId)!
+  }
+
+  async deleteIndependentWorkspace(workspaceId: string) {
+    const workspace = this.state.independentWorkspacesById.get(workspaceId)
+    if (!workspace) {
+      throw new Error("Independent workspace not found")
+    }
+    const event: WorkspaceEvent = {
+      v: STORE_VERSION,
+      type: "independent_workspace_deleted",
+      timestamp: Date.now(),
+      workspaceId,
+    }
+    await this.append(this.projectsLogPath, event)
+  }
+
+  listIndependentWorkspaces() {
+    return [...this.state.independentWorkspacesById.values()]
   }
 
   async createChat(workspaceId: string, repoId?: string) {
@@ -1327,6 +1376,7 @@ export class EventStore {
       v: STORE_VERSION,
       generatedAt: Date.now(),
       workspaces: this.listProjects().map((project) => ({ ...project })),
+      ...(this.state.independentWorkspacesById.size > 0 ? { independentWorkspaces: this.listIndependentWorkspaces() } : {}),
       chats: [...this.state.chatsById.values()]
         .filter((chat) => !chat.deletedAt)
         .map((chat) => ({ ...chat })),

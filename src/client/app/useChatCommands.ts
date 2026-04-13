@@ -147,6 +147,7 @@ export interface ChatCommandsArgs {
   submitPipeline: SubmitPipelineState
   submitPipelineRef: React.MutableRefObject<SubmitPipelineState>
   activeSessionsSubs: React.MutableRefObject<Map<string, () => void>>
+  pendingDeletedChatIdsRef: React.MutableRefObject<Set<string>>
 }
 
 export interface ChatCommandsReturn {
@@ -174,6 +175,8 @@ export interface ChatCommandsReturn {
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
   handleRenameChat: (chatId: string, title: string) => Promise<void>
   handleRemoveProject: (workspaceId: string) => Promise<void>
+  handleCreateWorkspace: (name: string) => Promise<void>
+  handleDeleteWorkspace: (workspaceId: string) => Promise<void>
   handleOpenExternal: (action: "open_finder") => Promise<void>
   handleOpenExternalPath: (action: "open_finder", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
@@ -231,6 +234,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     submitPipeline,
     submitPipelineRef,
     activeSessionsSubs,
+    pendingDeletedChatIdsRef,
   } = args
 
   // --- State owned by command handlers ---
@@ -513,6 +517,8 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       ? getNewestRemainingChatId(sidebarData.workspaceGroups, chat.chatId)
       : null
 
+    // Track as pending-delete so incoming WS snapshots don't re-insert it.
+    pendingDeletedChatIdsRef.current.add(chat.chatId)
     setSidebarData((current) => removeChatFromSidebar(current, chat.chatId))
     useChatInputStore.getState().clearQueuedDraft(chat.chatId)
     deleteCachedChat(chat.chatId)
@@ -523,7 +529,11 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
     // Fire-and-forget: server delete runs in the background.
     // The server will push a fresh sidebar snapshot via WS on completion.
-    socket.command({ type: "chat.delete", chatId: chat.chatId }).catch((error) => {
+    socket.command({ type: "chat.delete", chatId: chat.chatId }).then(() => {
+      pendingDeletedChatIdsRef.current.delete(chat.chatId)
+    }).catch((error) => {
+      // Keep in pending set on failure — sidebar snapshot will be authoritative.
+      pendingDeletedChatIdsRef.current.delete(chat.chatId)
       console.warn("[useChatCommands] background chat.delete failed:", error instanceof Error ? error.message : String(error))
     })
   }
@@ -562,6 +572,40 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       useTerminalLayoutStore.getState().clearProject(workspaceId)
       useRightSidebarStore.getState().clearProject(workspaceId)
       if (runtime?.workspaceId === workspaceId) {
+        navigate("/")
+      }
+      setCommandError(null)
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  // --- Independent workspace commands ---
+
+  async function handleCreateWorkspace(name: string) {
+    try {
+      const result = await socket.command<{ workspaceId: string }>({ type: "independent-workspace.create", name })
+      if (result?.workspaceId) {
+        navigate(`/workspace/${result.workspaceId}`)
+      }
+      setCommandError(null)
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function handleDeleteWorkspace(workspaceId: string) {
+    const confirmed = await dialog.confirm({
+      title: "Delete Workspace",
+      description: "Delete this workspace? This cannot be undone.",
+      confirmLabel: "Delete",
+      confirmVariant: "destructive",
+    })
+    if (!confirmed) return
+
+    try {
+      await socket.command({ type: "independent-workspace.delete", workspaceId })
+      if (window.location.pathname === `/workspace/${workspaceId}`) {
         navigate("/")
       }
       setCommandError(null)
@@ -936,6 +980,8 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     handleDeleteChat,
     handleRenameChat,
     handleRemoveProject,
+    handleCreateWorkspace,
+    handleDeleteWorkspace,
     handleOpenExternal,
     handleOpenExternalPath,
     handleOpenLocalLink,

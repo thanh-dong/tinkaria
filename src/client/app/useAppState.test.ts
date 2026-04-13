@@ -33,6 +33,7 @@ import { createIncrementalHydrator } from "../lib/parseTranscript"
 
 function createSidebarData(): SidebarData {
   return {
+    independentWorkspaces: [],
     workspaceGroups: [
       {
         groupKey: "project-1",

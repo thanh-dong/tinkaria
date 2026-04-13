@@ -29,6 +29,7 @@ import { useSubmitPipeline } from "./useSubmitPipeline"
 import { NatsSocket } from "./nats-socket"
 import type { AppTransport, SocketStatus } from "./socket-interface"
 import {
+  filterPendingDeletedChats,
   getActiveChatSnapshot,
   getSidebarChatRow,
   getUiUpdateRestartReconnectAction,
@@ -125,6 +126,8 @@ export interface AppState {
   restoreQueuedText: () => string
   handleDeleteChat: (chat: SidebarChatRow) => Promise<void>
   handleRemoveProject: (workspaceId: string) => Promise<void>
+  handleCreateWorkspace: (name: string) => Promise<void>
+  handleDeleteWorkspace: (workspaceId: string) => Promise<void>
   handleOpenExternal: (action: "open_finder") => Promise<void>
   handleOpenExternalPath: (action: "open_finder", localPath: string) => Promise<void>
   handleOpenLocalLink: (target: { path: string; line?: number; column?: number }) => Promise<void>
@@ -163,7 +166,7 @@ export function useAppState(activeChatId: string | null): AppState {
   const socket = useAppSocket()
   const dialog = useAppDialog()
 
-  const [sidebarData, setSidebarData] = useState<SidebarData>({ workspaceGroups: [] })
+  const [sidebarData, setSidebarData] = useState<SidebarData>({ workspaceGroups: [], independentWorkspaces: [] })
   const [localProjects, setLocalProjects] = useState<LocalWorkspacesSnapshot | null>(null)
   const [updateSnapshot, setUpdateSnapshot] = useState<UpdateSnapshot | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<SocketStatus>("connecting")
@@ -191,6 +194,7 @@ export function useAppState(activeChatId: string | null): AppState {
   }, [])
   const activeSessionsSubs = useRef<Map<string, () => void>>(new Map())
   const snapshotCallbackRef = useRef<(snapshot: ChatSnapshot) => void>(() => {})
+  const pendingDeletedChatIdsRef = useRef<Set<string>>(new Set())
 
   const { resumeRefreshNonce } = usePwaResume({
     socket,
@@ -209,7 +213,7 @@ export function useAppState(activeChatId: string | null): AppState {
 
   useEffect(() => {
     return socket.subscribe<SidebarData>({ type: "sidebar" }, (snapshot) => {
-      setSidebarData(snapshot)
+      setSidebarData(filterPendingDeletedChats(snapshot, pendingDeletedChatIdsRef.current))
       setProjectSelection((current) => transitionProjectSelection(current, {
         type: "sidebar.loaded",
         firstProjectId: snapshot.workspaceGroups[0]?.groupKey ?? null,
@@ -428,6 +432,7 @@ export function useAppState(activeChatId: string | null): AppState {
     submitPipeline,
     submitPipelineRef,
     activeSessionsSubs,
+    pendingDeletedChatIdsRef,
   })
 
   // Wire up the snapshot callback ref now that commands is available
@@ -492,6 +497,8 @@ export function useAppState(activeChatId: string | null): AppState {
     handleDeleteChat: commands.handleDeleteChat,
     handleRenameChat: commands.handleRenameChat,
     handleRemoveProject: commands.handleRemoveProject,
+    handleCreateWorkspace: commands.handleCreateWorkspace,
+    handleDeleteWorkspace: commands.handleDeleteWorkspace,
     handleOpenExternal: commands.handleOpenExternal,
     handleOpenExternalPath: commands.handleOpenExternalPath,
     handleOpenLocalLink: commands.handleOpenLocalLink,

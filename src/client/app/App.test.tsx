@@ -10,6 +10,8 @@ import {
   getUiIdentityOverlayHighlightRect,
   getUiIdentityOverlayPointerHandoffDelayMs,
   shouldIgnoreUiIdentityOverlayPointerTarget,
+  handleMobileTapCapture,
+  getMobileTapAnchorRect,
 } from "./App"
 import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
@@ -355,7 +357,174 @@ describe("sidebar ui identity coverage", () => {
     )
 
     expect(chatRowHtml).toContain('data-ui-id="sidebar.chat-row"')
+    expect(chatRowHtml).toContain('data-ui-c3="c3-113"')
     expect(localProjectsHtml).toContain('data-ui-id="sidebar.project-group"')
+    expect(localProjectsHtml).toContain('data-ui-c3="c3-113"')
     expect(localProjectsHtml).not.toContain("cursor-grab")
+  })
+})
+
+describe("handleMobileTapCapture", () => {
+  test("intercepts taps on tagged surfaces and returns target + position", () => {
+    const taggedElement = {
+      closest: (selector: string) => {
+        if (selector === '[data-ui-identity-overlay-root="true"]') return null
+        if (selector === '[data-ui-identity-fab="true"]') return null
+        if (selector === "[data-ui-id]") return taggedElement
+        return null
+      },
+      getAttribute: (name: string) => (name === "data-ui-id" ? "chat.page" : null),
+      parentElement: null,
+    } as unknown as Element
+
+    let defaultPrevented = false
+    let propagationStopped = false
+    const event = {
+      target: taggedElement,
+      clientX: 200,
+      clientY: 300,
+      preventDefault: () => { defaultPrevented = true },
+      stopPropagation: () => { propagationStopped = true },
+    } as unknown as MouseEvent
+
+    const result = handleMobileTapCapture(event)
+
+    expect(defaultPrevented).toBe(true)
+    expect(propagationStopped).toBe(true)
+    expect(result).toEqual({
+      target: taggedElement,
+      clientX: 200,
+      clientY: 300,
+    })
+  })
+
+  test("passes through taps on untagged surfaces", () => {
+    const untaggedElement = {
+      closest: () => null,
+      getAttribute: () => null,
+    }
+
+    let defaultPrevented = false
+    const event = {
+      target: untaggedElement,
+      clientX: 200,
+      clientY: 300,
+      preventDefault: () => { defaultPrevented = true },
+      stopPropagation: () => {},
+    } as unknown as MouseEvent
+
+    const result = handleMobileTapCapture(event)
+
+    expect(defaultPrevented).toBe(false)
+    expect(result).toBeNull()
+  })
+
+  test("passes through taps on overlay panel descendants", () => {
+    const overlayChild = {
+      closest: (selector: string) =>
+        selector === '[data-ui-identity-overlay-root="true"]' ? {} : null,
+    }
+
+    let defaultPrevented = false
+    const event = {
+      target: overlayChild,
+      clientX: 100,
+      clientY: 100,
+      preventDefault: () => { defaultPrevented = true },
+      stopPropagation: () => {},
+    } as unknown as MouseEvent
+
+    const result = handleMobileTapCapture(event)
+    expect(defaultPrevented).toBe(false)
+    expect(result).toBeNull()
+  })
+
+  test("passes through taps on FAB descendants", () => {
+    const fabChild = {
+      closest: (selector: string) =>
+        selector === '[data-ui-identity-fab="true"]' ? {} : null,
+    }
+
+    let defaultPrevented = false
+    const event = {
+      target: fabChild,
+      clientX: 100,
+      clientY: 100,
+      preventDefault: () => { defaultPrevented = true },
+      stopPropagation: () => {},
+    } as unknown as MouseEvent
+
+    const result = handleMobileTapCapture(event)
+    expect(defaultPrevented).toBe(false)
+    expect(result).toBeNull()
+  })
+})
+
+describe("getMobileTapAnchorRect", () => {
+  test("converts click coordinates to an anchor rect", () => {
+    expect(getMobileTapAnchorRect(200, 300)).toEqual({
+      top: 300,
+      left: 200,
+      right: 200,
+      bottom: 300,
+      width: 0,
+      height: 0,
+    })
+  })
+})
+
+describe("mobile tap cycle end-to-end", () => {
+  test("handleMobileTapCapture builds the correct result for a nested element", () => {
+    const grandparent = {
+      getAttribute: (name: string) => (name === "data-ui-id" ? "sidebar.project-group" : null),
+      closest: (selector: string) => {
+        if (selector === "[data-ui-id]") return grandparent
+        return null
+      },
+      parentElement: null,
+    } as unknown as Element
+    const parent = {
+      getAttribute: (name: string) => (name === "data-ui-id" ? "sidebar.chat-row" : null),
+      closest: (selector: string) => {
+        if (selector === "[data-ui-id]") return parent
+        if (selector === '[data-ui-identity-overlay-root="true"]') return null
+        if (selector === '[data-ui-identity-fab="true"]') return null
+        return null
+      },
+      parentElement: grandparent,
+    } as unknown as Element
+    const leaf = {
+      getAttribute: () => null,
+      closest: (selector: string) => {
+        if (selector === "[data-ui-id]") return parent
+        if (selector === '[data-ui-identity-overlay-root="true"]') return null
+        if (selector === '[data-ui-identity-fab="true"]') return null
+        return null
+      },
+      parentElement: parent,
+    } as unknown as Element
+
+    let defaultPrevented = false
+    let propagationStopped = false
+    const event = {
+      target: leaf,
+      clientX: 150,
+      clientY: 400,
+      preventDefault: () => { defaultPrevented = true },
+      stopPropagation: () => { propagationStopped = true },
+    } as unknown as MouseEvent
+
+    const result = handleMobileTapCapture(event)
+
+    expect(defaultPrevented).toBe(true)
+    expect(propagationStopped).toBe(true)
+    expect(result).not.toBeNull()
+    expect(result!.target).toBe(parent)
+    expect(result!.clientX).toBe(150)
+    expect(result!.clientY).toBe(400)
+
+    const anchor = getMobileTapAnchorRect(result!.clientX, result!.clientY)
+    expect(anchor.top).toBe(400)
+    expect(anchor.left).toBe(150)
   })
 })

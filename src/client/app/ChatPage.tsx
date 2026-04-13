@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { AlertCircle, ArrowDown, Loader2 } from "lucide-react"
-import { useOutletContext } from "react-router-dom"
+import { useLocation, useNavigate, useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
 import { SubagentIndicator } from "../components/chat-ui/SubagentIndicator"
@@ -111,6 +111,21 @@ interface ComposerLiftArgs {
   isTouchDevice: boolean
 }
 
+type SidebarDialogRequest = "fork" | "merge"
+
+function isSidebarDialogRequest(value: unknown): value is SidebarDialogRequest {
+  return value === "fork" || value === "merge"
+}
+
+export function getRequestedSidebarDialog(state: unknown): SidebarDialogRequest | null {
+  if (!state || typeof state !== "object") {
+    return null
+  }
+
+  const candidate = (state as { sidebarDialog?: unknown }).sidebarDialog
+  return isSidebarDialogRequest(candidate) ? candidate : null
+}
+
 export function TranscriptTailBoundary({
   hasMessages,
   sentinelRef,
@@ -145,7 +160,8 @@ function getSkillsFromDebugRaw(debugRaw?: string): string[] | null {
       result.push(trimmed)
     }
     return result.length > 0 ? result : null
-  } catch {
+  } catch (error) {
+    void error
     return null
   }
 }
@@ -310,6 +326,8 @@ export function ChatEmptyStateBrandMark() {
 
 export function ChatPage() {
   const state = useOutletContext<AppState>()
+  const location = useLocation()
+  const navigate = useNavigate()
   const chatCardRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const mobileSidebarSwipeRef = useRef<MobileSidebarSwipeState | null>(null)
@@ -342,6 +360,7 @@ export function ChatPage() {
   const [forkDialogOpen, setForkDialogOpen] = useState(false)
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
   const [composerLiftPx, setComposerLiftPx] = useState(0)
+  const requestedSidebarDialog = getRequestedSidebarDialog(location.state)
   const mergeSourceProjectId = state.pendingMergeProjectId ?? workspaceId
   const mergeAvailableChats = useMemo(() => {
     if (!mergeSourceProjectId) return []
@@ -386,6 +405,20 @@ export function ChatPage() {
       setMergeDialogOpen(true)
     }
   }, [state.pendingMergeProjectId])
+
+  useEffect(() => {
+    if (!requestedSidebarDialog) {
+      return
+    }
+
+    if (requestedSidebarDialog === "fork") {
+      setForkDialogOpen(true)
+    } else {
+      setMergeDialogOpen(true)
+    }
+
+    navigate(location.pathname, { replace: true, state: null })
+  }, [requestedSidebarDialog, navigate, location.pathname])
 
   const shouldRenderRightSidebarLayout = Boolean(workspaceId)
   const {

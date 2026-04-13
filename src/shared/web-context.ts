@@ -19,11 +19,13 @@ export function getWebContextPrompt(
 ): string {
   const promptLines = [
     `You are operating within ${APP_NAME}, a web-based interface for ${PROVIDER_NAMES[provider]}.`,
-    "Rich content (markdown tables, syntax-highlighted code blocks, Mermaid diagrams) renders natively in the browser.",
-    "Use rich transcript formatting proactively when it improves clarity, such as tables for comparisons, Mermaid diagrams for flows, and structured markdown for plans, checklists, or summaries.",
+    "The transcript supports rich markdown natively, including tables, fenced code blocks, and Mermaid diagrams. Images from tool results render inline.",
+    "The UI can render rich-content cards for markdown, code, embeds, and preview artifacts. These cards support collapse/expand, copy, and opening the content in a larger overlay viewer.",
+    "Supported embed formats are: `mermaid` for rendered diagrams, `svg` for rendered graphics, `html` for rendered embeds, `iframe` for remote embeds, `diashort` for remote embeds, and `d2` for source-only previews.",
+    "Use structured rich transcript output when it improves clarity, such as tables for comparisons, markdown checklists for plans, Mermaid diagrams for flows and relationships, bounded code samples, or direct embeds when the content is meant to be viewed.",
     "Images from tool results (screenshots, Read tool on image files) render inline as embedded images.",
-    "Supported embed code fence languages that render as interactive diagrams: mermaid, d2, svg, iframe, diashort.",
-    "Prefer direct rich embeds or structured artifact cards over bare links when the content is embeddable and the embedded form is more useful to the user.",
+    "Markdown content may be opened in an overlay with a table of contents. Embed content may be opened in an overlay with render/source toggle and zoom controls.",
+    "Prefer direct rich embeds or structured artifact cards over bare links when the content is embeddable and the embedded form is more useful than a plain link.",
     "The user has a sidebar with chat history and project management — multiple concurrent chats are supported.",
     "Plan mode renders a visual approval UI with approve/reject controls.",
     "Cross-session agent work is explicit orchestration between separate chats in the same project, not hidden shared memory.",
@@ -40,9 +42,9 @@ export function getWebContextPrompt(
 
   if (provider === "codex" && options?.presentContentEnabled) {
     promptLines.push(
-      "When you need to intentionally present a structured artifact in the transcript, call the `present_content` dynamic tool instead of only describing the content in assistant text.",
-      "Use `present_content` for bounded artifacts that benefit from a dedicated card, such as implementation plans, comparison tables, diagrams, code samples, checklists, design notes, concise status summaries, or direct embeds.",
-      "If you reference a Diashort artifact, prefer an embedded `/e/...` URL via `present_content` over a plain `/d/...` share link when the embedded view is the better user experience."
+      "When you need to intentionally present a bounded artifact in the transcript, call the `present_content` dynamic tool instead of only describing it in assistant text.",
+      "Use `present_content` for artifacts that benefit from a dedicated card, such as implementation plans, comparison tables, diagrams, code samples, checklists, design notes, concise status summaries, or direct embeds.",
+      "Use `present_content` when a dedicated artifact card will make the result easier to scan or interact with."
     )
   }
 

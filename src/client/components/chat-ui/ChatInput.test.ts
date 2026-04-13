@@ -4,6 +4,7 @@ import {
   getQueueActionDisabledState,
   getComposerControlsKey,
   getRestoredQueuedTextOnArrowUp,
+  hasTrimmedText,
   shouldQueueOnSubmitKeystroke,
   resolveComposerPreferences,
   resolvePlanModeState,
@@ -28,6 +29,14 @@ describe("getComposerControlsKey", () => {
     expect(getComposerControlsKey("chat-1", "codex")).toBe("chat-1:codex")
     expect(getComposerControlsKey("chat-1", "claude")).toBe("chat-1:claude")
     expect(getComposerControlsKey("chat-1", "codex")).not.toBe(getComposerControlsKey("chat-1", "claude"))
+  })
+})
+
+describe("hasTrimmedText", () => {
+  test("treats whitespace-only drafts as empty", () => {
+    expect(hasTrimmedText("")).toBe(false)
+    expect(hasTrimmedText("   \n")).toBe(false)
+    expect(hasTrimmedText(" x ")).toBe(true)
   })
 })
 

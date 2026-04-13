@@ -14,6 +14,7 @@ import {
   computeTailOffset,
   fetchTranscriptRange,
   shouldBackfillTranscriptWindow,
+  shouldPreserveMessagesOnResubscribe,
   shouldTriggerSnapshotRecovery,
   SNAPSHOT_RECOVERY_TIMEOUT_MS,
   summarizeTranscriptWindow,
@@ -118,10 +119,14 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       setChatSnapshot(null) // will be replaced when snapshot arrives
       setChatReady(true)    // show stale content immediately
     } else {
-      log("subscribing to chat (no cache)", { activeChatId })
       setChatSnapshot(null)
-      setMessages([])
-      setChatReady(false)
+      if (shouldPreserveMessagesOnResubscribe({ hasExistingMessages: messagesRef.current.length > 0, restoredFromCache: false })) {
+        log("re-subscribing to chat (keeping stale messages)", { activeChatId })
+      } else {
+        log("subscribing to chat (no cache)", { activeChatId })
+        setMessages([])
+        setChatReady(false)
+      }
     }
 
     // Buffer message events that arrive before the initial fetch completes

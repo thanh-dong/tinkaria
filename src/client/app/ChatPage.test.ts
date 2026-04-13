@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import type { HydratedTranscriptMessage } from "../../shared/types"
-import { ChatNavbar } from "../components/chat-ui/ChatNavbar"
+import { ChatNavbar, getChatNavbarUiIdentityDescriptors } from "../components/chat-ui/ChatNavbar"
 import { TextMessage } from "../components/messages/TextMessage"
 import type { ProcessedTextMessage } from "../components/messages/types"
-import { createUiIdentity, getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
+import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import {
   ChatEmptyStateBrandMark,
   getAvailableSkillsFromMessages,
@@ -14,6 +14,7 @@ import {
   getComposerLiftPx,
   getEmptyStateTypingDurationMs,
   getPendingSessionBootstrapStatusLabel,
+  getRequestedSidebarDialog,
   getScrollButtonBottomPx,
   getTranscriptAreaVisibility,
   TranscriptTailBoundary,
@@ -102,6 +103,20 @@ describe("getAvailableSkillsFromMessages", () => {
 
   test("returns an empty list when no messages exist (snapshot fallback precondition)", () => {
     expect(getAvailableSkillsFromMessages([])).toEqual([])
+  })
+})
+
+describe("getRequestedSidebarDialog", () => {
+  test("returns fork and merge requests from route state", () => {
+    expect(getRequestedSidebarDialog({ sidebarDialog: "fork" })).toBe("fork")
+    expect(getRequestedSidebarDialog({ sidebarDialog: "merge" })).toBe("merge")
+  })
+
+  test("ignores invalid route state payloads", () => {
+    expect(getRequestedSidebarDialog(null)).toBeNull()
+    expect(getRequestedSidebarDialog({})).toBeNull()
+    expect(getRequestedSidebarDialog({ sidebarDialog: "rename" })).toBeNull()
+    expect(getRequestedSidebarDialog("fork")).toBeNull()
   })
 })
 
@@ -450,14 +465,15 @@ describe("getChatPageUiIdentities", () => {
     const identityIndex = html.indexOf('data-ui-id="chat.navbar"')
     const forkButtonIndex = html.indexOf('title="Fork session"')
 
+    expect(html).toContain('data-ui-c3="c3-112"')
+    expect(html).toContain('data-ui-c3-label="chat-input"')
     expect(identityIndex).toBeGreaterThan(-1)
     expect(forkButtonIndex).toBeGreaterThan(-1)
     expect(identityIndex).toBeLessThan(forkButtonIndex)
   })
 
   test("renders curated navbar area and action ids on the stable visible controls", () => {
-    const navbarAreaId = createUiIdentity("chat.navbar", "area")
-    const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
+    const descriptors = getChatNavbarUiIdentityDescriptors()
     const html = renderToStaticMarkup(
       createElement(ChatNavbar, {
         sidebarCollapsed: false,
@@ -470,8 +486,8 @@ describe("getChatPageUiIdentities", () => {
       })
     )
 
-    expect(html).toMatch(new RegExp(`<div[^>]*data-ui-id="${navbarAreaId}"`))
-    expect(html).toMatch(new RegExp(`<button[^>]*data-ui-id="${forkSessionActionId}"`))
+    expect(html).toMatch(new RegExp(`<div[^>]*data-ui-id="${descriptors.area.id}"[^>]*data-ui-c3="c3-112"`))
+    expect(html).toMatch(new RegExp(`<button[^>]*data-ui-id="${descriptors.forkSessionAction.id}"[^>]*data-ui-c3="c3-112"`))
   })
 })
 

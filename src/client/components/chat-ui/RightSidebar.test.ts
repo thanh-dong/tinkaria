@@ -8,6 +8,8 @@ describe("RightSidebar", () => {
 
     expect(markup).toContain("diffs coming soon")
     expect(markup).toContain('data-ui-id="chat.right-sidebar"')
+    expect(markup).toContain('data-ui-c3="c3-115"')
+    expect(markup).toContain('data-ui-c3-label="right-sidebar"')
   })
 
   test("renders the close affordance", () => {

@@ -34,7 +34,7 @@ function getStructuredToolResultFromDebug(entry: Extract<TranscriptEntry, { kind
   try {
     const parsed = JSON.parse(entry.debugRaw) as { tool_use_result?: unknown }
     return parsed.tool_use_result
-  } catch {
+  } catch (_error: unknown) {
     return undefined
   }
 }
@@ -82,10 +82,19 @@ function hydrateEntry(
     case "tool_result": {
       const pendingCall = pendingToolCalls.get(entry.toolId)
       if (pendingCall) {
-        const rawResult = (
+        // For ask_user_question and exit_plan_mode, the runner publishes a structured
+        // tool_result (with { questions, answers }) BEFORE the Claude SDK echoes back
+        // its own tool_result (which may be a plain string or differently shaped).
+        // If we already have a result with structured answers, keep it — the SDK-echoed
+        // entry would overwrite it with a lossy representation.
+        const isStructuredTool =
           pendingCall.normalized.toolKind === "ask_user_question" ||
           pendingCall.normalized.toolKind === "exit_plan_mode"
-        )
+        if (isStructuredTool && pendingCall.hydrated.result != null) {
+          return null
+        }
+
+        const rawResult = isStructuredTool
           ? getStructuredToolResultFromDebug(entry) ?? entry.content
           : entry.content
 

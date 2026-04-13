@@ -1,4 +1,4 @@
-import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react"
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { ArrowUp, Check, ClockPlus, Loader2, Mic, Square } from "lucide-react"
 import {
   type AgentProvider,
@@ -199,8 +199,12 @@ export function shouldShowQueueAction(canCancel: boolean): boolean {
   return canCancel
 }
 
+export function hasTrimmedText(value: string): boolean {
+  return value.trim().length > 0
+}
+
 export function getQueueActionDisabledState(args: { disabled: boolean; value: string }): boolean {
-  return args.disabled || !args.value.trim()
+  return args.disabled || !hasTrimmedText(args.value)
 }
 
 export function getComposerActionDisabledState(args: {
@@ -223,9 +227,26 @@ export function shouldQueueOnSubmitKeystroke(args: {
   return args.metaKey || args.ctrlKey || !args.isTouchDevice
 }
 
+export function shouldInvokeCancelAction(
+  eventType: "pointerdown" | "click",
+  pointerTriggeredRef: { current: boolean }
+): boolean {
+  if (eventType === "pointerdown") {
+    pointerTriggeredRef.current = true
+    return true
+  }
+
+  if (pointerTriggeredRef.current) {
+    pointerTriggeredRef.current = false
+    return false
+  }
+
+  return true
+}
+
 export function getRestoredQueuedTextOnArrowUp(value: string, queuedText: string): string | null {
-  if (value.trim().length > 0) return null
-  return queuedText.trim().length > 0 ? queuedText : null
+  if (hasTrimmedText(value)) return null
+  return hasTrimmedText(queuedText) ? queuedText : null
 }
 
 export function shouldClearDraftAfterSubmit(submitResult: "queued" | "sent"): boolean {
@@ -406,6 +427,16 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
     setPlanMode: handlePlanModeChange,
   }), [resolved.selectedProvider, resolved.providerPrefs, showPlanMode, handlePlanModeChange])
 
+  const handleModelDoubleTap = useCallback(() => {
+    const provider = resolved.selectedProvider
+    const catalog = PROVIDERS.find((p) => p.id === provider)
+    if (!catalog) return
+    const models = catalog.models
+    const currentIndex = models.findIndex((m) => m.id === resolved.providerPrefs.model)
+    const nextIndex = (currentIndex + 1) % models.length
+    handleModelChange(provider, models[nextIndex].id)
+  }, [resolved.selectedProvider, resolved.providerPrefs.model, handleModelChange])
+
   return (
     <ChatPreferenceControls
       availableProviders={availableProviders}
@@ -415,6 +446,7 @@ const ComposerPreferenceControls = memo(forwardRef<ComposerPreferencesHandle, Co
       modelOptions={resolved.providerPrefs.modelOptions}
       onProviderChange={handleProviderChange}
       onModelChange={handleModelChange}
+      onModelDoubleTap={handleModelDoubleTap}
       onModelOptionChange={handleModelOptionChange}
       planMode={resolved.providerPrefs.planMode}
       onPlanModeChange={handlePlanModeChange}
@@ -454,21 +486,11 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const ribbonVisible = useSkillCompositionStore((s) => s.ribbonVisible)
   const toggleRibbon = useSkillCompositionStore((s) => s.toggleRibbon)
   const recordUsage = useSkillCompositionStore((s) => s.recordUsage)
-  const [value, setValue] = useState(() => (chatId ? getDraft(chatId) : ""))
+  const initialDraft = chatId ? getDraft(chatId) : ""
+  const draftValueRef = useRef(initialDraft)
+  const [hasText, setHasText] = useState(() => hasTrimmedText(initialDraft))
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composerPreferencesRef = useRef<ComposerPreferencesHandle>(null)
-  const voiceEnabled = useVoiceInputStore((s) => s.enabled)
-  const handleVoiceTranscribed = useCallback((text: string) => {
-    setValue((current) => {
-      const nextValue = current ? `${current} ${text}` : text
-      if (chatId) setDraft(chatId, nextValue)
-      return nextValue
-    })
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus()
-    })
-  }, [chatId, setDraft])
-  const voice = useVoiceInput(handleVoiceTranscribed)
   const isStandalone = useIsStandalone()
   const isTouchDevice = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0)
   const composerControlsKey = getComposerControlsKey(chatId, activeProvider)
@@ -506,6 +528,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     connectionStatus === "connected" ? "idle" : "reconnecting"
   ))
   const hasConnectedRef = useRef(connectionStatus === "connected")
+  const cancelPointerTriggeredRef = useRef(false)
 
   function getComposerSnapshot() {
     return composerPreferencesRef.current?.getSnapshot() ?? resolveComposerPreferences({
@@ -532,6 +555,33 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     element.style.height = `${element.scrollHeight}px`
   }, [])
 
+  const syncDraftValue = useCallback((nextValue: string) => {
+    draftValueRef.current = nextValue
+    const nextHasText = hasTrimmedText(nextValue)
+    setHasText((current) => (current === nextHasText ? current : nextHasText))
+    if (chatId) setDraft(chatId, nextValue)
+  }, [chatId, setDraft])
+
+  const setComposerValue = useCallback((nextValue: string) => {
+    const textarea = textareaRef.current
+    if (textarea && textarea.value !== nextValue) {
+      textarea.value = nextValue
+    }
+    syncDraftValue(nextValue)
+    autoResize()
+  }, [autoResize, syncDraftValue])
+
+  const voiceEnabled = useVoiceInputStore((s) => s.enabled)
+  const handleVoiceTranscribed = useCallback((text: string) => {
+    const current = draftValueRef.current
+    const nextValue = current ? `${current} ${text}` : text
+    setComposerValue(nextValue)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+    })
+  }, [setComposerValue])
+  const voice = useVoiceInput(handleVoiceTranscribed)
+
   const setTextareaRefs = useCallback((node: HTMLTextAreaElement | null) => {
     textareaRef.current = node
 
@@ -543,10 +593,6 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
 
     forwardedRef.current = node
   }, [forwardedRef])
-
-  useLayoutEffect(() => {
-    autoResize()
-  }, [value, autoResize])
 
   useEffect(() => {
     window.addEventListener("resize", autoResize)
@@ -591,25 +637,23 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     if (!textarea) return
     const command = formatSkillCommand(skill, resolvedProvider)
     const { value: nextValue, cursorPosition } = computeSkillInsertion(
-      value,
+      draftValueRef.current,
       textarea.selectionStart,
       textarea.selectionEnd,
       command
     )
-    setValue(nextValue)
-    if (chatId) setDraft(chatId, nextValue)
+    setComposerValue(nextValue)
     recordUsage([skill])
     requestAnimationFrame(() => {
       textarea.focus()
       textarea.selectionStart = cursorPosition
       textarea.selectionEnd = cursorPosition
-      autoResize()
     })
   }
 
   async function handleSubmit() {
-    if (!value.trim()) return
-    const rawValue = value
+    const rawValue = draftValueRef.current
+    if (!hasTrimmedText(rawValue)) return
     const composerSnapshot = getComposerSnapshot()
     let modelOptions: ModelOptions
 
@@ -631,8 +675,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       submitOptions,
     })
 
-    setValue("")
-    if (textareaRef.current) textareaRef.current.style.height = "auto"
+    setComposerValue("")
 
     try {
       const submitResult = await onSubmit(rawValue, submitOptions)
@@ -641,21 +684,18 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
       }
     } catch (error) {
       console.error("[ChatInput] Submit failed:", error)
-      setValue(rawValue)
-      if (chatId) setDraft(chatId, rawValue)
+      setComposerValue(rawValue)
     }
   }
 
   function handleRestoreQueuedText() {
-    const preservedDraft = chatId ? getDraft(chatId) : ""
+    const preservedDraft = draftValueRef.current
     const restored = onRestoreQueuedText?.()
     const nextValue = preservedDraft || restored
     if (!nextValue) return
-    setValue(nextValue)
-    if (chatId) setDraft(chatId, nextValue)
+    setComposerValue(nextValue)
     requestAnimationFrame(() => {
       textareaRef.current?.focus()
-      autoResize()
     })
   }
 
@@ -665,13 +705,13 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   }
 
   function handleQueueAction() {
-    if (getQueueActionDisabledState({ disabled, value })) return
+    if (getQueueActionDisabledState({ disabled, value: draftValueRef.current })) return
     void handleSubmit()
   }
 
   function handleKeyDown(event: React.KeyboardEvent) {
     if (event.key === "ArrowUp") {
-      const restored = getRestoredQueuedTextOnArrowUp(value, queuedText)
+      const restored = getRestoredQueuedTextOnArrowUp(draftValueRef.current, queuedText)
       if (restored) {
         event.preventDefault()
         handleRestoreQueuedText()
@@ -730,8 +770,9 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     disabled: disabled || connectionStatus !== "connected",
     reconnectVisualState,
   })
-  const queueActionDisabled = getQueueActionDisabledState({ disabled: composerActionsDisabled, value })
-  const submitActionDisabled = composerActionsDisabled || !value.trim()
+  const cancelActionDisabled = reconnectVisualState !== "idle" || connectionStatus !== "connected"
+  const queueActionDisabled = composerActionsDisabled || !hasText
+  const submitActionDisabled = composerActionsDisabled || !hasText
   const showConnectionBadge = reconnectVisualState !== "idle"
   return (
     <div>
@@ -802,13 +843,12 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
               <Textarea
                 ref={setTextareaRefs}
                 placeholder="Build something..."
-                value={value}
+                defaultValue={initialDraft}
                 autoFocus={!isTouchDevice}
                 {...{ [CHAT_INPUT_ATTRIBUTE]: "" }}
                 rows={1}
                 onChange={(event) => {
-                  setValue(event.target.value)
-                  if (chatId) setDraft(chatId, event.target.value)
+                  syncDraftValue(event.target.value)
                   autoResize()
                 }}
                 onKeyDown={handleKeyDown}
@@ -856,9 +896,15 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                     aria-label="Stop"
                     onPointerDown={(event) => {
                       event.preventDefault()
+                      if (!shouldInvokeCancelAction("pointerdown", cancelPointerTriggeredRef)) return
                       onCancel?.()
                     }}
-                    disabled={composerActionsDisabled}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      if (!shouldInvokeCancelAction("click", cancelPointerTriggeredRef)) return
+                      onCancel?.()
+                    }}
+                    disabled={cancelActionDisabled}
                     size="icon"
                     className={cn(
                       "flex-shrink-0 rounded-full h-10 w-10 md:h-11 md:w-11 touch-manipulation transition-colors",
@@ -893,7 +939,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                   type="button"
                   onPointerDown={(event) => {
                     event.preventDefault()
-                    if (!submitActionDisabled && value.trim()) {
+                    if (!submitActionDisabled && hasTrimmedText(draftValueRef.current)) {
                       void handleSubmit()
                     }
                   }}

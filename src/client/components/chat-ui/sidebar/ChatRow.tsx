@@ -1,10 +1,8 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { EllipsisVertical, Loader2, Pencil, Trash2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import type { SidebarChatRow } from "../../../../shared/types"
 import { AnimatedShinyText } from "../../ui/animated-shiny-text"
 import { Input } from "../../ui/input"
-import { Button } from "../../ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../ui/dropdown-menu"
 import { formatSidebarAgeLabel } from "../../../lib/formatters"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../../lib/uiIdentityOverlay"
 import { cn, normalizeChatId } from "../../../lib/utils"
@@ -14,14 +12,8 @@ import { useEventCallback } from "../../../hooks/useEventCallback"
 
 const loadingStatuses = new Set(["starting", "running"])
 const CHAT_ROW_UI_ID = "sidebar.chat-row"
-const CHAT_ROW_MENU_UI_ID = "sidebar.chat-row.menu"
 const CHAT_ROW_DESCRIPTOR = createUiIdentityDescriptor({
   id: CHAT_ROW_UI_ID,
-  c3ComponentId: "c3-113",
-  c3ComponentLabel: "sidebar",
-})
-const CHAT_ROW_MENU_DESCRIPTOR = createUiIdentityDescriptor({
-  id: CHAT_ROW_MENU_UI_ID,
   c3ComponentId: "c3-113",
   c3ComponentLabel: "sidebar",
 })
@@ -35,6 +27,8 @@ interface Props {
   activeChatId: string | null
   nowMs: number
   onSelectChat: (chatId: string) => void
+  onForkChat?: (chatId: string) => void
+  onMergeWithChat?: (chatId: string) => void
   onDeleteChat: (chatId: string) => void
   onRenameChat: (chatId: string, title: string) => void
 }
@@ -65,6 +59,8 @@ function ChatRowInner({
   activeChatId,
   nowMs,
   onSelectChat,
+  onForkChat,
+  onMergeWithChat,
   onDeleteChat,
   onRenameChat,
 }: Props) {
@@ -85,6 +81,12 @@ function ChatRowInner({
   })
   const handleRename = useEventCallback((title: string) => {
     onRenameChat(chat.chatId, title)
+  })
+  const handleFork = useEventCallback(() => {
+    onForkChat?.(chat.chatId)
+  })
+  const handleMergeWith = useEventCallback(() => {
+    onMergeWithChat?.(chat.chatId)
   })
 
   useEffect(() => {
@@ -110,7 +112,12 @@ function ChatRowInner({
   }
 
   return (
-    <ChatRowMenu onRename={startEditing} onDelete={handleDelete}>
+    <ChatRowMenu
+      onFork={handleFork}
+      onMergeWith={handleMergeWith}
+      onRename={startEditing}
+      onDelete={handleDelete}
+    >
       <div
         data-chat-id={normalizedChatId}
         {...getUiIdentityAttributeProps(CHAT_ROW_DESCRIPTOR)}
@@ -209,44 +216,11 @@ function ChatRowInner({
               <ProviderIcon className="h-2.5 w-2.5" />
             </span>
           ) : null}
-          <div className="relative h-7 w-7">
-            {ageLabel ? (
-              <span className="hidden md:flex absolute inset-0 items-center justify-end pr-1 text-[11px] text-muted-foreground opacity-50 transition-opacity group-hover:opacity-0">
-                {ageLabel}
-              </span>
-            ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "absolute inset-0 h-7 w-7 opacity-100 cursor-pointer rounded-sm hover:!bg-transparent !border-0",
-                    ageLabel
-                      ? "md:opacity-0 md:group-hover:opacity-100"
-                      : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                  )}
-                  onClick={(event) => event.stopPropagation()}
-                  title="Chat actions"
-                >
-                  <EllipsisVertical className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={2} uiId={CHAT_ROW_MENU_DESCRIPTOR}>
-                <DropdownMenuItem onSelect={startEditing}>
-                  <Pencil className="h-4 w-4" />
-                  <span className="text-xs font-medium">Rename</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={handleDelete}
-                  className="text-destructive dark:text-red-400 hover:bg-destructive/10 focus:bg-destructive/10 dark:hover:bg-red-500/20 dark:focus:bg-red-500/20"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="text-xs font-medium">Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {ageLabel ? (
+            <span className="hidden md:flex h-7 items-center justify-end pr-1 text-[11px] text-muted-foreground opacity-50">
+              {ageLabel}
+            </span>
+          ) : null}
         </div>
       </div>
     </ChatRowMenu>

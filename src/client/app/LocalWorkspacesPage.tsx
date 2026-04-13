@@ -1,11 +1,14 @@
+import { useState } from "react"
 import { useNavigate, useOutletContext } from "react-router-dom"
 import type { DiscoveredSession } from "../../shared/types"
+import { CreateWorkspaceModal } from "../components/CreateWorkspaceModal"
 import { LocalDev } from "../components/LocalDev"
 import type { AppState } from "./useAppState"
 
 export function LocalProjectsPage() {
   const state = useOutletContext<AppState>()
   const navigate = useNavigate()
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
 
   async function handleResumeHomepageSession(workspaceId: string, session: DiscoveredSession) {
     if (session.chatId) {
@@ -29,6 +32,16 @@ export function LocalProjectsPage() {
         onCreateProject={state.handleCreateProject}
         sessionsForProject={(workspaceId) => state.sessionsSnapshots.get(workspaceId)?.sessions ?? []}
         onResumeSession={handleResumeHomepageSession}
+        independentWorkspaces={state.sidebarData.independentWorkspaces}
+        onCreateWorkspace={() => setCreateWorkspaceOpen(true)}
+        onOpenWorkspace={(wsId) => navigate(`/workspace/${wsId}`)}
+      />
+      <CreateWorkspaceModal
+        open={createWorkspaceOpen}
+        onOpenChange={setCreateWorkspaceOpen}
+        onConfirm={(name) => {
+          void state.handleCreateWorkspace(name)
+        }}
       />
     </div>
   )

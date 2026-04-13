@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { getToolErrorHint } from "./ToolCallMessage"
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { getToolErrorHint, ToolCallMessage } from "./ToolCallMessage"
 
 describe("getToolErrorHint", () => {
   test("returns permission hint for permission denied errors", () => {
@@ -34,5 +36,27 @@ describe("getToolErrorHint", () => {
 
   test("returns null for empty strings", () => {
     expect(getToolErrorHint("")).toBeNull()
+  })
+})
+
+describe("ToolCallMessage", () => {
+  test("renders the tool call root with C3 ownership metadata", () => {
+    const html = renderToStaticMarkup(
+      createElement(ToolCallMessage, {
+        message: {
+          kind: "tool",
+          toolKind: "bash",
+          toolName: "Bash",
+          toolId: "tool-1",
+          id: "tool-1",
+          timestamp: "2026-04-02T00:00:00.000Z",
+          input: { command: "pwd" },
+        } as Parameters<typeof ToolCallMessage>[0]["message"],
+      })
+    )
+
+    expect(html).toContain('data-ui-id="message.tool-call.item"')
+    expect(html).toContain('data-ui-c3="c3-111"')
+    expect(html).toContain('data-ui-c3-label="messages"')
   })
 })

@@ -67,7 +67,7 @@ describe("LocalFilePreviewDialog", () => {
     expect(getLocalFilePreviewDialogUiIdentityProps()).toMatchObject({
       "data-ui-id": "content-preview.dialog",
       "data-ui-c3": "c3-111",
-      "data-ui-c3-label": "transcript-surfaces",
+      "data-ui-c3-label": "messages",
     })
   })
 
@@ -82,7 +82,7 @@ describe("LocalFilePreviewDialog", () => {
     expect(getLocalFilePreviewDialogUiIdentityProps()).toMatchObject({
       "data-ui-id": LOCAL_FILE_PREVIEW_DIALOG_UI_ID,
       "data-ui-c3": "c3-111",
-      "data-ui-c3-label": "transcript-surfaces",
+      "data-ui-c3-label": "messages",
     })
   })
 })

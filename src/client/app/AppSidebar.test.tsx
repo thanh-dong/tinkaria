@@ -11,7 +11,7 @@ import type { SidebarData, UpdateSnapshot } from "../../shared/types"
 await import("../components/chat-ui/sidebar/LocalProjectsSection")
 
 function createSidebarData(): SidebarData {
-  return { workspaceGroups: [] }
+  return { workspaceGroups: [], independentWorkspaces: [] }
 }
 
 function renderSidebar(overrides: Partial<Parameters<typeof AppSidebar>[0]> = {}) {
@@ -108,9 +108,10 @@ describe("AppSidebar", () => {
     expect(html).toContain("tinkaria-mark-fine.svg")
   })
 
-  test("renders the chat model indicator and provider glyph next to the sidebar row menu", () => {
+  test("renders the chat model indicator and provider glyph without inline chat-row action buttons", () => {
     const html = renderSidebar({
       data: {
+        independentWorkspaces: [],
         workspaceGroups: [
           {
             groupKey: "project-1",
@@ -135,12 +136,34 @@ describe("AppSidebar", () => {
 
     expect(html).toContain("gpt-5.4")
     expect(html).toContain('title="Codex"')
-    expect(html).toContain('title="Chat actions"')
+    expect(html).not.toContain('title="Chat actions"')
+  })
+
+  test("keeps project-group actions inside the hold menu instead of rendering inline buttons", () => {
+    const html = renderSidebar({
+      data: {
+        workspaceGroups: [
+          {
+            groupKey: "project-1",
+            localPath: "/tmp/demo",
+            chats: [],
+          },
+        ],
+        independentWorkspaces: [],
+      },
+      onMergeSession: () => {},
+    })
+
+    expect(html).toContain('data-ui-id="sidebar.project-group"')
+    expect(html).not.toContain('data-ui-id="sidebar.project-group.sessions.action"')
+    expect(html).not.toContain("aria-label=\"Coordination board\"")
+    expect(html).not.toContain("Merge sessions")
   })
 
   test("ignores handler identity churn when sidebar data is unchanged", () => {
     const previous = createSidebarProps({
       data: {
+        independentWorkspaces: [],
         workspaceGroups: [
           {
             groupKey: "project-1",

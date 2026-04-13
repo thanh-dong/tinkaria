@@ -28,6 +28,10 @@ describe("isEmbedLanguage", () => {
     expect(isEmbedLanguage("typescript")).toBe(false)
   })
 
+  test("returns true for html", () => {
+    expect(isEmbedLanguage("html")).toBe(true)
+  })
+
   test("returns false for null", () => {
     expect(isEmbedLanguage(null)).toBe(false)
   })
@@ -123,6 +127,41 @@ describe("EmbedRenderer", () => {
 
     expect(html).toContain("Embed URL is invalid or unsupported")
     expect(html).not.toContain('data-remote-embed="true"')
+  })
+})
+
+describe("EmbedRenderer html embed", () => {
+  test("renders sandboxed iframe with srcDoc", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="html" source="<h1>Hello</h1>" />
+    )
+
+    expect(html).toContain("srcDoc")
+    expect(html).toContain("&lt;h1&gt;Hello&lt;/h1&gt;")
+    expect(html).toContain('sandbox="allow-scripts"')
+  })
+
+  test("does not include allow-same-origin in sandbox", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="html" source="<p>test</p>" />
+    )
+
+    expect(html).not.toContain("allow-same-origin")
+  })
+
+  test("shows raw HTML in source mode", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "source", zoom: 1 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="html" source="<div>mockup</div>" />
+      </ContentViewerContext.Provider>
+    )
+
+    expect(html).not.toContain("srcDoc")
+    expect(html).toContain("&lt;div&gt;mockup&lt;/div&gt;")
   })
 })
 

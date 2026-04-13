@@ -6,6 +6,9 @@ describe("UserMessage", () => {
   test("uses normal word breaking for short prompts instead of aggressive mid-word wrapping", () => {
     const html = renderToStaticMarkup(<UserMessage content={"short line"} />)
 
+    expect(html).toContain('data-ui-id="message.user.prompt"')
+    expect(html).toContain('data-ui-c3="c3-111"')
+    expect(html).toContain('data-ui-c3-label="messages"')
     expect(html).toContain("break-normal")
     expect(html).toContain("[overflow-wrap:break-word]")
   })

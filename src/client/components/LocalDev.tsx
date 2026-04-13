@@ -14,6 +14,7 @@ import {
 import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/branding"
 import type {
   DiscoveredSession,
+  IndependentWorkspace,
   LocalWorkspacesSnapshot,
 } from "../../shared/types"
 import type { SocketStatus } from "../app/socket-interface"
@@ -41,6 +42,9 @@ interface LocalDevProps {
   onCreateProject: (project: { mode: "new" | "existing"; localPath: string; title: string }) => Promise<void>
   sessionsForProject?: (workspaceId: string) => DiscoveredSession[]
   onResumeSession?: (workspaceId: string, session: DiscoveredSession) => Promise<void>
+  independentWorkspaces?: IndependentWorkspace[]
+  onCreateWorkspace?: () => void
+  onOpenWorkspace?: (workspaceId: string) => void
 }
 
 interface HomepageRecentSession {
@@ -416,6 +420,34 @@ function RecentSessionRow({
   )
 }
 
+function WorkspaceCard({
+  workspace,
+  onClick,
+  index,
+}: {
+  workspace: IndependentWorkspace
+  onClick: () => void
+  index: number
+}) {
+  return (
+    <button
+      style={{ animationDelay: `${index * 40}ms` }}
+      className="animate-homepage-enter rounded-xl p-4 text-left transition-colors duration-200 bg-card ring-1 ring-border hover:ring-[color:var(--color-logo)]/15 group"
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-foreground truncate">{workspace.name}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            Created {formatRelativeTime(workspace.createdAt)}
+          </div>
+        </div>
+        <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+      </div>
+    </button>
+  )
+}
+
 function ProjectCard({
   projectTitle,
   localPath,
@@ -602,6 +634,9 @@ export function LocalDev({
   onCreateProject,
   sessionsForProject,
   onResumeSession,
+  independentWorkspaces,
+  onCreateWorkspace,
+  onOpenWorkspace,
 }: LocalDevProps) {
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null)
@@ -709,8 +744,40 @@ export function LocalDev({
               </div>
             ) : null}
 
+            {(independentWorkspaces?.length ?? 0) > 0 || onCreateWorkspace ? (
+              <div className="mb-6">
+                <div className="mb-2 flex items-baseline justify-between gap-4">
+                  <SectionHeader>Workspaces</SectionHeader>
+                  {onCreateWorkspace ? (
+                    <Button variant="outline" size="sm" onClick={onCreateWorkspace}>
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      New Workspace
+                    </Button>
+                  ) : null}
+                </div>
+                {independentWorkspaces && independentWorkspaces.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {independentWorkspaces.map((ws, index) => (
+                      <WorkspaceCard
+                        key={ws.id}
+                        workspace={ws}
+                        index={index}
+                        onClick={() => onOpenWorkspace?.(ws.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <InfoCard>
+                    <p className="text-sm text-muted-foreground">
+                      No workspaces yet. Create one to organize agents, repos, and workflows.
+                    </p>
+                  </InfoCard>
+                )}
+              </div>
+            ) : null}
+
             <div className="mb-2 flex items-baseline justify-between gap-4">
-              <SectionHeader>Workspaces</SectionHeader>
+              <SectionHeader>Projects</SectionHeader>
               <Button
                 variant="default"
                 size="sm"

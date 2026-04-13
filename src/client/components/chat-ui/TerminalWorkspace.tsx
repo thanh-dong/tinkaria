@@ -4,7 +4,7 @@ import type { AppTransport, SocketStatus } from "../../app/socket-interface"
 import { Button } from "../ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../ui/resizable"
 import { HotkeyTooltip, HotkeyTooltipContent, HotkeyTooltipTrigger } from "../ui/tooltip"
-import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import type { ProjectTerminalLayout } from "../../stores/terminalLayoutStore"
 import { TerminalPane } from "./TerminalPane"
 import { getMinimumTerminalWidth, getMinimumTerminalWorkspaceWidth } from "./TerminalWorkspaceLayout"
@@ -22,6 +22,12 @@ interface Props {
   onRemoveTerminal: (workspaceId: string, terminalId: string) => void
   onTerminalLayout: (workspaceId: string, sizes: number[]) => void
 }
+
+const TERMINAL_WORKSPACE_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
+  id: "chat.terminal-workspace",
+  c3ComponentId: "c3-110",
+  c3ComponentLabel: "chat",
+})
 
 export function TerminalWorkspace({
   workspaceId,
@@ -92,7 +98,7 @@ export function TerminalWorkspace({
 
   return (
     <div
-      {...getUiIdentityAttributeProps("chat.terminal-workspace")}
+      {...getUiIdentityAttributeProps(TERMINAL_WORKSPACE_UI_DESCRIPTOR)}
       className="flex h-full min-h-0 flex-col"
     >
       <div ref={containerRef} className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">

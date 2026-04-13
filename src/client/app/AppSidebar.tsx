@@ -8,6 +8,7 @@ import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../li
 import { cn } from "../lib/utils"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 const LocalProjectsSection = lazy(() => import("../components/chat-ui/sidebar/LocalProjectsSection").then(m => ({ default: m.LocalProjectsSection })))
+import { WorkspacesSection } from "../components/chat-ui/sidebar/WorkspacesSection"
 import type { AgentProvider, DiscoveredSession, SidebarData, SidebarChatRow, UpdateSnapshot } from "../../shared/types"
 import type { SocketStatus } from "./socket-interface"
 import { shouldCloseMobileSidebarFromSwipe, type MobileSidebarSwipeState } from "./ChatPage"
@@ -37,6 +38,11 @@ interface AppSidebarProps {
   onRefreshSessions: (workspaceId: string) => void
   onShowMoreSessions: (workspaceId: string) => void
   onMergeSession?: (workspaceId: string) => void
+  onCreateWorkspace?: () => void
+}
+
+interface SidebarDialogNavigationState {
+  sidebarDialog?: "fork" | "merge"
 }
 
 function areDiscoveredSessionsEqual(
@@ -132,6 +138,7 @@ function AppSidebarInner({
   onRefreshSessions,
   onShowMoreSessions,
   onMergeSession,
+  onCreateWorkspace,
 }: AppSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -224,6 +231,14 @@ function AppSidebarInner({
         navigate(`/chat/${chatId}`)
         onClose()
       }}
+      onForkChat={(chatId) => {
+        navigate(`/chat/${chatId}`, { state: { sidebarDialog: "fork" } satisfies SidebarDialogNavigationState })
+        onClose()
+      }}
+      onMergeWithChat={(chatId) => {
+        navigate(`/chat/${chatId}`, { state: { sidebarDialog: "merge" } satisfies SidebarDialogNavigationState })
+        onClose()
+      }}
       onDeleteChat={() => onDeleteChat(chat)}
       onRenameChat={onRenameChat}
     />
@@ -287,8 +302,8 @@ function AppSidebarInner({
       {collapsed && isUtilityPageActive && (
         <div className="hidden md:flex fixed left-0 top-0 h-full z-40 items-start pt-4 pl-5 border-l border-border/0">
           <div className="group/desktop-collapsed-shell flex items-center gap-1 rounded-full bg-background/80 pr-1 backdrop-blur-sm">
-            <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
-              <TinkariaSidebarMark className="absolute inset-0 size-full" imageClassName="size-5" />
+            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center">
+              <TinkariaSidebarMark className="absolute inset-0 size-full" imageClassName="size-6" />
               <Button
                 variant="ghost"
                 size="icon"
@@ -319,10 +334,10 @@ function AppSidebarInner({
         onPointerUp={handleSwipePointerEnd}
         onPointerCancel={handleSwipePointerEnd}
       >
-        <div className=" pl-3 pr-[7px] h-[64px] max-h-[64px] md:h-[55px] md:max-h-[55px] border-b flex items-center justify-between">
+        <div className="pl-2 pr-[7px] h-[64px] max-h-[64px] md:h-[55px] md:max-h-[55px] border-b flex items-center justify-between">
           <Button
             variant="ghost"
-            className="group/sidebar-shell flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:text-foreground"
+            className="group/sidebar-shell flex min-w-0 items-center gap-2 px-2 rounded-lg text-left transition-colors hover:text-foreground"
             onClick={() => {
               navigate("/")
               onClose()
@@ -330,13 +345,13 @@ function AppSidebarInner({
             title="Home"
             aria-label="Go to homepage"
           >
-            <div className="relative hidden md:flex h-8 w-8 shrink-0 items-center justify-center">
+            <div className="relative hidden md:flex h-9 w-9 shrink-0 items-center justify-center">
               <TinkariaSidebarMark
                 className="absolute inset-0 size-full"
-                imageClassName="h-5 w-5"
+                imageClassName="h-6 w-6"
               />
             </div>
-            <TinkariaSidebarMark className="h-5 w-5 sm:h-6 sm:w-6 md:hidden" imageClassName="h-4 w-4 sm:h-5 sm:w-5" />
+            <TinkariaSidebarMark className="h-6 w-6 sm:h-7 sm:w-7 md:hidden" imageClassName="h-5 w-5 sm:h-5.5 sm:w-5.5" />
             <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">
               {APP_NAME}
             </span>
@@ -419,6 +434,16 @@ function AppSidebarInner({
               <p className="text-sm text-slate-400 p-2 mt-6 text-center">No conversations yet</p>
             ) : null}
 
+            <WorkspacesSection
+              workspaces={data.independentWorkspaces}
+              onSelect={(wsId) => {
+                navigate(`/workspace/${wsId}`)
+                onClose()
+              }}
+              onCreate={() => onCreateWorkspace?.()}
+              activeWorkspaceId={location.pathname.startsWith("/workspace/") ? location.pathname.split("/")[2] : null}
+            />
+
             <Suspense fallback={null}>
               <LocalProjectsSection
                 workspaceGroups={orderedProjectGroups}
@@ -447,10 +472,6 @@ function AppSidebarInner({
                 onRefreshSessions={onRefreshSessions}
                 onShowMoreSessions={onShowMoreSessions}
                 onMergeSession={onMergeSession}
-                onOpenCoordination={(workspaceId) => {
-                  navigate(`/workspace/${workspaceId}`)
-                  onClose()
-                }}
               />
             </Suspense>
           </div>

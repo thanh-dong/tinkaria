@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import { PROVIDERS } from "../../../shared/types"
 import { useSkillCompositionStore } from "../../stores/skillCompositionStore"
-import { areChatInputPropsEqual, ChatInput } from "./ChatInput"
+import { areChatInputPropsEqual, ChatInput, shouldInvokeCancelAction } from "./ChatInput"
 
 describe("ChatInput", () => {
   afterEach(() => {
@@ -55,6 +55,9 @@ describe("ChatInput", () => {
       />
     )
 
+    expect(html).toContain('data-ui-id="chat.composer.area"')
+    expect(html).toContain('data-ui-c3="c3-112"')
+    expect(html).toContain('data-ui-c3-label="chat-input"')
     expect(html).toContain("text-amber-600")
     expect(html).toContain("border-amber-400/30")
     expect(html).not.toContain("transcript.message-list")
@@ -96,5 +99,21 @@ describe("ChatInput", () => {
       })),
       availableSkills: ["c3", "adapt"],
     })).toBe(true)
+  })
+
+  test("allows click activation for stop when no pointerdown happened first", () => {
+    const pointerTriggeredRef = { current: false }
+
+    expect(shouldInvokeCancelAction("click", pointerTriggeredRef)).toBe(true)
+    expect(pointerTriggeredRef.current).toBe(false)
+  })
+
+  test("dedupes the synthetic click that follows pointerdown on stop", () => {
+    const pointerTriggeredRef = { current: false }
+
+    expect(shouldInvokeCancelAction("pointerdown", pointerTriggeredRef)).toBe(true)
+    expect(pointerTriggeredRef.current).toBe(true)
+    expect(shouldInvokeCancelAction("click", pointerTriggeredRef)).toBe(false)
+    expect(pointerTriggeredRef.current).toBe(false)
   })
 })

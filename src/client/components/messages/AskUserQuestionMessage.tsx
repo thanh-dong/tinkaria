@@ -76,7 +76,7 @@ function QuestionCard({
           ) : totalQuestions > 1 ? (
             <span className="font-bold text-muted-foreground whitespace-nowrap">{currentIndex + 1} of {totalQuestions}</span>
           ) : null}
-          <span className="truncate">{question}</span>
+          <span className="text-pretty">{question}</span>
         </h3>
         {/* Progress bar */}
         {totalQuestions > 1 && (
@@ -96,9 +96,9 @@ function QuestionCard({
 function OptionContent({ label, description }: { label: string; description?: string }) {
   return (
     <>
-      <span className="text-foreground text-sm truncate block">{label}</span>
+      <span className="block text-sm text-foreground whitespace-normal break-words">{label}</span>
       {description && (
-        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground whitespace-normal break-words">{description}</p>
       )}
     </>
   )
@@ -152,14 +152,18 @@ function OptionRow({
       <Button
         variant="ghost"
         onClick={onClick}
-        className={cn(baseClasses, borderClass, "transition-all cursor-pointer h-auto w-full justify-start rounded-none")}
+        className={cn(
+          baseClasses,
+          borderClass,
+          "transition-all cursor-pointer h-auto w-full justify-start rounded-none border-x-0 border-t-0"
+        )}
         {...getUiIdentityAttributeProps(ASK_USER_OPTION_ACTION_DESCRIPTOR)}
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Checkbox selected={selected} multiSelect={multiSelect} />
           <div className="flex-1 min-w-0">
             <OptionContent label={option.label} description={option.description} />
           </div>
-          <Checkbox selected={selected} multiSelect={multiSelect} />
         </div>
       </Button>
     )
@@ -301,33 +305,46 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
 
     return (
       <div className="w-full" {...getUiIdentityAttributeProps(ASK_USER_AREA_DESCRIPTOR)}>
-        <div className="rounded-2xl border border-border overflow-hidden">
-          <div className="font-medium text-sm p-3 px-4 pr-5 bg-muted  border-b border-border flex flex-row items-center justify-between">
-            <p>Question{questions.length !== 1 ? "s" : ""}</p>
-            <p className="">{isDiscarded ? "Discarded" : "Answers"}</p>
-          </div>
-          {questions.map((question, index) => {
+        <div className="rounded-2xl border border-border bg-card p-3 sm:p-4">
+          <dl className="space-y-3">
+            {questions.map((question) => {
             const answerValue = displayAnswers[getQuestionKey(question)] || displayAnswers[question.question] || []
-            const isLast = index === questions.length - 1
 
             return (
               <div
                 key={getQuestionKey(question)}
-                className={cn(
-                  "w-full p-3 pt-2.5 pl-4 pr-5 bg-background flex items-center justify-between gap-3",
-                  !isLast && "border-b border-border"
-                )}
+                className={cn("space-y-3 rounded-xl border border-border bg-background p-3 sm:p-4")}
               >
-                <div className="text-sm text-pretty flex-1 min-w-0 truncate">{question.question}</div>
-                {answerValue.length > 0 && <div className="text-sm font-medium text-right max-w-[50%] flex-shrink-0 truncate">{answerValue.join(", ")}</div>}
+                <div className="space-y-1">
+                  <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    Question
+                  </dt>
+                  <p className="text-sm text-foreground text-pretty">{question.question}</p>
+                </div>
+                {answerValue.length > 0 && (
+                  <div className="space-y-1">
+                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      {isDiscarded ? "Status" : "Answer"}
+                    </dt>
+                    <dd className="text-sm font-medium text-foreground">
+                      {answerValue.join(", ")}
+                    </dd>
+                  </div>
+                )}
                 {answerValue.length === 0 && (
-                  <div className="text-sm font-medium text-right italic flex-shrink-0">
-                    {isDiscarded ? "Discarded" : "No Response"}
+                  <div className="space-y-1">
+                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      {isDiscarded ? "Status" : "Answer"}
+                    </dt>
+                    <dd className="text-sm font-medium italic text-muted-foreground">
+                      {isDiscarded ? "Discarded" : "No Response"}
+                    </dd>
                   </div>
                 )}
               </div>
             )
-          })}
+            })}
+          </dl>
         </div>
       </div>
     )
@@ -371,20 +388,20 @@ export const AskUserQuestionMessage = memo(function AskUserQuestionMessage({ mes
 
         {/* Custom input */}
         <div className="transition-all bg-background">
-          <div className="flex pr-5 items-center justify-between gap-3">
+          <div className="flex min-h-[55px] items-center gap-3 pl-4 pr-5">
+            <Checkbox
+              selected={!!customInput}
+              multiSelect={currentQuestion.multiSelect}
+              onClick={currentQuestion.multiSelect && customInput ? () => clearCustomInput(currentQuestion) : undefined}
+            />
             <Input
               type="text"
               value={customInput}
               onChange={(e) => handleCustomInputChange(currentQuestion, e.target.value)}
               onKeyDown={handleCustomInputEnter}
               placeholder="Other..."
-              className="flex-1 px-3 !py-1 pl-4 min-h-[55px] min-w-0 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
+              className="min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 !py-1 text-sm text-foreground outline-none ring-0 placeholder:text-muted-foreground focus-visible:ring-0"
               {...getUiIdentityAttributeProps(ASK_USER_CUSTOM_INPUT_DESCRIPTOR)}
-            />
-            <Checkbox
-              selected={!!customInput}
-              multiSelect={currentQuestion.multiSelect}
-              onClick={currentQuestion.multiSelect && customInput ? () => clearCustomInput(currentQuestion) : undefined}
             />
           </div>
         </div>

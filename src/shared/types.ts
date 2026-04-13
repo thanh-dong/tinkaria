@@ -199,6 +199,14 @@ export interface SidebarWorkspaceGroup {
 
 export interface SidebarData {
   workspaceGroups: SidebarWorkspaceGroup[]
+  independentWorkspaces: IndependentWorkspace[]
+}
+
+export interface IndependentWorkspace {
+  id: string
+  name: string
+  createdAt: number
+  updatedAt: number
 }
 
 export interface DiscoveredSession {

@@ -214,7 +214,21 @@ export function removeChatFromSidebar(data: SidebarData, chatId: string): Sideba
 
   return filtered.length === data.workspaceGroups.length && filtered.every((g, i) => g === data.workspaceGroups[i])
     ? data
-    : { workspaceGroups: filtered }
+    : { workspaceGroups: filtered, independentWorkspaces: data.independentWorkspaces }
+}
+
+export function filterPendingDeletedChats(data: SidebarData, pendingDeletedChatIds: ReadonlySet<string>): SidebarData {
+  if (pendingDeletedChatIds.size === 0) return data
+  const filtered = data.workspaceGroups
+    .map((group) => {
+      const chats = group.chats.filter((chat) => !pendingDeletedChatIds.has(chat.chatId))
+      return chats.length === group.chats.length ? group : { ...group, chats }
+    })
+    .filter((group) => group.chats.length > 0)
+
+  return filtered.length === data.workspaceGroups.length && filtered.every((g, i) => g === data.workspaceGroups[i])
+    ? data
+    : { workspaceGroups: filtered, independentWorkspaces: data.independentWorkspaces }
 }
 
 export function getNewestRemainingChatId(workspaceGroups: SidebarData["workspaceGroups"], activeChatId: string): string | null {
@@ -461,4 +475,11 @@ export function shouldQueueChatSubmit(isProcessing: boolean, queuedText: string)
 
 export function prependQueuedText(flushedText: string, queuedText: string): string {
   return appendQueuedText(flushedText, queuedText)
+}
+
+export function shouldPreserveMessagesOnResubscribe(args: {
+  hasExistingMessages: boolean
+  restoredFromCache: boolean
+}): boolean {
+  return args.hasExistingMessages && !args.restoredFromCache
 }

@@ -10,6 +10,12 @@ import {
   getUiIdentityAttributeProps,
   type UiIdentityModifierState,
 } from "../lib/uiIdentityOverlay"
+import {
+  isTouchDevice,
+  findNearestUiIdentityElement,
+  shouldInterceptMobileTap,
+} from "../lib/uiIdentityMobile"
+import { UiIdentityFab } from "../components/ui/UiIdentityFab"
 import { AppDialogProvider } from "../components/ui/app-dialog"
 import {
   UiIdentityOverlay,
@@ -19,12 +25,17 @@ import {
 import { TooltipProvider } from "../components/ui/tooltip"
 import { Toaster } from "sonner"
 import { AppSidebar } from "./AppSidebar"
+import { CreateWorkspaceModal } from "../components/CreateWorkspaceModal"
 import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalWorkspacesPage"
 import { WorkspacePage } from "./WorkspacePage"
 import { AppStateContext } from "./AppStateContext"
 import { useAppState } from "./useAppState"
 import { useEventCallback } from "../hooks/useEventCallback"
+import { useShortcuts, type ShortcutRegistration } from "../hooks/useShortcuts"
+import { ShortcutHelpOverlay } from "../components/ui/ShortcutHelpOverlay"
+import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
+import { PROVIDERS } from "../../shared/types"
 
 const UI_IDENTITY_OVERLAY_COPY_DURATION_MS = 1200
 const UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS = 320
@@ -210,6 +221,51 @@ export function getUiIdentityOverlayAnchorRect(
   }
 }
 
+export interface MobileTapResult {
+  target: Element
+  clientX: number
+  clientY: number
+}
+
+export function handleMobileTapCapture(event: MouseEvent): MobileTapResult | null {
+  const target = event.target
+  if (!target || typeof (target as Element).closest !== "function") {
+    return null
+  }
+
+  if (!shouldInterceptMobileTap(target as Element)) {
+    return null
+  }
+
+  const nearestTagged = findNearestUiIdentityElement(target as Element)
+  if (!nearestTagged) {
+    return null
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  return {
+    target: nearestTagged,
+    clientX: event.clientX,
+    clientY: event.clientY,
+  }
+}
+
+export function getMobileTapAnchorRect(
+  clientX: number,
+  clientY: number,
+): UiIdentityOverlayAnchorRect {
+  return {
+    top: clientY,
+    left: clientX,
+    right: clientX,
+    bottom: clientY,
+    width: 0,
+    height: 0,
+  }
+}
+
 async function copyUiIdentityToClipboard(descriptor: UiIdentityDescriptor): Promise<boolean> {
   const clipboard = typeof navigator === "undefined" ? null : navigator.clipboard
   if (!clipboard?.writeText) {
@@ -228,12 +284,14 @@ function UiIdentityOverlayController() {
   const [pointerPosition, setPointerPosition] = useState<UiIdentityOverlayPointerPosition | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [mobileActive, setMobileActive] = useState(false)
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pointerClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeRef = useRef(false)
 
   const stack = useMemo(() => buildUiIdentityStack(pointerTarget, 3), [pointerTarget])
-  const active = isUiIdentityOverlayActive(modifiers)
+  const keyboardActive = isUiIdentityOverlayActive(modifiers)
+  const active = keyboardActive || mobileActive
   activeRef.current = active
   const anchorRect = useMemo<UiIdentityOverlayAnchorRect | null>(
     () => getUiIdentityOverlayAnchorRect(pointerPosition),
@@ -278,6 +336,24 @@ function UiIdentityOverlayController() {
   }, [])
 
   useEffect(() => {
+    if (!mobileActive) return
+
+    function onCapture(event: MouseEvent) {
+      const result = handleMobileTapCapture(event)
+      if (!result) return
+
+      setPointerTarget(result.target)
+      setPointerPosition({ clientX: result.clientX, clientY: result.clientY })
+      setHighlightedId(null)
+    }
+
+    window.addEventListener("click", onCapture, { capture: true })
+    return () => {
+      window.removeEventListener("click", onCapture, { capture: true })
+    }
+  }, [mobileActive])
+
+  useEffect(() => {
     return () => {
       if (copiedTimeoutRef.current !== null) {
         clearTimeout(copiedTimeoutRef.current)
@@ -305,17 +381,35 @@ function UiIdentityOverlayController() {
     })
   }
 
+  function handleToggleMobile() {
+    setMobileActive((prev) => {
+      if (prev) {
+        setPointerTarget(null)
+        setPointerPosition(null)
+        setHighlightedId(null)
+      }
+      return !prev
+    })
+  }
+
+  const showFab = isTouchDevice()
+
   return (
-    <UiIdentityOverlay
-      active={active}
-      anchorRect={anchorRect}
-      highlightRect={active ? highlightRect : null}
-      stack={active ? stack : []}
-      highlightedId={active ? effectiveHighlightedId : null}
-      copiedId={copiedId}
-      onCopy={handleCopy}
-      onHighlight={setHighlightedId}
-    />
+    <>
+      <UiIdentityOverlay
+        active={active}
+        anchorRect={anchorRect}
+        highlightRect={active ? highlightRect : null}
+        stack={active ? stack : []}
+        highlightedId={active ? effectiveHighlightedId : null}
+        copiedId={copiedId}
+        onCopy={handleCopy}
+        onHighlight={setHighlightedId}
+      />
+      {showFab ? (
+        <UiIdentityFab active={mobileActive} onToggle={handleToggleMobile} />
+      ) : null}
+    </>
   )
 }
 
@@ -366,6 +460,10 @@ function AppLayout() {
   const handleShowMoreSessions = useEventCallback((workspaceId: string) => {
     state.handleShowMoreSessions(workspaceId)
   })
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
+  const handleCreateWorkspace = useEventCallback((name: string) => {
+    void state.handleCreateWorkspace(name)
+  })
 
   return (
     <div
@@ -398,10 +496,69 @@ function AppLayout() {
           onRefreshSessions={handleRefreshSessions}
           onShowMoreSessions={handleShowMoreSessions}
           onMergeSession={handleMergeSession}
+          onCreateWorkspace={() => setCreateWorkspaceOpen(true)}
         />
         <Outlet context={state} />
       </div>
+      <CreateWorkspaceModal
+        open={createWorkspaceOpen}
+        onOpenChange={setCreateWorkspaceOpen}
+        onConfirm={handleCreateWorkspace}
+      />
     </div>
+  )
+}
+
+function getNextModel(provider: "claude" | "codex", currentModel: string, direction: 1 | -1): string {
+  const catalog = PROVIDERS.find((p) => p.id === provider)
+  if (!catalog) return currentModel
+  const models = catalog.models
+  const currentIndex = models.findIndex((m) => m.id === currentModel)
+  if (currentIndex === -1) return currentModel
+  const nextIndex = (currentIndex + direction + models.length) % models.length
+  return models[nextIndex].id
+}
+
+function ShortcutController() {
+  const state = useContext(AppStateContext)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const composerState = useChatPreferencesStore((s) => s.composerState)
+  const setComposerModel = useChatPreferencesStore((s) => s.setComposerModel)
+
+  const isNewChat = state ? !state.chatHasKnownMessages : false
+  const activeScope = isNewChat ? "new-chat" as const : "global" as const
+
+  const registrations = useMemo((): ShortcutRegistration[] => {
+    const createNewChat = () => {
+      if (!state) return
+      const workspaceId = state.runtime?.workspaceId
+        ?? state.sidebarData.workspaceGroups[0]?.groupKey
+      if (workspaceId) {
+        void state.handleCreateChat(workspaceId)
+      }
+    }
+
+    const cycleModel = (direction: 1 | -1) => {
+      const nextModel = getNextModel(composerState.provider, composerState.model, direction)
+      setComposerModel(nextModel)
+    }
+
+    return [
+      { key: "/", alt: true, label: "Show shortcuts", scope: "global", handler: () => setHelpOpen((v) => !v) },
+      { key: "n", alt: true, label: "New chat", description: "Same project", scope: "global", handler: createNewChat },
+      { key: "ArrowLeft", alt: true, label: "Previous model", scope: "new-chat", handler: () => cycleModel(-1) },
+      { key: "ArrowRight", alt: true, label: "Next model", scope: "new-chat", handler: () => cycleModel(1) },
+    ]
+  }, [state, composerState.provider, composerState.model, setComposerModel])
+
+  const definitions = useShortcuts(registrations, activeScope)
+
+  return (
+    <ShortcutHelpOverlay
+      open={helpOpen}
+      onClose={() => setHelpOpen(false)}
+      shortcuts={definitions}
+    />
   )
 }
 
@@ -414,6 +571,7 @@ function AppInner() {
 
   return (
     <AppStateContext.Provider value={state}>
+      <ShortcutController />
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<LocalProjectsPage />} />

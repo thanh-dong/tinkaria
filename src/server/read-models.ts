@@ -56,7 +56,10 @@ export function deriveSidebarData(
     }
   })
 
-  return { workspaceGroups }
+  const independentWorkspaces = [...state.independentWorkspacesById.values()]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+
+  return { workspaceGroups, independentWorkspaces }
 }
 
 export function deriveLocalWorkspacesSnapshot(
