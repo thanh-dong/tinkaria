@@ -224,6 +224,23 @@ export function shouldQueueOnSubmitKeystroke(args: {
   return args.metaKey || args.ctrlKey || !args.isTouchDevice
 }
 
+export function shouldInvokeCancelAction(
+  eventType: "pointerdown" | "click",
+  pointerTriggeredRef: { current: boolean }
+): boolean {
+  if (eventType === "pointerdown") {
+    pointerTriggeredRef.current = true
+    return true
+  }
+
+  if (pointerTriggeredRef.current) {
+    pointerTriggeredRef.current = false
+    return false
+  }
+
+  return true
+}
+
 export function getRestoredQueuedTextOnArrowUp(value: string, queuedText: string): string | null {
   if (hasTrimmedText(value)) return null
   return hasTrimmedText(queuedText) ? queuedText : null
@@ -508,6 +525,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
     connectionStatus === "connected" ? "idle" : "reconnecting"
   ))
   const hasConnectedRef = useRef(connectionStatus === "connected")
+  const cancelPointerTriggeredRef = useRef(false)
 
   function getComposerSnapshot() {
     return composerPreferencesRef.current?.getSnapshot() ?? resolveComposerPreferences({
@@ -831,6 +849,12 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                     aria-label="Stop"
                     onPointerDown={(event) => {
                       event.preventDefault()
+                      if (!shouldInvokeCancelAction("pointerdown", cancelPointerTriggeredRef)) return
+                      onCancel?.()
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      if (!shouldInvokeCancelAction("click", cancelPointerTriggeredRef)) return
                       onCancel?.()
                     }}
                     disabled={cancelActionDisabled}
