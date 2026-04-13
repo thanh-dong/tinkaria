@@ -61,6 +61,22 @@ export function getContextBarColor(percent: number): string {
   return "bg-emerald-500 dark:bg-emerald-400"
 }
 
+function ContextBar({ percent, testId }: { percent: number; testId?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 shrink-0" data-testid={testId}>
+      <span className={cn("text-xs font-medium leading-none tabular-nums", getContextPercentTextColor(percent))}>
+        {percent}%
+      </span>
+      <div className="w-12 h-1.5 rounded-full bg-muted/60 overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all duration-500", getContextBarColor(percent))}
+          style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function getContextPercentTextColor(percent: number): string {
   if (percent >= 90) return "text-red-600 dark:text-red-400"
   if (percent >= 75) return "text-orange-600 dark:text-orange-400"
@@ -344,22 +360,31 @@ export function ChatNavbar({
               ) : null}
 
               {contextPercent !== undefined ? (
-                <div className="flex items-center gap-1.5 shrink-0" data-testid="context-bar">
-                  <span className={cn("text-xs font-medium leading-none tabular-nums", getContextPercentTextColor(contextPercent))}>
-                    {contextPercent}%
-                  </span>
-                  <div className="w-12 h-1.5 rounded-full bg-muted/60 overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all duration-500", getContextBarColor(contextPercent))}
-                      style={{ width: `${Math.min(100, Math.max(0, contextPercent))}%` }}
-                    />
-                  </div>
-                </div>
+                <ContextBar percent={contextPercent} testId="context-bar" />
               ) : null}
             </div>
           ) : null}
         </div>
       </div>
+
+      {hasRightContent ? (
+        <div
+          className="md:hidden flex items-center justify-between gap-2 w-full px-1 mt-1"
+          data-testid="mobile-info-row"
+        >
+          {compactRepoLabel ? (
+            <RepoDetailPopover
+              localPath={localPath}
+              repoStatus={currentRepoStatus}
+              compactLabel={compactRepoLabel}
+            />
+          ) : null}
+
+          {contextPercent !== undefined ? (
+            <ContextBar percent={contextPercent} />
+          ) : null}
+        </div>
+      ) : null}
     </CardHeader>
   )
 }

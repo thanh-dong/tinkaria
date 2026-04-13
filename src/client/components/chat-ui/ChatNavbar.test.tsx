@@ -324,6 +324,67 @@ describe("ChatNavbar", () => {
     expect(htmlBefore(html, 'data-testid="context-bar"')).toContain("hidden md:")
   })
 
+  test("renders mobile info row with repo label and context bar", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      localPath: "/workspace/kanna",
+      currentRepoStatus: cleanRepoStatus,
+      currentSessionRuntime: {
+        model: "claude-sonnet-4-5",
+        tokenUsage: { totalTokens: 1000, estimatedContextPercent: 25 },
+      },
+    })
+
+    expect(html).toContain('data-testid="mobile-info-row"')
+    const mobileRow = htmlElementForMarker(html, 'data-testid="mobile-info-row"')
+    expect(mobileRow).toContain("md:hidden")
+  })
+
+  test("mobile info row shows repo label", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      localPath: "/workspace/kanna",
+      currentRepoStatus: {
+        ...cleanRepoStatus,
+        branch: "feat/mobile",
+        ahead: 2,
+      },
+    })
+
+    expect(html).toContain('data-testid="mobile-info-row"')
+    // The mobile row should contain the compact label
+    const afterMobileRow = html.slice(html.indexOf('data-testid="mobile-info-row"'))
+    expect(afterMobileRow).toContain("kanna")
+    expect(afterMobileRow).toContain("feat/mobile +2")
+  })
+
+  test("mobile info row shows context percentage", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+      localPath: "/workspace/kanna",
+      currentRepoStatus: cleanRepoStatus,
+      currentSessionRuntime: {
+        model: "claude-sonnet-4-5",
+        tokenUsage: { totalTokens: 5000, estimatedContextPercent: 72 },
+      },
+    })
+
+    const afterMobileRow = html.slice(html.indexOf('data-testid="mobile-info-row"'))
+    expect(afterMobileRow).toContain("72%")
+  })
+
+  test("mobile info row is hidden when no right content", () => {
+    const html = renderNavbar({
+      sidebarCollapsed: false,
+      ...defaultProps,
+    })
+
+    expect(html).not.toContain('data-testid="mobile-info-row"')
+  })
+
   test("uses no text smaller than 12px", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,

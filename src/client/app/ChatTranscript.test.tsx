@@ -192,6 +192,40 @@ describe("groupMessages", () => {
     expect(items[2].type).toBe("single") // answer
   })
 
+  test("assistant text before special tool is ejected from wip-block so rationale is visible", () => {
+    // narration → tool → rationale text → AskUserQuestion → answer
+    const msgs = [text("Let me explore"), tool(), text("Here is what I found, pick one:"), specialTool(), text("Great choice")]
+    const items = groupMessages(msgs, false)
+
+    // wip-block (narration+tool), rationale → single, special → single, answer → single
+    expect(items).toHaveLength(4)
+    expect(items[0].type).toBe("wip-block")
+    if (items[0].type === "wip-block") {
+      expect(items[0].steps).toHaveLength(2) // "Let me explore" + tool only
+    }
+    expect(items[1].type).toBe("single") // rationale text visible
+    if (items[1].type === "single") {
+      expect(items[1].message.kind).toBe("assistant_text")
+    }
+    expect(items[2].type).toBe("single") // AskUserQuestion
+    expect(items[3].type).toBe("single") // answer
+  })
+
+  test("multiple trailing texts before special tool are all ejected", () => {
+    const msgs = [text("Checking"), tool(), text("Found options"), text("Here are the choices:"), specialTool()]
+    const items = groupMessages(msgs, true)
+
+    // wip-block (narration+tool), 2 texts ejected as singles, special → single
+    expect(items).toHaveLength(4)
+    expect(items[0].type).toBe("wip-block")
+    if (items[0].type === "wip-block") {
+      expect(items[0].steps).toHaveLength(2) // "Checking" + tool
+    }
+    expect(items[1].type).toBe("single") // "Found options"
+    expect(items[2].type).toBe("single") // "Here are the choices:"
+    expect(items[3].type).toBe("single") // special tool
+  })
+
   test("tool-only groups outside narration context use tool-group", () => {
     const msgs = [text("Answer"), tool(), tool()]
     // "Answer" is the last text (answer), then 2 tools follow

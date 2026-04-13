@@ -61,6 +61,12 @@ function findAnswerIndex(messages: HydratedTranscriptMessage[], isLoading: boole
   return -1
 }
 
+function isSpecialToolCall(message: HydratedTranscriptMessage): boolean {
+  if (message.kind !== "tool") return false
+  const toolCall = message as ProcessedToolCall
+  return SPECIAL_TOOL_NAMES.has(toolCall.toolName)
+}
+
 function isWipAbsorbable(message: HydratedTranscriptMessage): boolean {
   return message.kind === "assistant_text" || isCollapsibleToolCall(message)
 }
@@ -85,10 +91,19 @@ export function groupMessages(messages: HydratedTranscriptMessage[], isLoading: 
         index += 1
       }
 
-      if (steps.length >= 2 || isLoading) {
+      // Eject trailing assistant_text when followed by a special tool (AskUserQuestion, ExitPlanMode)
+      // so the rationale/context text renders visibly above the interactive block
+      if (index < messages.length && isSpecialToolCall(messages[index])) {
+        while (steps.length > 0 && steps[steps.length - 1].kind === "assistant_text") {
+          index -= 1
+          steps.pop()
+        }
+      }
+
+      if (steps.length >= 2 || (isLoading && steps.length >= 1)) {
         result.push({ type: "wip-block", steps, startIndex })
-      } else {
-        result.push({ type: "single", message, index: startIndex })
+      } else if (steps.length === 1) {
+        result.push({ type: "single", message: steps[0], index: startIndex })
       }
       continue
     }
