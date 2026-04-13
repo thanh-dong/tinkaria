@@ -544,7 +544,7 @@ function ShortcutController() {
     }
 
     return [
-      { key: "?", alt: true, label: "Show shortcuts", scope: "global", handler: () => setHelpOpen((v) => !v) },
+      { key: "/", alt: true, label: "Show shortcuts", scope: "global", handler: () => setHelpOpen((v) => !v) },
       { key: "n", alt: true, label: "New chat", description: "Same project", scope: "global", handler: createNewChat },
       { key: "ArrowLeft", alt: true, label: "Previous model", scope: "new-chat", handler: () => cycleModel(-1) },
       { key: "ArrowRight", alt: true, label: "Next model", scope: "new-chat", handler: () => cycleModel(1) },
