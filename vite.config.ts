@@ -79,6 +79,9 @@ export default defineConfig({
         target: `ws://${backendTargetHost}:${backendPort}`,
         ws: true,
       },
+      "/api/voice": {
+        target: `http://${backendTargetHost}:${backendPort}`,
+      },
     },
     allowedHosts: getAllowedHosts(),
     watch: {

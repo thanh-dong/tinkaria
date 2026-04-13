@@ -32,6 +32,7 @@ import { WorkflowStore } from "./workflow-store"
 import { WorkflowEngine } from "./workflow-engine"
 import { initVapid, PushSubscriptionStore, createPushRouter, sendPushToAll } from "./push-notifications"
 import { BunDockerClient, SandboxManager } from "./sandbox-manager"
+import { createVoiceRouter } from "./voice-routes"
 
 export interface StartServerOptions {
   port?: number
@@ -269,6 +270,7 @@ export async function startServer(options: StartServerOptions = {}) {
   const pushStore = new PushSubscriptionStore(path.join(store.dataDir, "push-subscriptions.json"))
   await pushStore.load()
   const pushRouter = createPushRouter(pushStore)
+  const voiceRouter = createVoiceRouter(authToken)
 
   const natsConnector = await NatsConnector.connect({
     natsUrl: daemonInfo.url,
@@ -532,6 +534,10 @@ export async function startServer(options: StartServerOptions = {}) {
 
           if (url.pathname.startsWith("/api/push/")) {
             return pushRouter(req)
+          }
+
+          if (url.pathname.startsWith("/api/voice/")) {
+            return voiceRouter(req)
           }
 
           return serveStatic(distDir, url.pathname)
