@@ -327,13 +327,10 @@ export function ChatNavbar({
           ) : null}
         </div>
 
-        {/* Center: session title — background pill on mobile for readability */}
+        {/* Center: session title — desktop only (mobile moves to row 2) */}
         {chatTitle ? (
           <div
-            className={cn(
-              "flex min-w-0 flex-1 items-center gap-1.5 px-1",
-              "max-md:rounded-full max-md:bg-background/80 max-md:border max-md:border-border/60 max-md:px-2.5 max-md:py-1.5 max-md:backdrop-blur-xl max-md:shadow-sm"
-            )}
+            className="hidden md:flex min-w-0 flex-1 items-center gap-1.5 px-1"
             data-testid="session-summary"
             data-status={chatStatus ?? "idle"}
           >
@@ -347,7 +344,7 @@ export function ChatNavbar({
           </div>
         ) : null}
 
-        {/* Right pill: compact repo + context bar — hidden on mobile */}
+        {/* Right pill: compact repo + context bar — desktop only */}
         <div className="hidden md:flex min-w-0 flex-1 justify-end">
           {hasRightContent ? (
             <div className="flex min-w-0 max-w-full items-center gap-2 rounded-full border border-border/80 bg-background/78 px-2.5 py-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
@@ -367,6 +364,23 @@ export function ChatNavbar({
         </div>
       </div>
 
+      {/* Mobile row 2: session title */}
+      {chatTitle ? (
+        <div
+          className="md:hidden flex items-center gap-1.5 w-full px-1 mt-1"
+          data-testid="mobile-title-row"
+        >
+          <span className={cn("size-2 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
+          <span
+            className="truncate text-xs leading-none text-muted-foreground"
+            title={chatTitle}
+          >
+            {chatTitle}
+          </span>
+        </div>
+      ) : null}
+
+      {/* Mobile row 3: dir(branch) + context bar */}
       {hasRightContent ? (
         <div
           className="md:hidden flex items-center justify-between gap-2 w-full px-1 mt-1"

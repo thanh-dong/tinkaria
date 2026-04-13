@@ -426,7 +426,7 @@ describe("ChatNavbar", () => {
     expect(html).toContain('title="A very long session title that will be truncated"')
   })
 
-  test("session title has background on mobile for visibility", () => {
+  test("session title renders in dedicated mobile row", () => {
     const html = renderNavbar({
       sidebarCollapsed: false,
       ...defaultProps,
@@ -434,9 +434,9 @@ describe("ChatNavbar", () => {
       chatStatus: "idle",
     })
 
-    const summaryElement = htmlElementForMarker(html, 'data-testid="session-summary"')
-    expect(summaryElement).toContain("max-md:bg-")
-    expect(summaryElement).toContain("max-md:backdrop-blur")
+    expect(html).toContain('data-testid="mobile-title-row"')
+    const mobileTitle = htmlElementForMarker(html, 'data-testid="mobile-title-row"')
+    expect(mobileTitle).toContain("md:hidden")
   })
 
   test("model indicator is always visible (not hidden on mobile)", () => {
