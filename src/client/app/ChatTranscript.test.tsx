@@ -285,6 +285,41 @@ describe("groupMessages", () => {
     expect(items[1].type).toBe("single") // answer
   })
 
+  test("assistant_text immediately followed by special tool terminates (regression: infinite loop)", () => {
+    // Regression for groupMessages: if an assistant_text is the only entry in `steps`
+    // when the eject check encounters a special tool, the old code popped + rewound
+    // `index` → outer loop re-entered the same branch at the same position forever.
+    // Ensure the function terminates and renders both the text and the special tool.
+    const msgs = [text("Here are your options:"), specialTool()]
+    const items = groupMessages(msgs, false)
+    expect(items).toHaveLength(2)
+    expect(items[0].type).toBe("single")
+    if (items[0].type === "single") {
+      expect(items[0].message.kind).toBe("assistant_text")
+    }
+    expect(items[1].type).toBe("single")
+    if (items[1].type === "single") {
+      expect(items[1].message.kind).toBe("tool")
+    }
+  })
+
+  test("assistant_text → special tool → more content terminates and preserves order", () => {
+    // Same as above but with content after the special tool to verify `index` ends
+    // up in the right place.
+    const msgs = [
+      text("Rationale"), specialTool(), text("After answer"),
+      text("More narration"), specialTool(), text("Final answer"),
+    ]
+    const items = groupMessages(msgs, false)
+    // Rationale→single, special→single, (After answer + More narration) ejected from wip,
+    // special→single, Final answer→single (it's the answer)
+    expect(items.length).toBeGreaterThanOrEqual(5)
+    // First two items: rationale text, then special tool
+    expect(items[0].type).toBe("single")
+    expect(items[1].type).toBe("single")
+    if (items[1].type === "single") expect(items[1].message.kind).toBe("tool")
+  })
+
   test("user_prompt resets context — no cross-turn grouping", () => {
     const msgs = [text("Old answer"), userPrompt(), text("Checking"), tool(), text("New answer")]
     const items = groupMessages(msgs, false)
