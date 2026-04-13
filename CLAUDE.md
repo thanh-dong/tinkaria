@@ -32,6 +32,29 @@ File lookup: `c3x lookup <file-or-glob>` maps files/directories to components + 
 - **Logging**: `LOG_PREFIX` constant, `console.warn` for recoverable, never bare `console.error` — `rule-prefixed-logging`
 - **Fallbacks**: Normalize external input, handle ENOENT/SyntaxError, never crash on bad data — `rule-graceful-fallbacks`
 
+## Rich Content in Responses
+
+Tinkaria renders rich content inline in the transcript. Use this for design review, visual verification, and interactive demos during development.
+
+**Supported formats in fenced code blocks:**
+- `` ```html `` — rendered HTML/CSS/JS embeds (interactive mockups, visual comparisons, color swatches)
+- `` ```mermaid `` — rendered diagrams (architecture, flows, sequences)
+- `` ```svg `` — rendered vector graphics
+- `` ```d2 `` — D2 diagrams (source preview)
+- `` ```iframe `` — remote embeds via URL
+
+**When to use:**
+- **UI changes**: render an HTML mockup showing before/after or the new component in isolation — lets the user approve visually before committing
+- **Architecture decisions**: mermaid or d2 diagrams for component relationships, data flow
+- **Design review**: side-by-side comparisons, interactive states (hover, active), responsive breakpoints
+- **Bug verification**: screenshot + annotated HTML mockup showing the fix
+
+**Guidelines:**
+- Keep mockups self-contained (inline styles, no external deps) so they render reliably
+- Use the project's actual color tokens and font stack for fidelity
+- For interactive mockups, add controls (buttons, toggles) so the user can explore states
+- Prefer `` ```html `` over describing layout in words — show, don't tell
+
 ## Dev
 
 ```bash
