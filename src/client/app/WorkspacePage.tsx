@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useOutletContext, useParams } from "react-router-dom"
+import { Bot, FolderGit2, Zap, Box } from "lucide-react"
 import type { AgentConfig } from "../../shared/agent-config-types"
 import { useAgentConfigSubscription } from "./useAgentConfigSubscription"
 import { useRepoSubscription } from "./useRepoSubscription"
@@ -10,8 +11,18 @@ import { AgentConfigPanel } from "../components/coordination/AgentConfigPanel"
 import { RepoPanel } from "../components/coordination/RepoPanel"
 import { WorkflowPanel } from "../components/coordination/WorkflowPanel"
 import { SandboxPanel } from "../components/coordination/SandboxPanel"
+import { SegmentedControl, type SegmentedOption } from "../components/ui/segmented-control"
 import type { AppState } from "./useAppState"
 import { toastCommand } from "../lib/toast"
+
+type WorkspaceTab = "agents" | "repos" | "workflows" | "sandbox"
+
+const TAB_OPTIONS: SegmentedOption<WorkspaceTab>[] = [
+  { value: "agents", label: "Agents", icon: Bot, tooltip: "Agents" },
+  { value: "repos", label: "Repos", icon: FolderGit2, tooltip: "Repos" },
+  { value: "workflows", label: "Workflows", icon: Zap, tooltip: "Workflows" },
+  { value: "sandbox", label: "Sandbox", icon: Box, tooltip: "Sandbox" },
+]
 
 export function WorkspacePage() {
   const { id: workspaceId } = useParams<{ id: string }>()
@@ -129,18 +140,30 @@ export function WorkspacePage() {
     )
   }
 
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("agents")
+
   return (
     <div className="flex-1 flex flex-col min-w-0 relative">
       <PageHeader title={workspaceName ?? "Workspace"} />
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-px bg-border min-h-0 mx-4 mb-4 rounded-lg overflow-hidden border border-border">
-        <div className="bg-background overflow-hidden">
+      <div className="px-4 mb-3">
+        <SegmentedControl
+          value={activeTab}
+          onValueChange={setActiveTab}
+          options={TAB_OPTIONS}
+          size="sm"
+          className="w-full md:w-auto"
+          optionClassName="flex-1 md:flex-initial justify-center"
+        />
+      </div>
+      <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg overflow-hidden border border-border bg-background">
+        {activeTab === "agents" && (
           <AgentConfigPanel
             configs={agentSnap?.configs ?? []}
             onSave={handleSaveAgent}
             onRemove={handleRemoveAgent}
           />
-        </div>
-        <div className="bg-background overflow-hidden">
+        )}
+        {activeTab === "repos" && (
           <RepoPanel
             repos={repoSnap?.repos ?? []}
             onAddRepo={handleAddRepo}
@@ -149,21 +172,21 @@ export function WorkspacePage() {
             onPullRepo={handlePullRepo}
             onPushRepo={handlePushRepo}
           />
-        </div>
-        <div className="bg-background overflow-hidden">
+        )}
+        {activeTab === "workflows" && (
           <WorkflowPanel
             runs={workflowSnap?.runs ?? []}
             activeRunIds={workflowSnap?.activeRunIds ?? []}
             onCancelRun={handleCancelWorkflow}
           />
-        </div>
-        <div className="bg-background overflow-hidden">
+        )}
+        {activeTab === "sandbox" && (
           <SandboxPanel
             snapshot={sandboxSnap}
             onCommand={(cmd) => { void state.socket.command(cmd) }}
             workspaceId={workspaceId}
           />
-        </div>
+        )}
       </div>
     </div>
   )

@@ -112,6 +112,23 @@ describe("SubagentInspectorTranscript", () => {
 
     expect(html).toContain("This session has no transcript yet.")
   })
+
+  test("keeps transcript content inside a bounded scroll shell", () => {
+    const html = renderToStaticMarkup(createElement(SubagentInspectorTranscript, {
+      session: {
+        snapshot: null,
+        messages: [{ kind: "assistant_text", text: "hello", id: "msg-1", timestamp: "2026-04-13T00:00:00Z" }],
+        isLoading: false,
+        error: null,
+      },
+      scrollRef: { current: null },
+      onOpenLocalLink: () => {},
+      onOpenExternalLink: () => false,
+    }))
+
+    expect(html).toContain("flex h-full min-h-0 flex-1 flex-col")
+    expect(html).toContain("min-h-0 flex-1 overflow-y-auto")
+  })
 })
 
 describe("SubagentIndicator", () => {

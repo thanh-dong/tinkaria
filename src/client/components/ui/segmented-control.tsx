@@ -70,7 +70,7 @@ export function SegmentedControl<T extends string>({
             )}
           >
             {iconElement}
-            <span>{option.label}</span>
+            <span className={icon ? "hidden md:inline" : undefined}>{option.label}</span>
           </button>
         )
 

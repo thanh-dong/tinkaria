@@ -255,8 +255,8 @@ export function SubagentInspectorTranscript({
   }
 
   return (
-    <div className="min-h-0 flex-1 rounded-2xl border border-border/70 bg-background/90">
-      <div ref={scrollRef} className="h-full overflow-y-auto px-4 py-4">
+    <div className="flex h-full min-h-0 flex-1 flex-col rounded-2xl border border-border/70 bg-background/90">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <ChatTranscript
           messages={session.messages}
           scrollRef={scrollRef}
@@ -569,7 +569,7 @@ export const SubagentIndicator = memo(function SubagentIndicator({
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 p-4">
+              <div className="flex min-h-0 flex-1 p-4">
                 <SubagentInspectorTranscript
                   session={session}
                   scrollRef={transcriptScrollRef}
