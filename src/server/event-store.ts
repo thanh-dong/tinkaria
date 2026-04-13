@@ -3,7 +3,7 @@ import { homedir } from "node:os"
 import path from "node:path"
 import { getDataDir, LOG_PREFIX } from "../shared/branding"
 import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
-import type { ProviderProfile, ProviderProfileRecord, WorkspaceProfileOverride } from "../shared/profile-types"
+import type { ProviderProfile, WorkspaceProfileOverride } from "../shared/profile-types"
 import type { AgentProvider, TranscriptEntry } from "../shared/types"
 import { STORE_VERSION } from "../shared/types"
 import {
