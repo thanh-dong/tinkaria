@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react"
 import { clampEmbedZoom, useContentViewer } from "./ContentViewerContext"
 
-const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort"])
+const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort", "html"])
 
 export function isEmbedLanguage(language: string | null): boolean {
   return language !== null && EMBED_LANGUAGES.has(language)
@@ -20,6 +20,10 @@ export const EmbedRenderer = memo(function EmbedRenderer({
 }: EmbedRendererProps) {
   if (format === "mermaid") {
     return <MermaidDiagram source={source} />
+  }
+
+  if (format === "html") {
+    return <HtmlEmbed source={source} />
   }
 
   if (format === "svg") {
@@ -186,7 +190,7 @@ function normalizeRemoteEmbedSource(format: string, source: string): string | nu
     }
 
     return url.toString()
-  } catch {
+  } catch (_err: unknown) {
     return null
   }
 }
@@ -220,6 +224,40 @@ function useEmbedState() {
   }
 
   return { mode, zoom, adjustZoom }
+}
+
+function HtmlEmbed({ source }: { source: string }) {
+  const { mode, zoom, adjustZoom } = useEmbedState()
+
+  return (
+    <>
+      {mode === "render" ? (
+        <div
+          onWheel={(event) => {
+            const direction = getEmbedWheelZoomIntent(event)
+            if (!direction) return
+            event.preventDefault()
+            adjustZoom(direction)
+          }}
+          data-embed-zoomable="true"
+          style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
+          className="overflow-hidden rounded-md border border-border/60 bg-background"
+        >
+          <iframe
+            data-html-embed="true"
+            srcDoc={source}
+            title="HTML content"
+            sandbox="allow-scripts"
+            className="block h-[420px] w-full border-0 bg-background"
+          />
+        </div>
+      ) : (
+        <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
+          {source}
+        </pre>
+      )}
+    </>
+  )
 }
 
 function RemoteEmbed({ format, source }: { format: string; source: string }) {
