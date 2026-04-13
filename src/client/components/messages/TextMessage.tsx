@@ -3,7 +3,7 @@ import { Streamdown } from "streamdown"
 import remarkGfm from "remark-gfm"
 import type { ProcessedTextMessage } from "./types"
 import { createMarkdownComponents } from "./shared"
-import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { RichContentBlock } from "../rich-content/RichContentBlock"
 import { EmbedRenderer } from "../rich-content/EmbedRenderer"
 import { remarkRichContentHint } from "../rich-content/remarkRichContentHint"
@@ -21,10 +21,10 @@ function extractDiashortUrls(text: string): string[] {
 }
 
 export const TextMessage = memo(function TextMessage({ message }: Props) {
-  const assistantResponseDescriptor = createUiIdentityDescriptor({
+  const assistantResponseDescriptor = createC3UiIdentityDescriptor({
     id: "message.assistant.response",
     c3ComponentId: "c3-111",
-    c3ComponentLabel: "transcript-surfaces",
+    c3ComponentLabel: "messages",
   })
   const isLong = message.text.length > LONG_MESSAGE_THRESHOLD
   const diashortUrls = extractDiashortUrls(message.text)

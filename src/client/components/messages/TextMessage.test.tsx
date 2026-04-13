@@ -18,6 +18,9 @@ describe("TextMessage", () => {
       <TextMessage message={createMessage("This is **unfinished bold")} />
     )
 
+    expect(html).toContain('data-ui-id="message.assistant.response"')
+    expect(html).toContain('data-ui-c3="c3-111"')
+    expect(html).toContain('data-ui-c3-label="messages"')
     expect(html).toContain('data-streamdown="strong"')
     expect(html).not.toContain("**unfinished bold")
   })
@@ -45,5 +48,4 @@ describe("TextMessage", () => {
 
     expect(html.match(/Embedded Diagram/g)?.length).toBe(1)
   })
-
 })

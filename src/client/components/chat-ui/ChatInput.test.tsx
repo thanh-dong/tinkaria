@@ -55,6 +55,9 @@ describe("ChatInput", () => {
       />
     )
 
+    expect(html).toContain('data-ui-id="chat.composer.area"')
+    expect(html).toContain('data-ui-c3="c3-112"')
+    expect(html).toContain('data-ui-c3-label="chat-input"')
     expect(html).toContain("text-amber-600")
     expect(html).toContain("border-amber-400/30")
     expect(html).not.toContain("transcript.message-list")

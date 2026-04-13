@@ -4,7 +4,12 @@ import { Button } from "../ui/button"
 import { CardHeader } from "../ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
-import { createUiIdentity, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import {
+  createC3UiIdentityDescriptor,
+  createUiIdentity,
+  getUiIdentityAttributeProps,
+  getUiIdentityIdMap,
+} from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import type { AgentProvider, CurrentRepoStatusSnapshot, DiscoveredSessionRuntime, SessionStatus } from "../../../shared/types"
 import { PROVIDER_ICONS, getProviderFromModel } from "../icons/ProviderIcons"
@@ -161,6 +166,39 @@ function getStatusDotClass(status: SessionStatus | undefined): string {
   }
 }
 
+const CHAT_NAVBAR_UI_DESCRIPTORS = {
+  root: createC3UiIdentityDescriptor({
+    id: "chat.navbar",
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
+  area: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.navbar", "area"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
+  forkSessionAction: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.navbar.fork-session", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
+  mergeSessionAction: createC3UiIdentityDescriptor({
+    id: createUiIdentity("chat.navbar.merge-session", "action"),
+    c3ComponentId: "c3-112",
+    c3ComponentLabel: "chat-input",
+  }),
+} as const
+
+const CHAT_NAVBAR_UI_IDENTITIES = getUiIdentityIdMap(CHAT_NAVBAR_UI_DESCRIPTORS)
+
+export function getChatNavbarUiIdentityDescriptors() {
+  return CHAT_NAVBAR_UI_DESCRIPTORS
+}
+
+export function getChatNavbarUiIdentities() {
+  return CHAT_NAVBAR_UI_IDENTITIES
+}
+
 export function ChatNavbar({
   sidebarCollapsed,
   onOpenSidebar,
@@ -177,9 +215,6 @@ export function ChatNavbar({
   runtimeProvider,
 }: Props) {
   const [mobileExpanded, setMobileExpanded] = useState(false)
-  const navbarAreaId = createUiIdentity("chat.navbar", "area")
-  const forkSessionActionId = createUiIdentity("chat.navbar.fork-session", "action")
-  const mergeSessionActionId = createUiIdentity("chat.navbar.merge-session", "action")
   const pathLabel = getPathLabel(localPath, currentRepoStatus)
   const compactRepoLabel = getCompactRepoLabel(pathLabel, currentRepoStatus)
   const contextPercent = currentSessionRuntime?.tokenUsage?.estimatedContextPercent
@@ -191,14 +226,14 @@ export function ChatNavbar({
 
   return (
     <CardHeader
-      {...getUiIdentityAttributeProps("chat.navbar")}
+      {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.root)}
       className={cn(
         "absolute top-0 left-0 right-0 z-10 px-3 pt-3 border-border/0 flex items-center justify-center",
         "bg-gradient-to-b from-background/80 via-background/55 to-transparent"
       )}
     >
       <div
-        {...getUiIdentityAttributeProps(navbarAreaId)}
+        {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.area)}
         className="relative flex items-center gap-2 w-full"
       >
         {/* Left pill: sidebar toggle + fork + model icon */}
@@ -237,7 +272,7 @@ export function ChatNavbar({
             <PanelLeft className="size-4.5" />
           </Button>
           <Button
-            {...getUiIdentityAttributeProps(forkSessionActionId)}
+            {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.forkSessionAction)}
             variant="ghost"
             size="icon"
             className={mobileExpanded ? "inline-flex" : "hidden md:inline-flex"}
@@ -250,7 +285,7 @@ export function ChatNavbar({
             <GitFork className="size-4.5" />
           </Button>
           <Button
-            {...getUiIdentityAttributeProps(mergeSessionActionId)}
+            {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.mergeSessionAction)}
             variant="ghost"
             size="icon"
             className={mobileExpanded ? "inline-flex" : "hidden md:inline-flex"}

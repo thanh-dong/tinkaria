@@ -51,6 +51,8 @@ describe("PresentContentMessage", () => {
     )
 
     expect(html).toContain('data-ui-id="message.present_content.item"')
+    expect(html).toContain('data-ui-c3="c3-106"')
+    expect(html).toContain('data-ui-c3-label="present-content"')
     expect(html).toContain("Framing text")
     expect(html).toContain('data-streamdown="strong"')
     expect(html).toContain("world")

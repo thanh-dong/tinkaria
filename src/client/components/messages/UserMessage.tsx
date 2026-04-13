@@ -2,7 +2,7 @@ import { memo, useCallback, useMemo, useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Check, Copy } from "lucide-react"
-import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import { Button } from "../ui/button"
 import { createMarkdownComponents } from "./shared"
@@ -27,10 +27,10 @@ export function copyUserPromptToClipboard(content: string, clipboard?: Clipboard
 }
 
 export const UserMessage = memo(function UserMessage({ content }: Props) {
-  const userPromptDescriptor = createUiIdentityDescriptor({
+  const userPromptDescriptor = createC3UiIdentityDescriptor({
     id: "message.user.prompt",
     c3ComponentId: "c3-111",
-    c3ComponentLabel: "transcript-surfaces",
+    c3ComponentLabel: "messages",
   })
   const parsed = useMemo(() => parseSkillsFromContent(content), [content])
   const [copied, setCopied] = useState(false)
