@@ -27,7 +27,8 @@ export function LocalProjectsPage() {
         snapshot={state.localProjects}
         startingLocalPath={state.startingLocalPath}
         commandError={state.commandError}
-        onOpenProject={state.handleOpenLocalProject}
+        onOpenProject={state.handleNavigateToProject}
+        onNewChat={state.handleOpenLocalProject}
         onCreateProject={state.handleCreateProject}
         sessionsForProject={(workspaceId) => state.sessionsSnapshots.get(workspaceId)?.sessions ?? []}
         onResumeSession={handleResumeHomepageSession}

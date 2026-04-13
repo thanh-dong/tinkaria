@@ -162,6 +162,7 @@ export interface ChatCommandsReturn {
   // Handlers
   handleCreateChat: (workspaceId: string) => Promise<void>
   handleOpenLocalProject: (localPath: string) => Promise<void>
+  handleNavigateToProject: (localPath: string) => Promise<void>
   handleCreateProject: (project: ProjectRequest) => Promise<void>
   handleCheckForUpdates: (options?: { force?: boolean }) => Promise<void>
   handleInstallUpdate: () => Promise<void>
@@ -346,6 +347,33 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
   async function handleOpenLocalProject(localPath: string) {
     await startChatFromIntent({ kind: "local_path", localPath })
+  }
+
+  async function handleNavigateToProject(localPath: string) {
+    try {
+      setStartingLocalPath(localPath)
+      const result = await socket.command<{ workspaceId: string }>({ type: "project.open", localPath })
+      setProjectSelection((current) => transitionProjectSelection(current, {
+        type: "project.explicitly_selected",
+        workspaceId: result.workspaceId,
+      }))
+      // Navigate to the latest chat if one exists, otherwise to the workspace page
+      const group = sidebarData.workspaceGroups.find(
+        (g) => g.groupKey === result.workspaceId || g.localPath === localPath
+      )
+      const latestChat = group?.chats[0]
+      if (latestChat) {
+        navigate(`/chat/${latestChat.chatId}`)
+      } else {
+        navigate(`/workspace/${result.workspaceId}`)
+      }
+      setSidebarOpen(false)
+      setCommandError(null)
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setStartingLocalPath(null)
+    }
   }
 
   async function handleCreateProject(project: ProjectRequest) {
@@ -942,6 +970,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     // Handlers
     handleCreateChat,
     handleOpenLocalProject,
+    handleNavigateToProject,
     handleCreateProject,
     handleCheckForUpdates,
     handleInstallUpdate,

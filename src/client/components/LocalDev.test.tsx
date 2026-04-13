@@ -181,6 +181,7 @@ describe("LocalDev homepage", () => {
           startingLocalPath={null}
           commandError={null}
           onOpenProject={async () => {}}
+          onNewChat={async () => {}}
           onCreateProject={async () => {}}
           sessionsForProject={(workspaceId) => {
             if (workspaceId === "/workspace/alpha") {
@@ -229,7 +230,7 @@ describe("LocalDev homepage", () => {
     expect(html).toContain("Alpha")
     expect(html).toContain("/workspace/alpha")
     expect(html).toContain("Continue Fix homepage copy")
-    expect(html).toContain("Start Fresh Task")
+    expect(html).toContain("New Chat")
 
     // Preferences footer
     expect(html).toContain('data-ui-id="home.preferences"')
@@ -263,6 +264,7 @@ describe("LocalDev homepage", () => {
           startingLocalPath={null}
           commandError="Can't reach your local Tinkaria server yet. Wait a moment, or start Tinkaria in a terminal on this machine and try again."
           onOpenProject={async () => {}}
+          onNewChat={async () => {}}
           onCreateProject={async () => {}}
         />
       </TooltipProvider>

@@ -78,7 +78,7 @@ export const ExitPlanModeMessage = memo(function ExitPlanModeMessage({ message, 
             variant="ghost"
             size="icon"
             className={cn(
-              "absolute top-2 right-2 z-10 h-8 w-8 rounded-md text-muted-foreground opacity-0 group-hover/plan:opacity-100 transition-opacity",
+              "absolute top-2 right-2 z-10 h-8 w-8 rounded-md text-muted-foreground md:opacity-0 md:group-hover/plan:opacity-100 transition-opacity",
               !copied && "hover:text-foreground",
               copied && "hover:!bg-transparent hover:!border-transparent"
             )}
@@ -88,14 +88,14 @@ export const ExitPlanModeMessage = memo(function ExitPlanModeMessage({ message, 
           </Button>
         )}
         <div className={cn(
-          "!pt-5 !pb-0 px-4 md:py-4.5 md:px-5.5 bg-muted dark:bg-card overflow-scroll no-pre-highlight transition-all",
-          isComplete && !expanded ? "max-h-[min(400px,40vh)] " : "",
-          isComplete ? "hover:!pb-[32px]" : ''
+          "!pt-5 px-4 md:py-4.5 md:px-5.5 bg-muted dark:bg-card overflow-scroll no-pre-highlight transition-all",
+          isComplete && !expanded ? "max-h-[min(400px,40vh)]" : "",
+          isComplete ? "!pb-[40px] md:!pb-0 md:hover:!pb-[32px]" : "!pb-0"
         )}>
           {isComplete && (
             <Button
               variant="ghost"
-              className={`absolute z-10 bottom-2 pr-2.5 !pl-3.5 h-[34px] inline-flex gap-1 text-sm left-[50%] -translate-x-[50%] text-muted-foreground backdrop-blur-sm hover:text-foreground opacity-0 group-hover/plan:opacity-100 transition-all rounded-full border border-border`}
+              className={`absolute z-10 bottom-2 pr-2.5 !pl-3.5 h-[34px] inline-flex gap-1 text-sm left-[50%] -translate-x-[50%] text-muted-foreground backdrop-blur-sm hover:text-foreground md:opacity-0 md:group-hover/plan:opacity-100 transition-all rounded-full border border-border`}
               onClick={() => setExpanded(!expanded)}
             >
               {expanded ? "Show Less" : "Show More"}

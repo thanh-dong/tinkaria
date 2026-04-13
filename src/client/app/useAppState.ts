@@ -112,6 +112,7 @@ export interface AppState {
   scrollToBottom: () => void
   handleCreateChat: (workspaceId: string) => Promise<void>
   handleOpenLocalProject: (localPath: string) => Promise<void>
+  handleNavigateToProject: (localPath: string) => Promise<void>
   handleCreateProject: (project: ProjectRequest) => Promise<void>
   handleCheckForUpdates: (options?: { force?: boolean }) => Promise<void>
   handleInstallUpdate: () => Promise<void>
@@ -484,6 +485,7 @@ export function useAppState(activeChatId: string | null): AppState {
     scrollToBottom,
     handleCreateChat: commands.handleCreateChat,
     handleOpenLocalProject: commands.handleOpenLocalProject,
+    handleNavigateToProject: commands.handleNavigateToProject,
     handleCreateProject: commands.handleCreateProject,
     handleCheckForUpdates: commands.handleCheckForUpdates,
     handleInstallUpdate: commands.handleInstallUpdate,

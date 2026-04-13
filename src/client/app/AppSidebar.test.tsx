@@ -149,6 +149,7 @@ describe("AppSidebar", () => {
             chats: [],
           },
         ],
+        independentWorkspaces: [],
       },
       onMergeSession: () => {},
     })

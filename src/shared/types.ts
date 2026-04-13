@@ -732,3 +732,64 @@ export interface OrchestrationChildNode {
 export interface OrchestrationHierarchySnapshot {
   children: OrchestrationChildNode[]
 }
+
+// ── Voice Input (Speech-to-Text) ──
+
+export type VoiceInputProvider = "openai-whisper" | "browser-native"
+
+export interface VoiceLanguageOption {
+  code: string
+  label: string
+}
+
+export const VOICE_SOURCE_LANGUAGES: VoiceLanguageOption[] = [
+  { code: "auto", label: "Auto-detect" },
+  { code: "vi", label: "Vietnamese" },
+  { code: "en", label: "English" },
+  { code: "zh", label: "Chinese" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "es", label: "Spanish" },
+  { code: "pt", label: "Portuguese" },
+  { code: "th", label: "Thai" },
+  { code: "id", label: "Indonesian" },
+]
+
+export const VOICE_TARGET_LANGUAGES: VoiceLanguageOption[] = [
+  { code: "en", label: "English" },
+  { code: "vi", label: "Vietnamese" },
+  { code: "zh", label: "Chinese" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "es", label: "Spanish" },
+]
+
+export interface VoiceInputConfig {
+  provider: VoiceInputProvider
+  sourceLanguage: string
+  targetLanguage: string
+  autoTranslate: boolean
+}
+
+export const DEFAULT_VOICE_CONFIG: VoiceInputConfig = {
+  provider: "openai-whisper",
+  sourceLanguage: "auto",
+  targetLanguage: "en",
+  autoTranslate: true,
+}
+
+export interface VoiceTranscribeRequest {
+  sourceLanguage: string
+  targetLanguage: string
+  autoTranslate: boolean
+}
+
+export interface VoiceTranscribeResponse {
+  text: string
+  detectedLanguage?: string
+  translated: boolean
+}

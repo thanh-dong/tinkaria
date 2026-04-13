@@ -51,3 +51,8 @@ src-tauri/target/
 # session-local working docs
 docs/superpowers/
 tasks/
+
+# gitnexus
+.gitnexus/
+.gitnexus
+.claude/skills/gitnexus/

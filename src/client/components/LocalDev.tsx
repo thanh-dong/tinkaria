@@ -1,13 +1,13 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { formatRelativeTime } from "../lib/formatters"
 import {
-  BadgePlus,
   Check,
   CodeXml,
   Copy,
   FolderOpen,
   Loader2,
   Plus,
+  SquarePen,
   Sparkles,
   ArrowRight,
 } from "lucide-react"
@@ -38,6 +38,7 @@ interface LocalDevProps {
   startingLocalPath: string | null
   commandError: string | null
   onOpenProject: (localPath: string) => Promise<void>
+  onNewChat: (localPath: string) => Promise<void>
   onCreateProject: (project: { mode: "new" | "existing"; localPath: string; title: string }) => Promise<void>
   sessionsForProject?: (workspaceId: string) => DiscoveredSession[]
   onResumeSession?: (workspaceId: string, session: DiscoveredSession) => Promise<void>
@@ -214,8 +215,8 @@ function getProjectPrimaryLabel(session: DiscoveredSession | null) {
   return `Continue ${truncateLabel(getSessionDisplayTitle(session), 28)}`
 }
 
-function getProjectSecondaryLabel(session: DiscoveredSession | null) {
-  return session ? "Start Fresh Task" : "Start First Task"
+function getProjectSecondaryLabel(_session: DiscoveredSession | null) {
+  return "New Chat"
 }
 
 function getProjectOverviewSummary(
@@ -524,7 +525,7 @@ function ProjectCard({
           onClick={(e) => { e.stopPropagation(); onStartTask() }}
           {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectSecondaryAction)}
         >
-          <Plus className="mr-1 h-3.5 w-3.5" />
+          <SquarePen className="mr-1 h-3.5 w-3.5" />
           {secondaryLabel}
         </Button>
       </div>
@@ -613,7 +614,7 @@ function ProjectOverviewPanel({
             }}
             {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectSecondaryAction)}
           >
-            <BadgePlus className="mr-1.5 h-4 w-4" />
+            <SquarePen className="mr-1.5 h-4 w-4" />
             {secondaryLabel}
           </Button>
         </div>
@@ -629,6 +630,7 @@ export function LocalDev({
   startingLocalPath,
   commandError,
   onOpenProject,
+  onNewChat,
   onCreateProject,
   sessionsForProject,
   onResumeSession,
@@ -819,7 +821,7 @@ export function LocalDev({
                           void onOpenProject(project.localPath)
                         }}
                         onStartTask={() => {
-                          void onOpenProject(project.localPath)
+                          void onNewChat(project.localPath)
                         }}
                       />
                     )
@@ -848,7 +850,7 @@ export function LocalDev({
                       void onOpenProject(selectedProject.localPath)
                     }}
                     onStartTask={() => {
-                      void onOpenProject(selectedProject.localPath)
+                      void onNewChat(selectedProject.localPath)
                     }}
                   />
                 ) : null}
