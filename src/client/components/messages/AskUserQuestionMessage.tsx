@@ -152,7 +152,11 @@ function OptionRow({
       <Button
         variant="ghost"
         onClick={onClick}
-        className={cn(baseClasses, borderClass, "transition-all cursor-pointer h-auto w-full justify-start rounded-none")}
+        className={cn(
+          baseClasses,
+          borderClass,
+          "transition-all cursor-pointer h-auto w-full justify-start rounded-none border-x-0 border-t-0"
+        )}
         {...getUiIdentityAttributeProps(ASK_USER_OPTION_ACTION_DESCRIPTOR)}
       >
         <div className="flex items-center gap-3">

@@ -5,11 +5,14 @@ import type { ProcessedToolCall } from "./types"
 
 function createMessage(): Extract<ProcessedToolCall, { toolKind: "ask_user_question" }> {
   return {
+    kind: "tool",
+    hidden: false,
+    id: "tool-message-1",
+    messageId: undefined,
+    timestamp: "2026-04-13T00:00:00.000Z",
+    toolId: "tool-ask-1",
     toolKind: "ask_user_question",
-    toolId: "toolu_ask",
-    title: "Ask user",
-    isExpanded: true,
-    hasResult: false,
+    toolName: "AskUserQuestion",
     input: {
       questions: [
         {
@@ -18,13 +21,12 @@ function createMessage(): Extract<ProcessedToolCall, { toolKind: "ask_user_quest
           options: [
             {
               label: "A very long option label that should wrap onto multiple lines instead of truncating midway through the sentence",
-              description: "A matching long description should also stay readable rather than being clipped after a couple of lines."
-            }
-          ]
-        }
-      ]
+              description: "A matching long description should also stay readable rather than being clipped after a couple of lines.",
+            },
+          ],
+        },
+      ],
     },
-    result: undefined
   }
 }
 
@@ -34,7 +36,7 @@ describe("AskUserQuestionMessage", () => {
       <AskUserQuestionMessage
         message={createMessage()}
         onSubmit={() => {}}
-        isLatest={true}
+        isLatest
       />
     )
 
@@ -49,12 +51,27 @@ describe("AskUserQuestionMessage", () => {
       <AskUserQuestionMessage
         message={createMessage()}
         onSubmit={() => {}}
-        isLatest={true}
+        isLatest
       />
     )
 
     expect(html).toContain("border-0")
     expect(html).toContain("rounded-none")
     expect(html).toContain("focus-visible:ring-0")
+  })
+
+  test("renders action options with only the intended bottom separator border", () => {
+    const html = renderToStaticMarkup(
+      <AskUserQuestionMessage
+        message={createMessage()}
+        onSubmit={() => {}}
+        isLatest
+      />
+    )
+
+    expect(html).toContain('data-ui-id="message.ask-user.option.action"')
+    expect(html).toContain("border-b")
+    expect(html).toContain("border-x-0")
+    expect(html).toContain("border-t-0")
   })
 })
