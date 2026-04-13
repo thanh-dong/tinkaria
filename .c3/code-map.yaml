@@ -1,0 +1,203 @@
+c3-101:
+  - src/client/app/App.tsx
+  - src/client/components/branding/*.tsx
+  - src/client/hooks/useIsStandalone.ts
+  - src/client/lib/*.ts
+  - src/main.tsx
+c3-102:
+  - src/client/stores/*.ts
+c3-103:
+  - src/client/hooks/useTheme.tsx
+  - src/index.css
+c3-104:
+  - src/client/components/ui/*.tsx
+c3-106:
+  - src/client/app/TinkariaTranscript.tsx
+  - src/client/components/messages/PresentContentMessage.test.tsx
+  - src/client/components/messages/PresentContentMessage.tsx
+  - src/client/lib/parseTranscript.test.ts
+  - src/client/lib/parseTranscript.ts
+  - src/shared/tools.test.ts
+  - src/shared/tools.ts
+  - src/shared/types.ts
+c3-107:
+  - src/client/components/rich-content/**
+c3-108:
+  - src/client/app/App.tsx
+  - src/client/components/ui/UiIdentityOverlay.tsx
+  - src/client/components/ui/context-menu.tsx
+  - src/client/components/ui/dropdown-menu.tsx
+  - src/client/lib/uiIdentityOverlay.ts
+c3-110:
+  - src/client/app/ChatPage.tsx
+  - src/client/app/TinkariaTranscript.tsx
+  - src/client/app/chatFocusPolicy.ts
+  - src/client/app/derived.ts
+  - src/client/app/nats-socket.ts
+  - src/client/app/socket-interface.ts
+  - src/client/app/useStickyChatFocus.ts
+  - src/client/app/useTinkariaState.machine.ts
+  - src/client/app/useTinkariaState.ts
+  - src/client/components/chat-ui/ForkSessionDialog.tsx
+  - src/client/components/chat-ui/MergeSessionDialog.tsx
+  - src/client/components/chat-ui/TerminalPane.tsx
+  - src/client/components/chat-ui/TerminalWorkspace.tsx
+c3-111:
+  - src/client/components/messages/*.ts
+  - src/client/components/messages/*.tsx
+c3-112:
+  - src/client/components/chat-ui/ChatInput.tsx
+  - src/client/components/chat-ui/ChatNavbar.tsx
+  - src/client/components/chat-ui/ChatPreferenceControls.tsx
+  - src/client/components/chat-ui/SkillRibbon.tsx
+  - src/client/components/chat-ui/SubagentIndicator.tsx
+c3-113:
+  - src/client/app/AppSidebar.tsx
+  - src/client/components/chat-ui/SessionPicker.tsx
+  - src/client/components/chat-ui/sidebar/*.tsx
+c3-115:
+  - src/client/app/useRightSidebarToggleAnimation.ts
+  - src/client/components/chat-ui/RightSidebar.tsx
+c3-117:
+  - src/client/app/PageHeader.tsx
+  - src/client/components/HomepagePreferences.tsx
+  - src/client/components/LocalDev.tsx
+  - src/client/components/NewWorkspaceModal.tsx
+c3-201:
+  - src/server/event-store.ts
+  - src/server/events.ts
+c3-203:
+  - bin/kanna
+  - bin/tinkaria
+  - scripts/*.ts
+  - src/server/branding-migration.ts
+  - src/server/cli-runtime.ts
+  - src/server/cli-supervisor.ts
+  - src/server/cli.ts
+  - src/server/external-open.ts
+  - src/server/generate-title.ts
+  - src/server/machine-name.ts
+  - src/server/paths.ts
+  - src/server/quick-response.ts
+  - src/server/restart.ts
+  - src/server/server.ts
+  - src/server/update-manager.ts
+c3-204:
+  - src/shared/branding.ts
+  - src/shared/dev-ports.ts
+  - src/shared/ports.ts
+  - src/shared/protocol.ts
+  - src/shared/tools.ts
+  - src/shared/types.ts
+c3-205:
+  - src/server/nats-auth.ts
+  - src/server/nats-bridge.ts
+  - src/server/nats-publisher.ts
+  - src/server/nats-responders.ts
+  - src/server/nats-streams.ts
+  - src/shared/nats-subjects.ts
+c3-206:
+  - src/server/orchestration.test.ts
+  - src/server/orchestration.ts
+c3-207:
+  - src/server/agent.test.ts
+  - src/server/agent.ts
+c3-208:
+  - src/server/codex-runtime.ts
+  - src/server/local-codex-kit.test.ts
+  - src/server/local-codex-kit.ts
+c3-209:
+  - src/client/components/coordination/**
+c3-210:
+  - src/server/agent.test.ts
+  - src/server/agent.ts
+  - src/server/claude-agent-coordinator.test.ts
+  - src/server/claude-harness.ts
+  - src/server/claude-turn.test.ts
+  - src/server/codex-harness.ts
+  - src/server/codex-turn.test.ts
+  - src/server/harness-types.ts
+c3-211:
+  - src/server/provider-catalog.ts
+c3-213:
+  - src/server/discovery.ts
+c3-214:
+  - src/server/read-models.ts
+c3-215:
+  - src/server/share.ts
+c3-216:
+  - src/server/codex-app-server-protocol.ts
+  - src/server/codex-app-server.ts
+c3-217:
+  - src/server/session-discovery.ts
+c3-222:
+  - bin/tinkaria-project
+ref-project-context:
+  - .agents/skills/shadcn/**
+  - .claude/skills/release/**
+  - .claude/skills/review-pr/**
+  - .claude/skills/shadcn
+  - .github/workflows/publish.yml
+  - .gitignore
+  - CHANGELOG.md
+  - CLAUDE.md
+  - LICENSE
+  - README.md
+  - assets/**
+  - bun.lock
+  - docs/**
+  - index.html
+  - package.json
+  - postcss.config.js
+  - public/**
+  - skills-lock.json
+  - tasks/**
+  - tsconfig.json
+  - vite.config.ts
+ref-ref-event-sourcing:
+  - src/server/event-store.ts
+  - src/server/events.ts
+ref-ref-provider-abstraction:
+  - src/server/provider-catalog.ts
+  - src/shared/types.ts
+ref-ref-radix-primitives:
+  - src/client/components/ui/*.tsx
+ref-ref-tailwind-theming:
+  - src/index.css
+  - tailwind.config.js
+ref-ref-websocket-protocol:
+  - src/client/app/nats-socket.ts
+  - src/client/app/socket-interface.ts
+  - src/server/nats-bridge.ts
+  - src/server/nats-publisher.ts
+  - src/server/nats-responders.ts
+  - src/shared/nats-subjects.ts
+  - src/shared/protocol.ts
+ref-ref-zustand-stores:
+  - src/client/stores/*.ts
+rule-bun-test-conventions:
+  - src/**/*.test.ts
+  - src/**/*.test.tsx
+rule-error-extraction:
+  - src/client/**/*.ts
+  - src/client/**/*.tsx
+  - src/server/**/*.ts
+rule-graceful-fallbacks:
+  - src/server/cli-runtime.ts
+  - src/server/event-store.ts
+  - src/server/nats-publisher.ts,src/server/nats-bridge.ts
+  - src/server/terminal-manager.ts
+rule-prefixed-logging:
+  - src/client/app/useKannaState.ts
+  - src/server/**/*.ts
+  - src/shared/branding.ts
+rule-rule-bun-runtime:
+  - src/server/**/*.ts
+rule-rule-strict-typescript:
+  - src/**/*.ts
+  - src/**/*.tsx
+rule-type-guards:
+  - src/server/provider-catalog.ts
+  - src/server/terminal-manager.ts
+  - src/shared/protocol.ts
+  - src/shared/types.ts

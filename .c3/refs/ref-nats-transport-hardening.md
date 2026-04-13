@@ -1,0 +1,99 @@
+---
+id: ref-nats-transport-hardening
+c3-seal: d7d89d10920783220cfd99c030645fece19bdacc4bced18603028e5f3f1b7278
+title: NATS transport hardening
+type: ref
+goal: Keep the NATS WebSocket transport (browser → Bun proxy → embedded NATS, and runner → NATS) stable under real-world Cloudflare tunnel latency, survive reconnect storms, and stay observable so regressions show up in logs rather than user reports.
+---
+
+## Goal
+
+Keep the NATS WebSocket transport (browser → Bun `/nats-ws` proxy → embedded NATS, and runner → NATS TCP) stable under real-world Cloudflare tunnel latency variance (1.3–4s WS handshake), survive reconnect storms, and stay observable so regressions show up in logs rather than user reports.
+
+## Choice
+
+Every actor that opens a NATS connection in this codebase follows eight disciplines:
+
+1. **Upstream readiness guard.** Never call `WebSocket.send()` on a socket in `CONNECTING` state. The Bun `/nats-ws` proxy buffers client frames in `ws.data.buffer` until `upstream.onopen` fires, then drains synchronously in-order before returning.
+2. **Bounded buffer, oldest-drop.** `NATS_WS_PROXY_BUFFER_LIMIT = 256` frames. On overflow the OLDEST frame is shifted off (newest survives) so the NATS protocol state machine sees the most recent negotiation. Drops log once per overflow burst, not per frame.
+3. **Single-attempt discovery.** Exactly one `wsconnect` in flight per `discoverAndConnect` call. Sequential fallback (direct URL → catch → proxy URL). No `Promise.race` probe, no AbortController gymnastics.
+4. **Explicit close on reset.** `resetConnection` is `async`, awaits `nc.close()` before nulling `this.nc`/`this.js`, and guards re-entrance with a `resetting` flag. No bare `this.nc = null`.
+5. **Monitor-loop capture.** `monitorStatus` binds `const nc = this.nc; const js = this.js` at entry, iterates `nc.status()`, passes those captured locals into `activateSubscription`, and `break`s when `this.nc !== nc`. Only the monitor whose `nc` still matches `this.nc` schedules the next reconnect.
+6. **Shared reconnect options.** Every NATS actor uses `{ maxReconnectAttempts: -1, reconnectTimeWait: 750, pingInterval: 15_000, maxPingOut: 3 }`. No actor relies on library defaults. Named constant where possible (runner uses `RUNNER_RECONNECT_OPTIONS`).
+7. **Observable proxy.** `/nats-ws` proxy maintains counters: `upgrades`, `upstreamOpen`, `upstreamError`, `upstreamClose`, `sendOnConnecting`, `bufferedFrames`, `bufferDrops`. A `setInterval(60_000)` flushes them to `console.warn(LOG_PREFIX, ...)`, skips when all counters are zero, and resets after each flush so each log line is a self-contained 1-minute delta.
+8. **Drain with timeout, fall back to close.** Shutdown paths race `nc.drain()` against a 3s timeout and fall back to `nc.close()` on expiry. `shutdownConnection` in `runner-nats.ts` is the canonical helper.
+## Why
+
+Concrete runtime constraints make each discipline non-optional:
+
+- **Cloudflare tunnel WS handshake latency is 1.3–4s with high variance.** Measured in prod: one upstream took **1964 ms** to open in the first minute after the hardening deploy. Any code path that assumes "`new WebSocket(...)` → immediately ready" will misbehave during that window.
+- **Bun WebSocket client follows WHATWG spec.** Calling `.send()` on a socket in `CONNECTING` state throws `InvalidStateError`. Empirically reproduced at `/tmp/final-race-demo.ts` before the hardening ADR. This was the root cause of the original "connection seems unstable" report.
+- **`Promise.race` cannot cancel an in-flight `wsconnect`.** The outer promise resolves/rejects on the timer, but the underlying `wsconnect` keeps running. When it eventually resolves, it reassigns `this.nc` — possibly on top of the fallback proxy connection. Two live connections, one orphaned, both leaking subscriptions.
+- **`this.nc = null` does not close the underlying WebSocket.** Without an explicit `close()`, the NATS status iterator keeps firing, callbacks keep mutating `this.*` on a zombie connection, and the WS stays alive until GC (minutes later).
+- **`monitorStatus` closure reads `this.nc` at call time.** If a successor connect reassigns `this.nc` during a reconnect event, `reactivateSubscriptionsAfterReconnect` will bind subscriptions to the NEW connection instead of the one the monitor was started on. Subscriptions then get double-activated on the successor plus whatever its own monitor does.
+- **NATS library default reconnect is NOT what we want.** `@nats-io/nats-core` defaults to `maxReconnectAttempts: 10`, `reconnectTimeWait: 2000`, `pingInterval: 120_000` — that gives us 20 seconds of reconnect attempts before giving up, and a 2-minute ping interval that is oblivious to CF tunnel transients. Every actor must be explicit.
+- **The runner is a long-lived independent process.** Without explicit reconnect options it crashes on any brief NATS blip and relies on systemd to respawn it, losing registered KV state and active turn context. It must survive the same transport-class failures the browser client does.
+- **Silent `onerror`/`onclose` is diagnostic blindness.** Before this hardening, `journalctl --user -u tinkaria` had zero log lines for the WS lifecycle. We could not tell whether users were reconnecting once an hour or once a second. A counter flush is cheap and gives us ground truth.
+- **Unbounded buffering would OOM on stuck upstream.** A slow or dead upstream plus a chatty client means the buffer grows without bound. 256 frames is enough to survive a 4s CF spike at typical NATS pacing; overflow means something is actually wrong and losing the OLDEST frame preserves the most-recent protocol state.
+## How
+
+Code locations — cite by identifier so line numbers can drift:
+
+- **`createNatsWsProxyHandlers` in `src/server/server.ts`** — the buffered `/nats-ws` proxy factory. `open` constructs the upstream but does NOT mark `ready` until `upstream.onopen`. `message` checks `ready && upstream.readyState === OPEN` before forwarding; otherwise pushes to `ws.data.buffer` and enforces the `NATS_WS_PROXY_BUFFER_LIMIT`. `onopen` drains the buffer synchronously before returning. `close` clears the buffer and closes upstream. The orphan-open guard in `onopen` (`if (ws.data.closed) upstream.close()`) handles the case where the outer client disconnects during the upstream handshake.
+**`createNatsWsProxyHandlers` in `src/server/server.ts`** — the buffered `/nats-ws` proxy factory. `open` constructs the upstream but does NOT mark `ready` until `upstream.onopen`. `message` checks `ready && upstream.readyState === OPEN` before forwarding; otherwise pushes to `ws.data.buffer` and enforces the `NATS_WS_PROXY_BUFFER_LIMIT`. `onopen` drains the buffer synchronously before returning. `close` clears the buffer and closes upstream. The orphan-open guard in `onopen` (`if (ws.data.closed) upstream.close()`) handles the case where the outer client disconnects during the upstream handshake.
+
+- **`discoverAndConnect` + `connect` in `src/client/app/nats-socket.ts`** — HTTPS always goes through the proxy URL (mixed-content blocks ws:// direct). HTTP tries the advertised direct URL sequentially via try/catch, falling through to the proxy. `probeConnection` does not exist. Exactly one `wsconnect` per call path.
+**`discoverAndConnect` + `connect` in `src/client/app/nats-socket.ts`** — HTTPS always goes through the proxy URL (mixed-content blocks ws:// direct). HTTP tries the advertised direct URL sequentially via try/catch, falling through to the proxy. `probeConnection` does not exist. Exactly one `wsconnect` per call path.
+
+- **`resetConnection` in `src/client/app/nats-socket.ts`** — `async`, guarded by `this.resetting`. Captures the current `nc` into a local, nulls `this.nc`/`this.js`, then `await nc.close().catch(() => {})`. Callers (`scheduleReconnect`, `reconnectNow`) await the reset before starting the next discovery.
+**`resetConnection` in `src/client/app/nats-socket.ts`** — `async`, guarded by `this.resetting`. Captures the current `nc` into a local, nulls `this.nc`/`this.js`, then `await nc.close().catch(() => {})`. Callers (`scheduleReconnect`, `reconnectNow`) await the reset before starting the next discovery.
+
+- **`monitorStatus` in `src/client/app/nats-socket.ts`** — captures `nc`/`js` as locals, iterates `nc.status()`, routes reactivation through the captured `nc`, exits the loop on `this.nc !== nc`. Only the matching monitor schedules the next reconnect.
+**`monitorStatus` in `src/client/app/nats-socket.ts`** — captures `nc`/`js` as locals, iterates `nc.status()`, routes reactivation through the captured `nc`, exits the loop on `this.nc !== nc`. Only the matching monitor schedules the next reconnect.
+
+- **`connectRunner` + `RUNNER_RECONNECT_OPTIONS` + `shutdownConnection` in `src/runner/runner-nats.ts`** — dependency-injectable wrapper around `@nats-io/transport-node`'s `connect`. Applies the shared reconnect options. `shutdownConnection` races `nc.drain()` against a 3s timeout and falls back to `nc.close()`. Callers: `src/runner/runner.ts`.
+**`connectRunner` + `RUNNER_RECONNECT_OPTIONS` + `shutdownConnection` in `src/runner/runner-nats.ts`** — dependency-injectable wrapper around `@nats-io/transport-node`'s `connect`. Applies the shared reconnect options. `shutdownConnection` races `nc.drain()` against a 3s timeout and falls back to `nc.close()`. Callers: `src/runner/runner.ts`.
+
+- **Counter flush in `src/server/server.ts`** — `setInterval(60_000)` logs `JSON.stringify(natsWsCounters)` only when `Object.values(counters).some(v => v > 0)`, then resets all fields. Cleared in `shutdown`.
+**Counter flush in `src/server/server.ts`** — `setInterval(60_000)` logs `JSON.stringify(natsWsCounters)` only when `Object.values(counters).some(v => v > 0)`, then resets all fields. Cleared in `shutdown`.
+
+Shared reconnect options (keep identical across actors):
+
+```ts
+{ maxReconnectAttempts: -1, reconnectTimeWait: 750, pingInterval: 15_000, maxPingOut: 3 }
+```
+Compliance gate — answer YES to all three before claiming this ref is honored:
+
+1. Does every `WebSocket.send()` on an upstream-style socket sit behind a `readyState === OPEN` check, or is the frame buffered until `onopen`?
+2. Does every NATS connection pass the shared reconnect options explicitly (no reliance on library defaults)?
+3. Does every async iterator over `nc.status()` capture `nc`/`js` as locals and exit on connection swap?
+## Not This
+
+- **Probe-with-timeout** (`Promise.race([wsconnect(url), timer])`) — cannot cancel the in-flight `wsconnect`; leaks orphan connections and produces double-open races. Deleted in this ADR.
+- **Synchronous `ws.data.upstream?.send(message)` without readyState check** — throws `InvalidStateError` during CONNECTING (1-4s window through CF tunnel). The original `/nats-ws` proxy shipped this bug.
+- **`this.nc = null` without `await nc.close()`** — orphaned WebSocket stays alive, status iterator keeps firing, `monitorStatus` keeps mutating state on a zombie.
+- **Calling `this.activateSubscription` from inside `monitorStatus`** — reads `this.nc` at call time, binds subscriptions to whatever the current successor connection is, not the one the monitor was started on.
+- **Relying on NATS library default reconnect settings** — different transports (`@nats-io/nats-core` vs `@nats-io/transport-node`) have different defaults and neither matches our operational needs.
+- **`nc.drain()` without timeout in shutdown** — drain waits for in-flight operations that may never settle if the upstream is dead; the process hangs until systemd kills it.
+- **Unbounded `ws.data.buffer`** — a stuck upstream plus a chatty client would grow the array without bound and eventually OOM the server.
+- **Silent `onerror = () => ws.close()`, `onclose = () => ws.close()`** — diagnostic blindness. If users report "it reconnects all the time" we cannot confirm or deny without client-side screen captures.
+- **Dropping NEWEST frame on buffer overflow** — the NATS protocol state machine depends on ordering and the most recent handshake frame (CONNECT, SUB, UNSUB) is the one that actually matters. Drop OLDEST so the newest negotiation always reaches the server.
+## Scope
+
+Applies to every actor in this repo that opens a NATS connection:
+
+- **`src/client/app/nats-socket.ts`** (browser client via `wsconnect`) — all eight disciplines
+- **`src/server/server.ts` `/nats-ws` proxy handlers + counters** — disciplines 1, 2, 7 (buffer, bounded, counters) apply to the proxy path; disciplines 6, 8 apply via `nats-bridge.ts` / `nats-connector.ts` for the server's own connection to the embedded NATS
+- **`src/server/nats-bridge.ts`** / **`src/server/nats-connector.ts`** — disciplines 6 (shared reconnect options) and 8 (drain with timeout)
+- **`src/runner/runner-nats.ts` + `src/runner/runner.ts`** — disciplines 6, 8 via `connectRunner` and `shutdownConnection`
+Future: any new actor that opens a NATS connection — TCP or WebSocket — MUST adopt the shared reconnect options. Any new actor acting as a WS proxy MUST adopt the upstream readiness guard and bounded buffer.
+
+## Override
+
+Deviations require an ADR that:
+
+- Names the specific discipline being overridden
+- States the failure mode being accepted (e.g., "this path is only exercised in unit tests, never in prod")
+- Points to a test or measurement that bounds the override's blast radius
+- Cites `ref-nats-transport-hardening` in its `affects` list
+Overrides are expected to be rare. The last time one of these disciplines was relaxed silently, it produced the bug chain documented in `adr-20260410-nats-reliability-sweep`.
