@@ -30,6 +30,17 @@ function createMessage(): Extract<ProcessedToolCall, { toolKind: "ask_user_quest
   }
 }
 
+function createCompletedMessage(): Extract<ProcessedToolCall, { toolKind: "ask_user_question" }> {
+  return {
+    ...createMessage(),
+    result: {
+      answers: {
+        delivery_method: ["Ship by courier"],
+      },
+    },
+  }
+}
+
 describe("AskUserQuestionMessage", () => {
   test("renders option labels and descriptions without truncation classes", () => {
     const html = renderToStaticMarkup(
@@ -85,5 +96,24 @@ describe("AskUserQuestionMessage", () => {
     expect(html).toContain("border-b")
     expect(html).toContain("border-x-0")
     expect(html).toContain("border-t-0")
+  })
+
+  test("renders completed questions as stacked question and answer blocks without legacy header labels", () => {
+    const html = renderToStaticMarkup(
+      <AskUserQuestionMessage
+        message={createCompletedMessage()}
+        onSubmit={() => {}}
+        isLatest
+      />
+    )
+
+    expect(html).toContain("<dl")
+    expect(html).toContain("<dt")
+    expect(html).toContain("<dd")
+    expect(html).toContain(">Question<")
+    expect(html).toContain(">Answer<")
+    expect(html).toContain("Ship by courier")
+    expect(html).not.toContain(">Questions<")
+    expect(html).not.toContain(">Answers<")
   })
 })
