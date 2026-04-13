@@ -815,7 +815,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                 disabled={disabled}
                 className="flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
               />
-              {voiceEnabled ? (
+              {voiceEnabled && voice.isAvailable ? (
                 <Button
                   type="button"
                   aria-label={voice.status === "recording" ? "Stop recording" : "Start voice input"}
@@ -943,7 +943,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
           setComposerPlanMode={setComposerPlanMode}
           resetComposerFromProvider={resetComposerFromProvider}
         />
-        <VoiceSettings />
+        <VoiceSettings isAvailable={voice.isAvailable} />
         <div className="min-w-3"/>
       </div>
     </div>

@@ -44,7 +44,7 @@ function LanguageSelect({
   )
 }
 
-function VoiceSettingsInner() {
+function VoiceSettingsInner({ isAvailable }: { isAvailable: boolean | null }) {
   const sourceLanguage = useVoiceInputStore((s) => s.sourceLanguage)
   const targetLanguage = useVoiceInputStore((s) => s.targetLanguage)
   const autoTranslate = useVoiceInputStore((s) => s.autoTranslate)
@@ -53,6 +53,8 @@ function VoiceSettingsInner() {
   const setTargetLanguage = useVoiceInputStore((s) => s.setTargetLanguage)
   const setAutoTranslate = useVoiceInputStore((s) => s.setAutoTranslate)
   const setEnabled = useVoiceInputStore((s) => s.setEnabled)
+
+  if (isAvailable === false) return null
 
   const sourceLabel = VOICE_SOURCE_LANGUAGES.find((l) => l.code === sourceLanguage)?.label ?? sourceLanguage
   const targetLabel = VOICE_TARGET_LANGUAGES.find((l) => l.code === targetLanguage)?.label ?? targetLanguage
