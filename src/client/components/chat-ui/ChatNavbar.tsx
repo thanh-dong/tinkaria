@@ -1,7 +1,6 @@
 import { useState } from "react"
-import { GitFork, Merge, MoreHorizontal, PanelLeft, X } from "lucide-react"
+import { GitFork, Merge, PanelLeft } from "lucide-react"
 import { Button } from "../ui/button"
-import { CardHeader } from "../ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import {
@@ -230,7 +229,6 @@ export function ChatNavbar({
   runtimeModel,
   runtimeProvider,
 }: Props) {
-  const [mobileExpanded, setMobileExpanded] = useState(false)
   const pathLabel = getPathLabel(localPath, currentRepoStatus)
   const compactRepoLabel = getCompactRepoLabel(pathLabel, currentRepoStatus)
   const contextPercent = currentSessionRuntime?.tokenUsage?.estimatedContextPercent
@@ -238,103 +236,82 @@ export function ChatNavbar({
   const provider = modelName ? getProviderFromModel(modelName) : (runtimeProvider ?? null)
   const ProviderIcon = provider ? PROVIDER_ICONS[provider] : null
 
-  const hasRightContent = Boolean(compactRepoLabel || contextPercent !== undefined)
-
   return (
-    <CardHeader
+    <div
       {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.root)}
-      className={cn(
-        "absolute top-0 left-0 right-0 z-10 px-3 pt-3 border-border/0 flex items-center justify-center",
-        "bg-gradient-to-b from-background/80 via-background/55 to-transparent"
-      )}
+      className="flex items-center gap-1.5 px-2 py-1.5 border-b border-border/40 bg-background flex-shrink-0"
     >
       <div
         {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.area)}
-        className="relative flex items-center gap-2 w-full"
+        className="flex items-center gap-1.5 w-full min-w-0"
       >
-        {/* Left pill: sidebar toggle + fork + model icon */}
-        <div className="flex items-center gap-1 flex-shrink-0 rounded-full border border-border/80 bg-background/78 p-1 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setMobileExpanded((v) => !v)}
-            data-testid="mobile-navbar-toggle"
-            title={mobileExpanded ? "Collapse actions" : "Show actions"}
-          >
-            {mobileExpanded ? <X className="size-4.5" /> : <MoreHorizontal className="size-4.5" />}
-          </Button>
-          {mobileExpanded ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => {
-                setMobileExpanded(false)
-                onOpenSidebar()
-              }}
-              title="Open sidebar"
-            >
-              <PanelLeft className="size-4.5" />
-            </Button>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden md:inline-flex"
-            onClick={sidebarCollapsed ? onExpandSidebar : onCollapseSidebar}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <PanelLeft className="size-4.5" />
-          </Button>
-          <Button
-            {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.forkSessionAction)}
-            variant="ghost"
-            size="icon"
-            className={mobileExpanded ? "inline-flex" : "hidden md:inline-flex"}
-            onClick={() => {
-              setMobileExpanded(false)
-              onForkSession()
-            }}
-            title="Fork session"
-          >
-            <GitFork className="size-4.5" />
-          </Button>
-          <Button
-            {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.mergeSessionAction)}
-            variant="ghost"
-            size="icon"
-            className={mobileExpanded ? "inline-flex" : "hidden md:inline-flex"}
-            onClick={() => {
-              setMobileExpanded(false)
-              onMergeSession()
-            }}
-            title="Merge sessions"
-          >
-            <Merge className="size-4.5" />
-          </Button>
-          {ProviderIcon && modelName ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center justify-center size-8 rounded-full text-muted-foreground" data-testid="model-indicator">
-                  <ProviderIcon className="size-3.5" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8}>
-                {modelName}
-              </TooltipContent>
-            </Tooltip>
-          ) : null}
-        </div>
+        {/* Sidebar toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden size-7"
+          onClick={onOpenSidebar}
+          title="Open sidebar"
+        >
+          <PanelLeft className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden md:inline-flex size-7"
+          onClick={sidebarCollapsed ? onExpandSidebar : onCollapseSidebar}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <PanelLeft className="size-4" />
+        </Button>
 
-        {/* Center: session title — desktop only (mobile moves to row 2) */}
+        {/* Fork / Merge */}
+        <Button
+          {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.forkSessionAction)}
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          onClick={onForkSession}
+          title="Fork session"
+        >
+          <GitFork className="size-3.5" />
+        </Button>
+        <Button
+          {...getUiIdentityAttributeProps(CHAT_NAVBAR_UI_DESCRIPTORS.mergeSessionAction)}
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          onClick={onMergeSession}
+          title="Merge sessions"
+        >
+          <Merge className="size-3.5" />
+        </Button>
+
+        {/* Provider icon */}
+        {ProviderIcon && modelName ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center justify-center size-7 text-muted-foreground" data-testid="model-indicator">
+                <ProviderIcon className="size-3.5" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8}>
+              {modelName}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+
+        {/* Separator */}
+        {chatTitle ? <div className="w-px h-3.5 bg-border/60 shrink-0" /> : null}
+
+        {/* Status dot + title */}
         {chatTitle ? (
           <div
-            className="hidden md:flex min-w-0 flex-1 items-center gap-1.5 px-1"
+            className="flex items-center gap-1.5 min-w-0 flex-1"
             data-testid="session-summary"
             data-status={chatStatus ?? "idle"}
           >
-            <span className={cn("size-2 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
+            <span className={cn("size-1.5 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
             <span
               className="truncate text-xs leading-none text-muted-foreground"
               title={chatTitle}
@@ -342,73 +319,21 @@ export function ChatNavbar({
               {chatTitle}
             </span>
           </div>
+        ) : <div className="flex-1" />}
+
+        {/* Repo label + context bar */}
+        {compactRepoLabel ? (
+          <RepoDetailPopover
+            localPath={localPath}
+            repoStatus={currentRepoStatus}
+            compactLabel={compactRepoLabel}
+          />
         ) : null}
 
-        {/* Right pill: compact repo + context bar — desktop only */}
-        <div className="hidden md:flex min-w-0 flex-1 justify-end">
-          {hasRightContent ? (
-            <div className="flex min-w-0 max-w-full items-center gap-2 rounded-full border border-border/80 bg-background/78 px-2.5 py-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-              {compactRepoLabel ? (
-                <RepoDetailPopover
-                  localPath={localPath}
-                  repoStatus={currentRepoStatus}
-                  compactLabel={compactRepoLabel}
-                />
-              ) : null}
-
-              {contextPercent !== undefined ? (
-                <ContextBar percent={contextPercent} testId="context-bar" />
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+        {contextPercent !== undefined ? (
+          <ContextBar percent={contextPercent} testId="context-bar" />
+        ) : null}
       </div>
-
-      {/* Mobile combined strip: provider + title + stats — transparent, frosted on touch */}
-      {(chatTitle || hasRightContent) ? (
-        <div
-          className={cn(
-            "md:hidden flex items-center gap-2 w-full min-w-0 px-2 py-1 mt-1 rounded-full",
-            "transition-all duration-200",
-            "bg-transparent",
-            "active:bg-background/80 active:backdrop-blur-xl active:border-border/60 active:shadow-sm",
-            "[&:hover]:bg-background/80 [&:hover]:backdrop-blur-xl [&:hover]:border-border/60 [&:hover]:shadow-sm",
-            "border border-transparent"
-          )}
-          data-testid="mobile-info-strip"
-        >
-          {ProviderIcon && modelName ? (
-            <div className="shrink-0 text-muted-foreground" data-testid="mobile-provider-icon">
-              <ProviderIcon className="size-3.5" />
-            </div>
-          ) : null}
-
-          {chatTitle ? (
-            <div
-              className="flex items-center gap-1.5 min-w-0 flex-1"
-              data-testid="mobile-title-row"
-            >
-              <span className={cn("size-2 shrink-0 rounded-full", getStatusDotClass(chatStatus))} />
-              <span
-                className="truncate text-xs leading-none text-muted-foreground"
-                title={chatTitle}
-              >
-                {chatTitle}
-              </span>
-            </div>
-          ) : <div className="flex-1" />}
-
-          {compactRepoLabel ? (
-            <span className="shrink-0 truncate text-xs leading-none text-muted-foreground" data-testid="mobile-repo-label">
-              {compactRepoLabel}
-            </span>
-          ) : null}
-
-          {contextPercent !== undefined ? (
-            <ContextBar percent={contextPercent} />
-          ) : null}
-        </div>
-      ) : null}
-    </CardHeader>
+    </div>
   )
 }

@@ -39,7 +39,7 @@ import { useEventCallback } from "../hooks/useEventCallback"
 
 const EMPTY_STATE_TEXT = "What are we building?"
 const EMPTY_STATE_TYPING_INTERVAL_MS = 19
-const CHAT_NAVBAR_OFFSET_PX = 72
+// Navbar is now a flow element — no offset constant needed
 const SCROLL_BUTTON_BASE_BOTTOM_PX = 120
 const SCROLL_BUTTON_SKILLS_RIBBON_OFFSET_PX = 52
 const MOBILE_SIDEBAR_SWIPE_EDGE_FRACTION = 1 / 3
@@ -627,15 +627,15 @@ export function ChatPage() {
           onMerge={state.handleMergeSession}
         />
 
-        <div className="flex-1 min-h-0" {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.transcript)}>
+        <div className="flex-1 min-h-0 relative" {...getUiIdentityAttributeProps(CHAT_PAGE_UI_DESCRIPTORS.transcript)}>
           <ScrollArea
             ref={state.scrollRef}
-            className="h-full px-4 scroll-pt-[72px]"
+            className="h-full px-4"
           >
             {transcriptVisibility !== "transcript" ? <div style={{ height: effectiveTranscriptPaddingBottom }} aria-hidden="true" /> : null}
             {transcriptVisibility === "transcript" ? (
               <TranscriptActionsContext.Provider value={transcriptActions}>
-                <div className="animate-fade-in space-y-5 pt-[72px] max-w-[800px] mx-auto">
+                <div className="animate-fade-in space-y-5 pt-4 max-w-[800px] mx-auto">
                   <ChatTranscript
                     messages={state.messages}
                     scrollRef={state.scrollRef}
@@ -678,31 +678,24 @@ export function ChatPage() {
             ) : null}
             {transcriptVisibility !== "transcript" ? <TranscriptTailBoundary hasMessages={false} sentinelRef={state.sentinelRef} /> : null}
           </ScrollArea>
-        </div>
 
-        {transcriptVisibility === "loading" ? (
-          <div
-            className="pointer-events-none absolute inset-x-4 animate-fade-in"
-            style={{
-              top: CHAT_NAVBAR_OFFSET_PX,
-              bottom: effectiveTranscriptPaddingBottom,
-            }}
-          >
-            <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
+          {transcriptVisibility === "loading" ? (
+            <div
+              className="pointer-events-none absolute inset-0 px-4 animate-fade-in"
+              style={{ bottom: effectiveTranscriptPaddingBottom }}
+            >
+              <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {transcriptVisibility === "empty" ? (
-          <div
-            key={state.activeChatId ?? "new-chat"}
-            className="pointer-events-none absolute inset-x-4 animate-fade-in"
-            style={{
-              top: CHAT_NAVBAR_OFFSET_PX,
-              bottom: effectiveTranscriptPaddingBottom,
-            }}
-          >
+          {transcriptVisibility === "empty" ? (
+            <div
+              key={state.activeChatId ?? "new-chat"}
+              className="pointer-events-none absolute inset-0 px-4 animate-fade-in"
+              style={{ bottom: effectiveTranscriptPaddingBottom }}
+            >
             <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
               <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 opacity-70">
                 {state.pendingSessionBootstrap?.chatId === state.activeChatId ? (
@@ -802,6 +795,7 @@ export function ChatPage() {
             </div>
           </div>
         ) : null}
+        </div>
 
         <div
           style={{ bottom: effectiveScrollButtonBottomPx }}
