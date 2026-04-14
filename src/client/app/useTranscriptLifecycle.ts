@@ -80,6 +80,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
   const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
   const [messages, setMessages] = useState<HydratedTranscriptMessage[]>([])
   const messagesRef = useRef<HydratedTranscriptMessage[]>(messages)
+  const messagesChatIdRef = useRef<string | null>(null)
   const messageCountRef = useRef(0)
   const [chatSnapshot, setChatSnapshot] = useState<ChatSnapshot | null>(null)
   const [orchestrationHierarchy, setOrchestrationHierarchy] = useState<OrchestrationHierarchySnapshot | null>(null)
@@ -97,10 +98,14 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       setProjectSelection((current) => transitionProjectSelection(current, { type: "chat.cleared" }))
       // Don't mutate cached hydrator — create a fresh one
       hydratorRef.current = createIncrementalHydrator()
+      messagesChatIdRef.current = null
       setMessages([])
       setChatReady(true)
       return
     }
+
+    setChatSnapshot(null)
+    setOrchestrationHierarchy(null)
 
     // Restore from cache or create fresh state
     const cached = getCachedChat(activeChatId)
@@ -115,15 +120,25 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
         cachedDiagnostics: summarizeTranscriptWindow(cached.messages),
         stale: cached.stale,
       })
+      messagesChatIdRef.current = activeChatId
+      messageCountRef.current = cached.messageCount
       setMessages(cached.messages)
-      setChatSnapshot(null) // will be replaced when snapshot arrives
       setChatReady(true)    // show stale content immediately
     } else {
-      setChatSnapshot(null)
-      if (shouldPreserveMessagesOnResubscribe({ hasExistingMessages: messagesRef.current.length > 0, restoredFromCache: false })) {
-        log("re-subscribing to chat (keeping stale messages)", { activeChatId })
+      if (shouldPreserveMessagesOnResubscribe({
+        hasExistingMessages: messagesRef.current.length > 0,
+        restoredFromCache: false,
+        currentMessagesChatId: messagesChatIdRef.current,
+        nextChatId: activeChatId,
+      })) {
+        log("re-subscribing to active chat (keeping messages)", { activeChatId })
       } else {
-        log("subscribing to chat (no cache)", { activeChatId })
+        log("subscribing to chat (no cache)", {
+          activeChatId,
+          previousMessagesChatId: messagesChatIdRef.current,
+        })
+        messagesChatIdRef.current = null
+        messageCountRef.current = 0
         setMessages([])
         setChatReady(false)
       }
@@ -149,6 +164,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       }
       for (const entry of allEntries) hydrator.hydrate(entry)
       const hydratedMessages = hydrator.getMessages()
+      messagesChatIdRef.current = chatId
       setMessages(hydratedMessages)
       log("transcript tail flushed", {
         chatId,
@@ -296,6 +312,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
             pendingRaf = requestAnimationFrame(() => {
               pendingRaf = null
               if (!cancelled) {
+                messagesChatIdRef.current = chatId
                 setMessages(hydrator.getMessages())
               }
             })
@@ -333,7 +350,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
       const departingSidebarChat = sidebarData.workspaceGroups
         .flatMap((g) => g.chats)
         .find((c) => c.chatId === chatId)
-      if (chatId && messagesRef.current.length > 0) {
+      if (chatId && messagesChatIdRef.current === chatId && messagesRef.current.length > 0) {
         setCachedChat(chatId, {
           hydrator,
           messages: messagesRef.current,

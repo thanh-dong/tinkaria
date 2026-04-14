@@ -276,15 +276,30 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
 
   async function createChatForProject(workspaceId: string) {
     useChatPreferencesStore.getState().initializeComposerForNewChat()
-    const result = await socket.command<{ chatId: string }>({ type: "chat.create", workspaceId })
+    const optimisticChatId = crypto.randomUUID()
     setProjectSelection((current) => transitionProjectSelection(current, {
       type: "project.explicitly_selected",
       workspaceId,
     }))
-    setPendingChatId(result.chatId)
-    navigate(`/chat/${result.chatId}`)
+    setPendingChatId(optimisticChatId)
+    navigate(`/chat/${optimisticChatId}`)
     setSidebarOpen(false)
-    setCommandError(null)
+    try {
+      const result = await socket.command<{ chatId: string }>({
+        type: "chat.create",
+        workspaceId,
+        chatId: optimisticChatId,
+      })
+      if (result.chatId !== optimisticChatId) {
+        setPendingChatId(result.chatId)
+        navigate(`/chat/${result.chatId}`, { replace: true })
+      }
+      setCommandError(null)
+    } catch (error) {
+      setPendingChatId(null)
+      navigate(activeChatId ? `/chat/${activeChatId}` : "/")
+      throw error
+    }
   }
 
   async function resolveProjectIdForStartChat(intent: StartChatIntent): Promise<{ workspaceId: string; localPath?: string }> {

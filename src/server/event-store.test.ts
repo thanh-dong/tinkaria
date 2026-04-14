@@ -200,6 +200,20 @@ describe("EventStore", () => {
     })
   })
 
+  test("createChat preserves a client-supplied chat id and reuses it idempotently", async () => {
+    const dataDir = await createTempDataDir()
+    const store = new EventStore(dataDir)
+    await store.initialize()
+
+    const project = await store.openProject("/tmp/project")
+    const first = await store.createChat(project.id, undefined, "chat-optimistic-1")
+    const second = await store.createChat(project.id, undefined, "chat-optimistic-1")
+
+    expect(first.id).toBe("chat-optimistic-1")
+    expect(second.id).toBe("chat-optimistic-1")
+    expect(store.listChatsByProject(project.id)).toHaveLength(1)
+  })
+
   test("appends new transcript entries only to the per-chat transcript file", async () => {
     const dataDir = await createTempDataDir()
     const store = new EventStore(dataDir)

@@ -314,7 +314,7 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         return readLocalFilePreview(command.localPath)
 
       case "chat.create": {
-        const chat = await store.createChat(command.workspaceId, command.repoId)
+        const chat = await store.createChat(command.workspaceId, command.repoId, command.chatId)
         return { chatId: chat.id }
       }
 

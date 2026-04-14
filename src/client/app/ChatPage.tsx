@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { AlertCircle, ArrowDown, Loader2 } from "lucide-react"
 import { useLocation, useNavigate, useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
@@ -681,7 +681,7 @@ export function ChatPage() {
 
           {transcriptVisibility === "loading" ? (
             <div
-              className="pointer-events-none absolute inset-0 px-4 animate-fade-in"
+              className="pointer-events-none absolute inset-0 px-4"
               style={{ bottom: effectiveTranscriptPaddingBottom }}
             >
               <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
@@ -692,8 +692,7 @@ export function ChatPage() {
 
           {transcriptVisibility === "empty" ? (
             <div
-              key={state.activeChatId ?? "new-chat"}
-              className="pointer-events-none absolute inset-0 px-4 animate-fade-in"
+              className="pointer-events-none absolute inset-0 px-4"
               style={{ bottom: effectiveTranscriptPaddingBottom }}
             >
             <div className="mx-auto flex h-full max-w-[800px] items-center justify-center">
@@ -763,31 +762,7 @@ export function ChatPage() {
                       className="text-base font-normal text-muted-foreground text-center max-w-xs flex items-center tinkaria-empty-state-text"
                       aria-label={EMPTY_STATE_TEXT}
                     >
-                      <span className="relative inline-grid place-items-start">
-                        <span className="invisible col-start-1 row-start-1 whitespace-pre flex items-center">
-                          <span>{EMPTY_STATE_TEXT}</span>
-                          <span className="tinkaria-typewriter-cursor-slot" aria-hidden="true" />
-                        </span>
-                        <span className="col-start-1 row-start-1 whitespace-pre flex items-center">
-                          <span
-                            className="tinkaria-typewriter-text"
-                            style={{
-                              "--tinkaria-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
-                              "--tinkaria-typewriter-steps": EMPTY_STATE_TEXT.length,
-                            } as CSSProperties}
-                          >
-                            {EMPTY_STATE_TEXT}
-                          </span>
-                          <span className="tinkaria-typewriter-cursor-slot" aria-hidden="true">
-                            <span
-                              className="tinkaria-typewriter-cursor"
-                              style={{
-                                "--tinkaria-typewriter-duration-ms": `${getEmptyStateTypingDurationMs(EMPTY_STATE_TEXT)}ms`,
-                              } as CSSProperties}
-                            />
-                          </span>
-                        </span>
-                      </span>
+                      <span className="whitespace-pre">{EMPTY_STATE_TEXT}</span>
                     </div>
                   </>
                 )}

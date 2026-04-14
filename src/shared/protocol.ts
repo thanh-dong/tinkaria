@@ -54,7 +54,7 @@ export type ClientCommand =
       type: "system.readLocalFilePreview"
       localPath: string
     }
-  | { type: "chat.create"; workspaceId: string; repoId?: string }
+  | { type: "chat.create"; workspaceId: string; repoId?: string; chatId?: string }
   | { type: "chat.rename"; chatId: string; title: string }
   | { type: "chat.delete"; chatId: string }
   | { type: "chat.markRead"; chatId: string }

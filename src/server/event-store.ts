@@ -948,23 +948,30 @@ export class EventStore {
     return [...this.state.independentWorkspacesById.values()]
   }
 
-  async createChat(workspaceId: string, repoId?: string) {
+  async createChat(workspaceId: string, repoId?: string, chatId?: string) {
     const project = this.state.workspacesById.get(workspaceId)
     if (!project || project.deletedAt) {
       throw new Error("Project not found")
     }
-    const chatId = crypto.randomUUID()
+    const nextChatId = chatId ?? crypto.randomUUID()
+    const existing = this.state.chatsById.get(nextChatId)
+    if (existing && !existing.deletedAt) {
+      if (existing.workspaceId !== workspaceId) {
+        throw new Error("Chat already exists for another project")
+      }
+      return existing
+    }
     const event: ChatEvent = {
       v: STORE_VERSION,
       type: "chat_created",
       timestamp: Date.now(),
-      chatId,
+      chatId: nextChatId,
       workspaceId,
       title: "New Chat",
       ...(repoId ? { repoId } : {}),
     }
     await this.append(this.chatsLogPath, event)
-    return this.state.chatsById.get(chatId)!
+    return this.state.chatsById.get(nextChatId)!
   }
 
   async renameChat(chatId: string, title: string) {

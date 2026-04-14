@@ -431,6 +431,35 @@ describe("nats-responders", () => {
     expect(changed).toBe(true)
   })
 
+  test("chat.create forwards a client-supplied optimistic chatId", async () => {
+    let seenWorkspaceId: string | null = null
+    let seenChatId: string | null = null
+    const { clientNc } = await setup({
+      store: {
+        ...createMockStore(),
+        createChat: async (workspaceId: string, _repoId?: string, chatId?: string) => {
+          seenWorkspaceId = workspaceId
+          seenChatId = chatId ?? null
+          return { id: chatId ?? "chat-1", workspaceId }
+        },
+      } as never,
+    })
+
+    const res = await sendCommand(clientNc, {
+      type: "chat.create",
+      workspaceId: "proj-1",
+      chatId: "chat-optimistic-1",
+    })
+
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual({ chatId: "chat-optimistic-1" })
+    if (seenWorkspaceId === null || seenChatId === null) {
+      throw new Error("expected chat.create to forward the optimistic identifiers")
+    }
+    expect(String(seenWorkspaceId)).toBe("proj-1")
+    expect(String(seenChatId)).toBe("chat-optimistic-1")
+  })
+
   test("chat.rename triggers onStateChange", async () => {
     let changed = false
     const { clientNc } = await setup({ onStateChange: () => { changed = true } })

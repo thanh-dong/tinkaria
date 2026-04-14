@@ -502,6 +502,11 @@ export function prependQueuedText(flushedText: string, queuedText: string): stri
 export function shouldPreserveMessagesOnResubscribe(args: {
   hasExistingMessages: boolean
   restoredFromCache: boolean
+  currentMessagesChatId: string | null
+  nextChatId: string | null
 }): boolean {
-  return args.hasExistingMessages && !args.restoredFromCache
+  return args.hasExistingMessages
+    && !args.restoredFromCache
+    && args.currentMessagesChatId !== null
+    && args.currentMessagesChatId === args.nextChatId
 }

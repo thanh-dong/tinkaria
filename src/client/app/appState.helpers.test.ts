@@ -401,16 +401,38 @@ describe("normalizeSessionBootstrapErrorMessage", () => {
 })
 
 describe("shouldPreserveMessagesOnResubscribe", () => {
-  test("preserves messages when existing messages and not from cache", () => {
-    expect(shouldPreserveMessagesOnResubscribe({ hasExistingMessages: true, restoredFromCache: false })).toBe(true)
+  test("preserves messages only when they already belong to the active chat", () => {
+    expect(shouldPreserveMessagesOnResubscribe({
+      hasExistingMessages: true,
+      restoredFromCache: false,
+      currentMessagesChatId: "chat-1",
+      nextChatId: "chat-1",
+    })).toBe(true)
   })
 
-  test("does not preserve when no existing messages", () => {
-    expect(shouldPreserveMessagesOnResubscribe({ hasExistingMessages: false, restoredFromCache: false })).toBe(false)
+  test("does not preserve when the next chat differs from the current transcript owner", () => {
+    expect(shouldPreserveMessagesOnResubscribe({
+      hasExistingMessages: true,
+      restoredFromCache: false,
+      currentMessagesChatId: "chat-old",
+      nextChatId: "chat-new",
+    })).toBe(false)
   })
 
-  test("does not preserve when restored from cache (cache path handles its own logic)", () => {
-    expect(shouldPreserveMessagesOnResubscribe({ hasExistingMessages: true, restoredFromCache: true })).toBe(false)
+  test("does not preserve when no existing messages or cache already restored", () => {
+    expect(shouldPreserveMessagesOnResubscribe({
+      hasExistingMessages: false,
+      restoredFromCache: false,
+      currentMessagesChatId: "chat-1",
+      nextChatId: "chat-1",
+    })).toBe(false)
+
+    expect(shouldPreserveMessagesOnResubscribe({
+      hasExistingMessages: true,
+      restoredFromCache: true,
+      currentMessagesChatId: "chat-1",
+      nextChatId: "chat-1",
+    })).toBe(false)
   })
 })
 

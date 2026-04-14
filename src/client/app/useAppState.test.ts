@@ -22,6 +22,7 @@ import {
   summarizeSessionBootstrapIntent,
   summarizeTranscriptWindow,
   shouldBackfillTranscriptWindow,
+  shouldPreserveMessagesOnResubscribe,
   shouldRefreshStaleSessionOnResume,
   shouldStickToBottomOnComposerSubmit,
   PWA_RESUME_STALE_AFTER_MS,
@@ -167,6 +168,42 @@ describe("shouldRefreshStaleSessionOnResume", () => {
       hiddenAt: 100,
       resumedAt: 100 + PWA_RESUME_STALE_AFTER_MS - 1,
       connectionStatus: "connected",
+    })).toBe(false)
+  })
+})
+
+describe("shouldPreserveMessagesOnResubscribe", () => {
+  test("preserves messages only when they already belong to the active chat", () => {
+    expect(shouldPreserveMessagesOnResubscribe({
+      hasExistingMessages: true,
+      restoredFromCache: false,
+      currentMessagesChatId: "chat-1",
+      nextChatId: "chat-1",
+    })).toBe(true)
+  })
+
+  test("does not carry a previous chat transcript into a different uncached chat", () => {
+    expect(shouldPreserveMessagesOnResubscribe({
+      hasExistingMessages: true,
+      restoredFromCache: false,
+      currentMessagesChatId: "chat-old",
+      nextChatId: "chat-new",
+    })).toBe(false)
+  })
+
+  test("returns false when there are no live messages or cache already restored", () => {
+    expect(shouldPreserveMessagesOnResubscribe({
+      hasExistingMessages: false,
+      restoredFromCache: false,
+      currentMessagesChatId: "chat-1",
+      nextChatId: "chat-1",
+    })).toBe(false)
+
+    expect(shouldPreserveMessagesOnResubscribe({
+      hasExistingMessages: true,
+      restoredFromCache: true,
+      currentMessagesChatId: "chat-1",
+      nextChatId: "chat-1",
     })).toBe(false)
   })
 })
