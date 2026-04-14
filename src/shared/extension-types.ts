@@ -31,3 +31,15 @@ export interface DetectionResult {
   icon: string
   detected: boolean
 }
+
+/** Persisted user preference for an extension (level 3 of the hierarchy) */
+export interface ExtensionPreference {
+  extensionId: string
+  enabled: boolean
+  updatedAt: number
+}
+
+/** Snapshot published to subscribers of extension-preferences topic */
+export interface ExtensionPreferencesSnapshot {
+  preferences: ExtensionPreference[]
+}

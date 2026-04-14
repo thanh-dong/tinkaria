@@ -17,6 +17,7 @@ export type SubscriptionTopic =
   | { type: "sandbox-status"; workspaceId: string }
   | { type: "runtime-status" }
   | { type: "profiles" }
+  | { type: "extension-preferences" }
 
 export interface TerminalSnapshot {
   terminalId: string
@@ -127,3 +128,5 @@ export type ClientCommand =
   | { type: "profile.resolve"; workspaceId: string; profileId: string }
   | { type: "workspace.profile.override.set"; workspaceId: string; profileId: string; overrides: Partial<Omit<import("./profile-types").ProviderProfile, "id" | "provider">> }
   | { type: "workspace.profile.override.remove"; workspaceId: string; profileId: string }
+  | { type: "extension.preference.set"; extensionId: string; enabled: boolean }
+  | { type: "extension.preference.list" }
