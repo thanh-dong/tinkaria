@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react"
-import { Outlet, Route, Routes, useLocation } from "react-router-dom"
+import { Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom"
 import { SettingsPage } from "./SettingsPage"
 import {
   buildUiIdentityStack,
@@ -36,7 +36,7 @@ import { useEventCallback } from "../hooks/useEventCallback"
 import { useShortcuts, type ShortcutRegistration } from "../hooks/useShortcuts"
 import { ShortcutHelpOverlay } from "../components/ui/ShortcutHelpOverlay"
 import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
-import { PROVIDERS } from "../../shared/types"
+import { PROVIDERS, type AgentProvider, type SidebarChatRow } from "../../shared/types"
 
 const UI_IDENTITY_OVERLAY_COPY_DURATION_MS = 1200
 const UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS = 320
@@ -486,21 +486,53 @@ function AppLayout() {
   )
 }
 
-function getNextModel(provider: "claude" | "codex", currentModel: string, direction: 1 | -1): string {
-  const catalog = PROVIDERS.find((p) => p.id === provider)
-  if (!catalog) return currentModel
-  const models = catalog.models
-  const currentIndex = models.findIndex((m) => m.id === currentModel)
-  if (currentIndex === -1) return currentModel
-  const nextIndex = (currentIndex + direction + models.length) % models.length
-  return models[nextIndex].id
+export function getNextProvider(currentProvider: AgentProvider, direction: 1 | -1): AgentProvider {
+  const currentIndex = PROVIDERS.findIndex((provider) => provider.id === currentProvider)
+  if (currentIndex === -1) return currentProvider
+  const nextIndex = (currentIndex + direction + PROVIDERS.length) % PROVIDERS.length
+  return PROVIDERS[nextIndex].id
+}
+
+export function getAdjacentUnreadChatId(
+  chats: SidebarChatRow[],
+  activeChatId: string | null,
+  direction: 1 | -1,
+): string | null {
+  if (chats.length === 0) return null
+
+  const activeIndex = activeChatId === null
+    ? (direction === 1 ? -1 : chats.length)
+    : chats.findIndex((chat) => chat.chatId === activeChatId)
+  const startIndex = activeIndex === -1
+    ? (direction === 1 ? -1 : chats.length)
+    : activeIndex
+
+  if (direction === 1) {
+    const nextUnread = chats.find((chat, index) => index > startIndex && chat.unread)
+    return nextUnread?.chatId ?? chats.find((chat) => chat.unread)?.chatId ?? null
+  }
+
+  for (let index = startIndex - 1; index >= 0; index -= 1) {
+    if (chats[index].unread) {
+      return chats[index].chatId
+    }
+  }
+
+  for (let index = chats.length - 1; index >= 0; index -= 1) {
+    if (chats[index].unread) {
+      return chats[index].chatId
+    }
+  }
+
+  return null
 }
 
 function ShortcutController() {
   const state = useContext(AppStateContext)
+  const navigate = useNavigate()
   const [helpOpen, setHelpOpen] = useState(false)
   const composerState = useChatPreferencesStore((s) => s.composerState)
-  const setComposerModel = useChatPreferencesStore((s) => s.setComposerModel)
+  const resetComposerFromProvider = useChatPreferencesStore((s) => s.resetComposerFromProvider)
 
   const isNewChat = state ? !state.chatHasKnownMessages : false
   const activeScope = isNewChat ? "new-chat" as const : "global" as const
@@ -515,18 +547,28 @@ function ShortcutController() {
       }
     }
 
-    const cycleModel = (direction: 1 | -1) => {
-      const nextModel = getNextModel(composerState.provider, composerState.model, direction)
-      setComposerModel(nextModel)
+    const cycleProvider = (direction: 1 | -1) => {
+      const nextProvider = getNextProvider(composerState.provider, direction)
+      resetComposerFromProvider(nextProvider)
+    }
+
+    const moveToUnreadSession = (direction: 1 | -1) => {
+      if (!state) return
+      const allChats = state.sidebarData.workspaceGroups.flatMap((group) => group.chats)
+      const nextChatId = getAdjacentUnreadChatId(allChats, state.activeChatId, direction)
+      if (!nextChatId || nextChatId === state.activeChatId) return
+      navigate(`/chat/${nextChatId}`)
     }
 
     return [
       { key: "/", alt: true, label: "Show shortcuts", scope: "global", handler: () => setHelpOpen((v) => !v) },
       { key: "n", alt: true, label: "New chat", description: "Same project", scope: "global", handler: createNewChat },
-      { key: "ArrowLeft", alt: true, label: "Previous model", scope: "new-chat", handler: () => cycleModel(-1) },
-      { key: "ArrowRight", alt: true, label: "Next model", scope: "new-chat", handler: () => cycleModel(1) },
+      { key: "ArrowLeft", alt: true, label: "Previous provider", scope: "new-chat", handler: () => cycleProvider(-1) },
+      { key: "ArrowRight", alt: true, label: "Next provider", scope: "new-chat", handler: () => cycleProvider(1) },
+      { key: "ArrowUp", alt: true, shift: true, label: "Previous unread session", scope: "global", handler: () => moveToUnreadSession(-1) },
+      { key: "ArrowDown", alt: true, shift: true, label: "Next unread session", scope: "global", handler: () => moveToUnreadSession(1) },
     ]
-  }, [state, composerState.provider, composerState.model, setComposerModel])
+  }, [state, composerState.provider, navigate, resetComposerFromProvider])
 
   const definitions = useShortcuts(registrations, activeScope)
 

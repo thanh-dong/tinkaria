@@ -35,6 +35,12 @@ function ShortcutKeys({ shortcut }: { shortcut: ShortcutDefinition }) {
           <span className="text-muted-foreground text-xs">+</span>
         </>
       )}
+      {shortcut.shift && (
+        <>
+          <kbd className={kbdClass}>Shift</kbd>
+          <span className="text-muted-foreground text-xs">+</span>
+        </>
+      )}
       <kbd className={kbdClass}>{displayKey(shortcut.key)}</kbd>
     </span>
   )
@@ -126,7 +132,7 @@ export function ShortcutHelpOverlay({
                 <div className="space-y-1.5">
                   {items.map((s) => (
                     <div
-                      key={`${s.alt}-${s.key}`}
+                      key={`${s.alt}-${Boolean(s.shift)}-${s.key}`}
                       className="flex items-center justify-between py-1"
                     >
                       <span className="text-sm text-foreground">{s.label}</span>

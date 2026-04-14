@@ -4,7 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server"
 import * as AppModule from "./App"
 import {
   bindUiIdentityOverlayWindowEvents,
+  getAdjacentUnreadChatId,
   getAppLayoutUiIdentityDescriptor,
+  getNextProvider,
   getUiIdentityOverlayAnchorRect,
   getUiIdentityOverlayCopyDurationMs,
   getUiIdentityOverlayHighlightRect,
@@ -17,6 +19,7 @@ import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import { ChatRow } from "../components/chat-ui/sidebar/ChatRow"
 import { LocalProjectsSection } from "../components/chat-ui/sidebar/LocalProjectsSection"
 import { TooltipProvider } from "../components/ui/tooltip"
+import type { SidebarChatRow } from "../../shared/types"
 
 function createOverlayStackElement(args: {
   id: string
@@ -41,6 +44,83 @@ describe("getUiIdentityOverlayCopyDurationMs", () => {
 describe("getUiIdentityOverlayPointerHandoffDelayMs", () => {
   test("uses a short handoff delay before clearing the current target", () => {
     expect(getUiIdentityOverlayPointerHandoffDelayMs()).toBe(320)
+  })
+})
+
+describe("getNextProvider", () => {
+  test("cycles providers in both directions", () => {
+    expect(getNextProvider("claude", 1)).toBe("codex")
+    expect(getNextProvider("codex", 1)).toBe("claude")
+    expect(getNextProvider("claude", -1)).toBe("codex")
+  })
+})
+
+describe("getAdjacentUnreadChatId", () => {
+  const chats: SidebarChatRow[] = [
+    {
+      _id: "chat-1",
+      _creationTime: 1,
+      chatId: "chat-1",
+      title: "Chat 1",
+      status: "idle",
+      unread: false,
+      localPath: "/tmp/project",
+      provider: "claude",
+      hasAutomation: false,
+    },
+    {
+      _id: "chat-2",
+      _creationTime: 2,
+      chatId: "chat-2",
+      title: "Chat 2",
+      status: "idle",
+      unread: true,
+      localPath: "/tmp/project",
+      provider: "codex",
+      hasAutomation: false,
+    },
+    {
+      _id: "chat-3",
+      _creationTime: 3,
+      chatId: "chat-3",
+      title: "Chat 3",
+      status: "idle",
+      unread: false,
+      localPath: "/tmp/project",
+      provider: "claude",
+      hasAutomation: false,
+    },
+    {
+      _id: "chat-4",
+      _creationTime: 4,
+      chatId: "chat-4",
+      title: "Chat 4",
+      status: "idle",
+      unread: true,
+      localPath: "/tmp/project",
+      provider: "claude",
+      hasAutomation: false,
+    },
+  ]
+
+  test("moves to the next unread chat after the active chat", () => {
+    expect(getAdjacentUnreadChatId(chats, "chat-1", 1)).toBe("chat-2")
+    expect(getAdjacentUnreadChatId(chats, "chat-2", 1)).toBe("chat-4")
+  })
+
+  test("wraps unread navigation when moving past the end", () => {
+    expect(getAdjacentUnreadChatId(chats, "chat-4", 1)).toBe("chat-2")
+  })
+
+  test("moves backwards through unread chats and wraps", () => {
+    expect(getAdjacentUnreadChatId(chats, "chat-4", -1)).toBe("chat-2")
+    expect(getAdjacentUnreadChatId(chats, "chat-2", -1)).toBe("chat-4")
+  })
+
+  test("uses list edges when there is no active chat and returns null when none are unread", () => {
+    expect(getAdjacentUnreadChatId(chats, null, 1)).toBe("chat-2")
+    expect(getAdjacentUnreadChatId(chats, null, -1)).toBe("chat-4")
+    expect(getAdjacentUnreadChatId(chats.map((chat) => ({ ...chat, unread: false })), "chat-1", 1)).toBeNull()
   })
 })
 

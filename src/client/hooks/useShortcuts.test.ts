@@ -16,15 +16,15 @@ describe("matchesShortcut", () => {
   }
 
   test("matches when altKey and key match", () => {
-    expect(matchesShortcut({ altKey: true, key: "?" }, shortcut)).toBe(true)
+    expect(matchesShortcut({ altKey: true, shiftKey: false, key: "?" }, shortcut)).toBe(true)
   })
 
   test("does not match when altKey is false", () => {
-    expect(matchesShortcut({ altKey: false, key: "?" }, shortcut)).toBe(false)
+    expect(matchesShortcut({ altKey: false, shiftKey: false, key: "?" }, shortcut)).toBe(false)
   })
 
   test("does not match when key differs", () => {
-    expect(matchesShortcut({ altKey: true, key: "n" }, shortcut)).toBe(false)
+    expect(matchesShortcut({ altKey: true, shiftKey: false, key: "n" }, shortcut)).toBe(false)
   })
 
   test("matches arrow keys", () => {
@@ -34,7 +34,20 @@ describe("matchesShortcut", () => {
       label: "Previous",
       scope: "new-chat",
     }
-    expect(matchesShortcut({ altKey: true, key: "ArrowLeft" }, arrow)).toBe(true)
+    expect(matchesShortcut({ altKey: true, shiftKey: false, key: "ArrowLeft" }, arrow)).toBe(true)
+  })
+
+  test("matches shift-modified shortcuts only when shift state matches", () => {
+    const unread: ShortcutDefinition = {
+      key: "ArrowDown",
+      alt: true,
+      shift: true,
+      label: "Next unread",
+      scope: "global",
+    }
+
+    expect(matchesShortcut({ altKey: true, shiftKey: true, key: "ArrowDown" }, unread)).toBe(true)
+    expect(matchesShortcut({ altKey: true, shiftKey: false, key: "ArrowDown" }, unread)).toBe(false)
   })
 })
 

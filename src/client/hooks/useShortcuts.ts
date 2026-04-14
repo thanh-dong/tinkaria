@@ -5,6 +5,7 @@ export type ShortcutScope = "global" | "new-chat"
 export interface ShortcutDefinition {
   key: string
   alt: boolean
+  shift?: boolean
   label: string
   description?: string
   scope: ShortcutScope
@@ -15,10 +16,12 @@ export interface ShortcutRegistration extends ShortcutDefinition {
 }
 
 export function matchesShortcut(
-  event: Pick<KeyboardEvent, "altKey" | "key">,
+  event: Pick<KeyboardEvent, "altKey" | "key"> & Partial<Pick<KeyboardEvent, "shiftKey">>,
   shortcut: ShortcutDefinition,
 ): boolean {
-  return event.altKey === shortcut.alt && event.key === shortcut.key
+  return event.altKey === shortcut.alt
+    && Boolean(event.shiftKey) === Boolean(shortcut.shift)
+    && event.key === shortcut.key
 }
 
 export function isShortcutActive(shortcut: ShortcutDefinition, activeScope: ShortcutScope): boolean {
