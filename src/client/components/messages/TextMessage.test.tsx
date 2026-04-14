@@ -46,6 +46,43 @@ describe("TextMessage", () => {
       />
     )
 
-    expect(html.match(/Embedded Diagram/g)?.length).toBe(1)
+    expect(html.match(/data-remote-embed="true"/g)?.length).toBe(1)
+  })
+
+  test("auto-upgrades fenced pug blocks into rich embeds", () => {
+    const html = renderToStaticMarkup(
+      <TextMessage
+        message={createMessage("Before\n\n```pug\nmain\n  h1 Hello\n```\n\nAfter")}
+      />
+    )
+
+    expect(html).toContain("Before")
+    expect(html).toContain("After")
+    expect(html).toContain('data-pug-embed="true"')
+    expect(html).toContain(">Pug<")
+    expect(html).toContain("Hello")
+  })
+
+  test("leaves non-pug fenced blocks as normal code blocks", () => {
+    const html = renderToStaticMarkup(
+      <TextMessage
+        message={createMessage("```typescript\nconst x = 1\n```")}
+      />
+    )
+
+    expect(html).not.toContain('data-pug-embed="true"')
+    expect(html).toContain("sh__token--keyword")
+    expect(html).toContain("const")
+  })
+
+  test("renders long assistant responses without the old response card title", () => {
+    const html = renderToStaticMarkup(
+      <TextMessage message={createMessage("x".repeat(801))} />
+    )
+
+    expect(html).toContain('data-ui-id="message.assistant.response"')
+    expect(html).not.toContain(">Response<")
+    expect(html).toContain("group-hover/rich-content:opacity-100")
+    expect(html).toContain("group-focus-within/rich-content:opacity-100")
   })
 })
