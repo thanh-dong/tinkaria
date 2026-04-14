@@ -516,8 +516,6 @@ export interface PresentContentSuccessToolResult {
   kind: "markdown" | "code" | "diagram"
   format: string
   source: string
-  renderedHtml?: string
-  renderError?: string
   summary?: string
   collapsed?: boolean
 }

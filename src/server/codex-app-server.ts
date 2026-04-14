@@ -15,8 +15,6 @@ import type {
 import { getWebContextPrompt } from "../shared/web-context"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
 import { normalizeToolCall } from "../shared/tools"
-import { normalizePresentContentFormat } from "../shared/presentContent"
-import { renderPugPreview } from "./pug-preview"
 import { z, type ZodIssue } from "zod"
 import {
   type CollabAgentToolCallItem,
@@ -323,7 +321,7 @@ function dynamicToolDefinitions(args: StartCodexTurnArgs): DynamicToolDefinition
           kind: { type: "string", enum: ["markdown", "code", "diagram"] },
           format: {
             type: "string",
-            description: "Content format such as markdown, typescript, mermaid, svg, html, pug, iframe, or diashort.",
+            description: "Content format such as markdown, typescript, mermaid, svg, html, iframe, or diashort.",
           },
           source: { type: "string" },
           summary: { type: "string" },
@@ -441,27 +439,10 @@ function presentContentToolCall(toolId: string, input: Record<string, unknown>):
 function enrichPresentContentResult(
   value: z.infer<typeof presentContentSchema>
 ): PresentContentSuccessToolResult {
-  const format = normalizePresentContentFormat(value.format)
-  const result: PresentContentSuccessToolResult = {
+  return {
     accepted: true,
     ...value,
-    format,
   }
-
-  if (format !== "pug") {
-    return result
-  }
-
-  const preview = renderPugPreview(value.source)
-
-  if (preview.html) {
-    result.renderedHtml = preview.html
-  }
-  if (preview.error) {
-    result.renderError = preview.error
-  }
-
-  return result
 }
 
 function orchestrationToolCall(toolId: string, toolName: string, input: Record<string, unknown>): TranscriptEntry {

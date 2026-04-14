@@ -28,8 +28,6 @@ describe("getWebContextPrompt", () => {
       expect(prompt).toContain("rich-content cards")
       expect(prompt).toContain("collapse/expand, copy, and opening the content in a larger overlay viewer")
       expect(prompt).toContain("`html` for rendered embeds")
-      expect(prompt).toContain("`pug`/`pugjs` for compiled template embeds")
-      expect(prompt).toContain("Tailwind v4 browser runtime available by default")
       expect(prompt).toContain("`d2` for source-only previews")
       expect(prompt).toContain("table of contents")
       expect(prompt).toContain("render/source toggle and zoom controls")

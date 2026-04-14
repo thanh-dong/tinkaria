@@ -49,31 +49,6 @@ describe("TextMessage", () => {
     expect(html.match(/data-remote-embed="true"/g)?.length).toBe(1)
   })
 
-  test("auto-upgrades fenced pug blocks into rich embeds", () => {
-    const html = renderToStaticMarkup(
-      <TextMessage
-        message={createMessage("Before\n\n```pug\nmain\n  h1 Hello\n```\n\nAfter")}
-      />
-    )
-
-    expect(html).toContain("Before")
-    expect(html).toContain("After")
-    expect(html).toContain(">Pug<")
-    expect(html).toContain("Rendering Pug preview...")
-    expect(html).toContain("main")
-  })
-
-  test("leaves non-pug fenced blocks as normal code blocks", () => {
-    const html = renderToStaticMarkup(
-      <TextMessage
-        message={createMessage("```typescript\nconst x = 1\n```")}
-      />
-    )
-
-    expect(html).not.toContain('data-pug-embed="true"')
-    expect(html).toContain("sh__token--keyword")
-    expect(html).toContain("const")
-  })
 
   test("renders long assistant responses without the old response card title", () => {
     const html = renderToStaticMarkup(

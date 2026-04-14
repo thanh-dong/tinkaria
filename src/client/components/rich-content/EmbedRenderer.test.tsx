@@ -1,13 +1,7 @@
-import { afterEach, describe, mock, test, expect } from "bun:test"
+import { describe, test, expect } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
-import { EmbedRenderer, getEmbedWheelZoomIntent, isEmbedLanguage, requestPugPreview } from "./EmbedRenderer"
+import { EmbedRenderer, getEmbedWheelZoomIntent, isEmbedLanguage } from "./EmbedRenderer"
 import { ContentViewerContext, type ContentViewerContextValue } from "./ContentViewerContext"
-
-const savedFetch = globalThis.fetch
-
-afterEach(() => {
-  globalThis.fetch = savedFetch
-})
 
 describe("isEmbedLanguage", () => {
   test("returns true for mermaid", () => {
@@ -28,11 +22,6 @@ describe("isEmbedLanguage", () => {
 
   test("returns true for diashort", () => {
     expect(isEmbedLanguage("diashort")).toBe(true)
-  })
-
-  test("returns true for pug and pugjs alias", () => {
-    expect(isEmbedLanguage("pug")).toBe(true)
-    expect(isEmbedLanguage("pugjs")).toBe(true)
   })
 
   test("returns false for typescript", () => {
@@ -176,76 +165,6 @@ describe("EmbedRenderer html embed", () => {
     expect(html).toContain("&lt;div&gt;mockup&lt;/div&gt;")
   })
 
-  test("renders pug through the html embed path with tailwind runtime", () => {
-    const html = renderToStaticMarkup(
-      <EmbedRenderer
-        format="pugjs"
-        source={"main\n  h1.text-3xl Hello"}
-        renderedHtml={'<main><h1 class="text-3xl">Hello</h1></main>'}
-      />
-    )
-
-    expect(html).toContain('data-pug-embed="true"')
-    expect(html).toContain("srcDoc")
-    expect(html).toContain("@tailwindcss/browser@4")
-    expect(html).toContain("text-3xl")
-    expect(html).toContain("Hello")
-  })
-
-  test("shows a readable fallback when pug render data is unavailable", () => {
-    const html = renderToStaticMarkup(
-      <EmbedRenderer format="pug" source={"main\n  h1 Hello"} />
-    )
-
-    expect(html).toContain("Rendering Pug preview...")
-    expect(html).toContain("main")
-    expect(html).not.toContain('data-pug-embed="true"')
-  })
-
-  test("requests generic pug previews from the local server endpoint", async () => {
-    const fetchMock = mock(() => Promise.resolve(new Response(JSON.stringify({ html: "<main><h1>Hello</h1></main>" }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })))
-    globalThis.fetch = fetchMock as unknown as typeof fetch
-
-    await expect(requestPugPreview("main\n  h1 Hello")).resolves.toEqual({
-      renderedHtml: "<main><h1>Hello</h1></main>",
-      renderError: undefined,
-    })
-    expect(fetchMock).toHaveBeenCalledWith("/api/render/pug", expect.objectContaining({
-      method: "POST",
-    }))
-  })
-
-  test("surfaces route failures as render errors", async () => {
-    const fetchMock = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Pug parse error" }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })))
-    globalThis.fetch = fetchMock as unknown as typeof fetch
-
-    await expect(requestPugPreview("main(\n  h1 Hello")).resolves.toEqual({
-      renderedHtml: undefined,
-      renderError: "Pug parse error",
-    })
-  })
-
-  test("shows raw pug source in source mode", () => {
-    const ctx: ContentViewerContextValue = {
-      state: { type: "embed", renderMode: "source", zoom: 1 },
-      dispatch: () => {},
-    }
-    const html = renderToStaticMarkup(
-      <ContentViewerContext.Provider value={ctx}>
-        <EmbedRenderer format="pug" source={"main\n  h1 Hello"} />
-      </ContentViewerContext.Provider>
-    )
-
-    expect(html).not.toContain("srcDoc")
-    expect(html).toContain("main")
-    expect(html).toContain("h1 Hello")
-  })
 })
 
 describe("EmbedRenderer with ContentViewerContext", () => {

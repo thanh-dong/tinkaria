@@ -33,7 +33,6 @@ import { WorkflowEngine } from "./workflow-engine"
 import { initVapid, PushSubscriptionStore, createPushRouter, sendPushToAll } from "./push-notifications"
 import { BunDockerClient, SandboxManager } from "./sandbox-manager"
 import { RuntimeRegistry } from "./runtime-registry"
-import { renderPugPreview } from "./pug-preview"
 
 export interface StartServerOptions {
   port?: number
@@ -99,21 +98,6 @@ function toBufferedFrame(message: IncomingWsMessage): NatsWsBufferedFrame {
 export interface CachedNatsInfo {
   bytes: Uint8Array
   isBinary: boolean
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null
-  return value as Record<string, unknown>
-}
-
-async function readPugPreviewSource(req: Request): Promise<string | null> {
-  try {
-    const payload = await req.json()
-    const record = asRecord(payload)
-    return typeof record?.source === "string" ? record.source : null
-  } catch (_error: unknown) {
-    return null
-  }
 }
 
 // Warmup helper: opens a one-shot WebSocket to NATS and captures the very
@@ -699,19 +683,6 @@ export async function startServer(options: StartServerOptions = {}) {
               token: authToken,
               ...(natsWsUrl ? { natsWsUrl } : {}),
             })
-          }
-
-          if (url.pathname === "/api/render/pug") {
-            if (req.method !== "POST") {
-              return Response.json({ error: "Method Not Allowed" }, { status: 405 })
-            }
-
-            const source = await readPugPreviewSource(req)
-            if (source === null) {
-              return Response.json({ error: "Invalid Pug preview payload" }, { status: 400 })
-            }
-
-            return Response.json(renderPugPreview(source))
           }
 
           if (url.pathname.startsWith("/api/workspace/")) {

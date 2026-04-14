@@ -1,59 +1,17 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { normalizePresentContentFormat } from "../../../shared/presentContent"
 import { clampEmbedZoom, useContentViewer } from "./ContentViewerContext"
 
-const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort", "html", "pug"])
+const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort", "html"])
 const TAILWIND_BROWSER_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
 const DEFAULT_EMBED_STYLE = "html,body{margin:0;min-height:100%;background:transparent;}body{padding:1rem;font-family:Inter,ui-sans-serif,system-ui,sans-serif;}"
-const PUG_PREVIEW_ENDPOINT = "/api/render/pug"
-const pugPreviewCache = new Map<string, { renderedHtml?: string; renderError?: string }>()
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null
-  return value as Record<string, unknown>
-}
-
-export async function requestPugPreview(source: string): Promise<{ renderedHtml?: string; renderError?: string }> {
-  try {
-    const response = await fetch(PUG_PREVIEW_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ source }),
-    })
-    const payload = await response.json().catch(() => null)
-    const record = asRecord(payload)
-    const renderedHtml = typeof record?.html === "string" ? record.html : undefined
-    const renderError = typeof record?.error === "string"
-      ? record.error
-      : response.ok
-        ? undefined
-        : `Pug preview request failed (${response.status})`
-
-    if (renderedHtml || renderError) {
-      return { renderedHtml, renderError }
-    }
-
-    return { renderError: "Pug preview unavailable" }
-  } catch (error: unknown) {
-    return {
-      renderError: error instanceof Error ? error.message : String(error),
-    }
-  }
-}
-
-type PugPreviewState = { renderedHtml?: string; renderError?: string; loading: boolean }
 
 export function isEmbedLanguage(language: string | null): boolean {
-  return language !== null && EMBED_LANGUAGES.has(normalizePresentContentFormat(language))
+  return language !== null && EMBED_LANGUAGES.has(language)
 }
 
 interface EmbedRendererProps {
   format: string
   source: string
-  renderedHtml?: string
-  renderError?: string
 }
 
 type EmbedWheelZoomIntent = "in" | "out" | null
@@ -61,29 +19,21 @@ type EmbedWheelZoomIntent = "in" | "out" | null
 export const EmbedRenderer = memo(function EmbedRenderer({
   format,
   source,
-  renderedHtml,
-  renderError,
 }: EmbedRendererProps) {
-  const normalizedFormat = normalizePresentContentFormat(format)
-
-  if (normalizedFormat === "mermaid") {
+  if (format === "mermaid") {
     return <MermaidDiagram source={source} />
   }
 
-  if (normalizedFormat === "html") {
+  if (format === "html") {
     return <HtmlEmbed source={source} />
   }
 
-  if (normalizedFormat === "pug") {
-    return <PugEmbed source={source} renderedHtml={renderedHtml} renderError={renderError} />
-  }
-
-  if (normalizedFormat === "svg") {
+  if (format === "svg") {
     return <SvgEmbed source={source} />
   }
 
-  if (normalizedFormat === "iframe" || normalizedFormat === "diashort") {
-    return <RemoteEmbed format={normalizedFormat} source={source} />
+  if (format === "iframe" || format === "diashort") {
+    return <RemoteEmbed format={format} source={source} />
   }
 
   // D2 and other formats: show source as fallback
@@ -304,107 +254,6 @@ function HtmlEmbed({ source }: { source: string }) {
             className="block h-[420px] w-full border-0 bg-background"
           />
         </div>
-      ) : (
-        <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
-          {source}
-        </pre>
-      )}
-    </>
-  )
-}
-
-function usePugPreview({
-  source,
-  renderedHtml,
-  renderError,
-}: {
-  source: string
-  renderedHtml?: string
-  renderError?: string
-}): PugPreviewState {
-  const cached = pugPreviewCache.get(source)
-  const [state, setState] = useState<PugPreviewState>(() => {
-    if (renderedHtml || renderError) return { renderedHtml, renderError, loading: false }
-    if (cached) return { ...cached, loading: false }
-    return { loading: true }
-  })
-
-  useEffect(() => {
-    if (renderedHtml || renderError) {
-      const next = { renderedHtml, renderError }
-      pugPreviewCache.set(source, next)
-      setState({ ...next, loading: false })
-      return
-    }
-
-    if (cached) {
-      setState({ ...cached, loading: false })
-      return
-    }
-
-    let cancelled = false
-    setState({ loading: true })
-
-    void requestPugPreview(source).then((next) => {
-      if (cancelled) return
-      pugPreviewCache.set(source, next)
-      setState({ ...next, loading: false })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [cached, renderedHtml, renderError, source])
-
-  return state
-}
-
-function PugEmbed({
-  source,
-  renderedHtml,
-  renderError,
-}: {
-  source: string
-  renderedHtml?: string
-  renderError?: string
-}) {
-  const { mode, zoom, adjustZoom } = useEmbedState()
-  const preview = usePugPreview({ source, renderedHtml, renderError })
-  const htmlSource = preview.renderedHtml ? createHtmlEmbedDocument(preview.renderedHtml) : null
-  const errorMessage = preview.renderError ?? (preview.loading ? "Rendering Pug preview..." : "Pug preview unavailable")
-
-  return (
-    <>
-      {mode === "render" ? (
-        htmlSource ? (
-          <div
-            onWheel={(event) => {
-              const direction = getEmbedWheelZoomIntent(event)
-              if (!direction) return
-              event.preventDefault()
-              adjustZoom(direction)
-            }}
-            data-embed-zoomable="true"
-            style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
-            className="overflow-hidden rounded-md border border-border/60 bg-background"
-          >
-            <iframe
-              data-html-embed="true"
-              data-pug-embed="true"
-              srcDoc={htmlSource}
-              title="Pug content"
-              sandbox="allow-scripts"
-              className="block h-[420px] w-full border-0 bg-background"
-            />
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="text-xs text-destructive">{errorMessage}</div>
-            <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
-              {source}
-            </pre>
-          </div>
-        )
       ) : (
         <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
           {source}
