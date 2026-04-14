@@ -149,7 +149,6 @@ describe("chatFocusPolicy", () => {
       root,
       fallback: chat,
       hasActiveOverlay: false,
-      hasActiveSelection: false,
     })).toBe("restore")
   })
 
@@ -164,7 +163,6 @@ describe("chatFocusPolicy", () => {
       root,
       fallback: chat,
       hasActiveOverlay: false,
-      hasActiveSelection: false,
     })).toBe("restore")
   })
 
@@ -179,7 +177,20 @@ describe("chatFocusPolicy", () => {
       root,
       fallback: chat,
       hasActiveOverlay: false,
-      hasActiveSelection: false,
+    })).toBe("none")
+  })
+
+  test("does not restore when transcript text is clicked", () => {
+    const { root, chat, transcriptText } = createTree()
+
+    expect(resolveChatFocusAction({
+      trigger: "pointer",
+      activeElement: null,
+      pointerStartTarget: transcriptText,
+      pointerEndTarget: transcriptText,
+      root,
+      fallback: chat,
+      hasActiveOverlay: false,
     })).toBe("none")
   })
 
@@ -194,7 +205,6 @@ describe("chatFocusPolicy", () => {
       root,
       fallback: chat,
       hasActiveOverlay: false,
-      hasActiveSelection: true,
     })).toBe("none")
   })
 
@@ -214,7 +224,6 @@ describe("chatFocusPolicy", () => {
       root,
       fallback: chat,
       hasActiveOverlay: hasActiveFocusOverlay(document),
-      hasActiveSelection: false,
     })).toBe("none")
   })
 

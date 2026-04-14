@@ -85,7 +85,6 @@ export function resolveChatFocusAction(args:
     root: RootLike | null
     fallback: { disabled?: boolean } | null
     hasActiveOverlay: boolean
-    hasActiveSelection: boolean
   },
 ): ChatFocusAction {
   const { activeElement, fallback, hasActiveOverlay } = args
@@ -101,18 +100,15 @@ export function resolveChatFocusAction(args:
     return "escape-focus"
   }
 
-  const { pointerStartTarget, pointerEndTarget, root, hasActiveSelection } = args
+  const { pointerStartTarget, pointerEndTarget, root } = args
   const interactionTarget = pointerEndTarget ?? pointerStartTarget
 
   if (!root || !interactionTarget || !root.contains(interactionTarget)) return "none"
   if (hasAttributeInTree(interactionTarget, FOCUS_FALLBACK_IGNORE_ATTRIBUTE)) return "none"
   if (hasAttributeInTree(activeElement, FOCUS_FALLBACK_IGNORE_ATTRIBUTE)) return "none"
   if (
-    hasActiveSelection
-    && (
-      hasAttributeInTree(pointerStartTarget, CHAT_SELECTION_ZONE_ATTRIBUTE)
-      || hasAttributeInTree(interactionTarget, CHAT_SELECTION_ZONE_ATTRIBUTE)
-    )
+    hasAttributeInTree(pointerStartTarget, CHAT_SELECTION_ZONE_ATTRIBUTE)
+    || hasAttributeInTree(interactionTarget, CHAT_SELECTION_ZONE_ATTRIBUTE)
   ) {
     return "none"
   }

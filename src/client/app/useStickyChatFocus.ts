@@ -1,7 +1,6 @@
 import { useEffect, type RefObject } from "react"
 import {
   hasActiveFocusOverlay,
-  hasActiveTextSelection,
   RESTORE_CHAT_INPUT_FOCUS_EVENT,
   resolveChatFocusAction,
 } from "./chatFocusPolicy"
@@ -33,7 +32,6 @@ export function useStickyChatFocus({ rootRef, fallbackRef, enabled, canCancel }:
         root,
         fallback,
         hasActiveOverlay: hasActiveFocusOverlay(document),
-        hasActiveSelection: hasActiveTextSelection(window.getSelection()),
       }) !== "restore") {
         pointerStartTarget = null
         return
