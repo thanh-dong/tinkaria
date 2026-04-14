@@ -78,11 +78,19 @@ describe("AppSidebar", () => {
     expect(html).toContain("font-logo")
     expect(html).toContain("Tinkaria")
     expect(html).toContain("tinkaria-mark-fine.svg")
-    expect(html).toContain("title=\"Home\"")
     expect(html).toContain("aria-label=\"Go to homepage\"")
+    expect(html).not.toContain('aria-label="Home"')
     expect(html).toContain('data-ui-id="chat.sidebar"')
     expect(html).toContain('data-ui-c3="c3-113"')
     expect(html).toContain('data-ui-c3-label="sidebar"')
+  })
+
+  test("uses the Tinkaria footer entry without connection chrome", () => {
+    const html = renderSidebar()
+
+    expect(html).not.toContain(">Connection<")
+    expect(html).not.toContain(">Connected<")
+    expect(html).toContain(">Tinkaria</button>")
   })
 
   test("renders the collapsed utility stub with an expand action", () => {
