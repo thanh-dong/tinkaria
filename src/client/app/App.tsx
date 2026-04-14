@@ -565,8 +565,8 @@ function ShortcutController() {
       { key: "n", alt: true, label: "New chat", description: "Same project", scope: "global", handler: createNewChat },
       { key: "ArrowLeft", alt: true, label: "Previous provider", scope: "new-chat", handler: () => cycleProvider(-1) },
       { key: "ArrowRight", alt: true, label: "Next provider", scope: "new-chat", handler: () => cycleProvider(1) },
-      { key: "ArrowUp", alt: true, shift: true, label: "Previous unread session", scope: "global", handler: () => moveToUnreadSession(-1) },
-      { key: "ArrowDown", alt: true, shift: true, label: "Next unread session", scope: "global", handler: () => moveToUnreadSession(1) },
+      { key: "ArrowUp", alt: true, label: "Previous unread session", scope: "global", handler: () => moveToUnreadSession(-1) },
+      { key: "ArrowDown", alt: true, label: "Next unread session", scope: "global", handler: () => moveToUnreadSession(1) },
     ]
   }, [state, composerState.provider, navigate, resetComposerFromProvider])
 
