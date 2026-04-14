@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import { PROVIDERS } from "../../../shared/types"
+import { CHAT_COMPOSER_PLACEHOLDER_POOL, getChatComposerPlaceholderText } from "../../lib/quirkyCopy"
 import { useSkillCompositionStore } from "../../stores/skillCompositionStore"
 import { areChatInputPropsEqual, ChatInput, shouldInvokeCancelAction } from "./ChatInput"
 
@@ -31,7 +32,7 @@ describe("ChatInput", () => {
     )
 
     const skillChipIndex = html.indexOf("/c3")
-    const placeholderIndex = html.indexOf("Build something...")
+    const placeholderIndex = html.indexOf(getChatComposerPlaceholderText(null))
     const modelIndex = html.indexOf("Opus")
     const skillsToggleIndex = html.indexOf(">Skills<")
 
@@ -115,5 +116,12 @@ describe("ChatInput", () => {
     expect(pointerTriggeredRef.current).toBe(true)
     expect(shouldInvokeCancelAction("click", pointerTriggeredRef)).toBe(false)
     expect(pointerTriggeredRef.current).toBe(false)
+  })
+
+  test("uses the curated quirky placeholder pool", () => {
+    const placeholder = getChatComposerPlaceholderText("chat-7")
+
+    expect(CHAT_COMPOSER_PLACEHOLDER_POOL).toContain(placeholder)
+    expect(getChatComposerPlaceholderText("chat-7")).toBe(placeholder)
   })
 })

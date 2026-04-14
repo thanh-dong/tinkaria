@@ -458,6 +458,30 @@
     }
   }
 
+  @keyframes tinkaria-empty-state-copy-drift {
+    0%,
+    100% {
+      opacity: 0.72;
+      transform: translateY(0);
+    }
+
+    50% {
+      opacity: 0.94;
+      transform: translateY(-2px);
+    }
+  }
+
+  @keyframes tinkaria-composer-placeholder-breathe {
+    0%,
+    100% {
+      opacity: 0.58;
+    }
+
+    50% {
+      opacity: 0.88;
+    }
+  }
+
   @keyframes tinkaria-cursor-blink {
     0%,
     49% {
@@ -486,7 +510,13 @@
   }
 
   .tinkaria-empty-state-text {
-    animation: tinkaria-empty-state-text-in 0.38s ease-out both;
+    animation:
+      tinkaria-empty-state-text-in 0.38s ease-out both,
+      tinkaria-empty-state-copy-drift 8.5s ease-in-out 0.45s infinite;
+  }
+
+  .tinkaria-composer-placeholder::placeholder {
+    animation: tinkaria-composer-placeholder-breathe 7.5s ease-in-out infinite;
   }
 
   .tinkaria-typewriter-cursor-slot {

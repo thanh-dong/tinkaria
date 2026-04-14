@@ -5,6 +5,7 @@ import type { HydratedTranscriptMessage } from "../../shared/types"
 import { ChatNavbar, getChatNavbarUiIdentityDescriptors } from "../components/chat-ui/ChatNavbar"
 import { TextMessage } from "../components/messages/TextMessage"
 import type { ProcessedTextMessage } from "../components/messages/types"
+import { CHAT_EMPTY_STATE_POOL, getChatEmptyStateText } from "../lib/quirkyCopy"
 import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import {
   ChatEmptyStateBrandMark,
@@ -12,7 +13,6 @@ import {
   getChatPageUiIdentityDescriptors,
   getChatPageUiIdentities,
   getComposerLiftPx,
-  getEmptyStateTypingDurationMs,
   getPendingSessionBootstrapStatusLabel,
   getRequestedSidebarDialog,
   getScrollButtonBottomPx,
@@ -377,11 +377,17 @@ describe("shouldRenderTranscriptCommandError", () => {
   })
 })
 
-describe("getEmptyStateTypingDurationMs", () => {
-  test("scales linearly with the configured per-character interval", () => {
-    expect(getEmptyStateTypingDurationMs("")).toBe(0)
-    expect(getEmptyStateTypingDurationMs("abc")).toBe(57)
-    expect(getEmptyStateTypingDurationMs("What are we building?")).toBe(399)
+describe("getChatEmptyStateText", () => {
+  test("selects a stable curated empty-state line from the quirky copy pool", () => {
+    const first = getChatEmptyStateText("chat-1")
+    const second = getChatEmptyStateText("chat-1")
+
+    expect(first).toBe(second)
+    expect(CHAT_EMPTY_STATE_POOL).toContain(first)
+  })
+
+  test("falls back to a valid default line when no active chat exists", () => {
+    expect(CHAT_EMPTY_STATE_POOL).toContain(getChatEmptyStateText(null))
   })
 })
 

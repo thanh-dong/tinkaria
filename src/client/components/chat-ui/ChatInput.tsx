@@ -12,6 +12,7 @@ import {
 import { Button } from "../ui/button"
 import { Textarea } from "../ui/textarea"
 import { createUiIdentity, createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import { getChatComposerPlaceholderText } from "../../lib/quirkyCopy"
 import { cn } from "../../lib/utils"
 import { useIsStandalone } from "../../hooks/useIsStandalone"
 import { useChatInputStore } from "../../stores/chatInputStore"
@@ -490,6 +491,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const composerPreferencesRef = useRef<ComposerPreferencesHandle>(null)
   const isStandalone = useIsStandalone()
   const isTouchDevice = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0)
+  const composerPlaceholder = getChatComposerPlaceholderText(chatId)
   const composerControlsKey = getComposerControlsKey(chatId, activeProvider)
   const composerAreaId = createUiIdentity("chat.composer", "area")
   const submitActionId = createUiIdentity("chat.composer.submit", "action")
@@ -828,7 +830,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
             <div className="flex items-end gap-2">
               <Textarea
                 ref={setTextareaRefs}
-                placeholder="Build something..."
+                placeholder={composerPlaceholder}
                 defaultValue={initialDraft}
                 autoFocus={!isTouchDevice}
                 {...{ [CHAT_INPUT_ATTRIBUTE]: "" }}
@@ -839,7 +841,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                 }}
                 onKeyDown={handleKeyDown}
                 disabled={disabled}
-                className="flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
+                className="tinkaria-composer-placeholder flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
               />
               {showQueueAction ? (
                 <div className="mb-1 flex items-center gap-2 md:mb-1.5">

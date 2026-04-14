@@ -32,13 +32,12 @@ import { useRightSidebarToggleAnimation } from "./useRightSidebarToggleAnimation
 import type { AppState } from "./useAppState"
 import { TranscriptActionsContext } from "./TranscriptActionsContext"
 import { enrichCommandError } from "./appState.helpers"
+import { getChatEmptyStateText } from "../lib/quirkyCopy"
 import { ChatTranscript } from "./ChatTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
 import type { HydratedTranscriptMessage } from "../../shared/types"
 import { useEventCallback } from "../hooks/useEventCallback"
 
-const EMPTY_STATE_TEXT = "What are we building?"
-const EMPTY_STATE_TYPING_INTERVAL_MS = 19
 // Navbar is now a flow element — no offset constant needed
 const SCROLL_BUTTON_BASE_BOTTOM_PX = 120
 const SCROLL_BUTTON_SKILLS_RIBBON_OFFSET_PX = 52
@@ -280,10 +279,6 @@ export function getTranscriptAreaVisibility(args: {
   return args.chatHasKnownMessages ? "loading" : "empty"
 }
 
-export function getEmptyStateTypingDurationMs(text: string): number {
-  return text.length * EMPTY_STATE_TYPING_INTERVAL_MS
-}
-
 export function shouldDismissMobileKeyboardOnFirstMessage(
   previousMessageCount: number,
   currentMessageCount: number,
@@ -376,6 +371,7 @@ export function ChatPage() {
     messageCount: state.messages.length,
     chatHasKnownMessages: state.chatHasKnownMessages,
   })
+  const emptyStateText = getChatEmptyStateText(state.activeChatId)
 
   const transcriptActions = useMemo(() => {
     const findGroupForActiveChat = () =>
@@ -760,9 +756,9 @@ export function ChatPage() {
                     <ChatEmptyStateBrandMark />
                     <div
                       className="text-base font-normal text-muted-foreground text-center max-w-xs flex items-center tinkaria-empty-state-text"
-                      aria-label={EMPTY_STATE_TEXT}
+                      aria-label={emptyStateText}
                     >
-                      <span className="whitespace-pre">{EMPTY_STATE_TEXT}</span>
+                      <span className="whitespace-pre">{emptyStateText}</span>
                     </div>
                   </>
                 )}
