@@ -13,6 +13,16 @@ function createMessage(text: string): ProcessedTextMessage {
 }
 
 describe("TextMessage", () => {
+  test("uses the available transcript width for assistant responses", () => {
+    const html = renderToStaticMarkup(
+      <TextMessage message={createMessage("Assistant response should fill the transcript row.")} />
+    )
+
+    expect(html).toContain('data-ui-id="message.assistant.response"')
+    expect(html).toContain('class="w-full max-w-full"')
+    expect(html).toContain("max-w-none")
+  })
+
   test("renders incomplete bold markdown without exposing unfinished markers", () => {
     const html = renderToStaticMarkup(
       <TextMessage message={createMessage("This is **unfinished bold")} />
@@ -59,5 +69,7 @@ describe("TextMessage", () => {
     expect(html).not.toContain(">Response<")
     expect(html).toContain("group-hover/rich-content:opacity-100")
     expect(html).toContain("group-focus-within/rich-content:opacity-100")
+    expect(html).not.toContain("pr-24")
+    expect(html).not.toContain("sm:pr-28")
   })
 })

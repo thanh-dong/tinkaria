@@ -29,7 +29,7 @@ export const TextMessage = memo(function TextMessage({ message }: Props) {
   const isLong = message.text.length > LONG_MESSAGE_THRESHOLD
   const diashortUrls = extractDiashortUrls(message.text)
   const content = (
-    <div className="text-pretty prose prose-sm dark:prose-invert px-0.5 w-full max-w-full space-y-4">
+    <div className="text-pretty prose prose-sm dark:prose-invert px-0.5 w-full max-w-none space-y-4">
       <Streamdown
         components={createMarkdownComponents()}
         linkSafety={{ enabled: false }}
@@ -41,7 +41,7 @@ export const TextMessage = memo(function TextMessage({ message }: Props) {
   )
 
   return (
-    <div {...getUiIdentityAttributeProps(assistantResponseDescriptor)}>
+    <div className="w-full max-w-full" {...getUiIdentityAttributeProps(assistantResponseDescriptor)}>
       {isLong ? (
         <RichContentBlock
           type="markdown"
@@ -49,7 +49,7 @@ export const TextMessage = memo(function TextMessage({ message }: Props) {
           defaultExpanded
           chrome="inline"
           controlsVisibility="hover-or-touch"
-          bodyClassName="p-0 pr-24 sm:pr-28"
+          bodyClassName="p-0"
           rawContent={message.text}
         >
           {content}
