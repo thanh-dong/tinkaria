@@ -78,6 +78,9 @@ export default defineConfig({
       "/api/render/pug": {
         target: `http://${backendTargetHost}:${backendPort}`,
       },
+      "/api/ext/": {
+        target: `http://${backendTargetHost}:${backendPort}`,
+      },
       "/nats-ws": {
         target: `ws://${backendTargetHost}:${backendPort}`,
         ws: true,

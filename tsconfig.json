@@ -76,6 +76,10 @@
     "src/client/components/rich-content/remarkRichContentHint.ts",
     "src/client/components/messages/FileContentView.tsx",
     "src/client/components/coordination/SandboxPanel.tsx",
-    "src/client/app/useSandboxSubscription.ts"
+    "src/client/app/useSandboxSubscription.ts",
+    "src/client/extensions.config.ts",
+    "src/client/extensions/**/*.ts",
+    "src/client/extensions/**/*.tsx",
+    "src/client/app/ProjectPage.tsx"
   ]
 }

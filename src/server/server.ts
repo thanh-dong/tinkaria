@@ -33,6 +33,8 @@ import { WorkflowEngine } from "./workflow-engine"
 import { initVapid, PushSubscriptionStore, createPushRouter, sendPushToAll } from "./push-notifications"
 import { BunDockerClient, SandboxManager } from "./sandbox-manager"
 import { RuntimeRegistry } from "./runtime-registry"
+import { createExtensionRouter } from "./extension-router"
+import { serverExtensions } from "./extensions.config"
 
 export interface StartServerOptions {
   port?: number
@@ -444,6 +446,7 @@ export async function startServer(options: StartServerOptions = {}) {
     workspaceId: "",
   })
   const projectAgentRouter = createWorkspaceAgentRouter(projectAgent)
+  const extensionRouter = createExtensionRouter(serverExtensions)
 
   // Use indirection to break the circular dependency:
   // coordinator -> onStateChange -> publisher.broadcastSnapshots
@@ -687,6 +690,10 @@ export async function startServer(options: StartServerOptions = {}) {
 
           if (url.pathname.startsWith("/api/workspace/")) {
             return projectAgentRouter(req)
+          }
+
+          if (url.pathname.startsWith("/api/ext/")) {
+            return extensionRouter(req)
           }
 
           if (url.pathname.startsWith("/api/push/")) {

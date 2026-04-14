@@ -6,17 +6,17 @@ import { ProvidersTab } from "./ProvidersTab"
 import { ProfilesTab } from "./ProfilesTab"
 import type { AppState } from "./useAppState"
 
-type SettingsTab = "providers" | "profiles"
+type TinkariaTab = "providers" | "profiles"
 
-const TAB_OPTIONS: SegmentedOption<SettingsTab>[] = [
+const TAB_OPTIONS: SegmentedOption<TinkariaTab>[] = [
   { value: "providers", label: "Providers", icon: Box, tooltip: "Providers" },
   { value: "profiles", label: "Profiles", icon: User, tooltip: "Profiles" },
 ]
 
-export function SettingsPage() {
+export function TinkariaPage() {
   const state = useOutletContext<AppState>()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<SettingsTab>("providers")
+  const [activeTab, setActiveTab] = useState<TinkariaTab>("providers")
 
   return (
     <div className="flex-1 flex flex-col min-w-0 relative">
@@ -28,7 +28,7 @@ export function SettingsPage() {
           <ArrowLeft className="size-4" />
         </button>
         <Settings className="size-4 text-muted-foreground hidden md:block" />
-        <h1 className="text-base font-semibold text-foreground md:text-lg">Settings</h1>
+        <h1 className="text-base font-semibold text-foreground md:text-lg">Tinkaria</h1>
       </div>
       <div className="px-4 mb-3">
         <SegmentedControl

@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react"
-import { Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom"
-import { SettingsPage } from "./SettingsPage"
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom"
+import { TinkariaPage } from "./SettingsPage"
 import {
   buildUiIdentityStack,
   createC3UiIdentityDescriptor,
@@ -30,6 +30,7 @@ import { CreateWorkspaceModal } from "../components/CreateWorkspaceModal"
 import { ChatPage } from "./ChatPage"
 import { LocalProjectsPage } from "./LocalWorkspacesPage"
 import { WorkspacePage } from "./WorkspacePage"
+import { ProjectPage } from "./ProjectPage"
 import { AppStateContext } from "./AppStateContext"
 import { useAppState } from "./useAppState"
 import { useEventCallback } from "../hooks/useEventCallback"
@@ -52,6 +53,22 @@ export function getUiIdentityOverlayCopyDurationMs() {
 
 export function getUiIdentityOverlayPointerHandoffDelayMs() {
   return UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS
+}
+
+interface LegacySettingsRedirectArgs {
+  pathname: string
+  search?: string
+  hash?: string
+}
+
+export function getLegacyTinkariaRedirectTarget({ pathname, search = "", hash = "" }: LegacySettingsRedirectArgs) {
+  const suffix = pathname === "/settings"
+    ? ""
+    : pathname.startsWith("/settings/")
+      ? pathname.slice("/settings".length)
+      : ""
+
+  return `/tinkaria${suffix}${search}${hash}`
 }
 
 export function getGlobalUiIdentityIds() {
@@ -581,6 +598,21 @@ function ShortcutController() {
   )
 }
 
+function LegacySettingsRedirect() {
+  const location = useLocation()
+
+  return (
+    <Navigate
+      replace
+      to={getLegacyTinkariaRedirectTarget({
+        pathname: location.pathname,
+        search: location.search,
+        hash: location.hash,
+      })}
+    />
+  )
+}
+
 function AppInner() {
   const location = useLocation()
   const activeChatId = location.pathname.startsWith("/chat/")
@@ -594,9 +626,11 @@ function AppInner() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<LocalProjectsPage />} />
-          <Route path="/settings/*" element={<SettingsPage />} />
+          <Route path="/tinkaria/*" element={<TinkariaPage />} />
+          <Route path="/settings/*" element={<LegacySettingsRedirect />} />
           <Route path="/chat/:chatId" element={<ChatPage />} />
           <Route path="/workspace/:id" element={<WorkspacePage />} />
+          <Route path="/project/:groupKey" element={<ProjectPage />} />
         </Route>
       </Routes>
     </AppStateContext.Provider>

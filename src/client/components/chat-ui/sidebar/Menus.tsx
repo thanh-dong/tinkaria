@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { GitBranchPlus, LayoutGrid, Merge, Pencil, SquarePen, Trash2 } from "lucide-react"
+import { GitBranchPlus, LayoutDashboard, LayoutGrid, Merge, Pencil, SquarePen, Trash2 } from "lucide-react"
 import { createUiIdentityDescriptor } from "../../../lib/uiIdentityOverlay"
 import {
   ContextMenu,
@@ -25,6 +25,7 @@ export function ProjectSectionMenu({
   onMergeSession,
   mergeDisabled = false,
   onOpenCoordination,
+  onOpenProject,
   onNewChat,
   newChatDisabled = false,
   onRemove,
@@ -33,6 +34,7 @@ export function ProjectSectionMenu({
   onMergeSession?: () => void
   mergeDisabled?: boolean
   onOpenCoordination?: () => void
+  onOpenProject?: () => void
   onNewChat?: () => void
   newChatDisabled?: boolean
   onRemove?: () => void
@@ -65,6 +67,17 @@ export function ProjectSectionMenu({
           >
             <LayoutGrid className="h-4 w-4" />
             <span className="text-xs font-medium">Coordination board</span>
+          </ContextMenuItem>
+        ) : null}
+        {onOpenProject ? (
+          <ContextMenuItem
+            onSelect={(event) => {
+              event.stopPropagation()
+              onOpenProject()
+            }}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            <span className="text-xs font-medium">Project view</span>
           </ContextMenuItem>
         ) : null}
         {onNewChat ? (

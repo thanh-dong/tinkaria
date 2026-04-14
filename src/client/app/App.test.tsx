@@ -5,6 +5,7 @@ import * as AppModule from "./App"
 import {
   bindUiIdentityOverlayWindowEvents,
   getAdjacentUnreadChatId,
+  getLegacyTinkariaRedirectTarget,
   getAppLayoutUiIdentityDescriptor,
   getNextProvider,
   getUiIdentityOverlayAnchorRect,
@@ -52,6 +53,14 @@ describe("getNextProvider", () => {
     expect(getNextProvider("claude", 1)).toBe("codex")
     expect(getNextProvider("codex", 1)).toBe("claude")
     expect(getNextProvider("claude", -1)).toBe("codex")
+  })
+})
+
+describe("getLegacyTinkariaRedirectTarget", () => {
+  test("maps legacy settings URLs onto the Tinkaria route", () => {
+    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings" })).toBe("/tinkaria")
+    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings/providers" })).toBe("/tinkaria/providers")
+    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings", search: "?tab=providers", hash: "#profiles" })).toBe("/tinkaria?tab=providers#profiles")
   })
 })
 

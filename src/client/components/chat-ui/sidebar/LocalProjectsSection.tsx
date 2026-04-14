@@ -29,6 +29,7 @@ interface Props {
   startingLocalPath?: string | null
   onMergeSession?: (workspaceId: string) => void
   onOpenCoordination?: (workspaceId: string) => void
+  onOpenProject?: (groupKey: string) => void
 }
 
 interface ProjectGroupSectionProps {
@@ -45,6 +46,7 @@ interface ProjectGroupSectionProps {
   startingLocalPath?: string | null
   onMergeSession?: (workspaceId: string) => void
   onOpenCoordination?: (workspaceId: string) => void
+  onOpenProject?: (groupKey: string) => void
 }
 
 function ProjectGroupSection({
@@ -61,6 +63,7 @@ function ProjectGroupSection({
   startingLocalPath,
   onMergeSession,
   onOpenCoordination,
+  onOpenProject,
 }: ProjectGroupSectionProps) {
   const { groupKey, localPath, chats: pathChats } = group
 
@@ -72,6 +75,7 @@ function ProjectGroupSection({
   const hasMenuActions = Boolean(
     onMergeSession
     || onOpenCoordination
+    || onOpenProject
     || onNewLocalChat
     || onRemoveProject
   )
@@ -118,6 +122,7 @@ function ProjectGroupSection({
           onMergeSession={onMergeSession ? () => onMergeSession(groupKey) : undefined}
           mergeDisabled={isConnectedDisabled}
           onOpenCoordination={onOpenCoordination ? () => onOpenCoordination(groupKey) : undefined}
+          onOpenProject={onOpenProject ? () => onOpenProject(groupKey) : undefined}
           onNewChat={onNewLocalChat ? () => onNewLocalChat(localPath) : undefined}
           newChatDisabled={isConnectedDisabled || isStartingCurrentPath}
           onRemove={onRemoveProject ? () => onRemoveProject(groupKey) : undefined}
@@ -159,6 +164,7 @@ export function LocalProjectsSection({
   startingLocalPath,
   onMergeSession,
   onOpenCoordination,
+  onOpenProject,
 }: Props) {
   return (
     <>
@@ -178,6 +184,7 @@ export function LocalProjectsSection({
           startingLocalPath={startingLocalPath}
           onMergeSession={onMergeSession}
           onOpenCoordination={onOpenCoordination}
+          onOpenProject={onOpenProject}
         />
       ))}
     </>
