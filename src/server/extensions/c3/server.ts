@@ -4,6 +4,23 @@ import path from "node:path"
 
 const LOG_PREFIX = "[c3-ext]"
 
+interface C3ListEntity {
+  id: string
+  type: string
+  title?: string
+  name?: string
+  parent?: string
+  status?: string
+  children?: C3ListEntity[]
+  [key: string]: unknown
+}
+
+interface C3ListJsonOutput {
+  entities?: C3ListEntity[]
+  items?: C3ListEntity[]
+  [key: string]: unknown
+}
+
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -63,15 +80,14 @@ async function runC3x(
 function handleList(projectPath: string): ExtensionRoute["handler"] {
   return async (_req, _params) => {
     try {
-      const { stdout, exitCode } = await runC3x(["list", "--compact"], projectPath)
+      const { stdout, exitCode } = await runC3x(["list", "--compact", "--json"], projectPath)
       if (exitCode !== 0) {
         console.warn(LOG_PREFIX, "c3x list exited with code", exitCode)
         return errorResponse("c3x execution failed", 503)
       }
-      // Try to parse as JSON, fall back to raw text
       try {
-        const parsed = JSON.parse(stdout)
-        return jsonResponse({ data: parsed })
+        const parsed = JSON.parse(stdout) as C3ListJsonOutput
+        return jsonResponse({ data: parsed.entities ?? parsed.items ?? parsed })
       } catch (_e: unknown) {
         return jsonResponse({ data: stdout.trim() })
       }

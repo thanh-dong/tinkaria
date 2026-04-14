@@ -123,9 +123,12 @@ describe("c3x integration", () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    // c3x list --compact returns an object or array
-    expect(body).toBeDefined()
-    expect(body.data).toBeDefined()
+    expect(Array.isArray(body.data)).toBe(true)
+    expect(body.data.length).toBeGreaterThan(0)
+    expect(body.data[0]).toMatchObject({
+      id: expect.any(String),
+      type: expect.any(String),
+    })
   })
 
   test("read handler returns content for a valid id", async () => {

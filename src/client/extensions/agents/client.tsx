@@ -1,7 +1,34 @@
 import { useCallback, useEffect, useState } from "react"
 import { ChevronRight, FileText, Loader2, ScrollText, Users } from "lucide-react"
+import { Button } from "../../components/ui/button"
+import {
+  createC3UiIdentityDescriptor,
+  getUiIdentityAttributeProps,
+} from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
 import type { ExtensionProps } from "../../../shared/extension-types"
+
+const AGENTS_EXTENSION_UI_DESCRIPTORS = {
+  root: createC3UiIdentityDescriptor({
+    id: "project.extensions.agents.area",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  section: createC3UiIdentityDescriptor({
+    id: "project.extensions.agents.section",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  sectionToggle: createC3UiIdentityDescriptor({
+    id: "project.extensions.agents.section-toggle.action",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+} as const
+
+export function getAgentsExtensionUiIdentityDescriptors() {
+  return AGENTS_EXTENSION_UI_DESCRIPTORS
+}
 
 // ── Types ────────────────────────────────────────────────
 
@@ -39,10 +66,12 @@ function CollapsibleItem({
 }) {
   return (
     <div className="border-b border-border last:border-b-0">
-      <button
+      <Button
         type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent/30 transition-colors"
+        variant="none"
+        className="flex h-auto w-full items-center justify-start gap-2 rounded-none px-3 py-2 text-left hover:bg-accent/30"
         onClick={() => onToggle(id)}
+        {...getUiIdentityAttributeProps(AGENTS_EXTENSION_UI_DESCRIPTORS.sectionToggle)}
       >
         <ChevronRight
           className={cn(
@@ -53,7 +82,7 @@ function CollapsibleItem({
         <span className="text-sm font-medium text-foreground truncate">
           {label}
         </span>
-      </button>
+      </Button>
       {expanded && (
         <div className="px-3 pb-3 pl-8">
           <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
@@ -77,7 +106,7 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden" {...getUiIdentityAttributeProps(AGENTS_EXTENSION_UI_DESCRIPTORS.section)}>
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border bg-muted/30">
         <Icon className="size-4 text-muted-foreground shrink-0" />
         <span className="text-sm font-semibold text-foreground">{title}</span>
@@ -141,7 +170,7 @@ export default function AgentsExtension({ localPath }: ExtensionProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex items-center justify-center p-8" {...getUiIdentityAttributeProps(AGENTS_EXTENSION_UI_DESCRIPTORS.root)}>
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     )
@@ -149,7 +178,7 @@ export default function AgentsExtension({ localPath }: ExtensionProps) {
 
   if (error) {
     return (
-      <div className="p-4">
+      <div className="p-4" {...getUiIdentityAttributeProps(AGENTS_EXTENSION_UI_DESCRIPTORS.root)}>
         <p className="text-sm text-destructive">Failed to load agent data: {error}</p>
       </div>
     )
@@ -158,7 +187,7 @@ export default function AgentsExtension({ localPath }: ExtensionProps) {
   if (!data) return null
 
   return (
-    <div className="p-4 space-y-4 overflow-y-auto h-full">
+    <div className="p-4 space-y-4 overflow-y-auto h-full" {...getUiIdentityAttributeProps(AGENTS_EXTENSION_UI_DESCRIPTORS.root)}>
       {/* CLAUDE.md */}
       <SectionCard icon={FileText} title="CLAUDE.md">
         {data.claudeMd.sections.length === 0 ? (

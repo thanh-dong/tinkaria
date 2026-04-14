@@ -1,6 +1,48 @@
 import { useCallback, useEffect, useState } from "react"
 import { Building2, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, FileText, GitBranch } from "lucide-react"
+import { Button } from "../../components/ui/button"
+import {
+  createC3UiIdentityDescriptor,
+  getUiIdentityAttributeProps,
+} from "../../lib/uiIdentityOverlay"
 import type { ExtensionProps } from "../../../shared/extension-types"
+
+const C3_EXTENSION_UI_DESCRIPTORS = {
+  root: createC3UiIdentityDescriptor({
+    id: "project.extensions.c3.area",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  entityItem: createC3UiIdentityDescriptor({
+    id: "project.extensions.c3.entity.item",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  entitySelectAction: createC3UiIdentityDescriptor({
+    id: "project.extensions.c3.entity-select.action",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  entityExpandAction: createC3UiIdentityDescriptor({
+    id: "project.extensions.c3.entity-expand.action",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  detailPanel: createC3UiIdentityDescriptor({
+    id: "project.extensions.c3.detail.area",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  refreshAction: createC3UiIdentityDescriptor({
+    id: "project.extensions.c3.refresh.action",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+} as const
+
+export function getC3ExtensionUiIdentityDescriptors() {
+  return C3_EXTENSION_UI_DESCRIPTORS
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -9,13 +51,23 @@ import type { ExtensionProps } from "../../../shared/extension-types"
 interface C3Entity {
   id: string
   name: string
+  title?: string
   type: string
   children?: C3Entity[]
   [key: string]: unknown
 }
 
+interface RawC3Entity {
+  id: string
+  name?: string
+  title?: string
+  type?: string
+  children?: RawC3Entity[]
+  [key: string]: unknown
+}
+
 interface C3ListResponse {
-  data: C3Entity[] | { items: C3Entity[] } | string
+  data: RawC3Entity[] | { entities?: RawC3Entity[]; items?: RawC3Entity[] } | string
 }
 
 interface C3DetailResponse {
@@ -34,26 +86,38 @@ async function fetchExtApi<T>(route: string, localPath: string, params?: Record<
 }
 
 /** Normalize whatever the server sends into a flat/nested C3Entity[] */
-function normalizeEntities(raw: C3ListResponse["data"]): C3Entity[] {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isRawC3EntityArray(value: unknown): value is RawC3Entity[] {
+  return Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === "string")
+}
+
+function normalizeEntity(entity: RawC3Entity): C3Entity {
+  const { children: rawChildren, ...rest } = entity
+  const children = isRawC3EntityArray(rawChildren) ? rawChildren.map(normalizeEntity) : undefined
+  return {
+    ...rest,
+    name: entity.name ?? entity.title ?? entity.id,
+    type: entity.type ?? "unknown",
+    ...(children ? { children } : {}),
+  }
+}
+
+export function normalizeC3Entities(raw: C3ListResponse["data"]): C3Entity[] {
   if (typeof raw === "string") {
     try {
       const parsed = JSON.parse(raw)
-      return normalizeEntities(parsed)
+      return normalizeC3Entities(parsed)
     } catch (_e: unknown) {
       return []
     }
   }
-  if (Array.isArray(raw)) return raw
-  if (raw && typeof raw === "object" && "items" in raw && Array.isArray(raw.items)) return raw.items
-  // Last resort: wrap the object itself
-  if (raw && typeof raw === "object") {
-    const entries = Object.entries(raw)
-    return entries.map(([key, value]) => ({
-      id: key,
-      name: key,
-      type: "unknown",
-      ...(typeof value === "object" && value !== null && !Array.isArray(value) ? value as unknown as Record<string, unknown> : {}),
-    }))
+  if (isRawC3EntityArray(raw)) return raw.map(normalizeEntity)
+  if (isRecord(raw)) {
+    if (isRawC3EntityArray(raw.entities)) return raw.entities.map(normalizeEntity)
+    if (isRawC3EntityArray(raw.items)) return raw.items.map(normalizeEntity)
   }
   return []
 }
@@ -111,7 +175,7 @@ function DetailPanel({
   if (!detail && !graph) return null
 
   return (
-    <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
+    <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3" {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.detailPanel)}>
       {detail !== null && (
         <div>
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
@@ -176,33 +240,42 @@ function EntityCard({
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => onSelect(entity.id)}
-        className={`w-full text-left px-4 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-accent/50 ${
+      <div
+        className={`w-full px-4 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-accent/50 ${
           isSelected ? "bg-accent/70" : ""
         }`}
         style={{ paddingLeft: `${1 + depth * 1.25}rem` }}
+        {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.entityItem)}
       >
         {hasChildren ? (
-          <button
+          <Button
             type="button"
+            variant="none"
             onClick={(e) => {
               e.stopPropagation()
               setExpanded(!expanded)
             }}
-            className="size-4 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
+            className="size-4 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+            {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.entityExpandAction)}
           >
             {expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-          </button>
+          </Button>
         ) : (
           <span className="size-4 shrink-0" />
         )}
 
-        <span className="text-xs font-mono text-muted-foreground shrink-0 w-16 truncate">{entity.id}</span>
-        <span className="text-sm font-medium text-foreground truncate flex-1">{entity.name}</span>
-        {typeBadge(entity.type)}
-      </button>
+        <Button
+          type="button"
+          variant="none"
+          onClick={() => onSelect(entity.id)}
+          className="flex h-auto min-w-0 flex-1 items-center justify-start gap-2.5 p-0 text-left"
+          {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.entitySelectAction)}
+        >
+          <span className="text-xs font-mono text-muted-foreground shrink-0 w-16 truncate">{entity.id}</span>
+          <span className="text-sm font-medium text-foreground truncate flex-1">{entity.name}</span>
+          {typeBadge(entity.type)}
+        </Button>
+      </div>
 
       {isSelected && (
         <DetailPanel
@@ -256,7 +329,7 @@ export default function C3Extension({ localPath }: ExtensionProps) {
     setGraph(null)
     try {
       const res = await fetchExtApi<C3ListResponse>("list", localPath)
-      setEntities(normalizeEntities(res.data))
+      setEntities(normalizeC3Entities(res.data))
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       setError(msg)
@@ -305,7 +378,7 @@ export default function C3Extension({ localPath }: ExtensionProps) {
   // -------------------------------------------------------------------------
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-12">
+      <div className="flex-1 flex items-center justify-center p-12" {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.root)}>
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Loading architecture...</p>
@@ -319,18 +392,21 @@ export default function C3Extension({ localPath }: ExtensionProps) {
   // -------------------------------------------------------------------------
   if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center p-12">
+      <div className="flex-1 flex items-center justify-center p-12" {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.root)}>
         <div className="flex flex-col items-center gap-3 max-w-sm text-center">
           <AlertCircle className="size-5 text-destructive" />
           <p className="text-sm text-foreground">{error}</p>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={fetchList}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
+            className="h-8 gap-1.5 border-0 bg-accent text-accent-foreground hover:bg-accent/80"
+            {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.refreshAction)}
           >
             <RefreshCw className="size-3.5" />
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -341,18 +417,21 @@ export default function C3Extension({ localPath }: ExtensionProps) {
   // -------------------------------------------------------------------------
   if (entities.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-12">
+      <div className="flex-1 flex items-center justify-center p-12" {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.root)}>
         <div className="flex flex-col items-center gap-3 text-center">
           <Building2 className="size-5 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">No architecture components found</p>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={fetchList}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
+            className="h-8 gap-1.5 border-0 bg-accent text-accent-foreground hover:bg-accent/80"
+            {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.refreshAction)}
           >
             <RefreshCw className="size-3.5" />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -364,20 +443,23 @@ export default function C3Extension({ localPath }: ExtensionProps) {
   const total = countEntities(entities)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden" {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.root)}>
       {/* Description bar — no heading (tab label already shows "Architecture") */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
         <span className="text-sm text-muted-foreground">
           {total} {total === 1 ? "entity" : "entities"} across containers and components
         </span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={fetchList}
-          className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+          className="size-7 border-0"
           title="Refresh"
+          {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.refreshAction)}
         >
           <RefreshCw className="size-3.5" />
-        </button>
+        </Button>
       </div>
 
       {/* Entity list */}

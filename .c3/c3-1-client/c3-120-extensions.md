@@ -1,6 +1,6 @@
 ---
 id: c3-120
-c3-seal: 8d3b7f1610f683f54732ac2becb4d160d16c4abbf2464635f857b54a0e3eeab5
+c3-seal: 6b9c03a10451beb5cd67f6d938bd270298c205b9521b9f41fd2d705766074fc2
 title: extensions
 type: component
 category: feature
@@ -8,11 +8,12 @@ parent: c3-1
 goal: Extension host for the Project Page — auto-detects relevant project extensions via filesystem probes, renders them as SegmentedControl tabs. Lazy-loads extension React components (c3 architecture, agents config, code overview). User preferences (enable/disable) override detection results globally.
 uses:
     - ref-mobile-tabbed-page-pattern
+    - ref-ref-event-sourcing
     - ref-ref-tailwind-theming
     - ref-screen-composition-patterns
-    - ref-ref-event-sourcing
     - rule-error-extraction
     - rule-ui-component-usage
+    - rule-ui-identity-composition
 ---
 
 ## Goal
@@ -45,7 +46,7 @@ Extension host for the Project Page — auto-detects relevant project extensions
 | rule-ui-component-usage | Use shared UI primitives for form elements |
 | rule-error-extraction | error instanceof Error ? error.message : String(error) |
 | rule-prefixed-logging | LOG_PREFIX for console.warn |
-
+| rule-ui-identity-composition | C3-owned data-ui-id and data-ui-c3 metadata for project extension surfaces |
 ## Extension Preferences (Client)
 
 Three-level visibility hierarchy determines whether an extension appears in a ProjectPage:
@@ -53,11 +54,8 @@ Three-level visibility hierarchy determines whether an extension appears in a Pr
 1. **Manifest declares** — extension exists in `clientExtensions` / `serverExtensions` registries
 2. **Filesystem detects** — `/api/ext/detect` probes the project path; only detected extensions proceed
 3. **User preferences override** — if `pref.enabled === false`, the extension is hidden even when detected
-
 `useExtensionPreferencesSubscription` subscribes to the `extension-preferences` WebSocket topic and returns an `ExtensionPreferencesSnapshot`. ProjectPage's `activeExtensions` memo combines detection results with preferences: `detectedIds.includes(ext.id) && pref?.enabled !== false`.
-
 `ExtensionsTab` (rendered in SettingsPage) lists all registered extensions with toggle switches. Toggling sends `extension.preference.set` command via the socket transport. Preferences are global (not per-project) in v1.
-
 ## Code Map
 
 | File | Purpose |

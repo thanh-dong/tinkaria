@@ -1,8 +1,34 @@
 import { useEffect, useState } from "react"
 import { AlertCircle, Loader2, Package } from "lucide-react"
+import {
+  createC3UiIdentityDescriptor,
+  getUiIdentityAttributeProps,
+} from "../../lib/uiIdentityOverlay"
 import type { ExtensionProps } from "../../../shared/extension-types"
 
 const LOG_PREFIX = "[CodeExtension]"
+
+const CODE_EXTENSION_UI_DESCRIPTORS = {
+  root: createC3UiIdentityDescriptor({
+    id: "project.extensions.code.area",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  manifest: createC3UiIdentityDescriptor({
+    id: "project.extensions.code.manifest.item",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  table: createC3UiIdentityDescriptor({
+    id: "project.extensions.code.table.area",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+} as const
+
+export function getCodeExtensionUiIdentityDescriptors() {
+  return CODE_EXTENSION_UI_DESCRIPTORS
+}
 
 interface ManifestResult {
   language: string
@@ -48,7 +74,7 @@ function DepsTable({ deps, label }: { deps: Record<string, string>; label: strin
       <h3 className="text-sm font-medium text-foreground mb-2">
         {label} ({sorted.length})
       </h3>
-      <div className="rounded-md border border-border overflow-hidden">
+      <div className="rounded-md border border-border overflow-hidden" {...getUiIdentityAttributeProps(CODE_EXTENSION_UI_DESCRIPTORS.table)}>
         <table className="w-full text-sm">
           <tbody>
             {sorted.map(([name, version]) => (
@@ -71,7 +97,7 @@ function ScriptsTable({ scripts }: { scripts: Record<string, string> }) {
   return (
     <div>
       <h3 className="text-sm font-medium text-foreground mb-2">Scripts</h3>
-      <div className="rounded-md border border-border overflow-hidden">
+      <div className="rounded-md border border-border overflow-hidden" {...getUiIdentityAttributeProps(CODE_EXTENSION_UI_DESCRIPTORS.table)}>
         <table className="w-full text-sm">
           <tbody>
             {entries.map(([name, command]) => (
@@ -94,7 +120,7 @@ function ManifestCard({ manifest }: { manifest: ManifestResult }) {
 
   if (manifest.error) {
     return (
-      <div className="p-4 space-y-3">
+    <div className="p-4 space-y-3" {...getUiIdentityAttributeProps(CODE_EXTENSION_UI_DESCRIPTORS.manifest)}>
         <div className="flex items-center gap-2">
           <LanguageBadge language={manifest.language} />
           <span className="text-sm text-destructive flex items-center gap-1">
@@ -108,7 +134,7 @@ function ManifestCard({ manifest }: { manifest: ManifestResult }) {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4" {...getUiIdentityAttributeProps(CODE_EXTENSION_UI_DESCRIPTORS.manifest)}>
       <div className="flex items-center gap-2">
         <LanguageBadge language={manifest.language} />
         {manifest.name && (
@@ -160,7 +186,7 @@ export default function CodeExtension({ localPath }: ExtensionProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex items-center justify-center p-8" {...getUiIdentityAttributeProps(CODE_EXTENSION_UI_DESCRIPTORS.root)}>
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     )
@@ -168,7 +194,7 @@ export default function CodeExtension({ localPath }: ExtensionProps) {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 gap-2">
+      <div className="flex flex-col items-center justify-center p-8 gap-2" {...getUiIdentityAttributeProps(CODE_EXTENSION_UI_DESCRIPTORS.root)}>
         <AlertCircle className="size-5 text-destructive" />
         <p className="text-sm text-muted-foreground">Failed to load project info</p>
         <p className="text-xs text-muted-foreground font-mono">{error}</p>
@@ -178,7 +204,7 @@ export default function CodeExtension({ localPath }: ExtensionProps) {
 
   if (manifests.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 gap-2">
+      <div className="flex flex-col items-center justify-center p-8 gap-2" {...getUiIdentityAttributeProps(CODE_EXTENSION_UI_DESCRIPTORS.root)}>
         <Package className="size-5 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">No project manifests found</p>
       </div>
@@ -186,7 +212,7 @@ export default function CodeExtension({ localPath }: ExtensionProps) {
   }
 
   return (
-    <div className="overflow-y-auto">
+    <div className="overflow-y-auto" {...getUiIdentityAttributeProps(CODE_EXTENSION_UI_DESCRIPTORS.root)}>
       {manifests.map((manifest, i) => (
         <div key={`${manifest.language}-${manifest.name}-${i}`}>
           {i > 0 && <div className="border-t border-border" />}

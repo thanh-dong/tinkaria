@@ -1,12 +1,66 @@
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { useNavigate, useOutletContext, useParams } from "react-router-dom"
 import { ArrowLeft, Building2, Bot, Code, FolderOpen, Loader2 } from "lucide-react"
+import { Button } from "../components/ui/button"
 import { SegmentedControl, type SegmentedOption } from "../components/ui/segmented-control"
 import { clientExtensions } from "../extensions.config"
 import type { AppState } from "./useAppState"
 import type { DetectionResult } from "../../shared/extension-types"
 import { useExtensionPreferencesSubscription } from "./useExtensionPreferencesSubscription"
 import { getPathBasename } from "../lib/formatters"
+import {
+  createC3UiIdentityDescriptor,
+  getUiIdentityAttributeProps,
+  getUiIdentityIdMap,
+} from "../lib/uiIdentityOverlay"
+
+const PROJECT_PAGE_UI_DESCRIPTORS = {
+  page: createC3UiIdentityDescriptor({
+    id: "project.extensions.page",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  header: createC3UiIdentityDescriptor({
+    id: "project.extensions.header",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  backAction: createC3UiIdentityDescriptor({
+    id: "project.extensions.back.action",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  tabs: createC3UiIdentityDescriptor({
+    id: "project.extensions.tabs",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  content: createC3UiIdentityDescriptor({
+    id: "project.extensions.content",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  emptyState: createC3UiIdentityDescriptor({
+    id: "project.extensions.empty-state",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+  loadingState: createC3UiIdentityDescriptor({
+    id: "project.extensions.loading-state",
+    c3ComponentId: "c3-120",
+    c3ComponentLabel: "extensions",
+  }),
+} as const
+
+const PROJECT_PAGE_UI_IDENTITIES = getUiIdentityIdMap(PROJECT_PAGE_UI_DESCRIPTORS)
+
+export function getProjectPageUiIdentityDescriptors() {
+  return PROJECT_PAGE_UI_DESCRIPTORS
+}
+
+export function getProjectPageUiIdentities() {
+  return PROJECT_PAGE_UI_IDENTITIES
+}
 
 const ICON_MAP: Record<string, typeof Building2> = {
   "building-2": Building2,
@@ -80,34 +134,38 @@ export function ProjectPage() {
 
   if (!groupKey) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-muted-foreground">Project not found</p>
+      <div className="flex-1 flex items-center justify-center" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.page)}>
+        <p className="text-muted-foreground" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.emptyState)}>Project not found</p>
       </div>
     )
   }
 
   if (!localPath) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-muted-foreground">Project not found</p>
+      <div className="flex-1 flex items-center justify-center" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.page)}>
+        <p className="text-muted-foreground" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.emptyState)}>Project not found</p>
       </div>
     )
   }
 
   if (detectedIds === null && !detectError) {
     return (
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3">
-          <button
+      <div className="flex-1 flex flex-col min-w-0 relative" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.page)}>
+        <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.header)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => navigate("/")}
-            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 md:hidden"
+            className="size-7 border-0 md:hidden"
+            {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.backAction)}
           >
             <ArrowLeft className="size-4" />
-          </button>
+          </Button>
           <FolderOpen className="size-4 text-muted-foreground hidden md:block" />
           <h1 className="text-base font-semibold text-foreground md:text-lg truncate">{getPathBasename(localPath)}</h1>
         </div>
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.loadingState)}>
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
       </div>
@@ -116,18 +174,22 @@ export function ProjectPage() {
 
   if (detectError || activeExtensions.length === 0) {
     return (
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3">
-          <button
+      <div className="flex-1 flex flex-col min-w-0 relative" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.page)}>
+        <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.header)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => navigate("/")}
-            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 md:hidden"
+            className="size-7 border-0 md:hidden"
+            {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.backAction)}
           >
             <ArrowLeft className="size-4" />
-          </button>
+          </Button>
           <FolderOpen className="size-4 text-muted-foreground hidden md:block" />
           <h1 className="text-base font-semibold text-foreground md:text-lg truncate">{getPathBasename(localPath)}</h1>
         </div>
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.emptyState)}>
           <p className="text-muted-foreground">No extensions available</p>
         </div>
       </div>
@@ -135,19 +197,23 @@ export function ProjectPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 relative">
-      <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3">
-        <button
+    <div className="flex-1 flex flex-col min-w-0 relative" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.page)}>
+      <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.header)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={() => navigate("/")}
-          className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 md:hidden"
+          className="size-7 border-0 md:hidden"
+          {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.backAction)}
         >
           <ArrowLeft className="size-4" />
-        </button>
+        </Button>
         <FolderOpen className="size-4 text-muted-foreground hidden md:block" />
         <h1 className="text-base font-semibold text-foreground md:text-lg truncate">{getPathBasename(localPath)}</h1>
       </div>
       {tabOptions.length > 1 && activeTab !== null && (
-        <div className="px-4 mb-3">
+        <div className="px-4 mb-3" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.tabs)}>
           <SegmentedControl
             value={activeTab}
             onValueChange={setActiveTab}
@@ -159,9 +225,9 @@ export function ProjectPage() {
           />
         </div>
       )}
-      <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg overflow-hidden border border-border bg-background">
+      <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg overflow-hidden border border-border bg-background" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.content)}>
         <Suspense fallback={
-          <div className="flex-1 flex items-center justify-center p-8">
+          <div className="flex-1 flex items-center justify-center p-8" {...getUiIdentityAttributeProps(PROJECT_PAGE_UI_DESCRIPTORS.loadingState)}>
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
         }>
