@@ -294,14 +294,17 @@ describe("CodexAppServerManager", () => {
           "Do not assume delegated chats share live intermediate reasoning"
         )
         expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
-          "Use rich transcript formatting proactively"
+          "Use structured rich transcript output when it improves clarity"
         )
         expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
           "Prefer direct rich embeds or structured artifact cards over bare links"
         )
         expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("implementation plans")
         expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("comparison tables")
-        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("Diashort artifact")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("`pug`/`pugjs` for compiled template embeds")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
+          "Tailwind v4 browser runtime available by default"
+        )
         child.writeServerMessage({
           id: message.id,
           result: { turn: { id: "turn-1", status: "completed", error: null } },

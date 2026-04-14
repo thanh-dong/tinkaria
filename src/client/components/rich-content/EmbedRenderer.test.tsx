@@ -24,6 +24,11 @@ describe("isEmbedLanguage", () => {
     expect(isEmbedLanguage("diashort")).toBe(true)
   })
 
+  test("returns true for pug and pugjs alias", () => {
+    expect(isEmbedLanguage("pug")).toBe(true)
+    expect(isEmbedLanguage("pugjs")).toBe(true)
+  })
+
   test("returns false for typescript", () => {
     expect(isEmbedLanguage("typescript")).toBe(false)
   })
@@ -137,6 +142,7 @@ describe("EmbedRenderer html embed", () => {
     )
 
     expect(html).toContain("srcDoc")
+    expect(html).toContain("@tailwindcss/browser@4")
     expect(html).toContain("&lt;h1&gt;Hello&lt;/h1&gt;")
     expect(html).toContain('sandbox="allow-scripts"')
   })
@@ -162,6 +168,34 @@ describe("EmbedRenderer html embed", () => {
 
     expect(html).not.toContain("srcDoc")
     expect(html).toContain("&lt;div&gt;mockup&lt;/div&gt;")
+  })
+
+  test("renders pug through the html embed path with tailwind runtime", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="pugjs" source={"main\n  h1.text-3xl Hello"} />
+    )
+
+    expect(html).toContain('data-pug-embed="true"')
+    expect(html).toContain("srcDoc")
+    expect(html).toContain("@tailwindcss/browser@4")
+    expect(html).toContain("text-3xl")
+    expect(html).toContain("Hello")
+  })
+
+  test("shows raw pug source in source mode", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "source", zoom: 1 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="pug" source={"main\n  h1 Hello"} />
+      </ContentViewerContext.Provider>
+    )
+
+    expect(html).not.toContain("srcDoc")
+    expect(html).toContain("main")
+    expect(html).toContain("h1 Hello")
   })
 })
 

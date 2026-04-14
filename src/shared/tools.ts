@@ -15,6 +15,7 @@ import type {
   ReadFileToolResult,
   TodoItem,
 } from "./types"
+import { normalizePresentContentFormat } from "./presentContent"
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null
@@ -71,7 +72,7 @@ export function normalizeToolCall(args: {
         input: {
           title: typeof input.title === "string" ? input.title : "",
           kind: isPresentContentKind(input.kind) ? input.kind : "markdown",
-          format: typeof input.format === "string" ? input.format : "text",
+          format: typeof input.format === "string" ? normalizePresentContentFormat(input.format) : "text",
           source: typeof input.source === "string" ? input.source : "",
           summary: typeof input.summary === "string" ? input.summary : undefined,
           collapsed: typeof input.collapsed === "boolean" ? input.collapsed : undefined,
@@ -303,7 +304,8 @@ function parseJsonValue(value: unknown): unknown {
   if (typeof value !== "string") return value
   try {
     return JSON.parse(value)
-  } catch {
+  } catch (error: unknown) {
+    void error
     return value
   }
 }
@@ -379,7 +381,7 @@ export function hydrateToolResult(tool: NormalizedToolCall, raw: unknown): Hydra
         accepted: true,
         title: typeof record?.title === "string" ? record.title : tool.input.title,
         kind: isPresentContentKind(record?.kind) ? record.kind : tool.input.kind,
-        format: typeof record?.format === "string" ? record.format : tool.input.format,
+        format: typeof record?.format === "string" ? normalizePresentContentFormat(record.format) : tool.input.format,
         source: typeof record?.source === "string" ? record.source : tool.input.source,
         summary: typeof record?.summary === "string" ? record.summary : tool.input.summary,
         collapsed: typeof record?.collapsed === "boolean" ? record.collapsed : tool.input.collapsed,

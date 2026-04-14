@@ -1,10 +1,14 @@
 import { memo, useEffect, useRef, useState } from "react"
+import { render as renderPug } from "pug"
+import { normalizePresentContentFormat } from "../../../shared/presentContent"
 import { clampEmbedZoom, useContentViewer } from "./ContentViewerContext"
 
-const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort", "html"])
+const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort", "html", "pug"])
+const TAILWIND_BROWSER_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
+const DEFAULT_EMBED_STYLE = "html,body{margin:0;min-height:100%;background:transparent;}body{padding:1rem;font-family:Inter,ui-sans-serif,system-ui,sans-serif;}"
 
 export function isEmbedLanguage(language: string | null): boolean {
-  return language !== null && EMBED_LANGUAGES.has(language)
+  return language !== null && EMBED_LANGUAGES.has(normalizePresentContentFormat(language))
 }
 
 interface EmbedRendererProps {
@@ -18,20 +22,26 @@ export const EmbedRenderer = memo(function EmbedRenderer({
   format,
   source,
 }: EmbedRendererProps) {
-  if (format === "mermaid") {
+  const normalizedFormat = normalizePresentContentFormat(format)
+
+  if (normalizedFormat === "mermaid") {
     return <MermaidDiagram source={source} />
   }
 
-  if (format === "html") {
+  if (normalizedFormat === "html") {
     return <HtmlEmbed source={source} />
   }
 
-  if (format === "svg") {
+  if (normalizedFormat === "pug") {
+    return <PugEmbed source={source} />
+  }
+
+  if (normalizedFormat === "svg") {
     return <SvgEmbed source={source} />
   }
 
-  if (format === "iframe" || format === "diashort") {
-    return <RemoteEmbed format={format} source={source} />
+  if (normalizedFormat === "iframe" || normalizedFormat === "diashort") {
+    return <RemoteEmbed format={normalizedFormat} source={source} />
   }
 
   // D2 and other formats: show source as fallback
@@ -228,6 +238,7 @@ function useEmbedState() {
 
 function HtmlEmbed({ source }: { source: string }) {
   const { mode, zoom, adjustZoom } = useEmbedState()
+  const htmlSource = createHtmlEmbedDocument(source)
 
   return (
     <>
@@ -245,12 +256,60 @@ function HtmlEmbed({ source }: { source: string }) {
         >
           <iframe
             data-html-embed="true"
-            srcDoc={source}
+            srcDoc={htmlSource}
             title="HTML content"
             sandbox="allow-scripts"
             className="block h-[420px] w-full border-0 bg-background"
           />
         </div>
+      ) : (
+        <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
+          {source}
+        </pre>
+      )}
+    </>
+  )
+}
+
+function PugEmbed({ source }: { source: string }) {
+  const { mode, zoom, adjustZoom } = useEmbedState()
+  const compiled = compilePugEmbedSource(source)
+
+  return (
+    <>
+      {mode === "render" ? (
+        compiled.ok ? (
+          <div
+            onWheel={(event) => {
+              const direction = getEmbedWheelZoomIntent(event)
+              if (!direction) return
+              event.preventDefault()
+              adjustZoom(direction)
+            }}
+            data-embed-zoomable="true"
+            style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
+            className="overflow-hidden rounded-md border border-border/60 bg-background"
+          >
+            <iframe
+              data-html-embed="true"
+              data-pug-embed="true"
+              srcDoc={compiled.html}
+              title="Pug content"
+              sandbox="allow-scripts"
+              className="block h-[420px] w-full border-0 bg-background"
+            />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-xs text-destructive">Pug render error</div>
+            <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
+              {compiled.message}
+            </pre>
+            <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
+              {source}
+            </pre>
+          </div>
+        )
       ) : (
         <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
           {source}
@@ -353,6 +412,63 @@ function readSvgTag(
   const name = nameMatch[1]
   const selfClosing = !closing && /\/\s*$/.test(body)
   return { name, closing, selfClosing, end: end + 1 }
+}
+
+function createHtmlEmbedDocument(source: string): string {
+  const trimmed = source.trim()
+  if (!trimmed) {
+    return createStandaloneHtmlDocument("")
+  }
+
+  if (!looksLikeHtmlDocument(trimmed)) {
+    return createStandaloneHtmlDocument(trimmed)
+  }
+
+  return injectEmbedShellIntoDocument(trimmed)
+}
+
+function createStandaloneHtmlDocument(bodyMarkup: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />${createTailwindBootstrapTag()}<style>${DEFAULT_EMBED_STYLE}</style></head><body>${bodyMarkup}</body></html>`
+}
+
+function createTailwindBootstrapTag(): string {
+  return `<script src="${TAILWIND_BROWSER_SCRIPT_URL}"></script>`
+}
+
+function looksLikeHtmlDocument(source: string): boolean {
+  return /<!doctype html/i.test(source) || /<html[\s>]/i.test(source) || /<head[\s>]/i.test(source)
+}
+
+function injectEmbedShellIntoDocument(source: string): string {
+  const withHead = /<head[\s>]/i.test(source)
+    ? source
+    : source.replace(/<html([^>]*)>/i, `<html$1><head></head>`)
+
+  const withTailwind = withHead.includes(TAILWIND_BROWSER_SCRIPT_URL)
+    ? withHead
+    : withHead.replace(/<\/head>/i, `${createTailwindBootstrapTag()}</head>`)
+
+  const withStyle = /<style[^>]*data-tinkaria-embed-base/i.test(withTailwind)
+    ? withTailwind
+    : withTailwind.replace(/<\/head>/i, `<style data-tinkaria-embed-base>${DEFAULT_EMBED_STYLE}</style></head>`)
+
+  return withStyle
+}
+
+function compilePugEmbedSource(source: string): { ok: true; html: string } | { ok: false; message: string } {
+  try {
+    const html = renderPug(source, { doctype: "html" })
+    return { ok: true, html: createHtmlEmbedDocument(html) }
+  } catch (error: unknown) {
+    return { ok: false, message: getErrorMessage(error) }
+  }
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && typeof error.message === "string" && error.message.trim()) {
+    return error.message
+  }
+  return "Pug render error"
 }
 
 function SvgEmbed({ source }: { source: string }) {

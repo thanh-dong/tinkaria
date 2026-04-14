@@ -204,7 +204,8 @@ function errorMessage(value: unknown): string {
 function parseJsonLine(line: string): unknown | null {
   try {
     return JSON.parse(line)
-  } catch {
+  } catch (error: unknown) {
+    void error
     return null
   }
 }
@@ -317,7 +318,10 @@ function dynamicToolDefinitions(args: StartCodexTurnArgs): DynamicToolDefinition
         properties: {
           title: { type: "string" },
           kind: { type: "string", enum: ["markdown", "code", "diagram"] },
-          format: { type: "string" },
+          format: {
+            type: "string",
+            description: "Content format such as markdown, typescript, mermaid, svg, html, pug, iframe, or diashort.",
+          },
           source: { type: "string" },
           summary: { type: "string" },
           collapsed: { type: "boolean" },
@@ -1046,7 +1050,8 @@ export class CodexAppServerManager {
     this.sessions.delete(chatId)
     try {
       context.child.kill("SIGKILL")
-    } catch {
+    } catch (error: unknown) {
+      void error
       // ignore kill failures
     }
   }
@@ -1694,7 +1699,8 @@ export class CodexAppServerManager {
     if (context.closed) return
     try {
       context.child.stdin.write(`${JSON.stringify(message)}\n`)
-    } catch {
+    } catch (error: unknown) {
+      void error
       // Child process already dead — ignore write failures (EPIPE etc.)
     }
   }

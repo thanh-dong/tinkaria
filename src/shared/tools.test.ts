@@ -72,6 +72,23 @@ describe("normalizeToolCall", () => {
     expect(tool.input.title).toBe("System Design")
     expect(tool.input.format).toBe("mermaid")
   })
+
+  test("normalizes present_content pug aliases", () => {
+    const tool = normalizeToolCall({
+      toolName: "present_content",
+      toolId: "tool-4b",
+      input: {
+        title: "Mockup",
+        kind: "diagram",
+        format: "pugjs",
+        source: "main\n  h1 Hello",
+      },
+    })
+
+    expect(tool.toolKind).toBe("present_content")
+    if (tool.toolKind !== "present_content") throw new Error("unexpected tool kind")
+    expect(tool.input.format).toBe("pug")
+  })
 })
 
 describe("hydrateToolResult", () => {
@@ -147,6 +164,36 @@ describe("hydrateToolResult", () => {
       source: "const x = 1",
       summary: "Context",
       collapsed: false,
+    })
+  })
+
+  test("hydrates present_content results with normalized pug aliases", () => {
+    const tool = normalizeToolCall({
+      toolName: "present_content",
+      toolId: "tool-4c",
+      input: {
+        title: "Mockup",
+        kind: "diagram",
+        format: "pugjs",
+        source: "main\n  h1 Hello",
+      },
+    })
+
+    const result = hydrateToolResult(tool, {
+      title: "Mockup",
+      kind: "diagram",
+      format: "pugjs",
+      source: "main\n  h1 Hello",
+    })
+
+    expect(result).toEqual({
+      accepted: true,
+      title: "Mockup",
+      kind: "diagram",
+      format: "pug",
+      source: "main\n  h1 Hello",
+      summary: undefined,
+      collapsed: undefined,
     })
   })
 
