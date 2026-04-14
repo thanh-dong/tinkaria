@@ -441,7 +441,7 @@ describe("getChatPageUiIdentities", () => {
     })
   })
 
-  test("renders the assistant response id outside the long-message response chrome", () => {
+  test("renders the assistant response id without the old response card title", () => {
     const html = renderToStaticMarkup(
       createElement(TextMessage, {
         message: createAssistantTextMessage("x".repeat(801)),
@@ -449,11 +449,11 @@ describe("getChatPageUiIdentities", () => {
     )
 
     const identityIndex = html.indexOf('data-ui-id="message.assistant.response"')
-    const responseTitleIndex = html.indexOf(">Response<")
 
     expect(identityIndex).toBeGreaterThan(-1)
-    expect(responseTitleIndex).toBeGreaterThan(-1)
-    expect(identityIndex).toBeLessThan(responseTitleIndex)
+    expect(html).not.toContain(">Response<")
+    expect(html).toContain("group-hover/rich-content:opacity-100")
+    expect(html).toContain("group-focus-within/rich-content:opacity-100")
   })
 
   test("renders the navbar id on the ChatNavbar visible surface", () => {

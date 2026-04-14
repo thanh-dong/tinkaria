@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useReducer, useState, type ReactNode } from "react"
+import { memo, useCallback, useMemo, useReducer, useRef, useState, type PointerEvent, type ReactNode } from "react"
 import {
   Code,
   FileText,
@@ -37,6 +37,9 @@ interface RichContentBlockProps {
   defaultExpanded?: boolean
   children: ReactNode
   rawContent?: string
+  chrome?: "card" | "inline"
+  controlsVisibility?: "always" | "hover-or-touch"
+  bodyClassName?: string
 }
 
 
@@ -46,6 +49,9 @@ export const RichContentBlock = memo(function RichContentBlock({
   defaultExpanded = false,
   children,
   rawContent,
+  chrome = "card",
+  controlsVisibility = "always",
+  bodyClassName,
 }: RichContentBlockProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [overlayOpen, setOverlayOpen] = useState(false)
@@ -58,6 +64,14 @@ export const RichContentBlock = memo(function RichContentBlock({
   const isMobile = useIsMobile()
   const Icon = typeIcons[type]
   const displayTitle = title ?? type
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  const handlePointerDownCapture = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (controlsVisibility !== "hover-or-touch" || event.pointerType !== "touch") {
+      return
+    }
+    rootRef.current?.focus()
+  }, [controlsVisibility])
 
   const handleCopy = useCallback(async () => {
     if (!rawContent) return
@@ -113,44 +127,75 @@ export const RichContentBlock = memo(function RichContentBlock({
     </div>
   )
 
+  const content = (
+    <div
+      className={cn(
+        "relative transition-[max-height] duration-200 ease-in-out",
+        !expanded && `${COLLAPSED_MAX_HEIGHT} overflow-hidden`
+      )}
+    >
+      <div className={cn(CONTENT_BLOCK_BODY_CLASS_NAME, bodyClassName)}>{children}</div>
+      {!expanded ? (
+        <div
+          className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none"
+          aria-hidden="true"
+        />
+      ) : null}
+    </div>
+  )
+
   return (
     <ContentViewerContext.Provider value={useMemo(() => ({ state: viewerState, dispatch }), [viewerState, dispatch])}>
-      <div className="group/rich-content rounded-lg border border-border overflow-hidden">
-        <div
-          className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 border-b border-border text-xs",
-            isMobile && "py-1"
-          )}
-        >
-          <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate font-medium text-muted-foreground">
-            {displayTitle}
-          </span>
-          {!isMobile ? (
-            <div className="ml-auto">{controls}</div>
-          ) : null}
-        </div>
-
-        <div
-          className={cn(
-            "relative transition-[max-height] duration-200 ease-in-out",
-            !expanded && `${COLLAPSED_MAX_HEIGHT} overflow-hidden`
-          )}
-        >
-          <div className={CONTENT_BLOCK_BODY_CLASS_NAME}>{children}</div>
-          {!expanded && (
+      <div
+        ref={rootRef}
+        className={cn(
+          "group/rich-content min-w-0",
+          chrome === "card" ? "rounded-lg border border-border overflow-hidden" : "relative w-full"
+        )}
+        onPointerDownCapture={handlePointerDownCapture}
+        tabIndex={controlsVisibility === "hover-or-touch" ? -1 : undefined}
+      >
+        {chrome === "card" ? (
+          <>
             <div
-              className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none"
-              aria-hidden="true"
-            />
-          )}
-        </div>
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 border-b border-border text-xs",
+                isMobile && "py-1"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate font-medium text-muted-foreground">
+                {displayTitle}
+              </span>
+              {!isMobile ? (
+                <div className="ml-auto">{controls}</div>
+              ) : null}
+            </div>
 
-        {isMobile ? (
-          <div className="flex items-center justify-end px-2.5 py-1.5 bg-muted/50 border-t border-border">
-            {controls}
-          </div>
-        ) : null}
+            {content}
+
+            {isMobile ? (
+              <div className="flex items-center justify-end px-2.5 py-1.5 bg-muted/50 border-t border-border">
+                {controls}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <div
+              className={cn(
+                "absolute right-0 top-0 z-10",
+                controlsVisibility === "hover-or-touch" && "opacity-0 pointer-events-none transition-opacity duration-150 group-hover/rich-content:opacity-100 group-hover/rich-content:pointer-events-auto group-focus-within/rich-content:opacity-100 group-focus-within/rich-content:pointer-events-auto"
+              )}
+            >
+              <div className="inline-flex items-center gap-0.5 rounded-full border border-border/70 bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
+                {controls}
+              </div>
+            </div>
+
+            {content}
+          </>
+        )}
 
         <ContentOverlay
           open={overlayOpen}

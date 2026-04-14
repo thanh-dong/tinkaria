@@ -133,4 +133,24 @@ describe("RichContentBlock", () => {
     // Embed state defaults: renderMode=render, zoom=1
     expect(html).toContain("100%")
   })
+
+  test("supports inline chrome with hover-or-touch revealed controls", () => {
+    const html = renderToStaticMarkup(
+      <RichContentBlock
+        type="markdown"
+        chrome="inline"
+        controlsVisibility="hover-or-touch"
+        rawContent="hello"
+      >
+        <p>hello</p>
+      </RichContentBlock>
+    )
+
+    expect(html).not.toContain("rounded-lg border border-border overflow-hidden")
+    expect(html).toContain("group-hover/rich-content:opacity-100")
+    expect(html).toContain("group-focus-within/rich-content:opacity-100")
+    expect(html).toContain('tabindex="-1"')
+    expect(html).toContain('aria-label="Copy content"')
+    expect(html).toContain('aria-label="Open in overlay"')
+  })
 })
