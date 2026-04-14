@@ -1,5 +1,5 @@
 import { useCallback, useReducer, useRef, useState, type ReactNode } from "react"
-import { ArrowLeft, Code, FileText, GitCompareArrows, Image, Copy, Check } from "lucide-react"
+import { ArrowLeft, Code, FileText, GitCompareArrows, Image, Copy, Check, X } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
   DIALOG_BODY_INSET_CLASS_NAME,
   RESPONSIVE_MODAL_HEADER_CLASS_NAME,
 } from "../ui/dialog"
+import { Button } from "../ui/button"
 import { cn } from "../../lib/utils"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps, type UiIdentityDescriptor } from "../../lib/uiIdentityOverlay"
 import { useIsMobile } from "../../hooks/useIsMobile"
@@ -23,6 +24,8 @@ const typeIcons: Record<RichContentType, typeof Code> = {
   code: Code, markdown: FileText, embed: Image, diff: GitCompareArrows,
 }
 
+const CONTENT_OVERLAY_FRAME_CLASS_NAME = "mx-auto w-full max-w-[96rem]"
+const CONTENT_OVERLAY_DIALOG_CLASS_NAME = "h-[100dvh] max-h-none"
 const CONTENT_OVERLAY_INNER_CLASS_NAME = `${DIALOG_BODY_INSET_CLASS_NAME} pt-4`
 const CONTENT_OVERLAY_ROOT_UI_ID = "rich-content.viewer.area"
 const CONTENT_OVERLAY_ROOT_UI_DESCRIPTOR = createUiIdentityDescriptor({
@@ -30,7 +33,7 @@ const CONTENT_OVERLAY_ROOT_UI_DESCRIPTOR = createUiIdentityDescriptor({
   c3ComponentId: "c3-107",
   c3ComponentLabel: "rich-content",
 })
-const DESKTOP_DIALOG_SIZE = "xl" as const
+const CONTENT_OVERLAY_DIALOG_SIZE = "fullscreen" as const
 
 const MOBILE_DIALOG_CLASSES =
   "h-[100dvh] data-[state=open]:slide-in-from-bottom data-[state=open]:duration-300 data-[state=closed]:slide-out-to-bottom data-[state=closed]:duration-200 data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100"
@@ -99,24 +102,45 @@ export function ContentOverlay({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        size={isMobile ? "fullscreen" : DESKTOP_DIALOG_SIZE}
-        className={cn(isMobile && MOBILE_DIALOG_CLASSES)}
+        size={CONTENT_OVERLAY_DIALOG_SIZE}
+        className={cn(CONTENT_OVERLAY_DIALOG_CLASS_NAME, isMobile && MOBILE_DIALOG_CLASSES)}
         {...getContentOverlayUiIdentityProps(rootUiId)}
       >
         <ContentViewerContext.Provider key={type} value={{ state: viewerState, dispatch }}>
           <DialogHeader className={cn(isMobile && RESPONSIVE_MODAL_HEADER_CLASS_NAME)}>
-            <div className="flex items-center gap-2 pr-8">
+            <div className={cn("flex w-full items-center gap-2", CONTENT_OVERLAY_FRAME_CLASS_NAME)}>
               {isMobile ? (
                 <DialogClose asChild>
-                  <button type="button" aria-label="Close" className="flex h-11 w-11 -ml-2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Close"
+                    className="-ml-2 h-11 w-11 rounded-lg text-muted-foreground hover:text-foreground"
+                  >
                     <ArrowLeft className="h-5 w-5" />
-                  </button>
+                  </Button>
                 </DialogClose>
               ) : (
                 <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
               )}
               <DialogTitle className="truncate text-sm">{title ?? type}</DialogTitle>
-              {!isMobile ? <div className="ml-auto">{controls}</div> : null}
+              {!isMobile ? (
+                <div className="ml-auto flex items-center gap-2">
+                  {controls}
+                  <DialogClose asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Close"
+                      className="h-8 w-8 rounded text-muted-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </DialogClose>
+                </div>
+              ) : null}
             </div>
           </DialogHeader>
 
@@ -131,12 +155,17 @@ export function ContentOverlay({
           ) : null}
 
           <DialogBody className="p-0">
-            <div ref={bodyRef} className={CONTENT_OVERLAY_INNER_CLASS_NAME}>{children}</div>
+            <div
+              ref={bodyRef}
+              className={cn(CONTENT_OVERLAY_INNER_CLASS_NAME, CONTENT_OVERLAY_FRAME_CLASS_NAME)}
+            >
+              {children}
+            </div>
           </DialogBody>
 
           {isMobile ? (
             <div className="flex items-center justify-end px-2.5 py-1.5 bg-muted/50 border-t border-border pb-[env(safe-area-inset-bottom)]">
-              {controls}
+              <div className={CONTENT_OVERLAY_FRAME_CLASS_NAME}>{controls}</div>
             </div>
           ) : null}
         </ContentViewerContext.Provider>
@@ -146,9 +175,11 @@ export function ContentOverlay({
 }
 
 export {
+  CONTENT_OVERLAY_DIALOG_CLASS_NAME,
+  CONTENT_OVERLAY_DIALOG_SIZE,
+  CONTENT_OVERLAY_FRAME_CLASS_NAME,
   CONTENT_OVERLAY_INNER_CLASS_NAME,
   CONTENT_OVERLAY_ROOT_UI_ID,
   MOBILE_DIALOG_CLASSES,
-  DESKTOP_DIALOG_SIZE,
   getContentOverlayUiIdentityProps,
 }
