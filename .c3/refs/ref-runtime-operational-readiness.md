@@ -1,6 +1,6 @@
 ---
 id: ref-runtime-operational-readiness
-c3-seal: 5f3418ccb49b0e08c44dfad055c0d6b94b0edb27cc629510d4a1ac636592c849
+c3-seal: 565b1adbf2dba8e42577efe90952a5be734101b90b18c755ada24be9bb50ece6
 title: runtime-operational-readiness
 type: ref
 goal: Make the Bun/NATS/runtime stack operationally observable and crash-resilient so health endpoints, startup behavior, and logs describe whether required runtime actors are actually ready to serve traffic — and child process failures cannot cascade into server death.
@@ -38,11 +38,53 @@ Three layers of defense prevent child process failures from killing the server:
 
 1. **IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
 **IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
+**IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
 
 2. **Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
 **Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
+**Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
 
 3. **Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
+**Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
 **Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
 
 When a child process dies, `failContext` cleanly resolves all pending work: pushes an error transcript entry, finishes the async queue, rejects pending RPC promises, and marks the context closed. Subsequent writes are silently dropped.

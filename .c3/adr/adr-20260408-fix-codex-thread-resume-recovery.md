@@ -1,6 +1,6 @@
 ---
 id: adr-20260408-fix-codex-thread-resume-recovery
-c3-seal: 200922f2d1dcac4525b23b794cc2144f166108936267e98945a56b0a29e1eb7e
+c3-seal: cec8a4a32a37653fbf379b98d491933e01c99cb6a6fa9749bc98d4f29958d95a
 title: fix-codex-thread-resume-recovery
 type: adr
 goal: Fix codex thread resume failures that cause threads to appear "deleted" with errors like "thread is not rollable".
@@ -22,8 +22,36 @@ Additionally, `startTurnForChat` in `agent.ts` has no error handling for `startS
 
 1. **`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
 **`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
+**`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
 
 2. **`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
+**`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
 **`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
 
 ## Affects

@@ -1,6 +1,6 @@
 ---
 id: c3-106
-c3-seal: 3cbb0cd06b0c62172b811eb514163d83f3b54f4576700864bb0ff65566b1027a
+c3-seal: 27b0cce1d1a33e21f8e99e7abbfb8dd30730c87dd7791ace836ea5602ab10df4
 title: present-content
 type: component
 category: feature
@@ -8,11 +8,14 @@ parent: c3-1
 goal: Dedicated present_content transcript feature that normalizes typed content artifacts, including direct embeds, and renders them as rich cards instead of generic tool text.
 uses:
     - c3-107
+    - recipe-agent-turn-render-flow
     - ref-component-identity-mapping
+    - ref-live-transcript-render-contract
     - ref-mcp-app-hosting
     - rule-bun-test-conventions
     - rule-react-no-effects
     - rule-rule-strict-typescript
+    - rule-transcript-boundary-regressions
 ---
 
 ## Goal
@@ -34,6 +37,8 @@ Dedicated present_content transcript feature that normalizes typed content artif
 | --- | --- |
 | ref-component-identity-mapping |  |
 | ref-mcp-app-hosting |  |
+| ref-live-transcript-render-contract |  |
+| recipe-agent-turn-render-flow |  |
 ## Related Rules
 
 | Rule | Constraint |
@@ -41,6 +46,7 @@ Dedicated present_content transcript feature that normalizes typed content artif
 | rule-bun-test-conventions | Tool normalization and renderer behavior stay covered end to end |
 | rule-react-no-effects | The transcript renderer stays declarative |
 | rule-rule-strict-typescript | present_content payloads remain typed across normalization and rendering |
+| rule-transcript-boundary-regressions |  |
 ## Container Connection
 
 Part of c3-1 (client). This is the user-visible structured artifact path in the transcript: Codex or future runtimes can emit bounded content cards or direct embeds, and the client renders them through one dedicated feature instead of treating them as generic tool output.

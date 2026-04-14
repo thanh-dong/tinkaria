@@ -1,11 +1,11 @@
 ---
 id: c3-0
-c3-seal: 4270c3634be9c7ce3d0f168f86eaa5f10a4673d903f76616f9f2a8d800ce33dc
+c3-seal: 7e7ff81c90a09aaa847aa0f9365099b15aebf105ec8f0dc9a0b9c4b1787a2632
 title: tinkaria
 goal: Provide a playful, web-based workbench UI for interacting with Claude Code and Codex — chat, terminals, project management, multi-provider support
 ---
 
-# Kanna
+# Tinkaria
 
 Full-stack TypeScript web UI for AI coding assistants (Claude Code & Codex CLIs).
 
@@ -17,7 +17,7 @@ Full-stack TypeScript web UI for AI coding assistants (Claude Code & Codex CLIs)
 ## Key Patterns
 
 - Event sourcing (JSONL logs + snapshot compaction)
-- CQRS (write: events → state, read: derived snapshots)
+- CQRS (write: events -> state, read: derived snapshots)
 - WebSocket subscription model (topic-based: sidebar, chat, terminal, keybindings)
 - Multi-provider abstraction (Claude + Codex, normalized catalog)
 - Multi-turn AI session management with tool gating

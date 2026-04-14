@@ -1,9 +1,9 @@
 ---
 id: adr-20260406-kit-isolation-by-project
-c3-seal: d1c74302640f8bee2810e72fd95c30e1b03e37baab2b65205079d2dbc1eff9dc
+c3-seal: 531597b73053ffd41b1a2b6343745d3fecd73a42454aebdc990cf5b29649f131
 title: define kit as the resilient execution unit with per-kit agent settings
 type: adr
-goal: '[ASSUMED] Design-only ADR to keep the hub simple, move agent execution into long-running kits, and make hub disconnects survivable.'
+goal: '[ASSUMED] Keep the multi-node design simple while making it resilient.'
 status: provisioned
 date: "2026-04-06"
 ---
@@ -18,7 +18,6 @@ We want three things only:
 - each `kit` can carry a different set of agent settings, such as system prompt, skills, tools, and other runtime-facing behavior exposed by Claude Code or Codex.
 - a running `kit` should not be taken down just because the hub disappears temporarily.
 At minimum, the system can run with exactly one kit. That single kit represents the system-wide agent executor.
-
 ## Decision
 
 Adopt a simple `hub + kits` model over the existing NATS transport:
@@ -30,7 +29,6 @@ Adopt a simple `hub + kits` model over the existing NATS transport:
 - every kit declares its agent settings up front.
 - if the hub disconnects, a kit keeps active work running, buffers unreconciled events locally, and replays them after reconnect.
 A kit is not the transcript owner and not the orchestration owner. It is the worker daemon with temporary recovery responsibility.
-
 ## Transport
 
 Use the existing embedded NATS transport as the only wire between hub and kit.
@@ -64,7 +62,6 @@ A kit is a long-running daemon process that:
 - buffers unacknowledged events locally until the hub confirms them
 - re-registers and reconciles after reconnect
 At minimum there is one kit in the system. More kits can be added later.
-
 ## Kit Settings
 
 Each kit may expose a different runtime configuration for the agent it runs.
@@ -81,21 +78,86 @@ Examples of kit settings:
 - sandbox or approval defaults
 - max concurrency
 In simple terms, two kits may run the same provider but still behave differently because their settings differ.
-
 ## Simplest Topology
 
 The minimal topology is:
 
 - one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+
 - one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
 That already gives us the split we want:
 
 - hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+
 - kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
 The next step up is:
 
 - one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+
 - many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
 That gives us multiple agent behaviors without changing the hub role.
 
 ## Routing Model
@@ -118,7 +180,6 @@ If the hub disconnects:
 - kit keeps trying to reconnect
 - after reconnect, kit re-registers and replays buffered events until the hub catches up
 This keeps the kit resilient without making it the source of truth.
-
 ## Recovery Rule
 
 To support replay safely:
@@ -128,7 +189,6 @@ To support replay safely:
 - kit may resend already-sent events during recovery
 - hub ingest must therefore be duplicate-safe
 The recovery journal inside the kit is only a delivery buffer, not the authoritative transcript.
-
 ## Session Rule
 
 A chat or long-running agent session should stay on the same kit when possible.
@@ -139,7 +199,6 @@ Reason:
 - changing kit settings mid-session can change behavior unexpectedly
 - reconnect recovery is simplest when a running turn stays attached to its original kit
 If we intentionally move a chat to a kit with different settings, the safe default is to start a fresh provider session.
-
 ## Why This Is Better
 
 - keeps the hub small and clear

@@ -27,11 +27,13 @@ import { OpenLocalLinkProvider } from "../components/messages/shared"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
 import { SPECIAL_TOOL_NAMES } from "./derived"
 
+const DEDICATED_RENDER_TOOL_NAMES = new Set([...SPECIAL_TOOL_NAMES, "present_content"])
+
 function isCollapsibleToolCall(message: HydratedTranscriptMessage) {
   if (message.kind !== "tool") return false
   const toolCall = message as ProcessedToolCall
   if (toolCall.isError) return false
-  return !SPECIAL_TOOL_NAMES.has(toolCall.toolName)
+  return !DEDICATED_RENDER_TOOL_NAMES.has(toolCall.toolName)
 }
 
 // Find the index of the "answer" assistant_text — the last one NOT followed by any tool call.
@@ -69,7 +71,7 @@ function findAnswerIndex(messages: HydratedTranscriptMessage[], isLoading: boole
 function isSpecialToolCall(message: HydratedTranscriptMessage): boolean {
   if (message.kind !== "tool") return false
   const toolCall = message as ProcessedToolCall
-  return SPECIAL_TOOL_NAMES.has(toolCall.toolName)
+  return DEDICATED_RENDER_TOOL_NAMES.has(toolCall.toolName)
 }
 
 function isWipAbsorbable(message: HydratedTranscriptMessage): boolean {

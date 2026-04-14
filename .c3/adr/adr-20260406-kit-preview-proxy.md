@@ -1,6 +1,6 @@
 ---
 id: adr-20260406-kit-preview-proxy
-c3-seal: a4dc9316fa1e19e09b3823947cb445bf2b7e9aa1d4abc5df1d93c1672839e180
+c3-seal: d156bc3d6b14a7daaceca4cfca84130835e81239240693250d7abdcc5398d73d
 title: kit-preview-proxy
 type: adr
 goal: Expose local dev server ports (e.g. localhost:5173) to Tinkaria viewers — including mobile PWA clients on LAN or remote — through kit-advertised preview targets, NATS HTTP relay, and pluggable tunnel strategy.
@@ -59,7 +59,6 @@ New NATS subjects for preview relay:
 - `kanna.kit.<kitId>.preview.request` — hub sends serialized HTTP request
 - `kanna.kit.<kitId>.preview.response` — kit returns serialized HTTP response
 Request envelope:
-
 ```typescript
 interface PreviewRequest {
   id: string
@@ -141,7 +140,6 @@ Client renders preview in an iframe. The iframe URL is:
 - LAN: `http://<hub-host>:<relayPort>/`
 - Remote: `<tunnelUrl>/`
 Client auto-detects: try LAN relay first, fall back to tunnel URL after timeout.
-
 ### Wildcard domain mode
 
 If `TINKARIA_PREVIEW_DOMAIN` is set (e.g. `tinkaria.example.com`), hub uses subdomain routing on its main port instead of separate relay ports:
@@ -150,7 +148,6 @@ If `TINKARIA_PREVIEW_DOMAIN` is set (e.g. `tinkaria.example.com`), hub uses subd
 - No extra ports, no tunnel needed
 - Requires wildcard DNS configuration
 This is the "or wildcard domain" alternative for users with their own infrastructure.
-
 ## Affected Components
 
 | Component | Change |

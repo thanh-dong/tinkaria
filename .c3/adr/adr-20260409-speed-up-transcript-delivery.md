@@ -1,6 +1,6 @@
 ---
 id: adr-20260409-speed-up-transcript-delivery
-c3-seal: b063913cddd30125f56b99604c944e5a30f94a7d3d78f473cd04440786348b49
+c3-seal: a582f841e509911082c69933e4bbf0920d67ac3b46a5a0355c9b6ed0be91cba0
 title: speed-up-transcript-delivery
 type: adr
 goal: 'Speed up transcript delivery end-to-end by addressing three high-impact bottlenecks:'
@@ -14,11 +14,53 @@ Speed up transcript delivery end-to-end by addressing three high-impact bottlene
 
 1. **Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
 **Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
+**Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
 
 2. **Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
 **Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
+**Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
 
 3. **Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
+**Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
 **Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
 
 ### Secondary Fixes

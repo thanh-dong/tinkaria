@@ -12,7 +12,6 @@ c3-103:
 c3-104:
   - src/client/components/ui/*.tsx
 c3-106:
-  - src/client/app/TinkariaTranscript.tsx
   - src/client/components/messages/PresentContentMessage.test.tsx
   - src/client/components/messages/PresentContentMessage.tsx
   - src/client/lib/parseTranscript.test.ts
@@ -30,7 +29,6 @@ c3-108:
   - src/client/lib/uiIdentityOverlay.ts
 c3-110:
   - src/client/app/ChatPage.tsx
-  - src/client/app/TinkariaTranscript.tsx
   - src/client/app/chatFocusPolicy.ts
   - src/client/app/derived.ts
   - src/client/app/nats-socket.ts
@@ -63,6 +61,16 @@ c3-117:
   - src/client/components/HomepagePreferences.tsx
   - src/client/components/LocalDev.tsx
   - src/client/components/NewWorkspaceModal.tsx
+c3-118:
+  - src/client/app/useTranscriptLifecycle.ts
+  - src/client/lib/parseTranscript.test.ts
+  - src/client/lib/parseTranscript.ts
+c3-119:
+  - src/client/app/ChatTranscript.test.tsx
+  - src/client/app/ChatTranscript.tsx
+  - src/client/lib/messageHeights.test.ts
+  - src/client/lib/messageHeights.ts
+  - src/client/lib/useMessageHeights.ts
 c3-201:
   - src/server/event-store.ts
   - src/server/events.ts
@@ -103,6 +111,13 @@ c3-207:
   - src/server/agent.test.ts
   - src/server/agent.ts
 c3-208:
+  - src/runner/runner-agent.test.ts
+  - src/runner/runner-agent.ts
+  - src/runner/runner-nats.test.ts
+  - src/runner/runner-nats.ts
+  - src/runner/runner.test.ts
+  - src/runner/runner.ts
+  - src/runner/turn-factories.ts
   - src/server/codex-runtime.ts
   - src/server/local-codex-kit.test.ts
   - src/server/local-codex-kit.ts
@@ -132,6 +147,25 @@ c3-217:
   - src/server/session-discovery.ts
 c3-222:
   - bin/tinkaria-project
+c3-226:
+  - src/server/transcript-consumer.test.ts
+  - src/server/transcript-consumer.ts
+ref-live-transcript-render-contract:
+  - src/client/app/ChatTranscript.tsx
+  - src/client/app/useTranscriptLifecycle.ts
+  - src/client/components/messages/PresentContentMessage.tsx
+  - src/client/components/messages/TextMessage.tsx
+  - src/client/components/messages/WipBlock.tsx
+  - src/client/lib/parseTranscript.ts
+  - src/runner/runner-agent.ts
+  - src/runner/runner-nats.ts
+  - src/runner/runner.ts
+  - src/runner/turn-factories.ts
+  - src/server/agent.ts
+  - src/server/harness-types.ts
+  - src/server/transcript-consumer.test.ts
+  - src/server/transcript-consumer.ts
+  - src/shared/tools.ts
 ref-project-context:
   - .agents/skills/shadcn/**
   - .claude/skills/release/**
@@ -196,6 +230,20 @@ rule-rule-bun-runtime:
 rule-rule-strict-typescript:
   - src/**/*.ts
   - src/**/*.tsx
+rule-transcript-boundary-regressions:
+  - src/client/app/ChatTranscript.test.tsx
+  - src/client/components/messages/PresentContentMessage.test.tsx
+  - src/client/components/rich-content/RichContentBlock.test.tsx
+  - src/client/lib/parseTranscript.test.ts
+  - src/runner/runner-agent.test.ts
+  - src/runner/runner-nats.test.ts
+  - src/runner/runner.test.ts
+  - src/server/agent.test.ts
+  - src/server/claude-agent-coordinator.test.ts
+  - src/server/claude-turn.test.ts
+  - src/server/codex-turn.test.ts
+  - src/server/transcript-consumer.test.ts
+  - src/shared/tools.test.ts
 rule-type-guards:
   - src/server/provider-catalog.ts
   - src/server/terminal-manager.ts

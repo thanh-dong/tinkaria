@@ -1,6 +1,6 @@
 ---
 id: ref-ref-provider-abstraction
-c3-seal: 2124470ec04177c219a9925fb29b7eac9594bfa34ff2ced4904c8292f5d114e2
+c3-seal: fef333961e1e2dffe028ba6a7abb99f90ce978485c19662d52b95bad3c5dcb9e
 title: ref-provider-abstraction
 type: ref
 goal: Abstract away differences between AI providers so the UI and business logic work identically regardless of which provider is active.
@@ -32,7 +32,6 @@ For each provider:
 3. Keep `AgentCoordinator` limited to prompt shaping, lifecycle bookkeeping, and the single harness call.
 4. Add focused harness tests that prove provider-owned bootstrap, fallback, and startup-failure behavior directly.
 Compliance questions:
-
 - Can the coordinator start the provider without directly calling the provider SDK or transport primitives?
 - Does the provider have a dedicated harness module that owns bootstrap/session-start choreography?
 - Are provider transport semantics verified in focused harness tests instead of only broad coordinator tests?

@@ -1,6 +1,6 @@
 ---
 id: adr-20260406-hub-kit-runtime-split
-c3-seal: 041f85f352634b9e5c2478ab303150c6ba82cbb8622a7f3e71561be8820b59aa
+c3-seal: 720f01b33d0ac887ec1eff34f9a14c3a4b4016b726471f0fdabb1f673c4a3cbf
 title: split runtime into hub control plane and kit workers
 type: adr
 goal: '[ASSUMED] Design-only ADR for a runtime split that isolates durable server concerns from disposable agent execution while keeping the naming contract precise enough to implement without transport ambiguity.'
@@ -19,7 +19,6 @@ Adopt a two-role architecture:
 - `hub` is the control plane. It hosts HTTP/UI, embedded NATS, the event store, read models, chat/project/session identity, orchestration state, approval flow, and the authoritative transcript.
 - `kit` is a long-lived execution daemon. It advertises capabilities, accepts leased turn assignments from the hub, runs provider-specific agent work, and emits status/tool/result events back to the hub.
 A single `kit` is not a one-shot worker. It is expected to handle many operations across many projects and agent sessions up to its configured capacity.
-
 ## Responsibilities
 ### Hub
 

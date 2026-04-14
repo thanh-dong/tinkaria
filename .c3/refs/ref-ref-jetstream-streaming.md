@@ -1,6 +1,6 @@
 ---
 id: ref-ref-jetstream-streaming
-c3-seal: 3819da014b0681f344bf93ff527d9e71c9d76d37b8e5c93a396e675e63d55878
+c3-seal: b35217af115eb07c646f88df8376659cc225011ae6e5c44ca5d887dfee6b38e0
 title: JetStream streaming architecture
 type: ref
 goal: Provide durable, gap-free, replayable message delivery for all real-time event streams in Tinkaria using NATS JetStream ordered consumers, eliminating silent message loss on disconnects and expensive full re-fetches on reconnect.
@@ -12,17 +12,17 @@ Provide durable, gap-free, replayable message delivery for all real-time event s
 
 ## Choice
 
-Three memory-backed JetStream streams with ordered pull consumers:
+Use memory-backed JetStream streams with ordered pull consumers for live runtime streams.
 
 | Stream | Subjects | Retention | Use |
 | --- | --- | --- | --- |
 | KANNA_TERMINAL_EVENTS | runtime.evt.terminal.> | 5 min / 10K msgs | Terminal output events |
 | KANNA_CHAT_MESSAGE_EVENTS | runtime.evt.chat.> | 30 min / 50K msgs | Chat transcript entries |
 | KANNA_KIT_TURN_EVENTS | runtime.kit.evt.turn.> | 5 min / 20K msgs | Kit daemon turn events |
-Publishing: `js.publish(subject, payload)` — fire-and-forget with JetStream durability.
-Consuming: Ordered consumers with `DeliverPolicy.New` for live sessions, filtered by subject (e.g. `runtime.evt.chat.<chatId>`).
-Fallback: Client falls back to plain `nc.subscribe()` when JetStream is unavailable (e.g. stream not created yet).
-
+| Operational choices: |  |  |  |
+- Publishing uses `js.publish(subject, payload)` with logged failure handling.
+- Consuming uses ordered consumers with `DeliverPolicy.New` for live sessions and subject filters such as `runtime.evt.chat.<chatId>`.
+- Clients fall back to plain `nc.subscribe()` when JetStream is unavailable, such as before stream creation.
 ## Why
 
 Plain `nc.publish()`/`nc.subscribe()` is fire-and-forget — messages sent during a client disconnect are permanently lost. This causes:
@@ -31,7 +31,6 @@ Plain `nc.publish()`/`nc.subscribe()` is fire-and-forget — messages sent durin
 - Missing chat transcript entries requiring full re-fetch on every reconnect
 - No replay capability for late-joining clients
 JetStream ordered consumers provide gap-free delivery with automatic sequence tracking. The consumer handles reconnection internally, replaying any messages missed during the gap.
-
 ## How
 
 **Server — publishing to JetStream:**
@@ -67,8 +66,7 @@ try {
   const messages = await consumer.consume()
   // iterate messages...
 } catch {
-  // Fallback to plain nc.subscribe()
   entry.eventSubscription = nc.subscribe(evtSubject)
 }
 ```
-**Stream name sharing:** Stream names are constants in `src/shared/nats-subjects.ts` (e.g. `CHAT_MESSAGE_EVENTS_STREAM_NAME`) — importable by both server and client without cross-boundary dependencies.
+**Stream name sharing:** Stream names are constants in `src/shared/nats-subjects.ts` (for example `CHAT_MESSAGE_EVENTS_STREAM_NAME`) and are importable by both server and client without cross-boundary dependencies.

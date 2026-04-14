@@ -1,6 +1,6 @@
 ---
 id: adr-20260409-copy-button-and-reconnect-polish
-c3-seal: 5245663f6f6c76aa5aa931aedfa8ca173f57ba65fa682a35e0007221ae880126
+c3-seal: a955c8f38fb8af5e02580d05eeaa00f4239cac48cbe952743b7f331e6abd5b0d
 title: copy-button-and-reconnect-polish
 type: adr
 goal: 'Polish two UI elements for subtlety and non-intrusion:'
@@ -14,8 +14,36 @@ Polish two UI elements for subtlety and non-intrusion:
 
 1. **UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
 **UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
+**UserMessage copy button (c3-111)**: Remove "Copy" text label, make icon-only, hide by default and reveal on hover (desktop) / touch (mobile), reposition inside bubble to stop overlapping content above.
 
 2. **ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
+**ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
 **ChatInput reconnecting badge (c3-112)**: Reduce visual weight — remove borders/backgrounds/uppercase from badge, soften composer border color, remove amber/emerald button color takeover.
 
 ## Affects

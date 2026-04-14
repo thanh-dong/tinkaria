@@ -96,6 +96,30 @@ function specialTool(): HydratedTranscriptMessage {
   } as HydratedTranscriptMessage
 }
 
+function presentContentTool(): HydratedTranscriptMessage {
+  return {
+    kind: "tool",
+    toolKind: "present_content",
+    toolName: "present_content",
+    toolId: nextId(),
+    id: nextId(),
+    timestamp: "2026-04-06T00:00:00Z",
+    input: {
+      title: "Artifact",
+      kind: "markdown",
+      format: "markdown",
+      source: "Artifact body",
+    },
+    result: {
+      accepted: true,
+      title: "Artifact",
+      kind: "markdown",
+      format: "markdown",
+      source: "Artifact body",
+    },
+  } as HydratedTranscriptMessage
+}
+
 function erroredTool(name = "Skill"): HydratedTranscriptMessage {
   return {
     kind: "tool", toolKind: "skill", toolName: name, toolId: nextId(),
@@ -206,6 +230,28 @@ describe("groupMessages", () => {
     expect(items[0].type).toBe("wip-block")
     expect(items[1].type).toBe("single") // special tool
     expect(items[2].type).toBe("single") // answer
+  })
+
+  test("present_content artifact stays outside wip-block with final assistant answer visible", () => {
+    const msgs = [text("Creating artifact"), presentContentTool(), text("Artifact ready")]
+    const items = groupMessages(msgs, false)
+
+    expect(items).toHaveLength(3)
+    expect(items[0].type).toBe("single")
+    if (items[0].type === "single") {
+      expect(items[0].message.kind).toBe("assistant_text")
+    }
+    expect(items[1].type).toBe("single")
+    if (items[1].type === "single") {
+      expect(items[1].message.kind).toBe("tool")
+      if (items[1].message.kind === "tool") {
+        expect(items[1].message.toolKind).toBe("present_content")
+      }
+    }
+    expect(items[2].type).toBe("single")
+    if (items[2].type === "single") {
+      expect(items[2].message.kind).toBe("assistant_text")
+    }
   })
 
   test("assistant text before special tool is ejected from wip-block so rationale is visible", () => {

@@ -1,16 +1,18 @@
 ---
 id: c3-210
-c3-seal: 12560d4ece60f645e81a4bc17e095fdb9fb0fc3a871ffc69bb89489c6a72e42f
+c3-seal: 6882d80faf5bab941378823baf69b2107b3af472caeb18a0e38737d3f0013826
 title: agent
 type: component
 category: feature
 parent: c3-2
-goal: AgentCoordinator and its provider harness seams manage multi-turn AI agent sessions, prompt shaping, tool gating, plan mode, and provider handoff without leaking provider transport details across the server.
+goal: RunnerProxy and provider harness seams manage multi-turn AI agent sessions, prompt shaping, tool gating, plan mode, transcript event flow, and provider handoff without leaking provider transport details across the server.
 uses:
     - c3-206
     - c3-207
+    - recipe-agent-turn-render-flow
     - ref-component-identity-mapping
     - ref-external-source-authority-boundaries
+    - ref-live-transcript-render-contract
     - ref-ref-provider-abstraction
     - rule-bun-test-conventions
     - rule-error-extraction
@@ -20,11 +22,12 @@ uses:
     - rule-provider-runtime-readiness
     - rule-rule-bun-runtime
     - rule-rule-strict-typescript
+    - rule-transcript-boundary-regressions
 ---
 
 ## Goal
 
-AgentCoordinator and its provider harness seams manage multi-turn AI agent sessions, prompt shaping, tool gating, plan mode, and provider handoff without leaking provider transport details across the server.
+RunnerProxy and provider harness seams manage multi-turn AI agent sessions, prompt shaping, tool gating, plan mode, transcript event flow, and provider handoff without leaking provider transport details across the server.
 
 ## Dependencies
 
@@ -43,6 +46,8 @@ AgentCoordinator and its provider harness seams manage multi-turn AI agent sessi
 | ref-ref-provider-abstraction | Provider harness seams keep Claude and Codex behind the same coordinator contract. |
 | ref-component-identity-mapping |  |
 | ref-external-source-authority-boundaries |  |
+| ref-live-transcript-render-contract |  |
+| recipe-agent-turn-render-flow |  |
 ## Related Rules
 
 | Rule | Constraint |
@@ -55,6 +60,7 @@ AgentCoordinator and its provider harness seams manage multi-turn AI agent sessi
 | rule-external-source-stale-handle-guards |  |
 | rule-provider-harness-boundaries | Provider transport/bootstrap stays behind dedicated harness entrypoints. |
 | rule-provider-runtime-readiness |  |
+| rule-transcript-boundary-regressions |  |
 ## Container Connection
 
-Part of c3-2 (server). This is the main AI execution engine: it bridges client chat commands to provider runtimes, delegates prompt composition to c3-207, keeps orchestration in c3-206, and reaches provider-specific bootstrap through dedicated harness seams instead of inlining transport logic.
+Part of c3-2 (server). This is the main AI execution control plane: it bridges client chat commands to runner-backed provider runtimes, delegates prompt composition to c3-207, keeps orchestration in c3-206, consumes transcript event flow from the runtime bridge, and reaches provider-specific bootstrap through dedicated harness seams instead of inlining transport logic.

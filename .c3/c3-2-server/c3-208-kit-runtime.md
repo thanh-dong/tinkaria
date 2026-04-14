@@ -1,18 +1,21 @@
 ---
 id: c3-208
-c3-seal: 7655d927757876acaa28e6fe3a1bfb3e1c0effdd4209d48fcb072071895cdd89
+c3-seal: 7013882b1163b48159cd4c3ca621c3b30bcde8843bc197c4956fe21a6adb1c17
 title: kit-runtime
 type: component
 category: foundation
 parent: c3-2
 goal: 'Own the hub-to-kit execution seam for Codex turns: track stable project-to-kit assignment, bridge turn/session traffic over NATS, and run the default local long-running kit without changing the client command surface.'
 uses:
+    - recipe-agent-turn-render-flow
     - ref-component-identity-mapping
+    - ref-live-transcript-render-contract
     - ref-nats-transport-hardening
     - ref-ref-jetstream-streaming
     - ref-runtime-operational-readiness
     - rule-provider-runtime-readiness
     - rule-subprocess-ipc-safety
+    - rule-transcript-boundary-regressions
 ---
 
 ## Goal
@@ -35,6 +38,8 @@ Own the hub-to-kit execution seam for Codex turns: track stable project-to-kit a
 | ref-component-identity-mapping |  |
 | ref-runtime-operational-readiness |  |
 | ref-nats-transport-hardening |  |
+| ref-live-transcript-render-contract |  |
+| recipe-agent-turn-render-flow |  |
 ## Related Rules
 
 | Rule | Constraint |
@@ -46,6 +51,7 @@ Own the hub-to-kit execution seam for Codex turns: track stable project-to-kit a
 | rule-rule-strict-typescript | Kit protocol payloads and runtime bindings stay strongly typed. |
 | rule-subprocess-ipc-safety |  |
 | rule-provider-runtime-readiness |  |
+| rule-transcript-boundary-regressions |  |
 ## Container Connection
 
 Part of c3-2 (server). This is the new execution boundary between the hub-owned agent/orchestration state and the Codex process that now runs behind a long-running local kit over embedded NATS.

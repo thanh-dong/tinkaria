@@ -1,6 +1,6 @@
 ---
 id: adr-20260331-split-chat-snapshot-channels
-c3-seal: daab90481eeac5ba5f6de38e77128681f6a10ce3131436f9e34748b5f855c2bf
+c3-seal: 1fd8ccde08c5cac768468d158d10ff33b2dc0d9ed13662c7d3e58ecc2cc8eddb
 title: split-chat-snapshot-channels
 type: adr
 goal: Split the chat snapshot into two NATS channels — a bounded runtime snapshot and individual message events — eliminating O(n²) re-serialization and unbounded payload growth.
@@ -30,8 +30,7 @@ Split the chat snapshot into two NATS channels — a bounded runtime snapshot an
 | --- | --- | --- | --- |
 | kanna.snap.chat.<id> | Runtime (status, title, provider, messageCount, availableProviders) | ~1KB | Status/metadata change |
 | kanna.snap.chat.<id>.messages | Individual TranscriptEntry | ~1-10KB | Each appendMessage |
-**3. New command:** `chat.getMessages { chatId, offset?, limit? }` — paginated initial load, returns `TranscriptEntry[]`.
-
+| 3. New command: chat.getMessages { chatId, offset?, limit? } — paginated initial load, returns TranscriptEntry[]. |  |  |  |
 ### Server changes
 
 - `deriveChatSnapshot` (read-models.ts): Remove `getMessages` callback parameter. Return `{ runtime, messageCount, availableProviders }`.

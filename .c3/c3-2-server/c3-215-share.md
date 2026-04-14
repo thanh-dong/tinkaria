@@ -1,11 +1,11 @@
 ---
 id: c3-215
-c3-seal: 8793db9582dd9e9944cfee941404a7197842ab01bd889a6dd3957b66ac024e9e
+c3-seal: cd12d4c0a203e3cafff205f7620ca32a65d4a1cca3096a0e9371cbe92ee465e1
 title: share
 type: component
 category: feature
 parent: c3-2
-goal: Cloudflared tunnel integration for sharing Kanna sessions publicly via a temporary URL, with QR code generation for easy mobile access.
+goal: Cloudflared tunnel integration for sharing Tinkaria sessions publicly via a temporary URL, with QR code generation for easy mobile access.
 uses:
     - ref-component-identity-mapping
     - rule-bun-test-conventions
@@ -17,7 +17,7 @@ uses:
 
 ## Goal
 
-Cloudflared tunnel integration for sharing Kanna sessions publicly via a temporary URL, with QR code generation for easy mobile access.
+Cloudflared tunnel integration for sharing Tinkaria sessions publicly via a temporary URL, with QR code generation for easy mobile access.
 
 ## Dependencies
 
@@ -39,4 +39,4 @@ Cloudflared tunnel integration for sharing Kanna sessions publicly via a tempora
 | rule-prefixed-logging |  |
 ## Container Connection
 
-Part of c3-2 (server). Activated by the CLI (c3-203) --share flag to expose the local Kanna instance over a public cloudflared tunnel.
+Part of c3-2 (server). Activated by the CLI (c3-203) --share flag to expose the local Tinkaria instance over a public cloudflared tunnel.

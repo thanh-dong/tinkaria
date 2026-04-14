@@ -1,14 +1,14 @@
 ---
 id: ref-ref-zustand-stores
-c3-seal: 741a69d17c5d9a68f49a2455897216f65f5d85d7bef254bf114877a5ab6d2cd9
-title: ref-zustand-stores
+c3-seal: fd08861a7d5121b6e158ef57ca462f57704fc4fe9038bb7ea816a1c241c74380
+title: zustand-stores
 type: ref
-goal: Manage client-side UI state with minimal boilerplate, fine-grained reactivity, and localStorage persistence where needed.
+goal: 'Document the Zustand store persistence pattern for Tinkaria: small domain stores, localStorage normalization, fine-grained selectors, and boundaries from server-derived state.'
 ---
 
 ## Goal
 
-Manage client-side UI state with minimal boilerplate, fine-grained reactivity, and localStorage persistence where needed.
+Document the Zustand store persistence pattern for Tinkaria: small domain stores, localStorage normalization, fine-grained selectors, and boundaries from server-derived state.
 
 ## Choice
 
@@ -21,3 +21,14 @@ Multiple small Zustand stores, each owning a specific domain: chatPreferences, c
 - Fine-grained subscriptions prevent unnecessary re-renders
 - localStorage persistence middleware handles serialization automatically
 - Small stores are easy to reason about and test in isolation
+## How
+
+Use small domain stores for browser UI state that outlives one component or coordinates multiple components.
+
+Implementation contract:
+
+- Store modules own state shape, actions, persistence keys, and normalization of persisted values.
+- Components select only the slices they need; avoid reading whole stores in high-churn render paths.
+- Draft state with per-chat identity belongs in keyed store maps or local component state, not effect-driven prop mirrors.
+- Persisted store changes require migration/default tests so stale localStorage cannot crash startup.
+- Server-derived state stays in subscription/read-model hooks; Zustand should not duplicate authoritative server snapshots.

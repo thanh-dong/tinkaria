@@ -1,6 +1,6 @@
 ---
 id: recipe-client-screen-tree
-c3-seal: 00491605a2a9569380fbd23510dc1756b53635ba73b6c1d46327d655fa19b675
+c3-seal: e0ac7b38de3e482d0209475fcd82860de5e9a6aed09eb55be70eceb70e09d61a
 title: client-screen-tree
 type: recipe
 goal: Maintain a fast lookup artifact for the client screen tree so any visible browser surface can be traced quickly from route -> owning C3 component -> semantic Alt+Shift ui id.
@@ -40,4 +40,4 @@ Maintain a fast lookup artifact for the client screen tree so any visible browse
 | message.*, content-preview.dialog | c3-111 / c3-107 depending on transcript vs rich-content surface |
 | overlay/controller internals | c3-108 |
 | workspace.* ids | c3-209 |
-Use this recipe as the first stop when a task starts from a screen, a screenshot, or an Alt+Shift copy buffer. It is the crosswalk between DOM identity, route ownership, and the C3 topology.
+| Use this recipe as the first stop when a task starts from a screen, a screenshot, or an Alt+Shift copy buffer. It is the crosswalk between DOM identity, route ownership, and the C3 topology. |  |

@@ -1,6 +1,6 @@
 ---
 id: c3-216
-c3-seal: 492107c1a2d1dfceda8ee3f863eceaa99e0100703162d2ca4d24e3cff949083d
+c3-seal: d88c797d64944389ac965bc1c667d5a9f251ae19e9cb5be03f360c04bba9b90e
 title: codex
 type: component
 category: feature
@@ -9,8 +9,10 @@ goal: Codex CLI protocol wrapper that spawns the Codex app-server subprocess, co
 uses:
     - c3-106
     - c3-207
+    - recipe-agent-turn-render-flow
     - recipe-project-c3-app-flow
     - ref-component-identity-mapping
+    - ref-live-transcript-render-contract
     - ref-mcp-app-hosting
     - ref-mcp-app-jtbd
     - ref-ref-provider-abstraction
@@ -23,6 +25,7 @@ uses:
     - rule-rule-bun-runtime
     - rule-rule-strict-typescript
     - rule-subprocess-ipc-safety
+    - rule-transcript-boundary-regressions
 ---
 
 ## Goal
@@ -48,6 +51,8 @@ Codex CLI protocol wrapper that spawns the Codex app-server subprocess, communic
 | ref-mcp-app-hosting |  |
 | recipe-project-c3-app-flow |  |
 | ref-mcp-app-jtbd |  |
+| ref-live-transcript-render-contract |  |
+| recipe-agent-turn-render-flow |  |
 ## Related Rules
 
 | Rule | Constraint |
@@ -60,6 +65,7 @@ Codex CLI protocol wrapper that spawns the Codex app-server subprocess, communic
 | rule-subprocess-ipc-safety |  |
 | rule-provider-harness-boundaries | Codex transport stays below the higher-level harness seam instead of leaking into the coordinator. |
 | rule-provider-runtime-readiness |  |
+| rule-transcript-boundary-regressions |  |
 ## Container Connection
 
-Part of c3-2 (server). This is the low-level Codex provider runtime adapter under AgentCoordinator: prompt context comes from c3-207, structured artifact output feeds c3-106, and the higher-level provider harness in c3-210 composes session-start orchestration above this subprocess bridge.
+Part of c3-2 (server). This is the low-level Codex provider runtime adapter below the runner/provider seam: prompt context comes from c3-207, structured artifact output feeds c3-106, transcript events participate in the live render contract, and higher-level turn/session orchestration remains in c3-210/c3-208.

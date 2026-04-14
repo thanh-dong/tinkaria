@@ -1,6 +1,6 @@
 ---
 id: rule-bun-test-conventions
-c3-seal: bb4376035379536dca30ac3344b53ea718d37cb06090b60f172e7baa2307ce21
+c3-seal: afe2c5a616db813d98178b1135c8304007773e5a86a4da41ff9b58ccd218e29d
 title: bun-test-conventions
 type: rule
 goal: 'All tests use Bun test framework with consistent structure: describe/test grouping, afterEach cleanup, typed test helpers, explicit resource management, environment variable isolation (save/clear/restore), and deterministic shell environments for PTY tests.'
@@ -96,13 +96,13 @@ class FakeWebSocket {
 
 | Anti-Pattern | Correct | Why Wrong Here |
 | --- | --- | --- |
-| import { it, jest } from "@jest/globals" | import { test } from "bun:test" | Wrong framework — Kanna uses Bun test only |
-| Using it("should work", ...) | test("works", ...) | Convention is test, not it |
-| No cleanup of temp dirs after test | afterEach with rm(dir, { recursive: true }) | Leaked resources pollute subsequent runs |
-| jest.mock("./module") | Fake class/object inline | Bun test has no jest.mock |
-| Tests read process.env.X without save/restore | Capture at module scope, clear in beforeEach, restore in afterEach | Env leaks between tests — CI sets vars that silently skip code paths |
-| PTY tests use user shell config as-is | Set ZDOTDIR + minimal .zshrc | Starship/powerline async rendering makes ctrl+d flaky under parallel load |
-| Empty ZDOTDIR temp dir (no .zshrc) | Create .zshrc with comment | zsh-newuser-install wizard blocks the terminal with interactive menu |
+| import { it, jest } from "@jest/globals" | import { test } from "bun:test" | Wrong framework; Tinkaria uses Bun test only |
+| it("should work", ...) | test("works", ...) | Convention is test, not it |
+| no cleanup of temp dirs after test | afterEach with rm(dir, { recursive: true }) | Leaked resources pollute later runs |
+| jest.mock("./module") | fake class/object inline | Bun test has no Jest mock API |
+| tests read process.env.X without save/restore | capture at module scope, clear in beforeEach, restore in afterEach | Env leaks between tests and CI may silently skip code paths |
+| PTY tests use user shell config as-is | set ZDOTDIR plus minimal .zshrc | Starship/powerline async rendering makes Ctrl+D flaky under parallel load |
+| empty ZDOTDIR temp dir with no .zshrc | create .zshrc with a comment | zsh-newuser-install wizard blocks terminal tests with an interactive menu |
 ## Scope
 
 All `*.test.ts` and `*.test.tsx` files in src/.

@@ -1,6 +1,6 @@
 ---
 id: adr-20260410-project-coordination-mcp
-c3-seal: 80c690e3acf371d8ba04a3c9284f997491c5bca003b6270f691bd19387f43add
+c3-seal: 3e0fc66c1e1af55ebaa5cd6a6848d763fdac41f1b35973db7be0a6f7c6439164
 title: project-coordination-mcp
 type: adr
 goal: Cross-session project coordination built entirely on existing NATS + EventStore infrastructure, with MCP as a thin tool interface following the established `createOrchestrationMcpServer()` pattern.
@@ -21,42 +21,288 @@ Sessions are isolated. Two sessions on the same project cannot see each other's 
 **NATS infrastructure (c3-205):**
 
 - 3 JetStream streams: `KANNA_TERMINAL_EVENTS` (memory, 5min/10K/64MB), `KANNA_CHAT_MESSAGE_EVENTS` (memory, 30min/50K/128MB), `KANNA_RUNNER_EVENTS` (file, 30min/50K/128MB)
+3 JetStream streams: `KANNA_TERMINAL_EVENTS` (memory, 5min/10K/64MB), `KANNA_CHAT_MESSAGE_EVENTS` (memory, 30min/50K/128MB), `KANNA_RUNNER_EVENTS` (file, 30min/50K/128MB)
+3 JetStream streams: `KANNA_TERMINAL_EVENTS` (memory, 5min/10K/64MB), `KANNA_CHAT_MESSAGE_EVENTS` (memory, 30min/50K/128MB), `KANNA_RUNNER_EVENTS` (file, 30min/50K/128MB)
+3 JetStream streams: `KANNA_TERMINAL_EVENTS` (memory, 5min/10K/64MB), `KANNA_CHAT_MESSAGE_EVENTS` (memory, 30min/50K/128MB), `KANNA_RUNNER_EVENTS` (file, 30min/50K/128MB)
+3 JetStream streams: `KANNA_TERMINAL_EVENTS` (memory, 5min/10K/64MB), `KANNA_CHAT_MESSAGE_EVENTS` (memory, 30min/50K/128MB), `KANNA_RUNNER_EVENTS` (file, 30min/50K/128MB)
+3 JetStream streams: `KANNA_TERMINAL_EVENTS` (memory, 5min/10K/64MB), `KANNA_CHAT_MESSAGE_EVENTS` (memory, 30min/50K/128MB), `KANNA_RUNNER_EVENTS` (file, 30min/50K/128MB)
+3 JetStream streams: `KANNA_TERMINAL_EVENTS` (memory, 5min/10K/64MB), `KANNA_CHAT_MESSAGE_EVENTS` (memory, 30min/50K/128MB), `KANNA_RUNNER_EVENTS` (file, 30min/50K/128MB)
+3 JetStream streams: `KANNA_TERMINAL_EVENTS` (memory, 5min/10K/64MB), `KANNA_CHAT_MESSAGE_EVENTS` (memory, 30min/50K/128MB), `KANNA_RUNNER_EVENTS` (file, 30min/50K/128MB)
+
 - KV bucket `runtime_snapshots` with dedup-on-publish (JSON string comparison via `lastJsonByKey`)
+KV bucket `runtime_snapshots` with dedup-on-publish (JSON string comparison via `lastJsonByKey`)
+KV bucket `runtime_snapshots` with dedup-on-publish (JSON string comparison via `lastJsonByKey`)
+KV bucket `runtime_snapshots` with dedup-on-publish (JSON string comparison via `lastJsonByKey`)
+KV bucket `runtime_snapshots` with dedup-on-publish (JSON string comparison via `lastJsonByKey`)
+KV bucket `runtime_snapshots` with dedup-on-publish (JSON string comparison via `lastJsonByKey`)
+KV bucket `runtime_snapshots` with dedup-on-publish (JSON string comparison via `lastJsonByKey`)
+KV bucket `runtime_snapshots` with dedup-on-publish (JSON string comparison via `lastJsonByKey`)
+
 - 28 command request/reply subjects under `runtime.cmd.*`
+28 command request/reply subjects under `runtime.cmd.*`
+28 command request/reply subjects under `runtime.cmd.*`
+28 command request/reply subjects under `runtime.cmd.*`
+28 command request/reply subjects under `runtime.cmd.*`
+28 command request/reply subjects under `runtime.cmd.*`
+28 command request/reply subjects under `runtime.cmd.*`
+28 command request/reply subjects under `runtime.cmd.*`
+
 - Snapshot pub/sub on `runtime.snap.*` with gzip compression (64KB threshold)
+Snapshot pub/sub on `runtime.snap.*` with gzip compression (64KB threshold)
+Snapshot pub/sub on `runtime.snap.*` with gzip compression (64KB threshold)
+Snapshot pub/sub on `runtime.snap.*` with gzip compression (64KB threshold)
+Snapshot pub/sub on `runtime.snap.*` with gzip compression (64KB threshold)
+Snapshot pub/sub on `runtime.snap.*` with gzip compression (64KB threshold)
+Snapshot pub/sub on `runtime.snap.*` with gzip compression (64KB threshold)
+Snapshot pub/sub on `runtime.snap.*` with gzip compression (64KB threshold)
+
 - Subject hierarchy: `runtime.{snap|evt|cmd}.{domain}.{entityId}` for main subjects, with a divergent `runtime.runner.*` prefix for runner subjects
+**EventStore (c3-201):**
+Subject hierarchy: `runtime.{snap|evt|cmd}.{domain}.{entityId}` for main subjects, with a divergent `runtime.runner.*` prefix for runner subjects
+**EventStore (c3-201):**
+Subject hierarchy: `runtime.{snap|evt|cmd}.{domain}.{entityId}` for main subjects, with a divergent `runtime.runner.*` prefix for runner subjects
+**EventStore (c3-201):**
+Subject hierarchy: `runtime.{snap|evt|cmd}.{domain}.{entityId}` for main subjects, with a divergent `runtime.runner.*` prefix for runner subjects
+**EventStore (c3-201):**
+Subject hierarchy: `runtime.{snap|evt|cmd}.{domain}.{entityId}` for main subjects, with a divergent `runtime.runner.*` prefix for runner subjects
+**EventStore (c3-201):**
+Subject hierarchy: `runtime.{snap|evt|cmd}.{domain}.{entityId}` for main subjects, with a divergent `runtime.runner.*` prefix for runner subjects
+**EventStore (c3-201):**
+Subject hierarchy: `runtime.{snap|evt|cmd}.{domain}.{entityId}` for main subjects, with a divergent `runtime.runner.*` prefix for runner subjects
+**EventStore (c3-201):**
+Subject hierarchy: `runtime.{snap|evt|cmd}.{domain}.{entityId}` for main subjects, with a divergent `runtime.runner.*` prefix for runner subjects
 **EventStore (c3-201):**
 
 - Category JSONL files (projects.jsonl, chats.jsonl, turns.jsonl, messages.jsonl) + per-entity transcripts
+Category JSONL files (projects.jsonl, chats.jsonl, turns.jsonl, messages.jsonl) + per-entity transcripts
+Category JSONL files (projects.jsonl, chats.jsonl, turns.jsonl, messages.jsonl) + per-entity transcripts
+Category JSONL files (projects.jsonl, chats.jsonl, turns.jsonl, messages.jsonl) + per-entity transcripts
+Category JSONL files (projects.jsonl, chats.jsonl, turns.jsonl, messages.jsonl) + per-entity transcripts
+Category JSONL files (projects.jsonl, chats.jsonl, turns.jsonl, messages.jsonl) + per-entity transcripts
+Category JSONL files (projects.jsonl, chats.jsonl, turns.jsonl, messages.jsonl) + per-entity transcripts
+Category JSONL files (projects.jsonl, chats.jsonl, turns.jsonl, messages.jsonl) + per-entity transcripts
+
 - Single-writer promise chain (serialized append + applyEvent)
+Single-writer promise chain (serialized append + applyEvent)
+Single-writer promise chain (serialized append + applyEvent)
+Single-writer promise chain (serialized append + applyEvent)
+Single-writer promise chain (serialized append + applyEvent)
+Single-writer promise chain (serialized append + applyEvent)
+Single-writer promise chain (serialized append + applyEvent)
+Single-writer promise chain (serialized append + applyEvent)
+
 - Snapshot compaction to snapshot.json at 2MB threshold
+Snapshot compaction to snapshot.json at 2MB threshold
+Snapshot compaction to snapshot.json at 2MB threshold
+Snapshot compaction to snapshot.json at 2MB threshold
+Snapshot compaction to snapshot.json at 2MB threshold
+Snapshot compaction to snapshot.json at 2MB threshold
+Snapshot compaction to snapshot.json at 2MB threshold
+Snapshot compaction to snapshot.json at 2MB threshold
+
 - StoreEvent union: ProjectEvent | ChatEvent | MessageEvent | TurnEvent
+StoreEvent union: ProjectEvent | ChatEvent | MessageEvent | TurnEvent
+StoreEvent union: ProjectEvent | ChatEvent | MessageEvent | TurnEvent
+StoreEvent union: ProjectEvent | ChatEvent | MessageEvent | TurnEvent
+StoreEvent union: ProjectEvent | ChatEvent | MessageEvent | TurnEvent
+StoreEvent union: ProjectEvent | ChatEvent | MessageEvent | TurnEvent
+StoreEvent union: ProjectEvent | ChatEvent | MessageEvent | TurnEvent
+StoreEvent union: ProjectEvent | ChatEvent | MessageEvent | TurnEvent
+
 - **Important**: `compact()` and `clearStorage()` are hardcoded to the four existing JSONL files — adding any new JSONL file requires explicit updates to both methods
+**Important**: `compact()` and `clearStorage()` are hardcoded to the four existing JSONL files — adding any new JSONL file requires explicit updates to both methods
+**Important**: `compact()` and `clearStorage()` are hardcoded to the four existing JSONL files — adding any new JSONL file requires explicit updates to both methods
+**Important**: `compact()` and `clearStorage()` are hardcoded to the four existing JSONL files — adding any new JSONL file requires explicit updates to both methods
+**Important**: `compact()` and `clearStorage()` are hardcoded to the four existing JSONL files — adding any new JSONL file requires explicit updates to both methods
+**Important**: `compact()` and `clearStorage()` are hardcoded to the four existing JSONL files — adding any new JSONL file requires explicit updates to both methods
+**Important**: `compact()` and `clearStorage()` are hardcoded to the four existing JSONL files — adding any new JSONL file requires explicit updates to both methods
+**Important**: `compact()` and `clearStorage()` are hardcoded to the four existing JSONL files — adding any new JSONL file requires explicit updates to both methods
+
 - Extension pattern: add event type to union, add JSONL file, update applyEvent + compact + clearStorage, add read model, add NATS publisher case
+**Read models (c3-214):**
+Extension pattern: add event type to union, add JSONL file, update applyEvent + compact + clearStorage, add read model, add NATS publisher case
+**Read models (c3-214):**
+Extension pattern: add event type to union, add JSONL file, update applyEvent + compact + clearStorage, add read model, add NATS publisher case
+**Read models (c3-214):**
+Extension pattern: add event type to union, add JSONL file, update applyEvent + compact + clearStorage, add read model, add NATS publisher case
+**Read models (c3-214):**
+Extension pattern: add event type to union, add JSONL file, update applyEvent + compact + clearStorage, add read model, add NATS publisher case
+**Read models (c3-214):**
+Extension pattern: add event type to union, add JSONL file, update applyEvent + compact + clearStorage, add read model, add NATS publisher case
+**Read models (c3-214):**
+Extension pattern: add event type to union, add JSONL file, update applyEvent + compact + clearStorage, add read model, add NATS publisher case
+**Read models (c3-214):**
+Extension pattern: add event type to union, add JSONL file, update applyEvent + compact + clearStorage, add read model, add NATS publisher case
 **Read models (c3-214):**
 
 - Pure `derive*()` functions: `deriveSidebarData`, `deriveLocalProjectsSnapshot`, `deriveChatSnapshot`, `deriveSessionsSnapshot`
+Pure `derive*()` functions: `deriveSidebarData`, `deriveLocalProjectsSnapshot`, `deriveChatSnapshot`, `deriveSessionsSnapshot`
+Pure `derive*()` functions: `deriveSidebarData`, `deriveLocalProjectsSnapshot`, `deriveChatSnapshot`, `deriveSessionsSnapshot`
+Pure `derive*()` functions: `deriveSidebarData`, `deriveLocalProjectsSnapshot`, `deriveChatSnapshot`, `deriveSessionsSnapshot`
+Pure `derive*()` functions: `deriveSidebarData`, `deriveLocalProjectsSnapshot`, `deriveChatSnapshot`, `deriveSessionsSnapshot`
+Pure `derive*()` functions: `deriveSidebarData`, `deriveLocalProjectsSnapshot`, `deriveChatSnapshot`, `deriveSessionsSnapshot`
+Pure `derive*()` functions: `deriveSidebarData`, `deriveLocalProjectsSnapshot`, `deriveChatSnapshot`, `deriveSessionsSnapshot`
+Pure `derive*()` functions: `deriveSidebarData`, `deriveLocalProjectsSnapshot`, `deriveChatSnapshot`, `deriveSessionsSnapshot`
+
 - Triggered on-demand by `broadcastSnapshots(changedTypes?)` via `computeSnapshot(topic)`
+Triggered on-demand by `broadcastSnapshots(changedTypes?)` via `computeSnapshot(topic)`
+Triggered on-demand by `broadcastSnapshots(changedTypes?)` via `computeSnapshot(topic)`
+Triggered on-demand by `broadcastSnapshots(changedTypes?)` via `computeSnapshot(topic)`
+Triggered on-demand by `broadcastSnapshots(changedTypes?)` via `computeSnapshot(topic)`
+Triggered on-demand by `broadcastSnapshots(changedTypes?)` via `computeSnapshot(topic)`
+Triggered on-demand by `broadcastSnapshots(changedTypes?)` via `computeSnapshot(topic)`
+Triggered on-demand by `broadcastSnapshots(changedTypes?)` via `computeSnapshot(topic)`
+
 - Published dual-channel: `nc.publish()` to snapshot subject + `kv.put()` to KV bucket
+Published dual-channel: `nc.publish()` to snapshot subject + `kv.put()` to KV bucket
+Published dual-channel: `nc.publish()` to snapshot subject + `kv.put()` to KV bucket
+Published dual-channel: `nc.publish()` to snapshot subject + `kv.put()` to KV bucket
+Published dual-channel: `nc.publish()` to snapshot subject + `kv.put()` to KV bucket
+Published dual-channel: `nc.publish()` to snapshot subject + `kv.put()` to KV bucket
+Published dual-channel: `nc.publish()` to snapshot subject + `kv.put()` to KV bucket
+Published dual-channel: `nc.publish()` to snapshot subject + `kv.put()` to KV bucket
+
 - `snapshotKvKey` uses explicit cases for chat/terminal/sessions/orchestration, with a default fallback returning `topic.type` as string for sidebar/local-projects/update
+**MCP server pattern — already exists:**
+`snapshotKvKey` uses explicit cases for chat/terminal/sessions/orchestration, with a default fallback returning `topic.type` as string for sidebar/local-projects/update
+**MCP server pattern — already exists:**
+`snapshotKvKey` uses explicit cases for chat/terminal/sessions/orchestration, with a default fallback returning `topic.type` as string for sidebar/local-projects/update
+**MCP server pattern — already exists:**
+`snapshotKvKey` uses explicit cases for chat/terminal/sessions/orchestration, with a default fallback returning `topic.type` as string for sidebar/local-projects/update
+**MCP server pattern — already exists:**
+`snapshotKvKey` uses explicit cases for chat/terminal/sessions/orchestration, with a default fallback returning `topic.type` as string for sidebar/local-projects/update
+**MCP server pattern — already exists:**
+`snapshotKvKey` uses explicit cases for chat/terminal/sessions/orchestration, with a default fallback returning `topic.type` as string for sidebar/local-projects/update
+**MCP server pattern — already exists:**
+`snapshotKvKey` uses explicit cases for chat/terminal/sessions/orchestration, with a default fallback returning `topic.type` as string for sidebar/local-projects/update
+**MCP server pattern — already exists:**
+`snapshotKvKey` uses explicit cases for chat/terminal/sessions/orchestration, with a default fallback returning `topic.type` as string for sidebar/local-projects/update
 **MCP server pattern — already exists:**
 
 - `createOrchestrationMcpServer(orchestrator, callerChatId)` in orchestration.ts (line 565) exposes 5 MCP tools
+`createOrchestrationMcpServer(orchestrator, callerChatId)` in orchestration.ts (line 565) exposes 5 MCP tools
+`createOrchestrationMcpServer(orchestrator, callerChatId)` in orchestration.ts (line 565) exposes 5 MCP tools
+`createOrchestrationMcpServer(orchestrator, callerChatId)` in orchestration.ts (line 565) exposes 5 MCP tools
+`createOrchestrationMcpServer(orchestrator, callerChatId)` in orchestration.ts (line 565) exposes 5 MCP tools
+`createOrchestrationMcpServer(orchestrator, callerChatId)` in orchestration.ts (line 565) exposes 5 MCP tools
+`createOrchestrationMcpServer(orchestrator, callerChatId)` in orchestration.ts (line 565) exposes 5 MCP tools
+`createOrchestrationMcpServer(orchestrator, callerChatId)` in orchestration.ts (line 565) exposes 5 MCP tools
+
 - Uses `createSdkMcpServer` from **`@anthropic-ai/claude-agent-sdk`** — NOT `@modelcontextprotocol/sdk`
+Uses `createSdkMcpServer` from **`@anthropic-ai/claude-agent-sdk`** — NOT `@modelcontextprotocol/sdk`
+Uses `createSdkMcpServer` from **`@anthropic-ai/claude-agent-sdk`** — NOT `@modelcontextprotocol/sdk`
+Uses `createSdkMcpServer` from **`@anthropic-ai/claude-agent-sdk`** — NOT `@modelcontextprotocol/sdk`
+Uses `createSdkMcpServer` from **`@anthropic-ai/claude-agent-sdk`** — NOT `@modelcontextprotocol/sdk`
+Uses `createSdkMcpServer` from **`@anthropic-ai/claude-agent-sdk`** — NOT `@modelcontextprotocol/sdk`
+Uses `createSdkMcpServer` from **`@anthropic-ai/claude-agent-sdk`** — NOT `@modelcontextprotocol/sdk`
+Uses `createSdkMcpServer` from **`@anthropic-ai/claude-agent-sdk`** — NOT `@modelcontextprotocol/sdk`
+
 - Tools registered with Zod v4 schemas: `spawn_agent`, `list_agents`, `send_input`, `wait_agent`, `close_agent`
+Tools registered with Zod v4 schemas: `spawn_agent`, `list_agents`, `send_input`, `wait_agent`, `close_agent`
+Tools registered with Zod v4 schemas: `spawn_agent`, `list_agents`, `send_input`, `wait_agent`, `close_agent`
+Tools registered with Zod v4 schemas: `spawn_agent`, `list_agents`, `send_input`, `wait_agent`, `close_agent`
+Tools registered with Zod v4 schemas: `spawn_agent`, `list_agents`, `send_input`, `wait_agent`, `close_agent`
+Tools registered with Zod v4 schemas: `spawn_agent`, `list_agents`, `send_input`, `wait_agent`, `close_agent`
+Tools registered with Zod v4 schemas: `spawn_agent`, `list_agents`, `send_input`, `wait_agent`, `close_agent`
+Tools registered with Zod v4 schemas: `spawn_agent`, `list_agents`, `send_input`, `wait_agent`, `close_agent`
+
 - Transport is handled by the agent SDK framework externally
+**Subscription protocol:**
+Transport is handled by the agent SDK framework externally
+**Subscription protocol:**
+Transport is handled by the agent SDK framework externally
+**Subscription protocol:**
+Transport is handled by the agent SDK framework externally
+**Subscription protocol:**
+Transport is handled by the agent SDK framework externally
+**Subscription protocol:**
+Transport is handled by the agent SDK framework externally
+**Subscription protocol:**
+Transport is handled by the agent SDK framework externally
+**Subscription protocol:**
+Transport is handled by the agent SDK framework externally
 **Subscription protocol:**
 
 - `SubscriptionTopic` union: sidebar | local-projects | update | chat | terminal | sessions | orchestration
+`SubscriptionTopic` union: sidebar | local-projects | update | chat | terminal | sessions | orchestration
+`SubscriptionTopic` union: sidebar | local-projects | update | chat | terminal | sessions | orchestration
+`SubscriptionTopic` union: sidebar | local-projects | update | chat | terminal | sessions | orchestration
+`SubscriptionTopic` union: sidebar | local-projects | update | chat | terminal | sessions | orchestration
+`SubscriptionTopic` union: sidebar | local-projects | update | chat | terminal | sessions | orchestration
+`SubscriptionTopic` union: sidebar | local-projects | update | chat | terminal | sessions | orchestration
+`SubscriptionTopic` union: sidebar | local-projects | update | chat | terminal | sessions | orchestration
+
 - Client subscribes via `snapshot.subscribe` command, server responds with initial snapshot, then pushes updates
+**Coordination primitives (partial, must evolve):**
+Client subscribes via `snapshot.subscribe` command, server responds with initial snapshot, then pushes updates
+**Coordination primitives (partial, must evolve):**
+Client subscribes via `snapshot.subscribe` command, server responds with initial snapshot, then pushes updates
+**Coordination primitives (partial, must evolve):**
+Client subscribes via `snapshot.subscribe` command, server responds with initial snapshot, then pushes updates
+**Coordination primitives (partial, must evolve):**
+Client subscribes via `snapshot.subscribe` command, server responds with initial snapshot, then pushes updates
+**Coordination primitives (partial, must evolve):**
+Client subscribes via `snapshot.subscribe` command, server responds with initial snapshot, then pushes updates
+**Coordination primitives (partial, must evolve):**
+Client subscribes via `snapshot.subscribe` command, server responds with initial snapshot, then pushes updates
+**Coordination primitives (partial, must evolve):**
+Client subscribes via `snapshot.subscribe` command, server responds with initial snapshot, then pushes updates
 **Coordination primitives (partial, must evolve):**
 
 - TaskLedger: in-memory Map, claim/complete/abandon, no project scoping, no events — **must be replaced**
+TaskLedger: in-memory Map, claim/complete/abandon, no project scoping, no events — **must be replaced**
+TaskLedger: in-memory Map, claim/complete/abandon, no project scoping, no events — **must be replaced**
+TaskLedger: in-memory Map, claim/complete/abandon, no project scoping, no events — **must be replaced**
+TaskLedger: in-memory Map, claim/complete/abandon, no project scoping, no events — **must be replaced**
+TaskLedger: in-memory Map, claim/complete/abandon, no project scoping, no events — **must be replaced**
+TaskLedger: in-memory Map, claim/complete/abandon, no project scoping, no events — **must be replaced**
+TaskLedger: in-memory Map, claim/complete/abandon, no project scoping, no events — **must be replaced**
+
 - SessionIndex: derives per-session summaries from transcript events — **reusable, needs replay-on-startup**
+SessionIndex: derives per-session summaries from transcript events — **reusable, needs replay-on-startup**
+SessionIndex: derives per-session summaries from transcript events — **reusable, needs replay-on-startup**
+SessionIndex: derives per-session summaries from transcript events — **reusable, needs replay-on-startup**
+SessionIndex: derives per-session summaries from transcript events — **reusable, needs replay-on-startup**
+SessionIndex: derives per-session summaries from transcript events — **reusable, needs replay-on-startup**
+SessionIndex: derives per-session summaries from transcript events — **reusable, needs replay-on-startup**
+SessionIndex: derives per-session summaries from transcript events — **reusable, needs replay-on-startup**
+
 - TranscriptSearchIndex: BM25 over transcripts — **reusable**
+TranscriptSearchIndex: BM25 over transcripts — **reusable**
+TranscriptSearchIndex: BM25 over transcripts — **reusable**
+TranscriptSearchIndex: BM25 over transcripts — **reusable**
+TranscriptSearchIndex: BM25 over transcripts — **reusable**
+TranscriptSearchIndex: BM25 over transcripts — **reusable**
+TranscriptSearchIndex: BM25 over transcripts — **reusable**
+TranscriptSearchIndex: BM25 over transcripts — **reusable**
+
 - ProjectAgent: thin facade with keyword routing — **delegate() must be replaced, facade is fine**
+ProjectAgent: thin facade with keyword routing — **delegate() must be replaced, facade is fine**
+ProjectAgent: thin facade with keyword routing — **delegate() must be replaced, facade is fine**
+ProjectAgent: thin facade with keyword routing — **delegate() must be replaced, facade is fine**
+ProjectAgent: thin facade with keyword routing — **delegate() must be replaced, facade is fine**
+ProjectAgent: thin facade with keyword routing — **delegate() must be replaced, facade is fine**
+ProjectAgent: thin facade with keyword routing — **delegate() must be replaced, facade is fine**
+ProjectAgent: thin facade with keyword routing — **delegate() must be replaced, facade is fine**
+
 - HTTP routes at `/api/project/*` (8 routes) — **backend-agnostic, reusable**
+HTTP routes at `/api/project/*` (8 routes) — **backend-agnostic, reusable**
+HTTP routes at `/api/project/*` (8 routes) — **backend-agnostic, reusable**
+HTTP routes at `/api/project/*` (8 routes) — **backend-agnostic, reusable**
+HTTP routes at `/api/project/*` (8 routes) — **backend-agnostic, reusable**
+HTTP routes at `/api/project/*` (8 routes) — **backend-agnostic, reusable**
+HTTP routes at `/api/project/*` (8 routes) — **backend-agnostic, reusable**
+HTTP routes at `/api/project/*` (8 routes) — **backend-agnostic, reusable**
+
 - CLI `tinkaria-project` (8 commands) — **backend-agnostic, reusable**
+CLI `tinkaria-project` (8 commands) — **backend-agnostic, reusable**
+CLI `tinkaria-project` (8 commands) — **backend-agnostic, reusable**
+CLI `tinkaria-project` (8 commands) — **backend-agnostic, reusable**
+CLI `tinkaria-project` (8 commands) — **backend-agnostic, reusable**
+CLI `tinkaria-project` (8 commands) — **backend-agnostic, reusable**
+CLI `tinkaria-project` (8 commands) — **backend-agnostic, reusable**
+CLI `tinkaria-project` (8 commands) — **backend-agnostic, reusable**
+
 ## Decision
 ### 1. New JetStream stream for coordination events
 
@@ -114,10 +360,8 @@ New state in StoreState: `coordinationByProject: Map<string, ProjectCoordination
 | Commands | runtime.cmd.project.worktree.remove |  |
 | Commands | runtime.cmd.project.rule.set |  |
 | Commands | runtime.cmd.project.rule.remove |  |
-Commands registered in `nats-responders.ts` via `registerCommandResponders()` — added to the existing SERVER_COMMANDS array (currently 28 entries). Each handler: validate → append to EventStore → broadcast snapshot.
-
-Note: existing `runtime.cmd.project.open/create/remove` commands operate on project lifecycle, not coordination. The new `runtime.cmd.project.todo.*` / `runtime.cmd.project.claim.*` / etc. use dotted sub-namespacing to avoid collision.
-
+| Commands registered in nats-responders.ts via registerCommandResponders() — added to the existing SERVER_COMMANDS array (currently 28 entries). Each handler: validate → append to EventStore → broadcast snapshot. |  |  |
+| Note: existing runtime.cmd.project.open/create/remove commands operate on project lifecycle, not coordination. The new runtime.cmd.project.todo.* / runtime.cmd.project.claim.* / etc. use dotted sub-namespacing to avoid collision. |  |  |
 ### 4. New subscription topic + read model
 
 ```typescript
@@ -148,7 +392,6 @@ Follows the exact same pattern as `createOrchestrationMcpServer()`:
 - Each tool handler: validate params → call store mutation method → return result
 - Transport handled by the agent SDK framework
 MCP is a **thin adapter** — it translates tool calls into EventStore mutations (which trigger NATS publishing). No persistence, no state, no logic. All coordination logic lives in EventStore + read models.
-
 ### 6. Homepage subscribes via existing NATS pattern
 
 The React client subscribes to `{ type: "project", projectId }` via `NatsSocket` — the exact same `subscribe()` / `onSnapshot()` pattern used for chat, sidebar, sessions, orchestration. No new transport, no MCP client in the browser.

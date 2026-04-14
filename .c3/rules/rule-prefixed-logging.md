@@ -1,6 +1,6 @@
 ---
 id: rule-prefixed-logging
-c3-seal: 2a4be05201913e63c124522313a027f024b2193fc39b688a9d2d1aad10018eec
+c3-seal: a6606585c7f7720ddf89cced673a5e7d2e43974acff82ce5686c65c499862a21
 title: prefixed-logging
 type: rule
 goal: Consistent, greppable logging across the codebase using the shared LOG_PREFIX constant and appropriate severity levels.
@@ -29,8 +29,7 @@ Convention: `const LOG_PREFIX = "[process-name]"` at the top of the entry file. 
 | Recoverable errors — corrupt data, failed I/O, state resets | console.warn | LOG_PREFIX, "Failed to load snapshot, resetting:", error |
 | CLI user output — startup banner, URLs, one-time info | console.log | APP_NAME, "— local-only project chat UI" |
 | Debug traces — module-level state changes, client-side flow | console.info | "[useTinkariaState] subscription updated" |
-`console.error` is never used directly. Fatal conditions throw; everything else warns.
-
+| console.error is never used directly. Fatal conditions throw; everything else warns. |  |  |
 ## Golden Example
 
 ```typescript

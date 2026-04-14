@@ -1,6 +1,6 @@
 ---
 id: ref-project-context
-c3-seal: e97f20ec8726028c926d5a1aef1fb59dfd8a3b2104f451c9292468c4c85f44f3
+c3-seal: e0c718de06fadf1b26c0b9b41e0df7dae107f6e6185ccbd60f9919e202216429
 title: project-context
 type: ref
 goal: Own repository-level documentation, packaging, static assets, and agent skill metadata that describe or package Tinkaria outside the client/server runtime.
@@ -10,7 +10,7 @@ uses:
 
 ## Goal
 
-Own repository-level documentation, packaging, static assets, and agent skill metadata that describe or package Kanna outside the client/server runtime.
+Own repository-level documentation, packaging, static assets, and agent skill metadata that describe or package Tinkaria outside the client/server runtime.
 
 ## Choice
 

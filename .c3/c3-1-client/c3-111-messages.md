@@ -1,38 +1,43 @@
 ---
 id: c3-111
-c3-seal: 7ced98a85a3c658b1eb459b221383cede7677b6bf8479f577e8ecb567a3468eb
+c3-seal: 2cd1f999c489b6c78fd83695947fea95d3a7bc36ca0d3a4de813405146513449
 title: messages
 type: component
 category: feature
 parent: c3-1
-goal: Render the transcript message surfaces for text, tool calls, system messages, user messages, results, plan UI, compact summaries, WIP narration blocks, and specialized artifact cards.
+goal: Render transcript message surfaces and grouping boundaries for assistant responses, WIP narration/tool work, dedicated special-tool interactions, present_content artifacts, system/user/result/status messages, compact summaries, and rich artifact cards.
 uses:
     - c3-106
     - c3-107
+    - recipe-agent-turn-render-flow
     - ref-component-identity-mapping
+    - ref-live-transcript-render-contract
     - rule-bun-test-conventions
     - rule-react-no-effects
     - rule-rule-strict-typescript
+    - rule-transcript-boundary-regressions
 ---
 
 ## Goal
 
-Render the transcript message surfaces for text, tool calls, system messages, user messages, results, plan UI, compact summaries, and specialized artifact cards.
+Render transcript message surfaces and grouping boundaries for assistant responses, WIP narration/tool work, dedicated special-tool interactions, present_content artifacts, system/user/result/status messages, compact summaries, and rich artifact cards.
 
 ## Dependencies
 
 | Direction | What | From/To |
 | --- | --- | --- |
 | IN | Processed message types and tool payloads from shared transcript typing | c3-204 |
-| IN | Shared UI primitives (Card, ScrollArea, Button) | c3-104 |
+| IN | Shared UI primitives used by message surfaces | c3-104 |
 | IN | Dedicated present_content artifact renderer | c3-106 |
 | IN | Shared rich-content overlays and viewer primitives | c3-107 |
-| OUT | Rendered message components consumed by the chat transcript shell | c3-110 |
+| OUT | Message components consumed by transcript renderer | c3-119 |
 ## Related Refs
 
 | Ref | Role |
 | --- | --- |
 | ref-component-identity-mapping |  |
+| ref-live-transcript-render-contract |  |
+| recipe-agent-turn-render-flow |  |
 ## Related Rules
 
 | Rule | Constraint |
@@ -40,6 +45,7 @@ Render the transcript message surfaces for text, tool calls, system messages, us
 | rule-rule-strict-typescript | Strict typing enforced across message variants |
 | rule-bun-test-conventions | Message rendering stays regression-tested |
 | rule-react-no-effects | Message surfaces remain pure rendering components |
+| rule-transcript-boundary-regressions |  |
 ## Container Connection
 
-Part of c3-1 (client). This is the transcript presentation layer: TinkariaTranscript maps processed messages into these renderers, with structured artifact cards delegated to c3-106 and shared rich-content primitives coming from c3-107. Assistant text may also auto-upgrade known embeddable links such as Diashort into rich artifact cards when the model emits a plain link instead of a dedicated `present_content` tool call.
+Part of c3-1 (client). ChatTranscript maps hydrated messages into render items, then message renderers own visible surfaces: WipBlock for progress/tool work, TextMessage for final or live assistant response text, PresentContentMessage for structured artifacts, and rich-content primitives for markdown/code/embed overlays. Assistant text may also auto-upgrade known embeddable links such as Diashort into rich artifact cards when the model emits a plain link instead of a dedicated present_content tool call.

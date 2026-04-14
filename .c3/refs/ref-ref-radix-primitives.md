@@ -1,7 +1,7 @@
 ---
 id: ref-ref-radix-primitives
-c3-seal: ca89fb6e0d12125ec4729ef282748d050e573163ee0844fe8b974ce10f5cf8ed
-title: ref-radix-primitives
+c3-seal: 11c92fe1ff358fefe5637444015a38ba3b2bc222e60993ce2828a586d225f8f9
+title: radix-primitives
 type: ref
 goal: Build accessible, composable UI components without reimplementing complex interaction patterns (focus management, keyboard navigation, screen reader support).
 ---
@@ -21,3 +21,13 @@ Radix UI primitives (Dialog, Select, ContextMenu, Popover, Tooltip, DropdownMenu
 - Composable API with slot-based parts (Trigger, Content, Item) fits React patterns
 - Battle-tested interaction patterns (focus trapping, escape handling, portal rendering)
 - Avoids heavyweight component libraries that impose design opinions
+## How
+
+Use Radix only for behavior-heavy primitives, wrapped behind `src/client/components/ui/*` so product surfaces consume stable local components.
+
+Implementation contract:
+
+- Feature code imports local UI wrappers, not raw `@radix-ui/*` primitives, unless creating/updating the wrapper itself.
+- Wrapper files own variant classes, focus-visible styles, portals, and accessibility labels.
+- Dialog/popover/dropdown changes require keyboard and focus-regression coverage when behavior changes.
+- Do not fork one-off dialog/menu primitives in feature components; extend the shared wrapper or add a focused primitive.
