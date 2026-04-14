@@ -38,6 +38,7 @@ public/icon-*.png
 
 # local tooling state
 .superpowers/
+.c3/c3.db
 
 # tauri / rust build output
 src-tauri/target/
