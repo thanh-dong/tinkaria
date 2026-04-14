@@ -1,6 +1,6 @@
 ---
 id: c3-112
-c3-seal: 7a2f45d2eb974a1d31dcea66604d6313494046744bbc805ceda2d63a3d9a251e
+c3-seal: 8f092679c5484f4572b54f23e7e2767296d2bed978ba3c6cd43d3764926a1ef6
 title: chat-input
 type: component
 category: feature
@@ -21,6 +21,71 @@ uses:
 
 Multi-line chat input with auto-resize, submit on Enter, cancel/queue behavior, and a preference bar for provider/model/context-window/reasoning-effort selection and plan-mode toggle.
 
+### Keyboard Behavior Matrix
+
+| Context | Key | Action |
+| --- | --- | --- |
+| Agent running (canCancel=true) | Enter | Queue message |
+| Agent running | Shift+Enter | Insert newline |
+| Idle (canCancel=false) | Enter (non-touch) | Submit |
+| Idle | Ctrl/Cmd+Enter | Submit |
+| Idle (touch device) | Enter | Insert newline |
+| Any state | Shift+Enter | Always insert newline |
+| Composer empty | Arrow Up | Restore queued text |
+| Any | Tab | Focus next chat input |
+| Any | Shift+Tab | Toggle plan mode |
+| Agent running | Escape | Cancel generation |
+### Send States
+
+Three visual states for the submit button:
+
+| State | Visual | Trigger |
+| --- | --- | --- |
+| idle | Arrow-up icon | Default, connection healthy |
+| reconnecting | Spinner animation | WebSocket disconnected |
+| reconnected | Checkmark icon (1.2s) | Just reconnected, then auto-resets to idle |
+### Queue vs Submit UX
+
+**Submit mode** (agent idle, `canCancel=false`):
+
+- Button: arrow-up icon, sends immediately
+- No cancel button shown
+**Queue mode** (agent running, `canCancel=true`):
+
+- Button: clock icon + "Queue" label, holds message until turn finishes
+- Cancel button shown (square stop icon) to abort current generation
+- Queued text block appears above composer: amber dashed border, message preview + "Clear" button
+**Disabled states:**
+
+- `composerActionsDisabled`: disabled prop OR connectionStatus !== "connected"
+- `submitActionDisabled`: composerActionsDisabled OR no text
+- `queueActionDisabled`: composerActionsDisabled OR no text
+### Draft Persistence
+
+- Reads from `chatInputStore.getDraft(chatId)` on mount/chat-switch
+- Writes on every keystroke via `setDraft(chatId, value)`
+- Clears on successful submit (both "queued" and "sent" results)
+- Preserved across chat switching — each chat has independent draft
+### Auto-Resize
+
+Textarea expands to fit content up to 200px max height. Recalculates on window resize and value change.
+
+### Preference Controls
+
+Rendered below textarea via `ComposerPreferenceControls`:
+
+| Control | Scope |
+| --- | --- |
+| Provider selector | Locked to runtime provider if session already has one |
+| Model selector | Filtered by selected provider |
+| Reasoning effort | Claude-specific slider |
+| Context window | Token budget selector |
+| Fast mode toggle | Toggles fast output mode |
+| Plan mode toggle | Shift+Tab shortcut |
+### Skill Ribbon
+
+When available slash commands exist (`availableSkills`), a `SkillRibbon` renders above the preference controls showing clickable skill chips that insert `/skillName` into the composer.
+
 ## Dependencies
 
 | Direction | What | From/To |
@@ -30,22 +95,6 @@ Multi-line chat input with auto-resize, submit on Enter, cancel/queue behavior, 
 | IN | Textarea, Button UI primitives | c3-104 |
 | IN | shared types (AgentProvider, ModelOptions, ProviderCatalogEntry) | c3-204 |
 | OUT | onSubmit callback with message + model options | c3-110 |
-## Related Refs
-
-| Ref | Role |
-| --- | --- |
-| ref-ref-zustand-stores | Per-chat draft and preference state |
-| ref-ref-radix-primitives | Select dropdowns, tooltip, and navbar button primitives |
-| ref-ref-provider-abstraction | Provider/model catalog for preference selection |
-| ref-component-identity-mapping |  |
-## Related Rules
-
-| Rule | Constraint |
-| --- | --- |
-| rule-rule-strict-typescript | Strict typing enforced across all source files |
-| rule-bun-test-conventions |  |
-| rule-react-no-effects |  |
-| rule-error-extraction |  |
 ## Container Connection
 
 Part of c3-1 (client). Feature layer rendered at the bottom of ChatPage. Collects user input and model preferences before sending to the agent.
