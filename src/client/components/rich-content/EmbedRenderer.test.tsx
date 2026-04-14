@@ -1,7 +1,13 @@
-import { describe, test, expect } from "bun:test"
+import { afterEach, describe, mock, test, expect } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
-import { EmbedRenderer, getEmbedWheelZoomIntent, isEmbedLanguage } from "./EmbedRenderer"
+import { EmbedRenderer, getEmbedWheelZoomIntent, isEmbedLanguage, requestPugPreview } from "./EmbedRenderer"
 import { ContentViewerContext, type ContentViewerContextValue } from "./ContentViewerContext"
+
+const savedFetch = globalThis.fetch
+
+afterEach(() => {
+  globalThis.fetch = savedFetch
+})
 
 describe("isEmbedLanguage", () => {
   test("returns true for mermaid", () => {
@@ -191,9 +197,38 @@ describe("EmbedRenderer html embed", () => {
       <EmbedRenderer format="pug" source={"main\n  h1 Hello"} />
     )
 
-    expect(html).toContain("Pug preview unavailable")
+    expect(html).toContain("Rendering Pug preview...")
     expect(html).toContain("main")
     expect(html).not.toContain('data-pug-embed="true"')
+  })
+
+  test("requests generic pug previews from the local server endpoint", async () => {
+    const fetchMock = mock(() => Promise.resolve(new Response(JSON.stringify({ html: "<main><h1>Hello</h1></main>" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    await expect(requestPugPreview("main\n  h1 Hello")).resolves.toEqual({
+      renderedHtml: "<main><h1>Hello</h1></main>",
+      renderError: undefined,
+    })
+    expect(fetchMock).toHaveBeenCalledWith("/api/render/pug", expect.objectContaining({
+      method: "POST",
+    }))
+  })
+
+  test("surfaces route failures as render errors", async () => {
+    const fetchMock = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Pug parse error" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    await expect(requestPugPreview("main(\n  h1 Hello")).resolves.toEqual({
+      renderedHtml: undefined,
+      renderError: "Pug parse error",
+    })
   })
 
   test("shows raw pug source in source mode", () => {

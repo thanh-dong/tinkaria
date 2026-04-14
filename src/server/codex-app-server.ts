@@ -2,7 +2,6 @@ import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { createInterface } from "node:readline"
 import type { Readable, Writable } from "node:stream"
-import { render as renderPug } from "pug"
 import type {
   AskUserQuestionItem,
   CodexReasoningEffort,
@@ -17,6 +16,7 @@ import { getWebContextPrompt } from "../shared/web-context"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
 import { normalizeToolCall } from "../shared/tools"
 import { normalizePresentContentFormat } from "../shared/presentContent"
+import { renderPugPreview } from "./pug-preview"
 import { z, type ZodIssue } from "zod"
 import {
   type CollabAgentToolCallItem,
@@ -452,10 +452,13 @@ function enrichPresentContentResult(
     return result
   }
 
-  try {
-    result.renderedHtml = renderPug(value.source, { doctype: "html" })
-  } catch (error: unknown) {
-    result.renderError = errorMessage(error)
+  const preview = renderPugPreview(value.source)
+
+  if (preview.html) {
+    result.renderedHtml = preview.html
+  }
+  if (preview.error) {
+    result.renderError = preview.error
   }
 
   return result

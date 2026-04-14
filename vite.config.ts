@@ -19,7 +19,7 @@ export function getAllowedHosts() {
     if (!Array.isArray(parsed)) return undefined
     const hosts = parsed.filter((value): value is string => typeof value === "string" && value.length > 0)
     return hosts.length > 0 ? hosts : undefined
-  } catch {
+  } catch (_error: unknown) {
     return undefined
   }
 }
@@ -73,6 +73,9 @@ export default defineConfig({
         target: `http://${backendTargetHost}:${backendPort}`,
       },
       "/auth/token": {
+        target: `http://${backendTargetHost}:${backendPort}`,
+      },
+      "/api/render/pug": {
         target: `http://${backendTargetHost}:${backendPort}`,
       },
       "/nats-ws": {

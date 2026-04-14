@@ -58,9 +58,9 @@ describe("TextMessage", () => {
 
     expect(html).toContain("Before")
     expect(html).toContain("After")
-    expect(html).toContain('data-pug-embed="true"')
     expect(html).toContain(">Pug<")
-    expect(html).toContain("Hello")
+    expect(html).toContain("Rendering Pug preview...")
+    expect(html).toContain("main")
   })
 
   test("leaves non-pug fenced blocks as normal code blocks", () => {

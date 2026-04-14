@@ -215,6 +215,45 @@ describe("startServer healthcheck", () => {
   }, 30_000)
 })
 
+describe("startServer pug preview route", () => {
+  test("compiles pug previews for generic UI embeds", async () => {
+    const started = await startServer({ port: 4325, host: "127.0.0.1", strictPort: true })
+    try {
+      const response = await fetch(`http://127.0.0.1:${started.port}/api/render/pug`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ source: "main\n  h1 Hello" }),
+      })
+      expect(response.ok).toBe(true)
+      await expect(response.json()).resolves.toEqual({
+        html: "<main><h1>Hello</h1></main>",
+      })
+    } finally {
+      await started.stop()
+    }
+  }, 30_000)
+
+  test("returns pug render errors without crashing the route", async () => {
+    const started = await startServer({ port: 4326, host: "127.0.0.1", strictPort: true })
+    try {
+      const response = await fetch(`http://127.0.0.1:${started.port}/api/render/pug`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ source: "main(\n  h1 Hello" }),
+      })
+      expect(response.ok).toBe(true)
+      const body = await response.json() as { error?: string }
+      expect(body.error).toContain("no closing bracket")
+    } finally {
+      await started.stop()
+    }
+  }, 30_000)
+})
+
 describe("/nats-ws proxy upstream race", () => {
   let harnesses: Array<{ stop: () => Promise<void> }> = []
 

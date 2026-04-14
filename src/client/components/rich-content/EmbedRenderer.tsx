@@ -5,6 +5,45 @@ import { clampEmbedZoom, useContentViewer } from "./ContentViewerContext"
 const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort", "html", "pug"])
 const TAILWIND_BROWSER_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
 const DEFAULT_EMBED_STYLE = "html,body{margin:0;min-height:100%;background:transparent;}body{padding:1rem;font-family:Inter,ui-sans-serif,system-ui,sans-serif;}"
+const PUG_PREVIEW_ENDPOINT = "/api/render/pug"
+const pugPreviewCache = new Map<string, { renderedHtml?: string; renderError?: string }>()
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+export async function requestPugPreview(source: string): Promise<{ renderedHtml?: string; renderError?: string }> {
+  try {
+    const response = await fetch(PUG_PREVIEW_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ source }),
+    })
+    const payload = await response.json().catch(() => null)
+    const record = asRecord(payload)
+    const renderedHtml = typeof record?.html === "string" ? record.html : undefined
+    const renderError = typeof record?.error === "string"
+      ? record.error
+      : response.ok
+        ? undefined
+        : `Pug preview request failed (${response.status})`
+
+    if (renderedHtml || renderError) {
+      return { renderedHtml, renderError }
+    }
+
+    return { renderError: "Pug preview unavailable" }
+  } catch (error: unknown) {
+    return {
+      renderError: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+type PugPreviewState = { renderedHtml?: string; renderError?: string; loading: boolean }
 
 export function isEmbedLanguage(language: string | null): boolean {
   return language !== null && EMBED_LANGUAGES.has(normalizePresentContentFormat(language))
@@ -274,6 +313,52 @@ function HtmlEmbed({ source }: { source: string }) {
   )
 }
 
+function usePugPreview({
+  source,
+  renderedHtml,
+  renderError,
+}: {
+  source: string
+  renderedHtml?: string
+  renderError?: string
+}): PugPreviewState {
+  const cached = pugPreviewCache.get(source)
+  const [state, setState] = useState<PugPreviewState>(() => {
+    if (renderedHtml || renderError) return { renderedHtml, renderError, loading: false }
+    if (cached) return { ...cached, loading: false }
+    return { loading: true }
+  })
+
+  useEffect(() => {
+    if (renderedHtml || renderError) {
+      const next = { renderedHtml, renderError }
+      pugPreviewCache.set(source, next)
+      setState({ ...next, loading: false })
+      return
+    }
+
+    if (cached) {
+      setState({ ...cached, loading: false })
+      return
+    }
+
+    let cancelled = false
+    setState({ loading: true })
+
+    void requestPugPreview(source).then((next) => {
+      if (cancelled) return
+      pugPreviewCache.set(source, next)
+      setState({ ...next, loading: false })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [cached, renderedHtml, renderError, source])
+
+  return state
+}
+
 function PugEmbed({
   source,
   renderedHtml,
@@ -284,8 +369,9 @@ function PugEmbed({
   renderError?: string
 }) {
   const { mode, zoom, adjustZoom } = useEmbedState()
-  const htmlSource = renderedHtml ? createHtmlEmbedDocument(renderedHtml) : null
-  const errorMessage = renderError ?? (htmlSource ? null : "Pug preview unavailable")
+  const preview = usePugPreview({ source, renderedHtml, renderError })
+  const htmlSource = preview.renderedHtml ? createHtmlEmbedDocument(preview.renderedHtml) : null
+  const errorMessage = preview.renderError ?? (preview.loading ? "Rendering Pug preview..." : "Pug preview unavailable")
 
   return (
     <>
