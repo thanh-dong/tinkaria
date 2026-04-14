@@ -2,6 +2,7 @@ import type { AgentProvider, IndependentWorkspace, WorkspaceSummary, TranscriptE
 import type { WorkspaceTodo, WorkspaceClaim, WorkspaceWorktree, WorkspaceRule } from "../shared/workspace-types"
 import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
 import type { ProviderProfile, ProviderProfileRecord, WorkspaceProfileOverride } from "../shared/profile-types"
+import type { ExtensionPreference } from "../shared/extension-types"
 import type { WorkflowRunState } from "../shared/workflow-types"
 import type { SandboxRecord, SandboxHealthReport, ResourceLimits } from "../shared/sandbox-types"
 
@@ -59,6 +60,7 @@ export interface StoreState {
   sandboxByWorkspace: Map<string, SandboxRecord>
   providerProfiles: Map<string, ProviderProfileRecord>
   workspaceProfileOverrides: Map<string, Map<string, WorkspaceProfileOverride>>
+  extensionPreferences: Map<string, ExtensionPreference>
 }
 
 export function createEmptyCoordinationState(): WorkspaceCoordinationState {
@@ -85,6 +87,7 @@ export interface SnapshotFile {
   sandboxes?: SandboxRecord[]
   providerProfiles?: ProviderProfileRecord[]
   workspaceProfileOverrides?: WorkspaceProfileOverride[]
+  extensionPreferences?: ExtensionPreference[]
 }
 
 export type WorkspaceEvent = {
@@ -256,7 +259,10 @@ export type ProviderProfileEvent =
   | { v: 3; type: "workspace_profile_override_set"; timestamp: number; workspaceId: string; profileId: string; overrides: Partial<Omit<ProviderProfile, "id" | "provider">> }
   | { v: 3; type: "workspace_profile_override_removed"; timestamp: number; workspaceId: string; profileId: string }
 
-export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent | RepoEvent | AgentConfigEvent | WorkflowEvent | SandboxEvent | ProviderProfileEvent
+export type ExtensionPreferenceEvent =
+  | { v: 3; type: "extension_preference_set"; timestamp: number; extensionId: string; enabled: boolean }
+
+export type StoreEvent = WorkspaceEvent | ChatEvent | MessageEvent | TurnEvent | CoordinationEvent | RepoEvent | AgentConfigEvent | WorkflowEvent | SandboxEvent | ProviderProfileEvent | ExtensionPreferenceEvent
 
 export function createEmptyState(): StoreState {
   return {
@@ -272,6 +278,7 @@ export function createEmptyState(): StoreState {
     sandboxByWorkspace: new Map(),
     providerProfiles: new Map(),
     workspaceProfileOverrides: new Map(),
+    extensionPreferences: new Map(),
   }
 }
 

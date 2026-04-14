@@ -13,6 +13,7 @@ import {
   type MessageEvent,
   type WorkspaceEvent,
   type ProviderProfileEvent,
+  type ExtensionPreferenceEvent,
   type SandboxEvent,
   type WorkflowEvent,
   type SnapshotFile,
@@ -59,6 +60,7 @@ export class EventStore {
   private readonly workflowsLogPath: string
   private readonly sandboxLogPath: string
   private readonly profilesLogPath: string
+  private readonly extensionPrefsLogPath: string
 
   constructor(dataDir = getDataDir(homedir())) {
     this.dataDir = dataDir
@@ -74,6 +76,7 @@ export class EventStore {
     this.workflowsLogPath = path.join(this.dataDir, "workflows.jsonl")
     this.sandboxLogPath = path.join(this.dataDir, "sandbox.jsonl")
     this.profilesLogPath = path.join(this.dataDir, "profiles.jsonl")
+    this.extensionPrefsLogPath = path.join(this.dataDir, "extension-prefs.jsonl")
   }
 
   async initialize() {
@@ -89,6 +92,7 @@ export class EventStore {
     await this.ensureFile(this.workflowsLogPath)
     await this.ensureFile(this.sandboxLogPath)
     await this.ensureFile(this.profilesLogPath)
+    await this.ensureFile(this.extensionPrefsLogPath)
     await this.loadSnapshot()
     await this.replayLogs()
     if (!(await this.hasLegacyTranscriptData()) && await this.shouldCompact()) {
@@ -120,6 +124,7 @@ export class EventStore {
       Bun.write(this.workflowsLogPath, ""),
       Bun.write(this.sandboxLogPath, ""),
       Bun.write(this.profilesLogPath, ""),
+      Bun.write(this.extensionPrefsLogPath, ""),
     ])
   }
 
@@ -195,6 +200,11 @@ export class EventStore {
           this.state.workspaceProfileOverrides.set(override.workspaceId, wsMap)
         }
       }
+      if (parsed.extensionPreferences?.length) {
+        for (const pref of parsed.extensionPreferences) {
+          this.state.extensionPreferences.set(pref.extensionId, { ...pref })
+        }
+      }
       if (parsed.messages?.length) {
         this.snapshotHasLegacyMessages = true
         for (const messageSet of parsed.messages) {
@@ -219,6 +229,7 @@ export class EventStore {
     this.state.sandboxByWorkspace.clear()
     this.state.providerProfiles.clear()
     this.state.workspaceProfileOverrides.clear()
+    this.state.extensionPreferences.clear()
     this.transcriptCache.clear()
   }
 
@@ -248,6 +259,8 @@ export class EventStore {
     await this.replayLog<SandboxEvent>(this.sandboxLogPath)
     if (this.storageReset) return
     await this.replayLog<ProviderProfileEvent>(this.profilesLogPath)
+    if (this.storageReset) return
+    await this.replayLog<ExtensionPreferenceEvent>(this.extensionPrefsLogPath)
   }
 
   private async replayLog<TEvent extends StoreEvent>(filePath: string) {
@@ -806,6 +819,14 @@ export class EventStore {
         this.state.workspaceProfileOverrides.get(event.workspaceId)?.delete(event.profileId)
         break
       }
+      case "extension_preference_set": {
+        this.state.extensionPreferences.set(event.extensionId, {
+          extensionId: event.extensionId,
+          enabled: event.enabled,
+          updatedAt: event.timestamp,
+        })
+        break
+      }
     }
   }
 
@@ -1241,6 +1262,13 @@ export class EventStore {
     await this.append<ProviderProfileEvent>(this.profilesLogPath, event)
   }
 
+  // --- Extension preference mutation methods ---
+
+  async setExtensionPreference(extensionId: string, enabled: boolean) {
+    const event: ExtensionPreferenceEvent = { v: STORE_VERSION, type: "extension_preference_set", timestamp: Date.now(), extensionId, enabled }
+    await this.append<ExtensionPreferenceEvent>(this.extensionPrefsLogPath, event)
+  }
+
   // --- Repo mutation methods ---
 
   async addRepo(id: string, workspaceId: string, localPath: string, origin: string | null, label: string | null, branch: string | null) {
@@ -1483,6 +1511,9 @@ export class EventStore {
           (wsMap) => [...wsMap.values()],
         ),
       } : {}),
+      ...(this.state.extensionPreferences.size > 0 ? {
+        extensionPreferences: [...this.state.extensionPreferences.values()],
+      } : {}),
     }
   }
 
@@ -1500,6 +1531,7 @@ export class EventStore {
       Bun.write(this.workflowsLogPath, ""),
       Bun.write(this.sandboxLogPath, ""),
       Bun.write(this.profilesLogPath, ""),
+      Bun.write(this.extensionPrefsLogPath, ""),
     ])
   }
 
@@ -1546,6 +1578,7 @@ export class EventStore {
       Bun.file(this.workflowsLogPath).size,
       Bun.file(this.sandboxLogPath).size,
       Bun.file(this.profilesLogPath).size,
+      Bun.file(this.extensionPrefsLogPath).size,
     ])
     return sizes.reduce((total, size) => total + size, 0) >= COMPACTION_THRESHOLD_BYTES
   }

@@ -92,6 +92,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "runtime.health",
   "profile.list",
   "profile.resolve",
+  "extension.preference.list",
 ])
 
 /** Commands handled by the Bun backend. */
@@ -169,6 +170,8 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "profile.resolve",
   "workspace.profile.override.set",
   "workspace.profile.override.remove",
+  "extension.preference.set",
+  "extension.preference.list",
 ]
 
 const DETECT_OPTIONS: Record<string, { binaryName: string; packageName: string; versionParser: (stdout: string) => string }> = {
@@ -759,6 +762,19 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
 
       case "workspace.profile.override.remove": {
         await store.removeWorkspaceProfileOverride(command.workspaceId, command.profileId)
+        return { ok: true }
+      }
+
+      // --- Extension preferences ---
+
+      case "extension.preference.list": {
+        return {
+          preferences: [...store.state.extensionPreferences.values()],
+        }
+      }
+
+      case "extension.preference.set": {
+        await store.setExtensionPreference(command.extensionId, command.enabled)
         return { ok: true }
       }
 

@@ -16,6 +16,7 @@ import type { SkillCache } from "./skill-discovery"
 import type { SessionOrchestrator } from "./orchestration"
 import type { RuntimeRegistry } from "./runtime-registry"
 import type { ProfileSnapshot } from "../shared/profile-types"
+import type { ExtensionPreferencesSnapshot } from "../shared/extension-types"
 
 const encoder = new TextEncoder()
 
@@ -53,6 +54,12 @@ function deriveProfileSnapshot(store: EventStore): ProfileSnapshot {
     workspaceOverrides: [...store.state.workspaceProfileOverrides.values()].flatMap(
       (wsMap) => [...wsMap.values()],
     ),
+  }
+}
+
+function deriveExtensionPreferencesSnapshot(store: EventStore): ExtensionPreferencesSnapshot {
+  return {
+    preferences: [...store.state.extensionPreferences.values()],
   }
 }
 
@@ -135,6 +142,8 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         return runtimeRegistry?.getSnapshot() ?? { runtimes: [] }
       case "profiles":
         return deriveProfileSnapshot(store)
+      case "extension-preferences":
+        return deriveExtensionPreferencesSnapshot(store)
       default: {
         const _exhaustive: never = topic
         throw new Error(`Unknown topic type: ${(_exhaustive as SubscriptionTopic).type}`)

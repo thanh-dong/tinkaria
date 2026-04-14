@@ -1,16 +1,18 @@
 import { useState } from "react"
 import { useNavigate, useOutletContext } from "react-router-dom"
-import { ArrowLeft, Box, Settings, User } from "lucide-react"
+import { ArrowLeft, Box, Puzzle, Settings, User } from "lucide-react"
 import { SegmentedControl, type SegmentedOption } from "../components/ui/segmented-control"
 import { ProvidersTab } from "./ProvidersTab"
 import { ProfilesTab } from "./ProfilesTab"
+import { ExtensionsTab } from "./ExtensionsTab"
 import type { AppState } from "./useAppState"
 
-type TinkariaTab = "providers" | "profiles"
+type TinkariaTab = "providers" | "profiles" | "extensions"
 
 const TAB_OPTIONS: SegmentedOption<TinkariaTab>[] = [
   { value: "providers", label: "Providers", icon: Box, tooltip: "Providers" },
   { value: "profiles", label: "Profiles", icon: User, tooltip: "Profiles" },
+  { value: "extensions", label: "Extensions", icon: Puzzle, tooltip: "Extensions" },
 ]
 
 export function TinkariaPage() {
@@ -44,6 +46,7 @@ export function TinkariaPage() {
       <div className="flex-1 min-h-0 px-4 pb-4 overflow-y-auto">
         {activeTab === "providers" && <ProvidersTab state={state} />}
         {activeTab === "profiles" && <ProfilesTab state={state} />}
+        {activeTab === "extensions" && <ExtensionsTab state={state} />}
       </div>
     </div>
   )

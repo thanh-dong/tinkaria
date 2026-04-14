@@ -50,7 +50,7 @@ function makeState(workspaceId: string): StoreState {
       unread: false, provider: "codex", planMode: false, sessionToken: null, lastTurnOutcome: null,
     }],
   ])
-  return { workspacesById, workspaceIdsByPath, independentWorkspacesById: new Map(), chatsById, coordinationByWorkspace: new Map(), agentConfigsByWorkspace: new Map(), reposById: new Map(), reposByPath: new Map(), workflowRunsByWorkspace: new Map(), sandboxByWorkspace: new Map(), providerProfiles: new Map(), workspaceProfileOverrides: new Map() }
+  return { workspacesById, workspaceIdsByPath, independentWorkspacesById: new Map(), chatsById, coordinationByWorkspace: new Map(), agentConfigsByWorkspace: new Map(), reposById: new Map(), reposByPath: new Map(), workflowRunsByWorkspace: new Map(), sandboxByWorkspace: new Map(), providerProfiles: new Map(), workspaceProfileOverrides: new Map(), extensionPreferences: new Map() }
 }
 
 describe("project agent integration", () => {

@@ -5,6 +5,7 @@ import { SegmentedControl, type SegmentedOption } from "../components/ui/segment
 import { clientExtensions } from "../extensions.config"
 import type { AppState } from "./useAppState"
 import type { DetectionResult } from "../../shared/extension-types"
+import { useExtensionPreferencesSubscription } from "./useExtensionPreferencesSubscription"
 import { getPathBasename } from "../lib/formatters"
 
 const ICON_MAP: Record<string, typeof Building2> = {
@@ -18,6 +19,7 @@ export function ProjectPage() {
   const state = useOutletContext<AppState>()
   const navigate = useNavigate()
 
+  const prefsSnapshot = useExtensionPreferencesSubscription(state.socket)
   const [detectedIds, setDetectedIds] = useState<string[] | null>(null)
   const [detectError, setDetectError] = useState(false)
 
@@ -47,8 +49,12 @@ export function ProjectPage() {
 
   const activeExtensions = useMemo(() => {
     if (!detectedIds) return []
-    return clientExtensions.filter((ext) => detectedIds.includes(ext.id))
-  }, [detectedIds])
+    return clientExtensions.filter((ext) => {
+      if (!detectedIds.includes(ext.id)) return false
+      const pref = prefsSnapshot?.preferences.find((p) => p.extensionId === ext.id)
+      return pref?.enabled !== false
+    })
+  }, [detectedIds, prefsSnapshot])
 
   const tabOptions = useMemo<SegmentedOption<string>[]>(() => {
     return activeExtensions.map((ext) => ({
