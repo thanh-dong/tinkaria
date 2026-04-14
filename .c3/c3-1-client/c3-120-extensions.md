@@ -1,11 +1,11 @@
 ---
 id: c3-120
-c3-seal: 6b9c03a10451beb5cd67f6d938bd270298c205b9521b9f41fd2d705766074fc2
+c3-seal: 8a74e8642a5c41908bf75474a2a74df7bbd9615ee32c45b245d09b36abede578
 title: extensions
 type: component
 category: feature
 parent: c3-1
-goal: Extension host for the Project Page — auto-detects relevant project extensions via filesystem probes, renders them as SegmentedControl tabs. Lazy-loads extension React components (c3 architecture, agents config, code overview). User preferences (enable/disable) override detection results globally.
+goal: Extension host for the Project Page — auto-detects relevant project extensions via filesystem probes, renders them as SegmentedControl tabs, and renders selected C3 entity documents as full markdown from c3x read --full. Lazy-loads extension React components (c3 architecture, agents config, code overview). User preferences (enable/disable) override detection results globally.
 uses:
     - ref-mobile-tabbed-page-pattern
     - ref-ref-event-sourcing
@@ -18,7 +18,7 @@ uses:
 
 ## Goal
 
-Extension host for the Project Page — auto-detects relevant project extensions via filesystem probes, renders them as SegmentedControl tabs. Lazy-loads extension React components (c3 architecture, agents config, code overview). User preferences (enable/disable) override detection results globally.
+Extension host for the Project Page — auto-detects relevant project extensions via filesystem probes, renders them as SegmentedControl tabs, and renders selected C3 entity documents as full markdown from c3x read --full. Lazy-loads extension React components (c3 architecture, agents config, code overview). User preferences (enable/disable) override detection results globally.
 
 ## Dependencies
 

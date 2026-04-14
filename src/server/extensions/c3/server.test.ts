@@ -151,7 +151,12 @@ describe("c3x integration", () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.data).toBeDefined()
+    expect(body.data).toMatchObject({
+      id: "c3-204",
+      type: "component",
+      body: expect.stringContaining("##"),
+    })
+    expect(body.data.body_truncated).toBeUndefined()
   })
 
   test("graph handler returns mermaid content", async () => {

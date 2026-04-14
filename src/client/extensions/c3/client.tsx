@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react"
+import Markdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { Building2, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, FileText, GitBranch } from "lucide-react"
 import { Button } from "../../components/ui/button"
 import {
   createC3UiIdentityDescriptor,
   getUiIdentityAttributeProps,
 } from "../../lib/uiIdentityOverlay"
+import { createMarkdownComponents } from "../../components/messages/shared"
 import type { ExtensionProps } from "../../../shared/extension-types"
 
 const C3_EXTENSION_UI_DESCRIPTORS = {
@@ -122,6 +125,60 @@ export function normalizeC3Entities(raw: C3ListResponse["data"]): C3Entity[] {
   return []
 }
 
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
+}
+
+function stringArrayValue(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : []
+}
+
+function markdownTableValue(value: string): string {
+  return value.replaceAll("|", "\\|").replaceAll("\n", "<br />")
+}
+
+function normalizeDetailRecord(record: Record<string, unknown>): string {
+  const title = stringValue(record.title) ?? stringValue(record.id) ?? "C3 document"
+  const metaRows = [
+    ["ID", stringValue(record.id)],
+    ["Type", stringValue(record.type)],
+    ["Status", stringValue(record.status)],
+    ["Parent", stringValue(record.parent)],
+    ["Category", stringValue(record.category)],
+  ].filter((row): row is [string, string] => row[1] !== null)
+  const uses = stringArrayValue(record.uses)
+  const goal = stringValue(record.goal)
+  const body = stringValue(record.body)
+  const sections = [`# ${title}`]
+
+  if (metaRows.length > 0) {
+    sections.push([
+      "| Field | Value |",
+      "| --- | --- |",
+      ...metaRows.map(([field, value]) => `| ${field} | ${markdownTableValue(value)} |`),
+    ].join("\n"))
+  }
+
+  if (goal) sections.push(`> ${goal}`)
+  if (uses.length > 0) sections.push(["## Uses", ...uses.map((use) => `- \`${use}\``)].join("\n"))
+  if (body) sections.push(body)
+
+  return sections.join("\n\n")
+}
+
+export function normalizeC3DetailDocument(detail: C3DetailResponse["data"]): string {
+  if (typeof detail === "string") {
+    try {
+      const parsed = JSON.parse(detail) as unknown
+      if (isRecord(parsed)) return normalizeDetailRecord(parsed)
+    } catch (_error: unknown) {
+      return detail
+    }
+    return detail
+  }
+  return normalizeDetailRecord(detail)
+}
+
 /** Flatten a nested tree into a list with depth info for counting */
 function countEntities(entities: C3Entity[]): number {
   let count = 0
@@ -145,6 +202,19 @@ function typeBadge(type: string) {
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${style.bg} ${style.text}`}>
       {type}
     </span>
+  )
+}
+
+export function C3MarkdownDocument({ source }: { source: string }) {
+  return (
+    <div className="prose prose-sm max-w-none text-foreground prose-headings:scroll-mt-4 prose-headings:font-semibold prose-p:leading-7 prose-pre:max-h-96 prose-pre:overflow-auto prose-table:text-sm dark:prose-invert">
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        components={createMarkdownComponents({ renderRichContentBlocks: false })}
+      >
+        {source}
+      </Markdown>
+    </div>
   )
 }
 
@@ -182,15 +252,9 @@ function DetailPanel({
             <FileText className="size-3" />
             Details
           </div>
-          {typeof detail === "string" ? (
-            <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-80 overflow-y-auto">
-              {detail}
-            </pre>
-          ) : (
-            <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-80 overflow-y-auto">
-              {JSON.stringify(detail, null, 2)}
-            </pre>
-          )}
+          <div className="max-h-[32rem] overflow-y-auto rounded-md border border-border bg-background px-4 py-3">
+            <C3MarkdownDocument source={normalizeC3DetailDocument(detail)} />
+          </div>
         </div>
       )}
       {(graphLoading || graph) && (

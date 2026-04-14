@@ -3,7 +3,12 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import AgentsExtension, { getAgentsExtensionUiIdentityDescriptors } from "./agents/client"
-import C3Extension, { getC3ExtensionUiIdentityDescriptors, normalizeC3Entities } from "./c3/client"
+import C3Extension, {
+  C3MarkdownDocument,
+  getC3ExtensionUiIdentityDescriptors,
+  normalizeC3DetailDocument,
+  normalizeC3Entities,
+} from "./c3/client"
 import CodeExtension, { getCodeExtensionUiIdentityDescriptors } from "./code/client"
 
 describe("project extension ui identity", () => {
@@ -34,6 +39,25 @@ describe("project extension ui identity", () => {
       { id: "c3-1", title: "client", type: "container", name: "client" },
       { id: "c3-120", title: "extensions", type: "component", name: "extensions" },
     ])
+  })
+
+  test("renders C3 detail documents as markdown", () => {
+    const markdown = normalizeC3DetailDocument({
+      id: "c3-120",
+      type: "component",
+      title: "extensions",
+      status: "active",
+      parent: "c3-1",
+      body: "## Goal\n\nRender **full** C3 docs.\n\n## Dependencies\n\n| Direction | What |\n| --- | --- |\n| IN | c3x read |",
+    })
+    const html = renderToStaticMarkup(createElement(C3MarkdownDocument, { source: markdown }))
+
+    expect(markdown).toContain("# extensions")
+    expect(markdown).toContain("## Goal")
+    expect(html).toContain("<h1")
+    expect(html).toContain("<strong>full</strong>")
+    expect(html).toContain("<table")
+    expect(html).not.toContain("&quot;body&quot;")
   })
 
   test("backs agents extension identities with C3-owned descriptors", () => {

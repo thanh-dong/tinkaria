@@ -108,12 +108,17 @@ function handleRead(projectPath: string): ExtensionRoute["handler"] {
     }
 
     try {
-      const { stdout, exitCode } = await runC3x(["read", id], projectPath)
+      const { stdout, exitCode } = await runC3x(["read", id, "--full"], projectPath)
       if (exitCode !== 0) {
         console.warn(LOG_PREFIX, "c3x read exited with code", exitCode)
         return errorResponse("c3x execution failed", 503)
       }
-      return jsonResponse({ data: stdout.trim() })
+      try {
+        const parsed = JSON.parse(stdout) as unknown
+        return jsonResponse({ data: parsed })
+      } catch (_error: unknown) {
+        return jsonResponse({ data: stdout.trim() })
+      }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error)
       console.warn(LOG_PREFIX, "read failed:", msg)
