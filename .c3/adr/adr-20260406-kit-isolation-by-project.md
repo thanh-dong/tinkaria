@@ -1,6 +1,6 @@
 ---
 id: adr-20260406-kit-isolation-by-project
-c3-seal: 531597b73053ffd41b1a2b6343745d3fecd73a42454aebdc990cf5b29649f131
+c3-seal: 4798a45a720ea387b6e93288f657cde22e492f69132c96a636a8e7438aaa8b5d
 title: define kit as the resilient execution unit with per-kit agent settings
 type: adr
 goal: '[ASSUMED] Keep the multi-node design simple while making it resilient.'
@@ -90,8 +90,32 @@ one hub
 one hub
 one hub
 one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
 
 - one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
+That already gives us the split we want:
+one kit
 That already gives us the split we want:
 one kit
 That already gives us the split we want:
@@ -116,8 +140,32 @@ hub owns truth
 hub owns truth
 hub owns truth
 hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
+hub owns truth
 
 - kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
+The next step up is:
+kit owns execution
 The next step up is:
 kit owns execution
 The next step up is:
@@ -142,8 +190,32 @@ one hub
 one hub
 one hub
 one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
+one hub
 
 - many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
+That gives us multiple agent behaviors without changing the hub role.
+many kits with different settings
 That gives us multiple agent behaviors without changing the hub role.
 many kits with different settings
 That gives us multiple agent behaviors without changing the hub role.

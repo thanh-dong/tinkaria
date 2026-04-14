@@ -1,6 +1,6 @@
 ---
 id: c3-110
-c3-seal: 4ffc2ac5b7d65f5981d2357c707f1f56f691bf47ae88eee8f951c1f70ec1d659
+c3-seal: ab06ba7543d8d64bbf1bdffeb6686935a1e02c78a6d36968bcffa418f55dd9a1
 title: chat
 type: component
 category: feature
@@ -45,8 +45,7 @@ Three states govern auto-scroll behavior:
 | anchoring | Initial load. Polling scroll height every 50ms until 5 consecutive stable cycles (250ms). Timeout at 2000ms. | Hidden |
 | following | At bottom. Auto-scrolls on new content via useLayoutEffect watching messages.length + status + inputHeight. | Hidden |
 | detached | User scrolled away manually. No auto-scroll. | Visible (if messageCount > 0) |
-**Transitions:**
-
+| Transitions: |  |  |
 - `anchoring` + initial-scroll-done(tail) → `following`
 - `anchoring` + initial-scroll-done(block) → `detached`
 - `anchoring` + chat-changed → `anchoring` (reset)
@@ -56,7 +55,6 @@ Three states govern auto-scroll behavior:
 - `detached` + IntersectionObserver sentinel visible → `following`
 - `detached` + chat-changed → `anchoring`
 **Bottom Detection:** IntersectionObserver watches a sentinel element at transcript tail. "Within bottom follow band" = within 2% of viewport height (minimum 2px). Programmatic scrolls (marked via `beginProgrammaticScroll()`) bypass manual-scroll detection to prevent false detach.
-
 **Scroll Button:** Positioned at 120px from bottom (+ 52px if skill ribbon visible). CSS scale transition: `scale-100` visible, `scale-60 opacity-0` hidden.
 
 ### Read Signal (Unread/Read)
@@ -71,7 +69,6 @@ Chats carry an `unread` boolean from the server sidebar snapshot.
 4. `document.visibilityState === "visible"`
 5. `document.hasFocus() === true`
 Action: `socket.command({ type: "chat.markRead", chatId })`. No manual UI trigger needed — purely passive on navigation and tab focus events.
-
 ### Submit Pipeline
 
 Five-state machine governing message submission with queuing:
@@ -83,14 +80,12 @@ Five-state machine governing message submission with queuing:
 | flushing | Sending queued text. Text is in flight. |
 | awaiting_busy_ack | Submitted, waiting for server to report busy status back. |
 | blocked | Duplicate submission detected (same text). Prevents re-sending. |
-**Decision tree on submit:**
-
+| Decision tree on submit: |  |
 1. No activeChatId → `handleSend()` directly (creates new chat)
 2. Agent processing OR already queued → `queueSubmit()` → mode = "queued"
 3. Pipeline in flushing/awaiting_busy_ack → `queueSubmit()` → mode = "queued"
 4. Otherwise → `startDirectSubmit()` → `handleSend()` → mode = "awaiting_busy_ack"
 **Queue flush:** When processing ends (snapshot arrives with idle status), `maybeFlushQueuedSubmit()` calls `startQueuedFlush()` → sends queued text → on success: `completeQueuedFlush()` clears queue. On failure: `failQueuedFlush()` restores text back to queue.
-
 **Blocked prevention:** `getQueuedFlushKey(chatId, text)` tracks last-failed text. If next submit matches the failed key, mode = "blocked" to prevent infinite retry loops.
 
 ### handleSend Flow
@@ -131,7 +126,6 @@ Five-state machine governing message submission with queuing:
 - Custom event `tinkaria:restore-chat-input-focus` → focus textarea
 - Disabled when: overlay open, text selection active, element has `data-focus-fallback-ignore`, sidebar open (mobile)
 Focus cycling: Tab key cycles between chat input textareas. `data-chat-input` attribute marks cycle targets.
-
 ## Dependencies
 
 | Direction | What | From/To |

@@ -1,6 +1,6 @@
 ---
 id: adr-20260408-session-process-isolation
-c3-seal: f37280b56fc9cdc1be8e84d3859d0fbb33ec7b02305a18f431483fc631d4ce77
+c3-seal: a6b1eaca8b172f988da54ba586c105c5c6a44ec52016bc7e91ae433d7ee68462
 title: session-process-isolation
 type: adr
 goal: 'Decouple agent session lifecycle from the Tinkaria UI server process so that:'
@@ -245,8 +245,40 @@ tinkaria CLI
 **Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
 **Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
 **Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
+**Claude SDK in subprocess**: `query()` returns async iterable. Runner serializes each message to NATS. SDK's HTTP connection stays within runner. **Risk: low.**
 
 2. **NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
+**NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
 **NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
 **NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
 **NATS daemon crash**: All communication stops. **Mitigation**: Runner and server detect disconnect, buffer locally, reconnect with backoff. Daemon writes PID file — CLI can restart it. JetStream disk store survives daemon restart.
@@ -279,6 +311,22 @@ tinkaria CLI
 **Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
 **Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
 **Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
+**Stale runner**: Runner hangs or becomes unresponsive. **Mitigation**: Heartbeat timeout (15s) + server can spawn replacement and force-kill stale one via PID.
 
 4. **Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
 **Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
@@ -296,8 +344,40 @@ tinkaria CLI
 **Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
 **Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
 **Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
+**Ordering**: JetStream per-subject ordering guaranteed. Transcript events keyed by `runtime.runner.evt.<chatId>` — per-chat order preserved.
 
 5. **Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
+**Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
 **Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
 **Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.
 **Startup race**: Server starts before NATS daemon is ready. **Mitigation**: `ensureNatsDaemon()` waits for port file to appear with exponential backoff.

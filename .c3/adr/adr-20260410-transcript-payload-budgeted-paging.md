@@ -1,6 +1,6 @@
 ---
 id: adr-20260410-transcript-payload-budgeted-paging
-c3-seal: 4e4eab0e36739ad11afde461fe93ece3ec2b563f7ef5814e62632a1dff7a22f1
+c3-seal: 6ce551a3d660b1197287734c8ab8e63b5808ac6f97a65f413e13af200f2441a9
 title: transcript-payload-budgeted-paging
 type: adr
 goal: Supersede the unsafe assumption in `adr-20260401-chunked-transcript-loading` that a fixed tail window by entry count is transport-safe.
@@ -39,7 +39,6 @@ This keeps transport safety inside the transport boundary, where `c3-205` alread
 **Secondary decision — externalize large transcript artifacts:**
 Do not keep treating append-only transcript JSONL as a blob store. Large screenshot/tool-result payloads should move to asset-backed references so transcripts remain event logs, not transport-hostile binary containers.
 Target direction:
-
 - transcript entry stores metadata + asset reference
 - large binary payload stored separately on disk
 - rich-content surfaces resolve the asset lazily when needed
@@ -59,8 +58,24 @@ This second phase reduces disk growth in `c3-201`, request/reply pressure in `c3
 `c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
 `c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
 `c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
+`c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
+`c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
+`c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
+`c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
+`c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
+`c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
+`c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
+`c3-205` (`nats-transport`) — new transcript paging command and bounded responder behavior
 
 - `c3-201` (`event-store`) — cursor/page assembly under byte budget
+`c3-201` (`event-store`) — cursor/page assembly under byte budget
+`c3-201` (`event-store`) — cursor/page assembly under byte budget
+`c3-201` (`event-store`) — cursor/page assembly under byte budget
+`c3-201` (`event-store`) — cursor/page assembly under byte budget
+`c3-201` (`event-store`) — cursor/page assembly under byte budget
+`c3-201` (`event-store`) — cursor/page assembly under byte budget
+`c3-201` (`event-store`) — cursor/page assembly under byte budget
+`c3-201` (`event-store`) — cursor/page assembly under byte budget
 `c3-201` (`event-store`) — cursor/page assembly under byte budget
 `c3-201` (`event-store`) — cursor/page assembly under byte budget
 `c3-201` (`event-store`) — cursor/page assembly under byte budget
@@ -77,8 +92,24 @@ This second phase reduces disk growth in `c3-201`, request/reply pressure in `c3
 `c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
 `c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
 `c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
+`c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
+`c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
+`c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
+`c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
+`c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
+`c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
+`c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
+`c3-204` (`shared-types`) — protocol update for paged transcript reads and asset references
 
 - `c3-110` (`chat`) — client transcript hydration switches to cursor paging
+`c3-110` (`chat`) — client transcript hydration switches to cursor paging
+`c3-110` (`chat`) — client transcript hydration switches to cursor paging
+`c3-110` (`chat`) — client transcript hydration switches to cursor paging
+`c3-110` (`chat`) — client transcript hydration switches to cursor paging
+`c3-110` (`chat`) — client transcript hydration switches to cursor paging
+`c3-110` (`chat`) — client transcript hydration switches to cursor paging
+`c3-110` (`chat`) — client transcript hydration switches to cursor paging
+`c3-110` (`chat`) — client transcript hydration switches to cursor paging
 `c3-110` (`chat`) — client transcript hydration switches to cursor paging
 `c3-110` (`chat`) — client transcript hydration switches to cursor paging
 `c3-110` (`chat`) — client transcript hydration switches to cursor paging
@@ -103,8 +134,32 @@ This second phase reduces disk growth in `c3-201`, request/reply pressure in `c3
 **Why this is better than raising NATS limits or rewriting transcript content first:**
 `c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
 **Why this is better than raising NATS limits or rewriting transcript content first:**
+`c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
+**Why this is better than raising NATS limits or rewriting transcript content first:**
+`c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
+**Why this is better than raising NATS limits or rewriting transcript content first:**
+`c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
+**Why this is better than raising NATS limits or rewriting transcript content first:**
+`c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
+**Why this is better than raising NATS limits or rewriting transcript content first:**
+`c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
+**Why this is better than raising NATS limits or rewriting transcript content first:**
+`c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
+**Why this is better than raising NATS limits or rewriting transcript content first:**
+`c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
+**Why this is better than raising NATS limits or rewriting transcript content first:**
+`c3-107` (`rich-content`) and `c3-106` (`present-content`) — lazy asset resolution for externalized artifacts
+**Why this is better than raising NATS limits or rewriting transcript content first:**
 
 - Raising `max_payload` just moves the ceiling and increases blast radius.
+Raising `max_payload` just moves the ceiling and increases blast radius.
+Raising `max_payload` just moves the ceiling and increases blast radius.
+Raising `max_payload` just moves the ceiling and increases blast radius.
+Raising `max_payload` just moves the ceiling and increases blast radius.
+Raising `max_payload` just moves the ceiling and increases blast radius.
+Raising `max_payload` just moves the ceiling and increases blast radius.
+Raising `max_payload` just moves the ceiling and increases blast radius.
+Raising `max_payload` just moves the ceiling and increases blast radius.
 Raising `max_payload` just moves the ceiling and increases blast radius.
 Raising `max_payload` just moves the ceiling and increases blast radius.
 Raising `max_payload` just moves the ceiling and increases blast radius.
@@ -121,8 +176,32 @@ Client-only chunk splitting is a guardrail, not a sound contract.
 Client-only chunk splitting is a guardrail, not a sound contract.
 Client-only chunk splitting is a guardrail, not a sound contract.
 Client-only chunk splitting is a guardrail, not a sound contract.
+Client-only chunk splitting is a guardrail, not a sound contract.
+Client-only chunk splitting is a guardrail, not a sound contract.
+Client-only chunk splitting is a guardrail, not a sound contract.
+Client-only chunk splitting is a guardrail, not a sound contract.
+Client-only chunk splitting is a guardrail, not a sound contract.
+Client-only chunk splitting is a guardrail, not a sound contract.
+Client-only chunk splitting is a guardrail, not a sound contract.
+Client-only chunk splitting is a guardrail, not a sound contract.
 
 - Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
+**Verification matrix:**
+Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
+**Verification matrix:**
+Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
+**Verification matrix:**
+Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
+**Verification matrix:**
+Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
+**Verification matrix:**
+Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
+**Verification matrix:**
+Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
+**Verification matrix:**
+Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
+**Verification matrix:**
+Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
 **Verification matrix:**
 Editing transcript content in place fights `ref-ref-event-sourcing` and turns storage cleanup into a hidden behavior change.
 **Verification matrix:**

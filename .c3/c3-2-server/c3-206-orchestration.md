@@ -1,6 +1,6 @@
 ---
 id: c3-206
-c3-seal: 8e1fb09928dc408722e5ef36cfff8fd0ac5b0e912fa32da5b302384c67a418e5
+c3-seal: 6617ea1e7ff48ad1422ddc7ae093e07a734c8c8668126dc092fbbe9a1b514cee
 title: orchestration
 type: component
 category: feature
@@ -33,16 +33,14 @@ SessionOrchestrator manages cross-session agent delegation, spawn/send/wait/clos
 | send_input | targetChatId, content | "Input sent" | Follow-up message to existing child. Target must not be running. |
 | wait_agent | targetChatId, timeoutMs? (default 120s) | { result, isError } | Blocks until child emits result entry. Auto-cancels on timeout. |
 | close_agent | targetChatId | "Agent closed" | Disposes child, marks as closed tombstone. Clears pending waiters. |
-All tools enforce ownership via `requireOwnedTarget()` — callers can only interact with their own spawned children.
-
+| All tools enforce ownership via requireOwnedTarget() — callers can only interact with their own spawned children. |  |  |  |
 ### Depth and Concurrency Limits
 
 | Limit | Default | Enforced At |
 | --- | --- | --- |
 | maxDepth | 3 | spawn_agent — rejects if child would exceed nesting depth |
 | maxConcurrency | 10 | spawn_agent — counts active (spawning + running + waiting) agents per workspace |
-Both configurable via `SessionOrchestratorArgs`.
-
+| Both configurable via SessionOrchestratorArgs. |  |  |
 ### Child Status Resolution
 
 Status is derived dynamically from coordinator state:
@@ -72,7 +70,6 @@ When `fork_context=true`, the child receives a bounded excerpt from the parent:
 - MAX_DELEGATED_CONTEXT_CHARS = 12,000 (total budget)
 - MAX_DELEGATED_CONTEXT_LINE_CHARS = 600 (per-line truncation)
 **Steps:**
-
 1. Convert parent transcript entries to single-line summaries (truncated at 600 chars each)
 2. Select last 24 lines
 3. If zero lines, return undefined (no context)
@@ -88,7 +85,6 @@ Builds nested `OrchestrationHierarchySnapshot` combining:
 - **External children**: detected from `tool_call` entries with `toolKind === "subagent_task"` and `tool_result` entries with `receiverThreadIds`
 - De-duplicated: if external child already tracked as internal, skip
 Each node carries: chatId, status, instruction (first 120 chars), spawnedAt, lastStatusAt.
-
 ### Internal State
 
 | Map | Keys | Values | Purpose |

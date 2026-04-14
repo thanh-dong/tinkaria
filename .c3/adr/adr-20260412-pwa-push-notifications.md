@@ -1,6 +1,6 @@
 ---
 id: adr-20260412-pwa-push-notifications
-c3-seal: 8cd1ab3a3347b4c88fdb944c78270b32931e3b9f3301c3f9a41db512b92bce0b
+c3-seal: 08f93c5717fd9a02d4873ae65b5af385018c3d3f43343b10729326f566ed036a
 title: pwa-push-notifications
 type: adr
 goal: Add Web Push Notifications to Tinkaria so users receive native OS notifications when important events occur — even when the browser tab is backgrounded or the PWA is closed. This extends the existing `ref-pwa` service worker (currently no-op) with push event handling, and adds server-side VAPID-based push delivery.
@@ -69,6 +69,14 @@ Feature detection (`serviceWorker` + `PushManager` + `Notification`)
 Feature detection (`serviceWorker` + `PushManager` + `Notification`)
 Feature detection (`serviceWorker` + `PushManager` + `Notification`)
 Feature detection (`serviceWorker` + `PushManager` + `Notification`)
+Feature detection (`serviceWorker` + `PushManager` + `Notification`)
+Feature detection (`serviceWorker` + `PushManager` + `Notification`)
+Feature detection (`serviceWorker` + `PushManager` + `Notification`)
+Feature detection (`serviceWorker` + `PushManager` + `Notification`)
+Feature detection (`serviceWorker` + `PushManager` + `Notification`)
+Feature detection (`serviceWorker` + `PushManager` + `Notification`)
+Feature detection (`serviceWorker` + `PushManager` + `Notification`)
+Feature detection (`serviceWorker` + `PushManager` + `Notification`)
 
 - Permission request (user-initiated, never on page load)
 Permission request (user-initiated, never on page load)
@@ -78,8 +86,24 @@ Permission request (user-initiated, never on page load)
 Permission request (user-initiated, never on page load)
 Permission request (user-initiated, never on page load)
 Permission request (user-initiated, never on page load)
+Permission request (user-initiated, never on page load)
+Permission request (user-initiated, never on page load)
+Permission request (user-initiated, never on page load)
+Permission request (user-initiated, never on page load)
+Permission request (user-initiated, never on page load)
+Permission request (user-initiated, never on page load)
+Permission request (user-initiated, never on page load)
+Permission request (user-initiated, never on page load)
 
 - Subscription lifecycle (subscribe/unsubscribe/check)
+Subscription lifecycle (subscribe/unsubscribe/check)
+Subscription lifecycle (subscribe/unsubscribe/check)
+Subscription lifecycle (subscribe/unsubscribe/check)
+Subscription lifecycle (subscribe/unsubscribe/check)
+Subscription lifecycle (subscribe/unsubscribe/check)
+Subscription lifecycle (subscribe/unsubscribe/check)
+Subscription lifecycle (subscribe/unsubscribe/check)
+Subscription lifecycle (subscribe/unsubscribe/check)
 Subscription lifecycle (subscribe/unsubscribe/check)
 Subscription lifecycle (subscribe/unsubscribe/check)
 Subscription lifecycle (subscribe/unsubscribe/check)
@@ -104,8 +128,32 @@ Send subscription to server
 `src/client/components/NotificationSettings.tsx`:
 Send subscription to server
 `src/client/components/NotificationSettings.tsx`:
+Send subscription to server
+`src/client/components/NotificationSettings.tsx`:
+Send subscription to server
+`src/client/components/NotificationSettings.tsx`:
+Send subscription to server
+`src/client/components/NotificationSettings.tsx`:
+Send subscription to server
+`src/client/components/NotificationSettings.tsx`:
+Send subscription to server
+`src/client/components/NotificationSettings.tsx`:
+Send subscription to server
+`src/client/components/NotificationSettings.tsx`:
+Send subscription to server
+`src/client/components/NotificationSettings.tsx`:
+Send subscription to server
+`src/client/components/NotificationSettings.tsx`:
 
 - Toggle for enabling/disabling push
+Toggle for enabling/disabling push
+Toggle for enabling/disabling push
+Toggle for enabling/disabling push
+Toggle for enabling/disabling push
+Toggle for enabling/disabling push
+Toggle for enabling/disabling push
+Toggle for enabling/disabling push
+Toggle for enabling/disabling push
 Toggle for enabling/disabling push
 Toggle for enabling/disabling push
 Toggle for enabling/disabling push
@@ -122,8 +170,24 @@ Notification type preferences (which events to notify)
 Notification type preferences (which events to notify)
 Notification type preferences (which events to notify)
 Notification type preferences (which events to notify)
+Notification type preferences (which events to notify)
+Notification type preferences (which events to notify)
+Notification type preferences (which events to notify)
+Notification type preferences (which events to notify)
+Notification type preferences (which events to notify)
+Notification type preferences (which events to notify)
+Notification type preferences (which events to notify)
+Notification type preferences (which events to notify)
 
 - Visual permission state indicator
+Visual permission state indicator
+Visual permission state indicator
+Visual permission state indicator
+Visual permission state indicator
+Visual permission state indicator
+Visual permission state indicator
+Visual permission state indicator
+Visual permission state indicator
 Visual permission state indicator
 Visual permission state indicator
 Visual permission state indicator

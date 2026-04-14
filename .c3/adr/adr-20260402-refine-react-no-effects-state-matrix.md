@@ -1,6 +1,6 @@
 ---
 id: adr-20260402-refine-react-no-effects-state-matrix
-c3-seal: 1bb6e8c516ad03e8409c8a94c6defe3ae14825c785fcfbc339ae9a97a8ed18a3
+c3-seal: ec6c11071688d1b196147fec63189a1b582a0c4f827b7f0a59c3c20d6ee8a26a
 title: Refine react-no-effects with state replacement matrix
 type: adr
 goal: Refine `rule-react-no-effects` so it gives concrete replacement choices for Kanna rather than only prohibitions.
@@ -22,6 +22,14 @@ Zustand is the current standard for shared browser-side client state and workflo
 Zustand is the current standard for shared browser-side client state and workflow coordination.
 Zustand is the current standard for shared browser-side client state and workflow coordination.
 Zustand is the current standard for shared browser-side client state and workflow coordination.
+Zustand is the current standard for shared browser-side client state and workflow coordination.
+Zustand is the current standard for shared browser-side client state and workflow coordination.
+Zustand is the current standard for shared browser-side client state and workflow coordination.
+Zustand is the current standard for shared browser-side client state and workflow coordination.
+Zustand is the current standard for shared browser-side client state and workflow coordination.
+Zustand is the current standard for shared browser-side client state and workflow coordination.
+Zustand is the current standard for shared browser-side client state and workflow coordination.
+Zustand is the current standard for shared browser-side client state and workflow coordination.
 
 - `useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
 `useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
@@ -31,8 +39,24 @@ Zustand is the current standard for shared browser-side client state and workflo
 `useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
 `useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
 `useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
+`useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
+`useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
+`useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
+`useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
+`useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
+`useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
+`useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
+`useSyncExternalStore` or adapter hooks are the standard for external subscriptions.
 
 - TanStack Query is not currently installed and is not the default answer to Effect removal.
+TanStack Query is not currently installed and is not the default answer to Effect removal.
+TanStack Query is not currently installed and is not the default answer to Effect removal.
+TanStack Query is not currently installed and is not the default answer to Effect removal.
+TanStack Query is not currently installed and is not the default answer to Effect removal.
+TanStack Query is not currently installed and is not the default answer to Effect removal.
+TanStack Query is not currently installed and is not the default answer to Effect removal.
+TanStack Query is not currently installed and is not the default answer to Effect removal.
+TanStack Query is not currently installed and is not the default answer to Effect removal.
 TanStack Query is not currently installed and is not the default answer to Effect removal.
 TanStack Query is not currently installed and is not the default answer to Effect removal.
 TanStack Query is not currently installed and is not the default answer to Effect removal.
@@ -57,8 +81,32 @@ If TanStack Query is adopted later, it is reserved for pull-based remote server 
 Why:
 If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
 Why:
+If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
+Why:
+If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
+Why:
+If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
+Why:
+If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
+Why:
+If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
+Why:
+If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
+Why:
+If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
+Why:
+If TanStack Query is adopted later, it is reserved for pull-based remote server state such as fetch/cache/invalidate flows, not local UI state or NATS push subscriptions.
+Why:
 
 - The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
+The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
+The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
+The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
+The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
+The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
+The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
+The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
+The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
 The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
 The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
 The repo already uses Zustand extensively, so it is the lowest-friction replacement for mirrored local workflow state.
@@ -75,8 +123,24 @@ The React guidance behind this rule recommends explicit subscription boundaries 
 The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
 The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
 The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
+The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
+The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
+The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
+The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
+The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
+The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
+The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
+The React guidance behind this rule recommends explicit subscription boundaries rather than effect-driven synchronization.
 
 - Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
+Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
+Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
+Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
+Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
+Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
+Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
+Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
+Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
 Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
 Query libraries solve a different class of problem than most of Kanna's current Effect misuse.
 Query libraries solve a different class of problem than most of Kanna's current Effect misuse.

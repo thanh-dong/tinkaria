@@ -1,6 +1,6 @@
 ---
 id: c3-112
-c3-seal: 8f092679c5484f4572b54f23e7e2767296d2bed978ba3c6cd43d3764926a1ef6
+c3-seal: fdc87918843744f4cc1951c9ba6899ee72f0c170d049c35da724ac739abf2a26
 title: chat-input
 type: component
 category: feature
@@ -49,17 +49,33 @@ Three visual states for the submit button:
 **Submit mode** (agent idle, `canCancel=false`):
 
 - Button: arrow-up icon, sends immediately
+Button: arrow-up icon, sends immediately
+
 - No cancel button shown
+**Queue mode** (agent running, `canCancel=true`):
+No cancel button shown
 **Queue mode** (agent running, `canCancel=true`):
 
 - Button: clock icon + "Queue" label, holds message until turn finishes
+Button: clock icon + "Queue" label, holds message until turn finishes
+
 - Cancel button shown (square stop icon) to abort current generation
+Cancel button shown (square stop icon) to abort current generation
+
 - Queued text block appears above composer: amber dashed border, message preview + "Clear" button
+**Disabled states:**
+Queued text block appears above composer: amber dashed border, message preview + "Clear" button
 **Disabled states:**
 
 - `composerActionsDisabled`: disabled prop OR connectionStatus !== "connected"
+`composerActionsDisabled`: disabled prop OR connectionStatus !== "connected"
+
 - `submitActionDisabled`: composerActionsDisabled OR no text
+`submitActionDisabled`: composerActionsDisabled OR no text
+
 - `queueActionDisabled`: composerActionsDisabled OR no text
+`queueActionDisabled`: composerActionsDisabled OR no text
+
 ### Draft Persistence
 
 - Reads from `chatInputStore.getDraft(chatId)` on mount/chat-switch

@@ -1,6 +1,6 @@
 ---
 id: c3-119
-c3-seal: 1949d4ca6558b2327314e29b056f1bd684e670bef2fb89b9b3f80b5504358edb
+c3-seal: 1f82a9b1ace6dfa924e33448f52959ff762cb9178f66842a55cedde7697d8733
 title: transcript-renderer
 type: component
 category: feature
@@ -47,25 +47,21 @@ Search backward for the last `assistant_text` not followed by a `tool_call`:
 | Completed (not loading) | Last assistant_text = the answer, always shown |
 | Streaming, tail is text with prior tool activity | Keep tail visible as live answer |
 | Streaming, tail is text with only prior narration | Suppress (return -1) to prevent transient prose flash before next tool |
-**Pass 2 — Main Grouping Loop**
-
+| Pass 2 — Main Grouping Loop |  |
 Iterates messages left-to-right, three branches:
 
 1. **WIP Block Formation** — triggered by `assistant_text` at index != answerIndex:
 **WIP Block Formation** — triggered by `assistant_text` at index != answerIndex:
-
-  - Start: `steps = [message]`
-  - Absorb loop: consume consecutive `assistant_text` or collapsible tool calls (never dedicated tools)
-  - Eject trailing text: if next message is a dedicated/special tool, pop trailing `assistant_text` from steps → emit as separate singles (preserves rationale text above interactive blocks)
-  - Emit: `wip-block` if steps >= 2, or >= 1 during loading; else `single`
-2. **Tool Group Formation** — triggered by collapsible tool call (non-error, non-dedicated):
+- Start: `steps = [message]`
+- Absorb loop: consume consecutive `assistant_text` or collapsible tool calls (never dedicated tools)
+- Eject trailing text: if next message is a dedicated/special tool, pop trailing `assistant_text` from steps → emit as separate singles (preserves rationale text above interactive blocks)
+- Emit: `wip-block` if steps >= 2, or >= 1 during loading; else `single`
+1. **Tool Group Formation** — triggered by collapsible tool call (non-error, non-dedicated):
 **Tool Group Formation** — triggered by collapsible tool call (non-error, non-dedicated):
-
-  - Absorb consecutive collapsible tools
-  - Emit: `tool-group` if group >= 2; else `single`
-3. **Fallthrough** — everything else: `single`
+- Absorb consecutive collapsible tools
+- Emit: `tool-group` if group >= 2; else `single`
+1. **Fallthrough** — everything else: `single`
 **Fallthrough** — everything else: `single`
-
 ### Dedicated Tool Boundaries
 
 Tools that NEVER enter WIP blocks or tool groups:
@@ -87,7 +83,6 @@ Uses `@tanstack/react-virtual` with:
 - Absolutely positioned divs with `transform: translateY()`
 - `measureElement` ref callback for actual DOM height measurement
 Height estimation (messageHeights.ts):
-
 | RenderItem | Estimate |
 | --- | --- |
 | tool-group | 64px fixed |
@@ -97,8 +92,7 @@ Height estimation (messageHeights.ts):
 | system_init | 48px |
 | result | 40px |
 | other kinds | 80px default |
-Font readiness: `useMessageHeights` waits for `waitForFont()` before enabling accurate layout.
-
+| Font readiness: useMessageHeights waits for waitForFont() before enabling accurate layout. |  |
 ### Render Dispatch
 
 Each virtual row maps to a RenderItem and dispatches:
