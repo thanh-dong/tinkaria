@@ -188,6 +188,7 @@ describe("processTranscriptMessages", () => {
           kind: "code",
           format: "typescript",
           source: "const x = 1",
+          renderedHtml: "<pre>const x = 1</pre>",
           summary: "Context",
           collapsed: false,
         },
@@ -202,6 +203,8 @@ describe("processTranscriptMessages", () => {
       kind: "code",
       format: "typescript",
       source: "const x = 1",
+      renderedHtml: "<pre>const x = 1</pre>",
+      renderError: undefined,
       summary: "Context",
       collapsed: false,
     })

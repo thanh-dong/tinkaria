@@ -46,15 +46,20 @@ function findAnswerIndex(messages: HydratedTranscriptMessage[], isLoading: boole
       if (messages[j].kind === "tool") { hasToolAfter = true; break }
     }
     if (hasToolAfter) break
-    // During loading: if this is the tail message and there is any prior
-    // activity (tools or other assistant_text), suppress the answer —
-    // it's likely mid-turn narration that will be followed by more tools.
-    // Prevents the flash where text briefly renders as a TextMessage then
-    // gets absorbed into a WipBlock when the next tool arrives.
+    // During loading: if this is the tail message and there is only prior
+    // assistant narration, suppress it so transient prose does not flash as
+    // the answer before the next tool arrives. Once tool activity has already
+    // happened, treat the trailing text as the current answer so it remains
+    // visible instead of getting swallowed into the WIP block.
     if (i === messages.length - 1) {
+      let hasPriorAssistant = false
+      let hasPriorTool = false
       for (let j = 0; j < i; j++) {
-        if (messages[j].kind === "tool" || messages[j].kind === "assistant_text") return -1
+        if (messages[j].kind === "tool") hasPriorTool = true
+        if (messages[j].kind === "assistant_text") hasPriorAssistant = true
       }
+      if (hasPriorTool) return i
+      if (hasPriorAssistant) return -1
     }
     return i
   }

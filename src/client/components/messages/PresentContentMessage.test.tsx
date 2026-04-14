@@ -133,6 +133,7 @@ describe("PresentContentMessage", () => {
             kind: "diagram",
             format: "pug",
             source: "main\n  h1.text-3xl Hello",
+            renderedHtml: '<main><h1 class="text-3xl">Hello</h1></main>',
           },
         })}
       />

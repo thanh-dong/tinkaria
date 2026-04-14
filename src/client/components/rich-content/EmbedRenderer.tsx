@@ -1,5 +1,4 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { render as renderPug } from "pug"
 import { normalizePresentContentFormat } from "../../../shared/presentContent"
 import { clampEmbedZoom, useContentViewer } from "./ContentViewerContext"
 
@@ -14,6 +13,8 @@ export function isEmbedLanguage(language: string | null): boolean {
 interface EmbedRendererProps {
   format: string
   source: string
+  renderedHtml?: string
+  renderError?: string
 }
 
 type EmbedWheelZoomIntent = "in" | "out" | null
@@ -21,6 +22,8 @@ type EmbedWheelZoomIntent = "in" | "out" | null
 export const EmbedRenderer = memo(function EmbedRenderer({
   format,
   source,
+  renderedHtml,
+  renderError,
 }: EmbedRendererProps) {
   const normalizedFormat = normalizePresentContentFormat(format)
 
@@ -33,7 +36,7 @@ export const EmbedRenderer = memo(function EmbedRenderer({
   }
 
   if (normalizedFormat === "pug") {
-    return <PugEmbed source={source} />
+    return <PugEmbed source={source} renderedHtml={renderedHtml} renderError={renderError} />
   }
 
   if (normalizedFormat === "svg") {
@@ -271,14 +274,23 @@ function HtmlEmbed({ source }: { source: string }) {
   )
 }
 
-function PugEmbed({ source }: { source: string }) {
+function PugEmbed({
+  source,
+  renderedHtml,
+  renderError,
+}: {
+  source: string
+  renderedHtml?: string
+  renderError?: string
+}) {
   const { mode, zoom, adjustZoom } = useEmbedState()
-  const compiled = compilePugEmbedSource(source)
+  const htmlSource = renderedHtml ? createHtmlEmbedDocument(renderedHtml) : null
+  const errorMessage = renderError ?? (htmlSource ? null : "Pug preview unavailable")
 
   return (
     <>
       {mode === "render" ? (
-        compiled.ok ? (
+        htmlSource ? (
           <div
             onWheel={(event) => {
               const direction = getEmbedWheelZoomIntent(event)
@@ -293,7 +305,7 @@ function PugEmbed({ source }: { source: string }) {
             <iframe
               data-html-embed="true"
               data-pug-embed="true"
-              srcDoc={compiled.html}
+              srcDoc={htmlSource}
               title="Pug content"
               sandbox="allow-scripts"
               className="block h-[420px] w-full border-0 bg-background"
@@ -301,10 +313,7 @@ function PugEmbed({ source }: { source: string }) {
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="text-xs text-destructive">Pug render error</div>
-            <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
-              {compiled.message}
-            </pre>
+            <div className="text-xs text-destructive">{errorMessage}</div>
             <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
               {source}
             </pre>
@@ -453,22 +462,6 @@ function injectEmbedShellIntoDocument(source: string): string {
     : withTailwind.replace(/<\/head>/i, `<style data-tinkaria-embed-base>${DEFAULT_EMBED_STYLE}</style></head>`)
 
   return withStyle
-}
-
-function compilePugEmbedSource(source: string): { ok: true; html: string } | { ok: false; message: string } {
-  try {
-    const html = renderPug(source, { doctype: "html" })
-    return { ok: true, html: createHtmlEmbedDocument(html) }
-  } catch (error: unknown) {
-    return { ok: false, message: getErrorMessage(error) }
-  }
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && typeof error.message === "string" && error.message.trim()) {
-    return error.message
-  }
-  return "Pug render error"
 }
 
 function SvgEmbed({ source }: { source: string }) {

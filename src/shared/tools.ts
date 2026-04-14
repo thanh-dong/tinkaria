@@ -383,6 +383,8 @@ export function hydrateToolResult(tool: NormalizedToolCall, raw: unknown): Hydra
         kind: isPresentContentKind(record?.kind) ? record.kind : tool.input.kind,
         format: typeof record?.format === "string" ? normalizePresentContentFormat(record.format) : tool.input.format,
         source: typeof record?.source === "string" ? record.source : tool.input.source,
+        renderedHtml: typeof record?.renderedHtml === "string" ? record.renderedHtml : undefined,
+        renderError: typeof record?.renderError === "string" ? record.renderError : undefined,
         summary: typeof record?.summary === "string" ? record.summary : tool.input.summary,
         collapsed: typeof record?.collapsed === "boolean" ? record.collapsed : tool.input.collapsed,
       } satisfies PresentContentToolResult

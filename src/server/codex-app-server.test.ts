@@ -1451,6 +1451,170 @@ describe("CodexAppServerManager", () => {
     })
   })
 
+  test("precompiles pug present_content payloads on the server", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+        return
+      }
+      if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+        return
+      }
+      if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          id: "dyn-pug-1",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-present-pug-1",
+            tool: "present_content",
+            arguments: {
+              title: "Mockup",
+              kind: "diagram",
+              format: "pugjs",
+              source: "main\n  h1.text-3xl Hello",
+            },
+          },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "show me a pug mockup",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+
+    const events = await collectStream(turn.stream)
+    const toolResult = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_result")
+
+    expect(toolResult?.entry.kind).toBe("tool_result")
+    if (!toolResult || toolResult.entry.kind !== "tool_result") throw new Error("missing tool result")
+    expect(toolResult.entry.content).toEqual({
+      accepted: true,
+      title: "Mockup",
+      kind: "diagram",
+      format: "pug",
+      source: "main\n  h1.text-3xl Hello",
+      renderedHtml: "<main><h1 class=\"text-3xl\">Hello</h1></main>",
+    })
+  })
+
+  test("keeps present_content turns alive when pug compilation fails", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+        return
+      }
+      if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+        return
+      }
+      if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          id: "dyn-pug-2",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-present-pug-2",
+            tool: "present_content",
+            arguments: {
+              title: "Broken Mockup",
+              kind: "diagram",
+              format: "pug",
+              source: "main(\n  h1 Hello",
+            },
+          },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "show me a broken pug mockup",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+
+    const events = await collectStream(turn.stream)
+    const toolResult = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_result")
+    const response = process.messages.find((message: any) => message.id === "dyn-pug-2")
+
+    expect(toolResult?.entry.kind).toBe("tool_result")
+    if (!toolResult || toolResult.entry.kind !== "tool_result") throw new Error("missing tool result")
+    expect(toolResult.entry.content).toEqual(expect.objectContaining({
+      accepted: true,
+      title: "Broken Mockup",
+      kind: "diagram",
+      format: "pug",
+      source: "main(\n  h1 Hello",
+      renderError: expect.stringContaining("no closing bracket"),
+    }))
+    expect(response).toEqual({
+      id: "dyn-pug-2",
+      result: {
+        contentItems: [{ type: "inputText", text: "presented" }],
+        success: true,
+      },
+    })
+  })
+
   test("routes session orchestration dynamic tools through the shared orchestrator", async () => {
     const spawnCalls: unknown[] = []
     const sendCalls: unknown[] = []

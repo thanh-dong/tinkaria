@@ -100,7 +100,12 @@ function renderSuccessContent(content: Extract<PresentContentResult, { accepted:
       >
         <div className="space-y-3">
           {summary}
-          <EmbedRenderer format={content.format} source={content.source} />
+          <EmbedRenderer
+            format={content.format}
+            source={content.source}
+            renderedHtml={content.renderedHtml}
+            renderError={content.renderError}
+          />
         </div>
       </RichContentBlock>
     )

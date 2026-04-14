@@ -2,10 +2,12 @@ import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { createInterface } from "node:readline"
 import type { Readable, Writable } from "node:stream"
+import { render as renderPug } from "pug"
 import type {
   AskUserQuestionItem,
   CodexReasoningEffort,
   PresentContentSchemaValidationError,
+  PresentContentSuccessToolResult,
   PresentContentValidationIssue,
   ServiceTier,
   TodoItem,
@@ -14,6 +16,7 @@ import type {
 import { getWebContextPrompt } from "../shared/web-context"
 import type { HarnessEvent, HarnessToolRequest, HarnessTurn } from "./harness-types"
 import { normalizeToolCall } from "../shared/tools"
+import { normalizePresentContentFormat } from "../shared/presentContent"
 import { z, type ZodIssue } from "zod"
 import {
   type CollabAgentToolCallItem,
@@ -433,6 +436,29 @@ function presentContentToolCall(toolId: string, input: Record<string, unknown>):
       input,
     }),
   })
+}
+
+function enrichPresentContentResult(
+  value: z.infer<typeof presentContentSchema>
+): PresentContentSuccessToolResult {
+  const format = normalizePresentContentFormat(value.format)
+  const result: PresentContentSuccessToolResult = {
+    accepted: true,
+    ...value,
+    format,
+  }
+
+  if (format !== "pug") {
+    return result
+  }
+
+  try {
+    result.renderedHtml = renderPug(value.source, { doctype: "html" })
+  } catch (error: unknown) {
+    result.renderError = errorMessage(error)
+  }
+
+  return result
 }
 
 function orchestrationToolCall(toolId: string, toolName: string, input: Record<string, unknown>): TranscriptEntry {
@@ -1252,17 +1278,14 @@ export class CodexAppServerManager {
           return
         }
 
-        const normalized = parsed.data
+        const normalized = enrichPresentContentResult(parsed.data)
 
         pendingTurn.queue.push({
           type: "transcript",
           entry: timestamped({
             kind: "tool_result",
             toolId: request.params.callId,
-            content: {
-              accepted: true,
-              ...normalized,
-            },
+            content: normalized,
           }),
         })
         this.writeMessage(context, {

@@ -172,7 +172,11 @@ describe("EmbedRenderer html embed", () => {
 
   test("renders pug through the html embed path with tailwind runtime", () => {
     const html = renderToStaticMarkup(
-      <EmbedRenderer format="pugjs" source={"main\n  h1.text-3xl Hello"} />
+      <EmbedRenderer
+        format="pugjs"
+        source={"main\n  h1.text-3xl Hello"}
+        renderedHtml={'<main><h1 class="text-3xl">Hello</h1></main>'}
+      />
     )
 
     expect(html).toContain('data-pug-embed="true"')
@@ -180,6 +184,16 @@ describe("EmbedRenderer html embed", () => {
     expect(html).toContain("@tailwindcss/browser@4")
     expect(html).toContain("text-3xl")
     expect(html).toContain("Hello")
+  })
+
+  test("shows a readable fallback when pug render data is unavailable", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer format="pug" source={"main\n  h1 Hello"} />
+    )
+
+    expect(html).toContain("Pug preview unavailable")
+    expect(html).toContain("main")
+    expect(html).not.toContain('data-pug-embed="true"')
   })
 
   test("shows raw pug source in source mode", () => {

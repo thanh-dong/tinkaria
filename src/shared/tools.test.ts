@@ -184,6 +184,7 @@ describe("hydrateToolResult", () => {
       kind: "diagram",
       format: "pugjs",
       source: "main\n  h1 Hello",
+      renderedHtml: "<main><h1>Hello</h1></main>",
     })
 
     expect(result).toEqual({
@@ -192,6 +193,8 @@ describe("hydrateToolResult", () => {
       kind: "diagram",
       format: "pug",
       source: "main\n  h1 Hello",
+      renderedHtml: "<main><h1>Hello</h1></main>",
+      renderError: undefined,
       summary: undefined,
       collapsed: undefined,
     })

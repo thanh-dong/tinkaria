@@ -158,17 +158,33 @@ describe("groupMessages", () => {
     }
   })
 
-  test("live turn: trailing text after tools is absorbed during loading to prevent flash", () => {
+  test("live turn: trailing text after tools stays visible as the current answer", () => {
     const msgs = [text("Checking"), tool(), text("Here is the answer")]
     const items = groupMessages(msgs, true)
 
-    // During loading, trailing text after tools stays in the wip-block
-    // to prevent the flash where text briefly renders as TextMessage
-    // then gets absorbed when a tool follows
-    expect(items).toHaveLength(1)
+    expect(items).toHaveLength(2)
     expect(items[0].type).toBe("wip-block")
     if (items[0].type === "wip-block") {
-      expect(items[0].steps).toHaveLength(3)
+      expect(items[0].steps).toHaveLength(2)
+    }
+    expect(items[1].type).toBe("single")
+  })
+
+  test("live turn: final answer after prior tools stays visible", () => {
+    const msgs = [text("Checking"), tool(), text("I found the root cause and fixed it.")]
+    const items = groupMessages(msgs, true)
+
+    expect(items).toHaveLength(2)
+    expect(items[0].type).toBe("wip-block")
+    if (items[0].type === "wip-block") {
+      expect(items[0].steps).toHaveLength(2)
+    }
+    expect(items[1].type).toBe("single")
+    if (items[1].type === "single") {
+      expect(items[1].message.kind).toBe("assistant_text")
+      if (items[1].message.kind === "assistant_text") {
+        expect(items[1].message.text).toBe("I found the root cause and fixed it.")
+      }
     }
   })
 
@@ -260,15 +276,16 @@ describe("groupMessages", () => {
     expect(items[1].type).toBe("single")
   })
 
-  test("single narration text becomes wip-block during loading", () => {
-    // During loading, even a single narration text should be a wip-block
-    // to prevent flash if a tool arrives shortly after
+  test("single narration text before a tool still groups, but trailing answer stays separate during loading", () => {
     const msgs = [text("Let me check"), tool(), text("Answer")]
     const items = groupMessages(msgs, true)
 
-    // narration absorbed into wip-block during loading
-    expect(items).toHaveLength(1)
+    expect(items).toHaveLength(2)
     expect(items[0].type).toBe("wip-block")
+    if (items[0].type === "wip-block") {
+      expect(items[0].steps).toHaveLength(2)
+    }
+    expect(items[1].type).toBe("single")
   })
 
   test("live turn: trailing text after prior narration is suppressed to prevent flash", () => {
@@ -393,4 +410,3 @@ describe("groupMessages", () => {
     expect(items[2].type).toBe("tool-group") // last 2
   })
 })
-
