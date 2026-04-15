@@ -337,6 +337,63 @@ describe("CodexAppServerManager", () => {
     await collectStream(turn.stream)
   })
 
+  test("advertises ask_user_question as a dynamic tool on turn start", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+      } else if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+      } else if (message.method === "turn/start") {
+        expect(message.params.dynamicTools).toContainEqual(
+          expect.objectContaining({
+            name: "ask_user_question",
+            inputSchema: expect.objectContaining({
+              type: "object",
+              required: ["questions"],
+            }),
+          })
+        )
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("ask_user_question")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("user input")
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "completed", error: null } },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "ask me",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+
+    await collectStream(turn.stream)
+  })
+
   test("advertises session orchestration tools on turn start when available", async () => {
     const process = new FakeCodexProcess((message, child) => {
       if (message.method === "initialize") {
@@ -1443,6 +1500,289 @@ describe("CodexAppServerManager", () => {
       result: {
         contentItems: [{ type: "inputText", text: "presented" }],
         success: true,
+      },
+    })
+  })
+
+  test("routes ask_user_question dynamic tool calls through pending user input", async () => {
+    let toolRequest: unknown
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+        return
+      }
+      if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+        return
+      }
+      if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          id: "dyn-ask-1",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-ask-1",
+            tool: "ask_user_question",
+            arguments: {
+              questions: [{
+                id: "runtime",
+                header: "Runtime",
+                question: "Which runtime?",
+                options: [
+                  { label: "Bun", description: "Fast JS runtime" },
+                  { label: "Node" },
+                ],
+              }],
+            },
+          },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "ask runtime",
+      planMode: false,
+      onToolRequest: async (request) => {
+        if (request.tool.toolKind !== "ask_user_question") {
+          throw new Error("unexpected tool request")
+        }
+        toolRequest = request
+        return {
+          questions: request.tool.input.questions,
+          answers: {
+            runtime: ["Bun"],
+          },
+        }
+      },
+    })
+
+    const events = await collectStream(turn.stream)
+    const toolCall = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_call")
+    const toolResults = events.filter((event) => event.type === "transcript" && event.entry.kind === "tool_result")
+    const response = process.messages.find((message: any) => message.id === "dyn-ask-1")
+
+    expect(toolCall?.entry.kind).toBe("tool_call")
+    if (!toolCall || toolCall.entry.kind !== "tool_call") throw new Error("missing tool call")
+    expect(toolCall.entry.tool.toolKind).toBe("ask_user_question")
+    expect(toolCall.entry.tool.toolName).toBe("AskUserQuestion")
+    expect(toolCall.entry.tool.toolId).toBe("call-ask-1")
+    expect(toolCall.entry.tool.input.questions).toEqual([{
+      id: "runtime",
+      header: "Runtime",
+      question: "Which runtime?",
+      options: [
+        { label: "Bun", description: "Fast JS runtime" },
+        { label: "Node" },
+      ],
+    }])
+    expect(toolRequest).toEqual({
+      tool: expect.objectContaining({
+        toolKind: "ask_user_question",
+        toolName: "AskUserQuestion",
+        toolId: "call-ask-1",
+      }),
+    })
+    expect(toolResults).toEqual([])
+    expect(response).toEqual({
+      id: "dyn-ask-1",
+      result: {
+        contentItems: [{ type: "inputText", text: JSON.stringify({ questions: toolCall.entry.tool.input.questions, answers: { runtime: ["Bun"] } }) }],
+        success: true,
+      },
+    })
+  })
+
+  test("auto-generates ask_user_question IDs and preserves multi-select", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+        return
+      }
+      if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+        return
+      }
+      if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          id: "dyn-ask-2",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-ask-2",
+            tool: "ask_user_question",
+            arguments: {
+              questions: [
+                { question: "First?" },
+                { question: "Pick many?", multiSelect: true, options: [{ label: "A" }, { label: "B" }] },
+              ],
+            },
+          },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "ask choices",
+      planMode: false,
+      onToolRequest: async (request) => {
+        if (request.tool.toolKind !== "ask_user_question") {
+          throw new Error("unexpected tool request")
+        }
+        return {
+          questions: request.tool.input.questions,
+          answers: {
+            "q-0": ["ok"],
+            "q-1": ["A", "B"],
+          },
+        }
+      },
+    })
+
+    const events = await collectStream(turn.stream)
+    const toolCall = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_call")
+    expect(toolCall?.entry.kind).toBe("tool_call")
+    if (!toolCall || toolCall.entry.kind !== "tool_call") throw new Error("missing tool call")
+    expect(toolCall.entry.tool.input.questions).toEqual([
+      { id: "q-0", question: "First?" },
+      { id: "q-1", question: "Pick many?", multiSelect: true, options: [{ label: "A" }, { label: "B" }] },
+    ])
+  })
+
+  test("rejects invalid ask_user_question dynamic payloads without waiting for user input", async () => {
+    let toolRequestCount = 0
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+        return
+      }
+      if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+        return
+      }
+      if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          id: "dyn-ask-invalid",
+          method: "item/tool/call",
+          params: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            callId: "call-ask-invalid",
+            tool: "ask_user_question",
+            arguments: { questions: [] },
+          },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "ask invalid",
+      planMode: false,
+      onToolRequest: async () => {
+        toolRequestCount += 1
+        return {}
+      },
+    })
+
+    const events = await collectStream(turn.stream)
+    const toolCall = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_call")
+    const toolResult = events.find((event) => event.type === "transcript" && event.entry.kind === "tool_result")
+    const response = process.messages.find((message: any) => message.id === "dyn-ask-invalid")
+
+    expect(toolCall?.entry.kind).toBe("tool_call")
+    if (!toolCall || toolCall.entry.kind !== "tool_call") throw new Error("missing tool call")
+    expect(toolCall.entry.tool.toolKind).toBe("ask_user_question")
+    expect(toolRequestCount).toBe(0)
+    expect(toolResult?.entry.kind).toBe("tool_result")
+    if (!toolResult || toolResult.entry.kind !== "tool_result") throw new Error("missing tool result")
+    expect(toolResult.entry.isError).toBe(true)
+    expect(response).toEqual({
+      id: "dyn-ask-invalid",
+      result: {
+        contentItems: [{ type: "inputText", text: "Invalid ask_user_question payload" }],
+        success: false,
       },
     })
   })

@@ -14,6 +14,7 @@ const PROVIDER_NAMES: Record<AgentProvider, string> = {
 export function getWebContextPrompt(
   provider: AgentProvider,
   options?: {
+    askUserQuestionEnabled?: boolean
     presentContentEnabled?: boolean
   }
 ): string {
@@ -45,6 +46,12 @@ export function getWebContextPrompt(
       "When you need to intentionally present a bounded artifact in the transcript, call the `present_content` dynamic tool instead of only describing it in assistant text.",
       "Use `present_content` for artifacts that benefit from a dedicated card, such as implementation plans, comparison tables, diagrams, code samples, checklists, design notes, concise status summaries, or direct embeds.",
       "Use `present_content` when a dedicated artifact card will make the result easier to scan or interact with."
+    )
+  }
+
+  if (provider === "codex" && options?.askUserQuestionEnabled) {
+    promptLines.push(
+      "When you need clarification, a decision, or user input before proceeding, call the `ask_user_question` dynamic tool."
     )
   }
 

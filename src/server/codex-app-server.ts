@@ -331,6 +331,44 @@ function dynamicToolDefinitions(args: StartCodexTurnArgs): DynamicToolDefinition
         additionalProperties: false,
       },
     },
+    {
+      name: "ask_user_question",
+      description: "Ask the user one or more questions and wait for their response.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          questions: {
+            type: "array",
+            minItems: 1,
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                question: { type: "string" },
+                header: { type: "string" },
+                options: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      label: { type: "string" },
+                      description: { type: "string" },
+                    },
+                    required: ["label"],
+                    additionalProperties: false,
+                  },
+                },
+                multiSelect: { type: "boolean" },
+              },
+              required: ["question"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["questions"],
+        additionalProperties: false,
+      },
+    },
   ]
 
   if (args.orchestrator && args.orchestrationChatId) {
@@ -411,6 +449,19 @@ const presentContentSchema = z.object({
   collapsed: z.boolean().optional(),
 }).strict()
 
+const askUserQuestionSchema = z.object({
+  questions: z.array(z.object({
+    id: z.string().optional(),
+    question: z.string(),
+    header: z.string().optional(),
+    options: z.array(z.object({
+      label: z.string(),
+      description: z.string().optional(),
+    })).optional(),
+    multiSelect: z.boolean().optional(),
+  })).min(1),
+}).strict()
+
 function presentContentValidationError(issues: ZodIssue[]): { error: PresentContentSchemaValidationError } {
   return {
     error: {
@@ -432,6 +483,17 @@ function presentContentToolCall(toolId: string, input: Record<string, unknown>):
       toolName: "present_content",
       toolId,
       input,
+    }),
+  })
+}
+
+function askUserQuestionToolCall(toolId: string, questions: AskUserQuestionItem[]): TranscriptEntry {
+  return timestamped({
+    kind: "tool_call",
+    tool: normalizeToolCall({
+      toolName: "AskUserQuestion",
+      toolId,
+      input: { questions },
     }),
   })
 }
@@ -970,6 +1032,7 @@ export class CodexAppServerManager {
             model: args.model,
             reasoning_effort: null,
             developer_instructions: getWebContextPrompt("codex", {
+              askUserQuestionEnabled: shouldAdvertiseDynamicTools,
               presentContentEnabled: shouldAdvertiseDynamicTools,
             }),
           },
@@ -1276,6 +1339,63 @@ export class CodexAppServerManager {
           id: request.id,
           result: {
             contentItems: [{ type: "inputText", text: "presented" }],
+            success: true,
+          } satisfies DynamicToolCallResponse,
+        })
+        return
+      }
+
+      if (request.params.tool === "ask_user_question") {
+        const payload = dynamicToolPayload(request.params.arguments)
+        const parsed = askUserQuestionSchema.safeParse(payload)
+        const questions = parsed.success
+          ? parsed.data.questions.map((question, index) => ({
+              ...question,
+              id: question.id ?? `q-${index}`,
+            }))
+          : []
+
+        pendingTurn.queue.push({
+          type: "transcript",
+          entry: askUserQuestionToolCall(request.params.callId, questions),
+        })
+
+        if (!parsed.success) {
+          pendingTurn.queue.push({
+            type: "transcript",
+            entry: timestamped({
+              kind: "tool_result",
+              toolId: request.params.callId,
+              content: "Invalid ask_user_question payload",
+              isError: true,
+            }),
+          })
+          this.writeMessage(context, {
+            id: request.id,
+            result: {
+              contentItems: [{ type: "inputText", text: "Invalid ask_user_question payload" }],
+              success: false,
+            } satisfies DynamicToolCallResponse,
+          })
+          return
+        }
+
+        const toolRequest: HarnessToolRequest = {
+          tool: {
+            kind: "tool",
+            toolKind: "ask_user_question",
+            toolName: "AskUserQuestion",
+            toolId: request.params.callId,
+            input: { questions },
+            rawInput: payload,
+          },
+        }
+
+        const result = await pendingTurn.onToolRequest(toolRequest)
+        this.writeMessage(context, {
+          id: request.id,
+          result: {
+            contentItems: [{ type: "inputText", text: JSON.stringify(result) }],
             success: true,
           } satisfies DynamicToolCallResponse,
         })

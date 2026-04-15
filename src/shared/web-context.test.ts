@@ -83,4 +83,19 @@ describe("getWebContextPrompt", () => {
     const prompt = getWebContextPrompt("claude", { presentContentEnabled: true })
     expect(prompt).not.toContain("present_content")
   })
+
+  test("mentions ask_user_question for codex only when the tool is advertised", () => {
+    const enabledPrompt = getWebContextPrompt("codex", { askUserQuestionEnabled: true })
+    const disabledPrompt = getWebContextPrompt("codex", { askUserQuestionEnabled: false })
+
+    expect(enabledPrompt).toContain("ask_user_question")
+    expect(enabledPrompt).toContain("clarification")
+    expect(enabledPrompt).toContain("user input")
+    expect(disabledPrompt).not.toContain("ask_user_question")
+  })
+
+  test("never mentions ask_user_question for claude", () => {
+    const prompt = getWebContextPrompt("claude", { askUserQuestionEnabled: true })
+    expect(prompt).not.toContain("ask_user_question")
+  })
 })
