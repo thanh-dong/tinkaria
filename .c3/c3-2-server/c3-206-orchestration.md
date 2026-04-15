@@ -1,6 +1,6 @@
 ---
 id: c3-206
-c3-seal: 6617ea1e7ff48ad1422ddc7ae093e07a734c8c8668126dc092fbbe9a1b514cee
+c3-seal: d5be5e5d91a0509ebf48b4476d0a2be694ab63db8b3efb2d7e891cbaf5930ff0
 title: orchestration
 type: component
 category: feature
@@ -18,90 +18,62 @@ uses:
     - rule-transcript-boundary-regressions
 ---
 
+# orchestration
 ## Goal
 
 SessionOrchestrator manages cross-session agent delegation, spawn/send/wait/close operations, depth and concurrency limits, and cancellation cascades.
 
-### MCP Tools
+## Parent Fit
 
-`createOrchestrationMcpServer(orchestrator, callerChatId)` registers 5 tools:
-
-| Tool | Args | Returns | Behavior |
-| --- | --- | --- | --- |
-| spawn_agent | instruction, provider?, fork_context? | { chatId } | Creates child session. Seeds with bounded parent transcript if fork_context=true. |
-| list_agents | (none) | OrchestrationHierarchySnapshot | Returns full nested tree of all spawned + external children with live statuses. |
-| send_input | targetChatId, content | "Input sent" | Follow-up message to existing child. Target must not be running. |
-| wait_agent | targetChatId, timeoutMs? (default 120s) | { result, isError } | Blocks until child emits result entry. Auto-cancels on timeout. |
-| close_agent | targetChatId | "Agent closed" | Disposes child, marks as closed tombstone. Clears pending waiters. |
-| All tools enforce ownership via requireOwnedTarget() — callers can only interact with their own spawned children. |  |  |  |
-### Depth and Concurrency Limits
-
-| Limit | Default | Enforced At |
-| --- | --- | --- |
-| maxDepth | 3 | spawn_agent — rejects if child would exceed nesting depth |
-| maxConcurrency | 10 | spawn_agent — counts active (spawning + running + waiting) agents per workspace |
-| Both configurable via SessionOrchestratorArgs. |  |  |
-### Child Status Resolution
-
-Status is derived dynamically from coordinator state:
-
-| Coordinator State | Orchestration Status |
+| Field | Value |
 | --- | --- |
-| In activeTurns (starting/running) | running |
-| waiting_for_user | waiting |
-| failed | failed |
-| Closed tombstone | closed |
-| Not in activeTurns | completed |
-### Cancellation Cascade
+| Parent | c3-2 |
+| Role | Own orchestration behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep orchestration decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
 
-`cancelWithCascade(chatId)` performs recursive post-order cancellation:
+Provide durable agent-ready documentation for orchestration so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
 
-1. Traverse `children` map to find all descendants
-2. Cancel each descendant first (deepest first)
-3. Cancel parent last
-4. Call `cleanup()` to purge all origin tracking for the tree
-### Delegated Context Algorithm (buildDelegatedContext)
+## Foundational Flow
 
-When `fork_context=true`, the child receives a bounded excerpt from the parent:
-
-**Constants:**
-
-- MAX_DELEGATED_CONTEXT_ENTRIES = 24 (most recent)
-- MAX_DELEGATED_CONTEXT_CHARS = 12,000 (total budget)
-- MAX_DELEGATED_CONTEXT_LINE_CHARS = 600 (per-line truncation)
-**Steps:**
-1. Convert parent transcript entries to single-line summaries (truncated at 600 chars each)
-2. Select last 24 lines
-3. If zero lines, return undefined (no context)
-4. Build header: "Forked parent chat context" + disclaimer + omission count
-5. Join header + lines. If total <= 12k chars, return as-is
-6. If over budget: trim from oldest line first, keep newest, until fits
-7. Child instruction is NOT rewritten — context is appended separately by coordinator
-### Hierarchy Tree (getHierarchy)
-
-Builds nested `OrchestrationHierarchySnapshot` combining:
-
-- **Internal children**: spawned via spawn_agent, tracked in `children` Map and `origins` Map
-- **External children**: detected from `tool_call` entries with `toolKind === "subagent_task"` and `tool_result` entries with `receiverThreadIds`
-- De-duplicated: if external child already tracked as internal, skip
-Each node carries: chatId, status, instruction (first 120 chars), spawnedAt, lastStatusAt.
-### Internal State
-
-| Map | Keys | Values | Purpose |
-| --- | --- | --- | --- |
-| children | parentChatId | Set of childChatIds | Parent-child ownership |
-| origins | childChatId | OriginRecord (parent, depth, instruction, timestamps, status) | Reverse lookup + metadata |
-| externalChildren | callerChatId | Map of receiverId to ExternalAgentStateRecord | Codex subagent tracking |
-| waiters | childChatId | Array of { resolve, reject, timer } | Pending wait_agent promises |
-| tombstones | childChatId | true | Closed children (pruned periodically) |
-## Dependencies
-
-| Direction | What | From/To |
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | Project/chat state and turn execution callbacks | c3-210 |
-| IN | Persistent chat/project store backing spawned sessions | c3-201 |
-| OUT | MCP orchestration tools exposed to Claude turns | c3-210 |
-| OUT | Delegated child turn lifecycle requests | c3-216 |
-## Container Connection
+| Preconditions | Parent container context is loaded before orchestration behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to orchestration ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
 
-Part of c3-2 (server). This is the cross-session coordination layer beside AgentCoordinator: it turns tool-mediated delegation into spawned chats, waiters, and cancellation cascades without introducing hidden shared state.
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks orchestration to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside orchestration ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
+
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs orchestration behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
+
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| spawnAgent | OUT | Creates a child chat, records ownership/depth, and starts its first turn through coordinator.startTurnForChat. | c3-210 agent boundary | src/server/orchestration.ts; bun test src/server/orchestration.test.ts --test-name-pattern 'spawnAgent' |
+| sendInput idle target | OUT | If coordinator.activeTurns.has(targetChatId) is false, sendInput starts a new turn on the owned target child. | c3-210 agent boundary | src/server/orchestration.ts; bun test src/server/orchestration.test.ts --test-name-pattern 'calls startTurnForChat' |
+| sendInput active target | OUT | If coordinator.activeTurns.has(targetChatId) is true, sendInput must queue the follow-up through coordinator.queue instead of throwing busy/already-running. | c3-210 agent boundary | src/server/orchestration.ts; bun test src/server/orchestration.test.ts --test-name-pattern 'queues input if target is already running' |
+| wait and close ownership | OUT | waitForResult and closeAgent must require owned targets and update child hierarchy without bypassing coordinator cancellation/disposal. | c3-210 agent boundary | src/server/orchestration.ts; bun test src/server/orchestration.test.ts |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Busy follow-up regression | sendInput checks only target existence and directly starts a turn while the child is active. | Codex reports Chat is already running or Target chat is already running. | bun test src/server/orchestration.test.ts --test-name-pattern 'queues input if target is already running' |
+| Active-state source confusion | Troubleshooting assumes TranscriptConsumer status is the only active source. | Race reproduces only immediately after spawnAgent/startTurnForChat. | Read c3-210 Contract; bun test src/server/runner-proxy.test.ts --test-name-pattern 'activeTurns.has() returns true immediately' |
+| Ownership bypass | sendInput, wait, or close accepts a target not owned by the caller. | Cross-session child operations affect unrelated chats. | bun test src/server/orchestration.test.ts --test-name-pattern 'does not own' |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

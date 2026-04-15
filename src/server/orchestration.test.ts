@@ -74,12 +74,21 @@ function createFakeStore() {
 
 function createFakeCoordinator() {
   const startedTurns: Array<{ chatId: string; content: string; delegatedContext?: string; isSpawned?: boolean; provider: string }> = []
+  const queuedTurns: Array<{
+    type: "chat.queue"
+    chatId: string
+    content: string
+    provider?: string
+    model?: string
+    planMode?: boolean
+  }> = []
   const activeTurns = new Map<string, unknown>()
   const cancelledChats: string[] = []
   const disposedChats: string[] = []
 
   return {
     startedTurns,
+    queuedTurns,
     activeTurns,
     cancelledChats,
     disposedChats,
@@ -93,6 +102,17 @@ function createFakeCoordinator() {
     async startTurnForChat(args: { chatId: string; content: string; delegatedContext?: string; isSpawned?: boolean; provider: string }) {
       startedTurns.push(args)
       activeTurns.set(args.chatId, { chatId: args.chatId })
+    },
+    async queue(args: {
+      type: "chat.queue"
+      chatId: string
+      content: string
+      provider?: string
+      model?: string
+      planMode?: boolean
+    }) {
+      queuedTurns.push(args)
+      return { chatId: args.chatId, queued: true }
     },
     async cancel(chatId: string) {
       cancelledChats.push(chatId)
@@ -343,7 +363,7 @@ describe("SessionOrchestrator", () => {
       ).rejects.toThrow(/not found|spawned agent/i)
     })
 
-    test("rejects if target is already running", async () => {
+    test("queues input if target is already running", async () => {
       ctx = createOrchestrator()
       const caller = await seedCallerChat(ctx.store)
       const { chatId: targetId } = await ctx.orchestrator.spawnAgent(caller.id, {
@@ -351,12 +371,22 @@ describe("SessionOrchestrator", () => {
       })
 
       // Target is still in activeTurns from spawnAgent
-      await expect(
-        ctx.orchestrator.sendInput(caller.id, {
-          targetChatId: targetId,
+      await expect(ctx.orchestrator.sendInput(caller.id, {
+        targetChatId: targetId,
+        content: "more input",
+      })).resolves.toBeUndefined()
+
+      expect(ctx.coordinator.startedTurns).toHaveLength(1)
+      expect(ctx.coordinator.queuedTurns).toEqual([
+        {
+          type: "chat.queue",
+          chatId: targetId,
           content: "more input",
-        }),
-      ).rejects.toThrow(/already running|busy/i)
+          provider: "claude",
+          model: "sonnet",
+          planMode: false,
+        },
+      ])
     })
 
     test("rejects when caller does not own the target child", async () => {

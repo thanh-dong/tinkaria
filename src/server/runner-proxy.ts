@@ -46,7 +46,7 @@ export class RunnerProxy {
     this._getActiveStatuses = options.getActiveStatuses
     this.runtimeRegistry = options.runtimeRegistry ?? null
     this.activeTurns = {
-      has: (chatId: string) => this._getActiveStatuses().has(chatId),
+      has: (chatId: string) => this.hasActiveOrJustStartedTurn(chatId),
     }
   }
 
@@ -81,8 +81,12 @@ export class RunnerProxy {
     return this._getActiveStatuses()
   }
 
+  private hasObservedActiveTurn(chatId: string): boolean {
+    return this._getActiveStatuses().has(chatId)
+  }
+
   private hasActiveOrJustStartedTurn(chatId: string): boolean {
-    return this.activeTurns.has(chatId) || this.recentlyStartedChats.has(chatId)
+    return this.hasObservedActiveTurn(chatId) || this.recentlyStartedChats.has(chatId)
   }
 
   private async sendCommand(cmd: string, payload: unknown): Promise<unknown> {
@@ -180,7 +184,7 @@ export class RunnerProxy {
 
   async drainQueuedTurn(chatId: string): Promise<boolean> {
     this.recentlyStartedChats.delete(chatId)
-    if (this.activeTurns.has(chatId)) return false
+    if (this.hasObservedActiveTurn(chatId)) return false
 
     const queued = this.store.getQueuedTurn(chatId)
     if (!queued) return false

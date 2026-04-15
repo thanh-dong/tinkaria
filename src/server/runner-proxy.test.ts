@@ -312,6 +312,21 @@ describe("RunnerProxy", () => {
     expect(proxy!.activeTurns.has("inactive-chat")).toBe(false)
   })
 
+  test("activeTurns.has() returns true immediately after starting a chat", async () => {
+    await setup()
+
+    await proxy!.startTurnForChat({
+      chatId: "just-started-chat",
+      provider: "codex",
+      content: "Initial task",
+      model: "gpt-5.4",
+      planMode: false,
+      appendUserPrompt: true,
+    })
+
+    expect(proxy!.activeTurns.has("just-started-chat")).toBe(true)
+  })
+
   test("startTurnForChat() forwards StartTurnCommand and persists model", async () => {
     const { store } = await setup()
 

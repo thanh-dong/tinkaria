@@ -28,6 +28,15 @@ interface OrchestratorCoordinator {
     planMode: boolean
     appendUserPrompt: boolean
   }): Promise<void>
+  queue(args: {
+    type: "chat.queue"
+    chatId: string
+    provider?: AgentProvider
+    content: string
+    model?: string
+    effort?: string
+    planMode?: boolean
+  }): Promise<{ chatId: string; queued: boolean }>
   cancel(chatId: string): Promise<void>
   disposeChat(chatId: string): Promise<void>
 }
@@ -200,16 +209,26 @@ export class SessionOrchestrator {
   ): Promise<void> {
     this.requireOwnedTarget(callerChatId, args.targetChatId)
     const targetChat = this.store.requireChat(args.targetChatId)
+    const provider = targetChat.provider ?? "claude"
+    const model = args.model ?? normalizeServerModel(provider)
+
     if (this.coordinator.activeTurns.has(args.targetChatId)) {
-      throw new Error(`Target chat ${args.targetChatId} is already running (busy)`)
+      await this.coordinator.queue({
+        type: "chat.queue",
+        chatId: args.targetChatId,
+        provider,
+        content: args.content,
+        model,
+        planMode: false,
+      })
+      return
     }
 
-    const provider = targetChat.provider ?? "claude"
     await this.coordinator.startTurnForChat({
       chatId: args.targetChatId,
       provider,
       content: args.content,
-      model: args.model ?? normalizeServerModel(provider),
+      model,
       planMode: false,
       appendUserPrompt: true,
     })
