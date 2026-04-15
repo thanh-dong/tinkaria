@@ -85,22 +85,31 @@ describe("AppSidebar", () => {
     expect(html).toContain('data-ui-c3-label="sidebar"')
   })
 
-  test("renders connection indicator in the sidebar footer", () => {
+  test("renders dot-only connection indicator in the sidebar footer", () => {
     const html = renderSidebar({
       connectionStatus: "disconnected",
       ready: false,
     })
 
-    expect(html).toContain('data-sidebar-connection-indicator="disconnected"')
+    const footerIndex = html.indexOf('data-sidebar-footer="true"')
+    const indicatorIndex = html.indexOf('data-sidebar-connection-indicator="disconnected"')
+
+    expect(footerIndex).toBeGreaterThan(-1)
+    expect(indicatorIndex).toBeGreaterThan(footerIndex)
     expect(html).toContain('aria-label="Connection status: Disconnected"')
-    expect(html).toContain(">Disconnected<")
+    expect(html).not.toContain(">Disconnected<")
+    expect(html).not.toContain(">Connecting<")
+    expect(html).not.toContain(">Connected<")
   })
 
-  test("uses the Tinkaria footer entry without connection chrome", () => {
+  test("keeps the header free of connection chrome", () => {
     const html = renderSidebar()
+    const headerEndIndex = html.indexOf('class="flex-1 min-h-0 overflow-y-auto scrollbar-hide"')
+    const headerHtml = html.slice(0, headerEndIndex)
 
     expect(html).not.toContain(">Connection<")
-    expect(html).toContain(">Tinkaria</button>")
+    expect(headerHtml).toContain("Go to homepage")
+    expect(headerHtml).not.toContain("data-sidebar-connection-indicator")
   })
 
   test("renders the collapsed utility stub with an expand action", () => {

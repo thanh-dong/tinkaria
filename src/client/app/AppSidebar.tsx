@@ -307,18 +307,6 @@ function AppSidebarInner({
             </span>
           </Button>
           <div className="flex items-center gap-1">
-            <span
-              data-sidebar-connection-indicator={connectionIndicatorState}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-muted-foreground/60"
-              aria-label={`Connection status: ${connectionIndicatorLabel}`}
-              title={`Connection status: ${connectionIndicatorLabel}`}
-            >
-              <span
-                aria-hidden="true"
-                className={cn("size-1.5 rounded-full", SIDEBAR_CONNECTION_DOT_CLASSES[connectionIndicatorState])}
-              />
-              <span className="hidden sm:inline">{connectionIndicatorLabel}</span>
-            </span>
             {showDevBadge ? (
               <span
                 className="mr-1 inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-bold tracking-wider text-muted-foreground"
@@ -418,14 +406,27 @@ function AppSidebarInner({
           </div>
         </div>
 
-        <div className="border-t border-border p-2">
-          <button
-            onClick={() => { navigate("/tinkaria"); onClose() }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 w-full"
-          >
-            <Settings className="h-4 w-4" />
-            Tinkaria
-          </button>
+        <div data-sidebar-footer="true" className="border-t border-border p-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { navigate("/tinkaria"); onClose() }}
+              className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50"
+            >
+              <Settings className="h-4 w-4" />
+              Tinkaria
+            </button>
+            <span
+              data-sidebar-connection-indicator={connectionIndicatorState}
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground/60"
+              aria-label={`Connection status: ${connectionIndicatorLabel}`}
+              title={`Connection status: ${connectionIndicatorLabel}`}
+            >
+              <span
+                aria-hidden="true"
+                className={cn("size-1.5 rounded-full", SIDEBAR_CONNECTION_DOT_CLASSES[connectionIndicatorState])}
+              />
+            </span>
+          </div>
         </div>
       </div>
 
