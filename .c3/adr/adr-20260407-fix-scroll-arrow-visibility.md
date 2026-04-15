@@ -1,8 +1,14 @@
 ---
 id: adr-20260407-fix-scroll-arrow-visibility
-c3-seal: d480a24526268bd5b4fbf20a90a5cd0baa44295ae29446f7e01d6b13f181bc96
+c3-seal: 182ea7f5b035054e08a9c03c41d014ac256d96f82bb0ee79479fdef3d303c7a5
 title: fix-scroll-arrow-visibility
 type: adr
+goal: Document fix-scroll-arrow-visibility architecture decisions and responsibilities.
 status: proposed
 date: "2026-04-07"
 ---
+
+# fix-scroll-arrow-visibility
+## Goal
+
+Document fix-scroll-arrow-visibility architecture decisions and responsibilities.

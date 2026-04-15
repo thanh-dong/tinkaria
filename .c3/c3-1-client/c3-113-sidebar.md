@@ -1,6 +1,6 @@
 ---
 id: c3-113
-c3-seal: 171412093d870e8e93fb47acebb353680dae0b6688c14050ad7f83f90550e9f4
+c3-seal: 8162cf1aede56e9038eaa93544faa9566caffbbeb5e259b1b4bc12e5ba8b80bc
 title: sidebar
 type: component
 category: feature
@@ -20,37 +20,58 @@ uses:
     - rule-ui-identity-composition
 ---
 
+# sidebar
 ## Goal
 
 Render the persistent left sidebar: project-group navigation, chat rows, per-project menus, and resumable session picker overlays, with shared sidebar ui ids for Alt+Shift inspection.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-1 |
+| Role | Own sidebar behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep sidebar decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for sidebar so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | Sidebar snapshot data and chat/project actions from TinkariaState | c3-110 |
-| IN | Session discovery snapshots per project | c3-217 |
-| IN | Shared semantic ui-id helpers for rows, groups, and session picker surfaces | c3-108 |
-| OUT | Route navigation to / and /chat/:chatId plus resume-session intents | c3-101 |
-## Related Refs
+| Preconditions | Parent container context is loaded before sidebar behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to sidebar ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-ref-websocket-protocol | Real-time sidebar data updates via WebSocket subscriptions |
-| ref-ref-radix-primitives | Context menus and button primitives for project, chat, and collapsed-shell actions |
-| c3-108 |  |
-| ref-component-identity-mapping |  |
-| ref-responsive-modal-pattern |  |
-| ref-screen-composition-patterns |  |
-| ref-mobile-tabbed-page-pattern |  |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks sidebar to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside sidebar ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
 
-| Rule | Constraint |
-| --- | --- |
-| rule-rule-strict-typescript | Strict typing enforced across all source files |
-| rule-react-no-effects |  |
-| rule-ui-identity-composition |  |
-| rule-ui-component-usage |  |
-## Container Connection
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs sidebar behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Part of c3-1 (client). This shell stays mounted across routed screens and gives Alt+Shift a stable sidebar ownership map: chat rows, project groups, menus, and session picker overlays all resolve back here.
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| sidebar input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| sidebar output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

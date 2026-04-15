@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import { PROVIDERS } from "../../../shared/types"
-import { CHAT_COMPOSER_PLACEHOLDER_POOL, getChatComposerPlaceholderText } from "../../lib/quirkyCopy"
+import {
+  CHAT_COMPOSER_PLACEHOLDER_POOL,
+  getAwaitingChatComposerPlaceholderText,
+  getChatComposerPlaceholderText,
+} from "../../lib/quirkyCopy"
 import { useSkillCompositionStore } from "../../stores/skillCompositionStore"
 import { areChatInputPropsEqual, ChatInput, shouldInvokeCancelAction } from "./ChatInput"
 
@@ -123,5 +127,23 @@ describe("ChatInput", () => {
 
     expect(CHAT_COMPOSER_PLACEHOLDER_POOL).toContain(placeholder)
     expect(getChatComposerPlaceholderText("chat-7")).toBe(placeholder)
+  })
+
+  test("marks the composer placeholder as rotating while awaiting", () => {
+    const html = renderToStaticMarkup(
+      <ChatInput
+        onSubmit={async () => "queued"}
+        onCancel={() => {}}
+        disabled={false}
+        canCancel={true}
+        chatId="chat-7"
+        connectionStatus="connected"
+        activeProvider={null}
+        availableProviders={PROVIDERS}
+      />
+    )
+
+    expect(html).toContain(`placeholder="${getAwaitingChatComposerPlaceholderText("chat-7", 0)}`)
+    expect(html).toContain("tinkaria-composer-placeholder-rotating")
   })
 })

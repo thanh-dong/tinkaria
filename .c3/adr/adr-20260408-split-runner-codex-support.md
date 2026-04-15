@@ -1,8 +1,14 @@
 ---
 id: adr-20260408-split-runner-codex-support
-c3-seal: b276ad83c99230aa010f5f84092e144bb329bb46a17f72bcc4e905217c44957d
+c3-seal: 22e53f8198d5d707c389bbc3961acf79fd3230412de0d78cfeb05e58a4e286af
 title: split-runner-codex-support
 type: adr
+goal: Document split-runner-codex-support architecture decisions and responsibilities.
 status: proposed
 date: "2026-04-08"
 ---
+
+# split-runner-codex-support
+## Goal
+
+Document split-runner-codex-support architecture decisions and responsibilities.

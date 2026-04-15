@@ -1,6 +1,6 @@
 ---
 id: c3-1
-c3-seal: 1a2a94f60f17cf8bcc46830b1716f479ccd35f8357d7294e34ac4f3a4f0fe12c
+c3-seal: 09dfdd40deb13e36156b84dbb050c16e072ce7cb9a3d3aac259e13c177c0e46f
 title: client
 type: container
 boundary: service
@@ -16,16 +16,22 @@ React 19 single-page application running in the browser — chat interface, term
 
 | ID | Name | Category | Status | Goal Contribution |
 | --- | --- | --- | --- | --- |
-| c3-101 | app-shell | Foundation | active | Routing, layout, providers |
-| c3-102 | stores | Foundation | active | Client-side UI state |
-| c3-103 | theme | Foundation | active | Dark/light/system theming |
-| c3-104 | ui-primitives | Foundation | active | Reusable Radix-based components |
-| c3-110 | chat | Feature | active | Main chat interface |
-| c3-111 | messages | Feature | active | Rich message rendering |
-| c3-112 | chat-input | Feature | active | User input + model selection |
-| c3-113 | sidebar | Feature | active | Navigation + project list |
-| c3-115 | right-sidebar | Feature | active | File explorer panel |
-| c3-117 | projects | Feature | active | Project discovery + creation |
+| c3-101 | app-shell | Foundation | active | Routing, layout, providers, and client-level composition. |
+| c3-102 | stores | Foundation | active | Client-side state and persistence boundaries. |
+| c3-103 | theme | Foundation | active | Dark/light/system theming and design tokens. |
+| c3-104 | ui-primitives | Foundation | active | Reusable Radix-based component primitives. |
+| c3-106 | present-content | Feature | active | Transcript-delivered rich artifact rendering. |
+| c3-107 | rich-content | Feature | active | Markdown, code, diagram, HTML, SVG, and Pug embed rendering. |
+| c3-108 | ui-identity | Foundation | active | Stable UI identity metadata and inspection overlays. |
+| c3-110 | chat | Feature | active | Main chat route, command dispatch, and active turn state. |
+| c3-111 | messages | Feature | active | Prompt, assistant, tool, and transcript message rendering. |
+| c3-112 | chat-input | Feature | active | Composer input, queueing controls, and model selection. |
+| c3-113 | sidebar | Feature | active | Navigation, project groups, session lists, and route entry. |
+| c3-115 | right-sidebar | Feature | active | File explorer and adjacent workspace panel behavior. |
+| c3-117 | projects | Feature | active | Project discovery, overview, and creation surfaces. |
+| c3-118 | transcript-lifecycle | Feature | active | Transcript loading, pagination, and read/follow state. |
+| c3-119 | transcript-renderer | Feature | active | Transcript grouping and render selection for message streams. |
+| c3-120 | extensions | Feature | active | Project extension surfaces including C3, agents, and code views. |
 ## Responsibilities
 
 - Render chat transcripts with rich message types (tool calls, diffs, todos, plans)

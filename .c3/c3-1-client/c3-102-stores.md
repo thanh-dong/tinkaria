@@ -1,6 +1,6 @@
 ---
 id: c3-102
-c3-seal: 24c0557674f4f8c1c652149c0be2e327668df82c1251d74910e20aa9e0ee98e5
+c3-seal: 12f0ff459067cd1f46878b86f4830a1fd3332edb160f3d6d6c57a11eb851a22b
 title: stores
 type: component
 category: foundation
@@ -13,31 +13,58 @@ uses:
     - rule-rule-strict-typescript
 ---
 
+# stores
 ## Goal
 
 Provide lightweight Zustand stores for all client-side UI preferences and layout state — chat input drafts, model/provider preferences, terminal layout splits, sidebar visibility, and project group ordering.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-1 |
+| Role | Own stores behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep stores decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for stores so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | shared types (AgentProvider, ModelOptions) | c3-204 |
-| OUT | chatInputStore (draft text per chat) | c3-112 |
-| OUT | chatPreferencesStore (provider, model, plan mode) | c3-112 |
-| OUT | rightSidebarStore (open state, panel sizes) | c3-115 |
-| OUT | projectGroupOrderStore (sidebar group order) | c3-113 |
-## Related Refs
+| Preconditions | Parent container context is loaded before stores behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to stores ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-ref-zustand-stores | State management library — each store is a standalone hook with localStorage persistence |
-| ref-component-identity-mapping |  |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks stores to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside stores ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
 
-| Rule | Constraint |
-| --- | --- |
-| rule-rule-strict-typescript | Strict typing enforced across all source files |
-| rule-bun-test-conventions |  |
-## Container Connection
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs stores behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Part of c3-1 (client). Foundation layer — feature components consume these stores for UI state without prop-drilling.
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| stores input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| stores output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

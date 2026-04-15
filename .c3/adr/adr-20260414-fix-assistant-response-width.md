@@ -1,6 +1,6 @@
 ---
 id: adr-20260414-fix-assistant-response-width
-c3-seal: 05d6d115b5e2bb62bdc24719732878f76cf5f6446d334d71e79a22f1b749611e
+c3-seal: f26a3e04efd429ea334f279ef2ee7587f4b696a784680689ce0d33aacef516d0
 title: fix-assistant-response-width
 type: adr
 goal: Fix assistant response messages rendering too narrow / heavily padded versus other transcript messages, with regression proof before layout change.
@@ -9,3 +9,5 @@ date: "2026-04-14"
 ---
 
 ## Goal
+
+Fix assistant response messages rendering too narrow / heavily padded versus other transcript messages, with regression proof before layout change.

@@ -1,6 +1,6 @@
 ---
 id: c3-209
-c3-seal: 5f11f3a3b843aba37b11a19f77e89f1695d382ad7a9c362fb3f208e7144d63d0
+c3-seal: 8b1e0480c4ae8931a6d0020af86e1266fd68fc81157caa9084a1055832166207
 title: coordination
 type: component
 category: foundation
@@ -17,44 +17,58 @@ uses:
     - rule-ui-component-usage
 ---
 
+# coordination
 ## Goal
 
 Cross-session project coordination — durable shared todos, file claims, worktrees, and rules. EventStore-backed JSONL persistence with NATS JetStream distribution and MCP tool interface.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-2 |
+| Role | Own coordination behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep coordination decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for coordination so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | EventStore mutations and state | c3-201 |
-| IN | Read model derivation | c3-214 |
-| OUT | Coordination snapshots via NATS | c3-205 |
-| OUT | MCP tools to Claude sessions | c3-210 |
-## Related Refs
+| Preconditions | Parent container context is loaded before coordination behavior is changed. | ref-ref-event-sourcing |
+| Inputs | Accept only the files, commands, data, or calls that belong to coordination ownership. | ref-ref-event-sourcing |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-ref-event-sourcing |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-ref-event-sourcing |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-ref-event-sourcing | Coordination events follow append-only JSONL pattern |
-| ref-ref-websocket-protocol | Snapshot publishing uses same dual-channel pattern |
-| ref-screen-composition-patterns |  |
-| ref-workspace-journey-test-contracts |  |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks coordination to deliver its documented responsibility. | ref-ref-event-sourcing |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-ref-event-sourcing |
+| Alternate paths | When a request falls outside coordination ownership, hand it to the parent or sibling component. | ref-ref-event-sourcing |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-ref-event-sourcing |
+## Governance
 
-| Rule | Role |
-| --- | --- |
-| rule-bun-test-conventions | All test files follow Bun test patterns |
-| rule-rule-strict-typescript | Strict types, no any |
-| rule-error-extraction | Safe error extraction in tool handlers |
-| rule-ui-component-usage |  |
-| rule-journey-test-coverage |  |
-## Container Connection
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-ref-event-sourcing | ref | Governs coordination behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Extends event-store (c3-201), read-models (c3-214), and nats-transport (c3-205) with project coordination.
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| coordination input | IN | Callers must provide context that matches the component goal and parent fit. | c3-2 boundary | c3x lookup plus targeted tests or review. |
+| coordination output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-2 boundary | c3x check and project test suite. |
+## Change Safety
 
-**Files:**
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
 
-- `src/server/coordination-mcp.ts` — MCP server with 12 tools
-- `src/server/coordination-mcp.test.ts`
-- `src/server/event-store-coordination.test.ts`
-- `src/server/read-models-coordination.test.ts`
-- `src/server/coordination-integration.test.ts`
-- `src/shared/project-agent-types.ts` (shared with other components)
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

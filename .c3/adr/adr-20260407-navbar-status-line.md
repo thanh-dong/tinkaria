@@ -1,8 +1,14 @@
 ---
 id: adr-20260407-navbar-status-line
-c3-seal: 5f1c5d38bf290e93dccaecf91d5fb4ba73874509512f6528fa3a4f834fd4b480
+c3-seal: 64d5668e7b25cf56d19e1d9516405d57a5d083dc74ba51e352912452708d0956
 title: navbar-status-line
 type: adr
+goal: Document navbar-status-line architecture decisions and responsibilities.
 status: proposed
 date: "2026-04-07"
 ---
+
+# navbar-status-line
+## Goal
+
+Document navbar-status-line architecture decisions and responsibilities.

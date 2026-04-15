@@ -1,6 +1,6 @@
 ---
 id: c3-112
-c3-seal: 1799ac646484b4654ab87881bbba2c12669c717486c2fc2d0087c8c082fa0336
+c3-seal: b8e54e8940772eda0dec929ff370ccdb58991460a4865e1e9307a056dc3e448f
 title: chat-input
 type: component
 category: feature
@@ -8,6 +8,7 @@ parent: c3-1
 goal: Multi-line chat input with auto-resize, submit on Enter, cancel/queue behavior, and a preference bar for provider/model/context-window/reasoning-effort selection and plan-mode toggle.
 uses:
     - ref-component-identity-mapping
+    - ref-quirky-copy
     - ref-ref-provider-abstraction
     - ref-ref-radix-primitives
     - ref-ref-zustand-stores
@@ -17,76 +18,59 @@ uses:
     - rule-rule-strict-typescript
 ---
 
+# chat-input
 ## Goal
 
 Multi-line chat input with auto-resize, submit on Enter, cancel/queue behavior, and a preference bar for provider/model/context-window/reasoning-effort selection and plan-mode toggle.
 
-### Keyboard Behavior Matrix
+## Parent Fit
 
-| Context | Key | Action |
-| --- | --- | --- |
-| Agent running (canCancel=true) | Enter | Queue message through onSubmit / chat.queue path |
-| Agent running | Shift+Enter | Insert newline |
-| Idle (canCancel=false) | Enter (non-touch) | Submit immediately |
-| Idle | Ctrl/Cmd+Enter | Submit immediately |
-| Idle (touch device) | Enter | Insert newline |
-| Any state | Shift+Enter | Always insert newline |
-| Composer empty | Arrow Up | Restore queued text preview |
-| Any | Tab | Focus next chat input |
-| Any | Shift+Tab | Toggle plan mode |
-| Agent running | Escape | Cancel generation |
-### Send States
-
-| State | Visual | Trigger |
-| --- | --- | --- |
-| idle | Arrow-up icon | Default, connection healthy |
-| reconnecting | Spinner animation | WebSocket disconnected |
-| reconnected | Checkmark icon for 1.2s | Just reconnected, then auto-resets to idle |
-### Queue vs Submit UX
-
-Submit mode (`canCancel=false`): the arrow button sends immediately and no cancel button is shown.
-
-Queue mode (`canCancel=true`): the stop button cancels the current generation and the queue button submits a follow-up to the parent chat command layer. The composer may show a queued text block above the textarea while the backend queue command is being accepted. Once `chat.queue` succeeds, c3-110 clears the local preview; c3-210/c3-201 own durable queued execution behind the screen.
-
-Disabled states:
-
-- `composerActionsDisabled`: disabled prop or `connectionStatus !== "connected"`
-- `submitActionDisabled`: composer disabled or no text
-- `queueActionDisabled`: composer disabled or no text
-### Draft Persistence
-
-- Reads from `chatInputStore.getDraft(chatId)` on mount/chat-switch.
-- Writes on every keystroke via `setDraft(chatId, value)`.
-- Clears on successful submit result (`queued` or `sent`).
-- Preserved across chat switching; each chat has independent draft.
-- Queued draft persistence is UI recovery only. Durable queued execution lives on the server after `chat.queue` succeeds.
-### Auto-Resize
-
-Textarea expands to fit content up to 200px max height. It recalculates on window resize and value change.
-
-### Preference Controls
-
-| Control | Scope |
+| Field | Value |
 | --- | --- |
-| Provider selector | Locked to runtime provider if session already has one |
-| Model selector | Filtered by selected provider |
-| Reasoning effort | Claude-specific slider |
-| Context window | Token budget selector |
-| Fast mode toggle | Toggles fast output mode |
-| Plan mode toggle | Shift+Tab shortcut |
-### Skill Ribbon
+| Parent | c3-1 |
+| Role | Own chat-input behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep chat-input decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
 
-When slash commands exist, `SkillRibbon` renders above preference controls with clickable skill chips that insert `/skillName` into the composer.
+Provide durable agent-ready documentation for chat-input so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
 
-## Dependencies
+## Foundational Flow
 
-| Direction | What | From/To |
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | chatInputStore (draft text per chat) | c3-102 |
-| IN | chatPreferencesStore (provider, model, plan mode) | c3-102 |
-| IN | Textarea, Button UI primitives | c3-104 |
-| IN | shared types (AgentProvider, ModelOptions, ProviderCatalogEntry) | c3-204 |
-| OUT | onSubmit callback with message + model options | c3-110 |
-## Container Connection
+| Preconditions | Parent container context is loaded before chat-input behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to chat-input ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
 
-Part of c3-1 (client). Feature layer rendered at the bottom of ChatPage. Collects user input and model preferences before sending to the agent.
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks chat-input to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside chat-input ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
+
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs chat-input behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+| ref-quirky-copy | ref | Citation added by c3x wire; refine the governed behavior before review. | wired citation beats uncited local prose | Added by c3x wire. |
+## Contract
+
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| chat-input input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| chat-input output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

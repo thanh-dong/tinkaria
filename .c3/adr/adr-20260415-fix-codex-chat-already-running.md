@@ -1,6 +1,6 @@
 ---
 id: adr-20260415-fix-codex-chat-already-running
-c3-seal: da98485be63354b73bb4ee04ad5755f16058445f7b92b58790f5b4d6d9740beb
+c3-seal: c54cb8fedd0edb40c201e3363bf4674be8f84c3a5c1737142f1dac7ee4a80b64
 title: fix-codex-chat-already-running
 type: adr
 goal: Fix the Codex session state bug where send_input against an already-running child chat surfaced as a busy/already-running error with only Dismiss available.
@@ -24,7 +24,6 @@ Work Breakdown:
 - Updated src/server/runner-proxy.test.ts so recently started Codex chats are active immediately for orchestration.
 - Updated C3 docs for c3-206, c3-208, c3-210, and c3-226 to document active-state sources, queue-drain ownership, duplicate-start symptoms, and exact verification commands.
 Parent Delta: none. The server container, orchestration, agent, kit-runtime, and transcript-runtime responsibilities already cover session orchestration, queued follow-up ownership, active-turn state, runner handoff, and queue-drain triggers; this change makes those existing contracts explicit.
-
 Verification:
 
 - bun test src/server/runner-proxy.test.ts --test-name-pattern 'activeTurns.has() returns true immediately'
@@ -34,7 +33,6 @@ Verification:
 - C3X_MODE=agent bash /home/lagz0ne/.agents/skills/c3/bin/c3x.sh check
 - git diff --check
 Note: transcript-consumer.test.ts currently fails during embedded NATS JetStream setup with 'insufficient storage resources available' before assertions; this is outside the patched code path.
-
 ## Verification Target
 
 Reproduce or identify the stale-running path, add focused coverage where practical, then verify with tests/typecheck and browser smoke if frontend behavior changes.

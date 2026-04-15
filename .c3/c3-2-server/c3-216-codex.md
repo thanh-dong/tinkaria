@@ -1,6 +1,6 @@
 ---
 id: c3-216
-c3-seal: d88c797d64944389ac965bc1c667d5a9f251ae19e9cb5be03f360c04bba9b90e
+c3-seal: 4117131748ead7f3756554b14646db9aa0ceb80e3e61b3e2c02ee8ee161b8e95
 title: codex
 type: component
 category: feature
@@ -28,44 +28,58 @@ uses:
     - rule-transcript-boundary-regressions
 ---
 
+# codex
 ## Goal
 
 Codex CLI protocol wrapper that spawns the Codex app-server subprocess, communicates via JSON-RPC over stdin/stdout, advertises dynamic tools, and translates Codex events into the shared harness turn model consumed by the higher-level provider seam in c3-210.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-2 |
+| Role | Own codex behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep codex decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for codex so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | Shared prompt/developer-instructions composition for Codex turns | c3-207 |
-| IN | Shared transcript and tool payload types | c3-204 |
-| IN | Zod schema validation for dynamic tool payload safety | ref-zod-defensive-validation |
-| OUT | Codex HarnessTurn streams consumed by AgentCoordinator and its provider harness seam | c3-210 |
-| OUT | Dynamic tool payloads for dedicated present_content transcript artifacts | c3-106 |
-## Related Refs
+| Preconditions | Parent container context is loaded before codex behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to codex ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-ref-provider-abstraction | Codex provider transport stays behind the shared harness contract. |
-| ref-zod-defensive-validation | Dynamic tool payloads are validated before entering the transcript. |
-| ref-component-identity-mapping |  |
-| ref-mcp-app-hosting |  |
-| recipe-project-c3-app-flow |  |
-| ref-mcp-app-jtbd |  |
-| ref-live-transcript-render-contract |  |
-| recipe-agent-turn-render-flow |  |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks codex to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside codex ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
 
-| Rule | Constraint |
-| --- | --- |
-| rule-rule-bun-runtime | Server bridge code stays on Bun-native APIs. |
-| rule-rule-strict-typescript | Protocol and transcript payloads remain strongly typed. |
-| rule-error-extraction | App-server and transport failures are surfaced safely. |
-| rule-bun-test-conventions | Protocol-level regression tests cover turn/start and dynamic tool behavior. |
-| rule-prefixed-logging | Runtime bridge activity stays greppable. |
-| rule-subprocess-ipc-safety |  |
-| rule-provider-harness-boundaries | Codex transport stays below the higher-level harness seam instead of leaking into the coordinator. |
-| rule-provider-runtime-readiness |  |
-| rule-transcript-boundary-regressions |  |
-## Container Connection
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs codex behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Part of c3-2 (server). This is the low-level Codex provider runtime adapter below the runner/provider seam: prompt context comes from c3-207, structured artifact output feeds c3-106, transcript events participate in the live render contract, and higher-level turn/session orchestration remains in c3-210/c3-208.
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| codex input | IN | Callers must provide context that matches the component goal and parent fit. | c3-2 boundary | c3x lookup plus targeted tests or review. |
+| codex output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-2 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

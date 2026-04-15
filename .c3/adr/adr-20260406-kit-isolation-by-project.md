@@ -1,6 +1,6 @@
 ---
 id: adr-20260406-kit-isolation-by-project
-c3-seal: 4798a45a720ea387b6e93288f657cde22e492f69132c96a636a8e7438aaa8b5d
+c3-seal: 491c1a7cf9a59f6fcf9d94a1e19a337cb0081f7fbcbb0dbeb38c035c8e907971
 title: define kit as the resilient execution unit with per-kit agent settings
 type: adr
 goal: '[ASSUMED] Keep the multi-node design simple while making it resilient.'
@@ -98,7 +98,6 @@ one hub
 one hub
 one hub
 one hub
-
 - one kit
 That already gives us the split we want:
 one kit
@@ -131,7 +130,6 @@ one kit
 That already gives us the split we want:
 one kit
 That already gives us the split we want:
-
 - hub owns truth
 hub owns truth
 hub owns truth
@@ -148,7 +146,6 @@ hub owns truth
 hub owns truth
 hub owns truth
 hub owns truth
-
 - kit owns execution
 The next step up is:
 kit owns execution
@@ -181,7 +178,6 @@ kit owns execution
 The next step up is:
 kit owns execution
 The next step up is:
-
 - one hub
 one hub
 one hub
@@ -198,7 +194,6 @@ one hub
 one hub
 one hub
 one hub
-
 - many kits with different settings
 That gives us multiple agent behaviors without changing the hub role.
 many kits with different settings
@@ -231,7 +226,6 @@ many kits with different settings
 That gives us multiple agent behaviors without changing the hub role.
 many kits with different settings
 That gives us multiple agent behaviors without changing the hub role.
-
 ## Routing Model
 
 Keep the routing model simple:

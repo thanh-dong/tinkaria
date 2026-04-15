@@ -1,8 +1,14 @@
 ---
 id: adr-20260403-persist-queued-composer-messages
-c3-seal: e4670fee758da371b158f4e7964af78a52be3214e5ba5aacdce0e0f98f936ad6
+c3-seal: f36b310a4762df4d332dfd343cc686e46f217f3b5e2a634d09324832a6632735
 title: persist-queued-composer-messages
 type: adr
+goal: Document persist-queued-composer-messages architecture decisions and responsibilities.
 status: proposed
 date: "2026-04-03"
 ---
+
+# persist-queued-composer-messages
+## Goal
+
+Document persist-queued-composer-messages architecture decisions and responsibilities.

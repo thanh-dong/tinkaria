@@ -1,6 +1,6 @@
 ---
 id: c3-204
-c3-seal: 5032e8c5f46dec3f7b3d605319bf5ef4525050cfb3dbb92bf6826b0ca065e12c
+c3-seal: 46c0f0f9bb1d604013a3df3967c4653e5b9635108ea33b78cf90fa80593ba4c2
 title: shared-types
 type: component
 category: foundation
@@ -19,39 +19,58 @@ uses:
     - rule-type-guards
 ---
 
+# shared-types
 ## Goal
 
 Shared type definitions, WebSocket/NATS command protocol envelope schema, tool normalization, port constants, and branding used by both client and server.
 
-Protocol responsibilities:
+## Parent Fit
 
-- Define typed client commands such as `chat.send`, `chat.queue`, `chat.cancel`, `chat.respondTool`, snapshots, and workspace/runtime commands.
-- Keep command payloads provider-neutral where possible while preserving provider/model/modelOptions fields at the boundary.
-- Keep shared protocol types pure TypeScript with no server/client runtime dependency.
-`chat.queue` is the durable follow-up command. The client uses it only for an existing chat; the server either sends immediately when idle or persists a queued turn for later drain when a turn is active or just-started.
-
-## Dependencies
-
-- None (leaf module — depended on by nearly everything else)
-## Related Refs
-
-| Ref | Role |
+| Field | Value |
 | --- | --- |
-| ref-ref-websocket-protocol | Protocol envelope types and subscription topics |
-| ref-zod-defensive-validation |  |
-| ref-component-identity-mapping |  |
-| ref-mcp-app-hosting |  |
-| ref-live-transcript-render-contract |  |
-| recipe-agent-turn-render-flow |  |
-## Related Rules
+| Parent | c3-2 |
+| Role | Own shared-types behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep shared-types decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
 
-| Rule | Constraint |
-| --- | --- |
-| rule-rule-strict-typescript | Strict typing enforced across all source files |
-| rule-bun-test-conventions |  |
-| rule-type-guards |  |
-| rule-graceful-fallbacks |  |
-| rule-transcript-boundary-regressions |  |
-## Container Connection
+Provide durable agent-ready documentation for shared-types so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
 
-Part of c3-2 (server). The shared contract layer — defines the types and protocol that the client (c3-1) and server (c3-2) agree on.
+## Foundational Flow
+
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Preconditions | Parent container context is loaded before shared-types behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to shared-types ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
+
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks shared-types to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside shared-types ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
+
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs shared-types behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
+
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| shared-types input | IN | Callers must provide context that matches the component goal and parent fit. | c3-2 boundary | c3x lookup plus targeted tests or review. |
+| shared-types output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-2 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

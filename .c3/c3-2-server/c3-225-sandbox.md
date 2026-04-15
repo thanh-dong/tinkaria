@@ -1,6 +1,6 @@
 ---
 id: c3-225
-c3-seal: 1d1083de637815aa8d1cefacfd60469dd2da3561957e79e1c491aed4440ca55b
+c3-seal: 3135b60724ae4d43ed7a9b6ab7497b59f116ce2208c1d46e03835cee05d33c75
 title: sandbox
 type: component
 category: feature
@@ -19,54 +19,58 @@ uses:
     - rule-ui-component-usage
 ---
 
+# sandbox
 ## Goal
 
 Docker-based workspace isolation — create, manage, and monitor sandbox containers per workspace with health checks, NATS communication, and security constraints.
 
-## Responsibilities
+## Parent Fit
 
-- SandboxManager wraps Docker CLI for container lifecycle (create, start, stop, destroy, exec, logs, inspect)
-- BunDockerClient provides Bun.spawn-based Docker command execution
-- SandboxHealthMonitor polls running containers and tracks consecutive failures
-- Security: --cap-drop ALL, --security-opt=no-new-privileges, --read-only rootfs
-## Dependencies
+| Field | Value |
+| --- | --- |
+| Parent | c3-2 |
+| Role | Own sandbox behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep sandbox decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
 
-| Direction | What | From/To |
+Provide durable agent-ready documentation for sandbox so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | EventStore mutations and state | c3-201 |
-| IN | Read model derivation | c3-214 |
-| OUT | Sandbox snapshots via NATS | c3-205 |
-| OUT | SandboxPanel renders status | c3-209 |
-## Related Refs
+| Preconditions | Parent container context is loaded before sandbox behavior is changed. | ref-ref-event-sourcing |
+| Inputs | Accept only the files, commands, data, or calls that belong to sandbox ownership. | ref-ref-event-sourcing |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-ref-event-sourcing |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-ref-event-sourcing |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-ref-event-sourcing | Sandbox events follow append-only JSONL pattern |
-| ref-ref-websocket-protocol | Snapshot publishing uses dual-channel pattern |
-| ref-workspace-journey-test-contracts |  |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks sandbox to deliver its documented responsibility. | ref-ref-event-sourcing |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-ref-event-sourcing |
+| Alternate paths | When a request falls outside sandbox ownership, hand it to the parent or sibling component. | ref-ref-event-sourcing |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-ref-event-sourcing |
+## Governance
 
-| Rule | Role |
-| --- | --- |
-| rule-error-extraction | Safe error extraction in catch blocks |
-| rule-prefixed-logging | LOG_PREFIX in server, local prefix in subprocess |
-| rule-bun-test-conventions | All test files follow Bun test patterns |
-| rule-rule-strict-typescript | Strict types, no any |
-| rule-rule-bun-runtime | Bun APIs only |
-| rule-ui-component-usage | SandboxPanel uses Button primitive |
-| rule-journey-test-coverage |  |
-## Container Connection
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-ref-event-sourcing | ref | Governs sandbox behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Extends event-store (c3-201) with sandbox events/reducers, nats-transport (c3-205) with sandbox stream/responders, and read-models (c3-214) with deriveSandboxSnapshot.
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| sandbox input | IN | Callers must provide context that matches the component goal and parent fit. | c3-2 boundary | c3x lookup plus targeted tests or review. |
+| sandbox output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-2 boundary | c3x check and project test suite. |
+## Change Safety
 
-**Files:**
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
 
-- `src/server/sandbox-manager.ts` — DockerClient + BunDockerClient + SandboxManager
-- `src/server/sandbox-manager.test.ts` — 9 unit tests
-- `src/server/sandbox-health.ts` — SandboxHealthMonitor
-- `src/server/sandbox-health.test.ts` — 5 health monitor tests
-- `src/shared/sandbox-types.ts` — Types
-- `src/sandbox/Dockerfile` — Container image
-- `src/sandbox/entrypoint.ts` — Container entrypoint
-- `src/client/components/coordination/SandboxPanel.tsx` — UI panel
-- `src/client/app/useSandboxSubscription.ts` — Subscription hook
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

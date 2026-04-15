@@ -1,6 +1,6 @@
 ---
 id: c3-201
-c3-seal: 0e4753888f06c4f69e6e848da34e0d260b6606941c1ca9f9ce35bd6b2f5d027f
+c3-seal: 6a986eeee80ac2c16e37d11843c16b16539c2c1a8f07f4e74ef41fa3f5b2d333
 title: event-store
 type: component
 category: foundation
@@ -18,46 +18,58 @@ uses:
     - rule-type-guards
 ---
 
+# event-store
 ## Goal
 
 JSONL-based append-only event log with snapshot compaction for persisting all project, chat, queued-turn, and transcript state.
 
-Persistent domains:
+## Parent Fit
 
-- Projects and independent workspaces in the projects log.
-- Chat metadata in the chats log.
-- Turn lifecycle, session tokens, and queued chat turns in the turns log.
-- Per-chat transcript files for durable message history.
-- Coordination, repo, workflow, sandbox, profile, and extension-preference logs for their respective projections.
-Queued turn contract:
-
-- `chat_turn_queued` appends/coalesces one queued follow-up per chat in `queuedTurnsByChat`.
-- `chat_queued_turn_cleared` removes the queued turn when `RunnerProxy.drainQueuedTurn()` claims it for execution.
-- Snapshot compaction includes pending queued turns so a queued follow-up survives store replay and restart.
-- Tests for queued turns must prove append/coalesce, replay, and clear behavior.
-## Dependencies
-
-- src/shared/types.ts (STORE_VERSION, AgentProvider, TranscriptEntry)
-- src/shared/branding.ts (getDataDir, LOG_PREFIX)
-- src/server/events.ts (StoreEvent union types, StoreState, SnapshotFile, createEmptyState)
-- src/server/paths.ts (resolveLocalPath)
-## Related Refs
-
-| Ref | Role |
+| Field | Value |
 | --- | --- |
-| ref-ref-event-sourcing | Append-only JSONL event log with snapshot compaction |
-| ref-component-identity-mapping |  |
-## Related Rules
+| Parent | c3-2 |
+| Role | Own event-store behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep event-store decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
 
-| Rule | Constraint |
-| --- | --- |
-| rule-rule-bun-runtime | Server code uses Bun APIs exclusively |
-| rule-rule-strict-typescript | Strict typing enforced across all source files |
-| rule-error-extraction |  |
-| rule-bun-test-conventions |  |
-| rule-type-guards |  |
-| rule-prefixed-logging |  |
-| rule-graceful-fallbacks |  |
-## Container Connection
+Provide durable agent-ready documentation for event-store so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
 
-Part of c3-2 (server). Provides the single source of truth for all persistent state — projects, chats, transcripts, and turn lifecycle events.
+## Foundational Flow
+
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Preconditions | Parent container context is loaded before event-store behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to event-store ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
+
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks event-store to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside event-store ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
+
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs event-store behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
+
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| event-store input | IN | Callers must provide context that matches the component goal and parent fit. | c3-2 boundary | c3x lookup plus targeted tests or review. |
+| event-store output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-2 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

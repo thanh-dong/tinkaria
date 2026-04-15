@@ -1,6 +1,6 @@
 ---
 id: ref-runtime-operational-readiness
-c3-seal: 4512f71a7a9c99ab21a235e1d91d49b3994cb83eff5d6e6e87994957c71b6f41
+c3-seal: 3dce7e07dd6d11543600485a161f4681d0f32b3d92565d952ff2d2b3990f1e90
 title: runtime-operational-readiness
 type: ref
 goal: Make the Bun/NATS/runtime stack operationally observable and crash-resilient so health endpoints, startup behavior, and logs describe whether required runtime actors are actually ready to serve traffic — and child process failures cannot cascade into server death.
@@ -68,7 +68,6 @@ Three layers of defense prevent child process failures from killing the server:
 **IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
 **IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
 **IPC write guards** (`rule-subprocess-ipc-safety`): All writes to child process stdin check `context.closed` before writing and wrap the write in try/catch. A dead child's stdin raises EPIPE — this must never propagate as an unhandled error.
-
 2. **Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
 **Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
 **Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
@@ -101,7 +100,6 @@ Three layers of defense prevent child process failures from killing the server:
 **Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
 **Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
 **Async handler safety**: Fire-and-forget async calls (`handleServerRequest`, `handleNotification`) append `.catch(() => {})` so that failures after the child dies do not become unhandled rejections.
-
 3. **Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
 **Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
 **Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
@@ -134,5 +132,4 @@ Three layers of defense prevent child process failures from killing the server:
 **Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
 **Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
 **Global safety net**: `process.on("unhandledRejection")` in `cli.ts` logs stray rejections with `console.warn` instead of allowing Bun's default exit-on-rejection behavior. This is a last-resort backstop, not a substitute for fixing root causes.
-
 When a child process dies, `failContext` cleanly resolves all pending work: pushes an error transcript entry, finishes the async queue, rejects pending RPC promises, and marks the context closed. Subsequent writes are silently dropped.

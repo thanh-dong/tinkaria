@@ -1,8 +1,14 @@
 ---
 id: adr-20260406-current-session-runtime-metadata
-c3-seal: 497b851405d274fb580133cc994d409c6a6a56ce326c6230db239b9e45e12a81
+c3-seal: e9784947e3cfb818bdc40adf029b7ac2405c1d05310ffded44d71a150ae07a25
 title: current-session-runtime-metadata
 type: adr
+goal: Document current-session-runtime-metadata architecture decisions and responsibilities.
 status: proposed
 date: "2026-04-06"
 ---
+
+# current-session-runtime-metadata
+## Goal
+
+Document current-session-runtime-metadata architecture decisions and responsibilities.

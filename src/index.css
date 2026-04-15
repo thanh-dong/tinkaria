@@ -519,6 +519,11 @@
     animation: tinkaria-composer-placeholder-breathe 7.5s ease-in-out infinite;
   }
 
+  .tinkaria-composer-placeholder-rotating::placeholder {
+    animation-duration: 3.2s;
+    color: color-mix(in oklch, currentColor 64%, oklch(71.2% 0.194 13.428) 36%);
+  }
+
   .tinkaria-typewriter-cursor-slot {
     display: inline-flex;
     align-items: center;

@@ -1,6 +1,6 @@
 ---
 id: c3-106
-c3-seal: 3dd5c2f0ebf0613e9ddebb56eb8766d0f0c49bdb02ac63f00a0ee80e79880b8a
+c3-seal: 3e2880aa22371bc49a57089b760e9e650d93f1576c3a0ef423913ac5a0d3c4d9
 title: present-content
 type: component
 category: feature
@@ -18,37 +18,58 @@ uses:
     - rule-transcript-boundary-regressions
 ---
 
+# present-content
 ## Goal
 
 Dedicated present_content transcript feature that normalizes typed content artifacts, including direct embeds, and renders them as rich cards instead of generic tool text.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-1 |
+| Role | Own present-content behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep present-content decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for present-content so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | Dynamic tool calls and tool results emitted by the Codex runtime | c3-216 |
-| IN | Shared tool normalization and typed transcript payloads | c3-204 |
-| IN | Rich overlay, embed/code/markdown rendering primitives, and remote embed support | c3-107 |
-| OUT | Dedicated transcript rendering branch for present_content messages | c3-111 |
-| OUT | Concrete artifact examples used by prompt guidance, including embed-first recommendations | c3-207 |
-## Related Refs
+| Preconditions | Parent container context is loaded before present-content behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to present-content ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-component-identity-mapping |  |
-| ref-mcp-app-hosting |  |
-| ref-live-transcript-render-contract |  |
-| recipe-agent-turn-render-flow |  |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks present-content to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside present-content ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
 
-| Rule | Constraint |
-| --- | --- |
-| rule-bun-test-conventions | Tool normalization and renderer behavior stay covered end to end |
-| rule-react-no-effects | The transcript renderer stays declarative |
-| rule-rule-strict-typescript | present_content payloads remain typed across normalization and rendering |
-| rule-transcript-boundary-regressions |  |
-## Container Connection
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs present-content behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Part of c3-1 (client). This is the user-visible structured artifact path in the transcript: Codex or future runtimes can emit bounded content cards or direct embeds, and the client renders them through one dedicated feature instead of treating them as generic tool output.
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| present-content input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| present-content output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
 
-For `present_content` artifacts with `format: "pug"`, this component does not require server enrichment or a new transcript result shape. The corresponding update is local to the client render path: `c3-106` passes the original artifact source to `c3-107`, and `c3-107` treats Puggy as short-form static/safe HTML. `c3-204` remains the shared contract owner and owns the copied renderer files, but present_content payloads stay unchanged: no `compiledHtml`, no server precompile metadata, and no hydration contract expansion.
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

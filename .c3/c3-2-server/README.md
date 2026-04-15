@@ -1,6 +1,6 @@
 ---
 id: c3-2
-c3-seal: de67f8c8517de25d72181d1f7092cdf08fc18a3a52793ccee6e59c9864c3b652
+c3-seal: f7a54fa862c02605c10918ef9ede956a7d2f6de92f49a44721b0d1744116d1ca
 title: server
 type: container
 boundary: service
@@ -16,15 +16,30 @@ Bun HTTP + WebSocket server managing all persistent state, AI agent sessions, te
 
 | ID | Name | Category | Status | Goal Contribution |
 | --- | --- | --- | --- | --- |
-| c3-201 | event-store | Foundation | active | JSONL event sourcing + snapshots |
-| c3-203 | cli | Foundation | active | Entry point, supervisor, restart |
-| c3-204 | shared-types | Foundation | active | Protocol, types, tool definitions |
-| c3-210 | agent | Feature | active | Multi-turn AI session management |
-| c3-211 | providers | Feature | active | Provider/model catalog |
-| c3-213 | discovery | Feature | active | Project scanning |
-| c3-214 | read-models | Feature | active | CQRS derived views |
-| c3-215 | share | Feature | active | Tunnel/QR sharing |
-| c3-216 | codex | Feature | active | Codex CLI integration |
+| c3-201 | event-store | Foundation | active | JSONL event sourcing, snapshots, and replay state. |
+| c3-203 | cli | Foundation | active | Server entry point, process startup, and operational commands. |
+| c3-204 | shared-types | Foundation | active | Shared protocol, schemas, tool contracts, and render utilities. |
+| c3-205 | nats-transport | Foundation | active | NATS/WebSocket transport and JetStream message delivery. |
+| c3-206 | orchestration | Foundation | active | Session orchestration and provider runtime coordination. |
+| c3-207 | prompt-context | Foundation | active | Prompt assembly, developer instructions, and context surfaces. |
+| c3-208 | kit-runtime | Foundation | active | Local kit process/runtime boundary and lifecycle. |
+| c3-209 | coordination | Foundation | active | Cross-session coordination and shared task state. |
+| c3-210 | agent | Feature | active | Multi-turn AI session management and turn execution. |
+| c3-211 | providers | Feature | active | Provider/model catalog and provider-specific capabilities. |
+| c3-213 | discovery | Feature | active | Local project scanning and workspace discovery. |
+| c3-214 | read-models | Feature | active | CQRS derived views for client state. |
+| c3-215 | share | Feature | active | Tunnel and QR sharing behavior. |
+| c3-216 | codex | Feature | active | Codex CLI integration and Codex app-server protocol. |
+| c3-217 | session-discovery | Feature | active | External provider session discovery and resume data. |
+| c3-218 | session-index | Feature | active | Session indexing, naming, unread state, and ordering. |
+| c3-219 | task-ledger | Feature | active | Durable task/todo ledger behavior for project work. |
+| c3-220 | transcript-search | Feature | active | Transcript search, retrieval, and matching surfaces. |
+| c3-222 | project-agent | Feature | active | Workspace/project agent operations and automation. |
+| c3-223 | skill-discovery | Feature | active | Skill inventory, discovery, and prompt integration. |
+| c3-224 | journey-verification | Feature | active | End-to-end journey verification contracts and harnesses. |
+| c3-225 | sandbox | Feature | active | Sandbox lifecycle, health, and isolation surfaces. |
+| c3-226 | transcript-runtime | Feature | active | Live transcript runtime bridge and event consumption. |
+| c3-227 | extension-router | Feature | active | Server routing for project extension data. |
 ## Responsibilities
 
 - Persist all state via JSONL event logs with snapshot compaction

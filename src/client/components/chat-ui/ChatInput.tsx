@@ -12,7 +12,7 @@ import {
 import { Button } from "../ui/button"
 import { Textarea } from "../ui/textarea"
 import { createUiIdentity, createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
-import { getChatComposerPlaceholderText } from "../../lib/quirkyCopy"
+import { getAwaitingChatComposerPlaceholderText, getChatComposerPlaceholderText } from "../../lib/quirkyCopy"
 import { cn } from "../../lib/utils"
 import { useIsStandalone } from "../../hooks/useIsStandalone"
 import { useChatInputStore } from "../../stores/chatInputStore"
@@ -24,6 +24,7 @@ import { SkillRibbon } from "./SkillRibbon"
 import type { SocketStatus } from "../../app/socket-interface"
 
 const RECONNECT_SUCCESS_FADE_MS = 1200
+const AWAITING_PLACEHOLDER_ROTATE_MS = 3200
 
 type ComposerReconnectVisualState = "idle" | "reconnecting" | "reconnected"
 
@@ -487,11 +488,14 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const initialDraft = chatId ? getDraft(chatId) : ""
   const draftValueRef = useRef(initialDraft)
   const [hasText, setHasText] = useState(() => hasTrimmedText(initialDraft))
+  const [awaitingPlaceholderStep, setAwaitingPlaceholderStep] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composerPreferencesRef = useRef<ComposerPreferencesHandle>(null)
   const isStandalone = useIsStandalone()
   const isTouchDevice = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0)
-  const composerPlaceholder = getChatComposerPlaceholderText(chatId)
+  const composerPlaceholder = canCancel
+    ? getAwaitingChatComposerPlaceholderText(chatId, awaitingPlaceholderStep)
+    : getChatComposerPlaceholderText(chatId)
   const composerControlsKey = getComposerControlsKey(chatId, activeProvider)
   const composerAreaId = createUiIdentity("chat.composer", "area")
   const submitActionId = createUiIdentity("chat.composer.submit", "action")
@@ -590,6 +594,22 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   useEffect(() => {
     if (!isTouchDevice) textareaRef.current?.focus()
   }, [chatId, isTouchDevice])
+
+  useEffect(() => {
+    if (!canCancel) {
+      setAwaitingPlaceholderStep(0)
+      return
+    }
+
+    setAwaitingPlaceholderStep(0)
+    const intervalId = window.setInterval(() => {
+      setAwaitingPlaceholderStep((step) => step + 1)
+    }, AWAITING_PLACEHOLDER_ROTATE_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [canCancel, chatId])
 
   useEffect(() => {
     if (connectionStatus !== "connected") {
@@ -841,7 +861,10 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                 }}
                 onKeyDown={handleKeyDown}
                 disabled={disabled}
-                className="tinkaria-composer-placeholder min-w-0 flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
+                className={cn(
+                  "tinkaria-composer-placeholder min-w-0 flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none",
+                  canCancel && "tinkaria-composer-placeholder-rotating"
+                )}
               />
               {showQueueAction ? (
                 <div className="flex-shrink-0 mb-1 -mr-0.5 flex items-center gap-2 md:mr-0 md:mb-1.5">

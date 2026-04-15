@@ -1,8 +1,14 @@
 ---
 id: adr-20260409-codex-integration-reorganization
-c3-seal: 40e2d0ede2aaeda2c4c90eeb079ae14aa42f7b6a8ac69d56b5ae742cceff4412
+c3-seal: 6dbf94ae4494a8d75b77864baf0c2e30c37ee19bc538e54523405128edaf5f9b
 title: codex-integration-reorganization
 type: adr
+goal: Document codex-integration-reorganization architecture decisions and responsibilities.
 status: proposed
 date: "2026-04-09"
 ---
+
+# codex-integration-reorganization
+## Goal
+
+Document codex-integration-reorganization architecture decisions and responsibilities.

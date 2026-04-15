@@ -1,8 +1,14 @@
 ---
 id: adr-20260406-remove-chat-navbar-folder-diff
-c3-seal: c36be0839f18d09fa6d2ba00de35b0acdde11f7e0a560616cffea2ad0c87c252
+c3-seal: 8d47743fb56b40d93993e389516baae0e91898dea647e2f504ac66651b24e03e
 title: remove-chat-navbar-folder-diff
 type: adr
+goal: Document remove-chat-navbar-folder-diff architecture decisions and responsibilities.
 status: implemented
 date: "2026-04-06"
 ---
+
+# remove-chat-navbar-folder-diff
+## Goal
+
+Document remove-chat-navbar-folder-diff architecture decisions and responsibilities.

@@ -1,6 +1,6 @@
 ---
 id: c3-227
-c3-seal: 2cd278d33b731800fb469c149e8cb478ceea723ac107f860933f7c65ecf659c6
+c3-seal: eb381fb78846a2bbef8dd17712809faceca30b120f7f6fa587e392a0e25dd188
 title: extension-router
 type: component
 category: feature
@@ -13,38 +13,58 @@ uses:
     - rule-rule-bun-runtime
 ---
 
+# extension-router
 ## Goal
 
 Server-side extension infrastructure — filesystem detection, route multiplexing, and three first-party extension handlers (c3 architecture via c3x CLI, agents config via file parsing, code manifests via language-specific parsers).
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-2 |
+| Role | Own extension-router behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep extension-router decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for extension-router so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | HTTP requests on /api/ext/* | c3-204 |
-| IN | Project filesystem for detection probes | c3-213 |
-| OUT | DetectionResult[] for extension discovery | c3-120 |
-| OUT | Extension-specific JSON data | c3-120 |
-## Related Refs
+| Preconditions | Parent container context is loaded before extension-router behavior is changed. | rule-error-extraction |
+| Inputs | Accept only the files, commands, data, or calls that belong to extension-router ownership. | rule-error-extraction |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | rule-error-extraction |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | rule-error-extraction |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-ref-tailwind-theming | N/A (server-side) |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks extension-router to deliver its documented responsibility. | rule-error-extraction |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | rule-error-extraction |
+| Alternate paths | When a request falls outside extension-router ownership, hand it to the parent or sibling component. | rule-error-extraction |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | rule-error-extraction |
+## Governance
 
-| Rule | Role |
-| --- | --- |
-| rule-error-extraction | error instanceof Error ? error.message : String(error) in catch blocks |
-| rule-prefixed-logging | LOG_PREFIX constant for all log output |
-| rule-graceful-fallbacks | Handle missing c3x, missing files, malformed JSON |
-| rule-rule-bun-runtime | Bun.spawn for c3x, Bun.file for reads |
-## Code Map
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| rule-error-extraction | rule | Governs extension-router behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-| File | Purpose |
-| --- | --- |
-| src/server/extension-router.ts | Route multiplexer + filesystem detection |
-| src/server/extensions.config.ts | Extension registry |
-| src/server/extensions/c3/server.ts | C3 extension — shells to c3x CLI |
-| src/server/extensions/agents/server.ts | Agents extension — parses CLAUDE.md, skills, agents.md |
-| src/server/extensions/code/server.ts | Code extension — parses package.json, Cargo.toml, go.mod, pyproject.toml |
-| src/shared/extension-types.ts | Shared contract types |
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| extension-router input | IN | Callers must provide context that matches the component goal and parent fit. | c3-2 boundary | c3x lookup plus targeted tests or review. |
+| extension-router output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-2 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

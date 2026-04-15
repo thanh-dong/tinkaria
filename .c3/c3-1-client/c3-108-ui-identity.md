@@ -1,6 +1,6 @@
 ---
 id: c3-108
-c3-seal: 3e9fcb1abc0b207fc78a336f5be3e8f1ffa36e19b4db2d99964cd6efc41cf549
+c3-seal: c22558a2a60292520c59e1033d3733ba398c1337b41995506a677b05e51deb68
 title: ui-identity
 type: component
 category: foundation
@@ -14,27 +14,58 @@ uses:
     - rule-ui-identity-composition
 ---
 
+# ui-identity
 ## Goal
 
 Own semantic UI identity helpers plus the Alt+Shift overlay controller so interactive client surfaces expose stable `data-ui-id` hooks that map back to C3 screen/component ownership.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
-| --- | --- | --- |
-| IN | Pointer and keyboard events from the outer app shell | c3-101 |
-| IN | Semantic ui-id tags emitted by chat, sidebar, and home screen surfaces | c3-110 |
-| IN | Semantic ui-id tags emitted by project discovery and homepage surfaces | c3-117 |
-| IN | Semantic ui-id tags emitted by sidebar rows, project groups, and session picker surfaces | c3-113 |
-| OUT | Alt+Shift overlay stack, copyable ui ids, and shared identity helpers | c3-1 |
-## Related Rules
-
-| Rule | Constraint |
+| Field | Value |
 | --- | --- |
-| rule-bun-test-conventions | Keep identity helpers and overlay behavior regression-tested. |
-| rule-react-no-effects | Keep the overlay controller constrained to external event synchronization rather than view-derived effects. |
-| rule-rule-strict-typescript | Preserve stable typed identity maps and helper contracts. |
-| rule-ui-identity-composition |  |
-## Container Connection
+| Parent | c3-1 |
+| Role | Own ui-identity behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep ui-identity decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
 
-Part of c3-1 (client). This is the client-side identity spine: shared helpers mint semantic `data-ui-id` values, the app-shell listens for Alt+Shift, and the overlay reveals the nearest tagged ownership path so screen discovery can jump straight into C3.
+Provide durable agent-ready documentation for ui-identity so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Preconditions | Parent container context is loaded before ui-identity behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to ui-identity ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
+
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks ui-identity to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside ui-identity ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
+
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs ui-identity behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
+
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| ui-identity input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| ui-identity output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

@@ -1,8 +1,14 @@
 ---
 id: adr-20260401-fix-first-chat-entry-duplication
-c3-seal: 033b982f135ee83a7f36193d2ed718041599b1d28aa5ec0b28f47f755add18f5
+c3-seal: 338ea40097b44e566e44b60fa4cae9c3a6101662fb5b2e3694214f1ade0ac2d3
 title: fix-first-chat-entry-duplication
 type: adr
+goal: Document fix-first-chat-entry-duplication architecture decisions and responsibilities.
 status: proposed
 date: "2026-04-01"
 ---
+
+# fix-first-chat-entry-duplication
+## Goal
+
+Document fix-first-chat-entry-duplication architecture decisions and responsibilities.

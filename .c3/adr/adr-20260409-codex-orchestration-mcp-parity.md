@@ -1,8 +1,14 @@
 ---
 id: adr-20260409-codex-orchestration-mcp-parity
-c3-seal: fd1024bdbd6ce021ed334374f66eb2f1234096703f8335f6f8bc9b28c50f9daa
+c3-seal: f83c699b412fb6facb25ad0a9cab0dfe2b9580781cdc334984d4c0f17fd7a751
 title: codex-orchestration-mcp-parity
 type: adr
+goal: Document codex-orchestration-mcp-parity architecture decisions and responsibilities.
 status: implemented
 date: "2026-04-09"
 ---
+
+# codex-orchestration-mcp-parity
+## Goal
+
+Document codex-orchestration-mcp-parity architecture decisions and responsibilities.

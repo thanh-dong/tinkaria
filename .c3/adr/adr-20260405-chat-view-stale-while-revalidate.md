@@ -1,8 +1,14 @@
 ---
 id: adr-20260405-chat-view-stale-while-revalidate
-c3-seal: 4922f7fa7468905bfa8dcefa39ade812f88f7f9c6091016c59d93c91c9a83757
+c3-seal: 183c33ef8cd1af3f95f5c25804540f145ec299e509925ca48e9f18ac2c95ae8a
 title: chat-view-stale-while-revalidate
 type: adr
+goal: Document chat-view-stale-while-revalidate architecture decisions and responsibilities.
 status: implemented
 date: "2026-04-05"
 ---
+
+# chat-view-stale-while-revalidate
+## Goal
+
+Document chat-view-stale-while-revalidate architecture decisions and responsibilities.

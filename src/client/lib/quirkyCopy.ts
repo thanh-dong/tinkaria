@@ -35,6 +35,11 @@ function selectPhrase(pool: readonly string[], seed: string): string {
   return pool[hashSeed(seed) % pool.length]
 }
 
+function selectPhraseAtStep(pool: readonly string[], seed: string, step: number): string {
+  const normalizedStep = Number.isFinite(step) ? Math.max(0, Math.trunc(step)) : 0
+  return pool[(hashSeed(seed) + normalizedStep) % pool.length]
+}
+
 const EMPTY_STATE_SPECS = [
   { frame: "What are we %?", parts: ["tink", "ar", "ing"] },
   { frame: "What are we % up?", parts: ["scrom", "m", "ing"] },
@@ -70,4 +75,15 @@ export function getChatEmptyStateText(chatId: string | null | undefined): string
 
 export function getChatComposerPlaceholderText(chatId: string | null | undefined): string {
   return selectPhrase(CHAT_COMPOSER_PLACEHOLDER_POOL, `${chatId ?? "default"}:composer-placeholder`)
+}
+
+export function getAwaitingChatComposerPlaceholderText(
+  chatId: string | null | undefined,
+  step: number
+): string {
+  return selectPhraseAtStep(
+    CHAT_COMPOSER_PLACEHOLDER_POOL,
+    `${chatId ?? "default"}:composer-placeholder`,
+    step
+  )
 }

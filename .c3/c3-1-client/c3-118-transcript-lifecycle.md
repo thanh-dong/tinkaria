@@ -1,6 +1,6 @@
 ---
 id: c3-118
-c3-seal: a1cf938b8cea8637d3047d2e19787830cf294b22973fc0095d9364f3c47f36d3
+c3-seal: c97dc44f4127157bf3f0da7d04e8c0fab133be127ff8ef46b6569369f62128c2
 title: transcript-lifecycle
 type: component
 category: feature
@@ -17,123 +17,58 @@ uses:
     - rule-transcript-boundary-regressions
 ---
 
+# transcript-lifecycle
 ## Goal
 
 Own live transcript ingestion on the client: cache restore, snapshot/tail fetch, backfill, event buffering, incremental hydration, RAF batching, and message-array handoff to the transcript renderer.
 
-### Hook API
+## Parent Fit
 
-`useTranscriptLifecycle(args)` returns:
+| Field | Value |
+| --- | --- |
+| Parent | c3-1 |
+| Role | Own transcript-lifecycle behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep transcript-lifecycle decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
 
-| Field | Type | Purpose |
+Provide durable agent-ready documentation for transcript-lifecycle so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| messages | HydratedTranscriptMessage[] | Hydrated message array for rendering |
-| messagesRef | RefObject | Stable ref synced via useLayoutEffect |
-| messageCountRef | RefObject number | Total entry count from server |
-| chatSnapshot | ChatSnapshot or null | Latest chat metadata snapshot |
-| orchestrationHierarchy | OrchestrationHierarchySnapshot or null | Delegated session tree |
-| chatReady | boolean | True once initial data is available for rendering |
-### Lifecycle Phases
+| Preconditions | Parent container context is loaded before transcript-lifecycle behavior is changed. | ref-live-transcript-render-contract |
+| Inputs | Accept only the files, commands, data, or calls that belong to transcript-lifecycle ownership. | ref-live-transcript-render-contract |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-live-transcript-render-contract |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-live-transcript-render-contract |
+## Business Flow
 
-The hook executes five ordered phases when a chat becomes active:
-
-**Phase 1 — Cache Restore** (immediate, synchronous feel)
-
-1. Call `getCachedChat(activeChatId)` on mount
-Call `getCachedChat(activeChatId)` on mount
-
-2. If cache exists: restore hydrator state, set messages, set `chatReady = true` immediately
-If cache exists: restore hydrator state, set messages, set `chatReady = true` immediately
-
-3. Stale cached content renders while fresh data loads — no blank screen
-Stale cached content renders while fresh data loads — no blank screen
-
-4. Hydrator's `seenEntryIds` set prevents duplicate processing when fresh entries arrive
-**Phase 2 — Socket Subscription + Snapshot**
-Hydrator's `seenEntryIds` set prevents duplicate processing when fresh entries arrive
-**Phase 2 — Socket Subscription + Snapshot**
-
-5. Subscribe to socket channel `{ type: "chat", chatId }`
-Subscribe to socket channel `{ type: "chat", chatId }`
-
-6. Wait for snapshot callback containing `messageCount`
-Wait for snapshot callback containing `messageCount`
-
-7. If no snapshot arrives within `SNAPSHOT_RECOVERY_TIMEOUT_MS`, trigger `fetchTailFallback()` which fetches from offset 0
-**Phase 3 — Tail Fetch + Backfill**
-If no snapshot arrives within `SNAPSHOT_RECOVERY_TIMEOUT_MS`, trigger `fetchTailFallback()` which fetches from offset 0
-**Phase 3 — Tail Fetch + Backfill**
-
-8. `fetchTail(messageCount)` computes offset via `computeTailOffset(messageCount)`
-`fetchTail(messageCount)` computes offset via `computeTailOffset(messageCount)`
-
-9. Fetches `fetchTranscriptRange({ socket, chatId, offset, limit: TRANSCRIPT_TAIL_SIZE })`
-Fetches `fetchTranscriptRange({ socket, chatId, offset, limit: TRANSCRIPT_TAIL_SIZE })`
-
-10. Processes entries through `processTranscriptMessages(entries)` for preview
-Processes entries through `processTranscriptMessages(entries)` for preview
-
-11. If window needs backfill (entries reference earlier context), loops to fetch earlier chunks and prepend
-If window needs backfill (entries reference earlier context), loops to fetch earlier chunks and prepend
-
-12. Calls `flushTail(entries, "fetched")` to commit
-**Phase 4 — Buffer Flush**
-Calls `flushTail(entries, "fetched")` to commit
-**Phase 4 — Buffer Flush**
-
-13. Before Phase 3 completes, live events arriving via socket are buffered in a `buffer: TranscriptEntry[]` array
-Before Phase 3 completes, live events arriving via socket are buffered in a `buffer: TranscriptEntry[]` array
-
-14. `flushTail()` sets `initialFetchDone = true`, merges `[...fetchedEntries, ...buffer]`
-`flushTail()` sets `initialFetchDone = true`, merges `[...fetchedEntries, ...buffer]`
-
-15. Resets hydrator only if NOT restored from cache (avoids losing cache state)
-Resets hydrator only if NOT restored from cache (avoids losing cache state)
-
-16. Hydrates all combined entries, clears buffer
-**Phase 5 — Streaming (steady state)**
-Hydrates all combined entries, clears buffer
-**Phase 5 — Streaming (steady state)**
-
-17. Each incoming event calls `hydrator.hydrate(entry)`
-Each incoming event calls `hydrator.hydrate(entry)`
-
-18. RAF batching: if no pending frame, schedule `requestAnimationFrame`
-RAF batching: if no pending frame, schedule `requestAnimationFrame`
-
-19. Inside RAF callback: call `hydrator.getMessages()` once, `setMessages()` once
-Inside RAF callback: call `hydrator.getMessages()` once, `setMessages()` once
-
-20. Multiple events within one frame coalesce into a single React render
-Multiple events within one frame coalesce into a single React render
-
-### Hydration Mechanics (parseTranscript.ts)
-
-The `IncrementalHydrator` maintains closure state:
-
-- `pendingToolCalls`: Map keyed by toolId, holding `{ hydrated: HydratedToolCall, normalized: NormalizedToolCall }`
-- `messages`: HydratedTranscriptMessage[]
-- `seenEntryIds`: Set for deduplication
-- `dirty`: boolean controlling array identity
-**Critical mutation pattern for tool_result:**
-1. `tool_call` entry arrives → hydrated, stored in `pendingToolCalls` map
-2. `tool_result` entry arrives → looks up pending call by `toolId`
-3. Attaches result to hydrated tool call **in-place** (mutation): `pendingCall.hydrated.result = ...`
-4. Returns `null` — tool_result does NOT become a separate message
-5. Sets `dirty = true` so `getMessages()` creates `[...messages]` — new array reference triggers React repaint
-This in-place mutation + new-array-ref pattern is the key invariant. Breaking it (e.g., forgetting to set dirty) silently loses tool results in the UI.
-### Unmount + Cache Save
-
-On unmount or chat switch: saves current hydrator, messages, messageCount, and timestamp via `setCachedChat()` so next visit starts from Phase 1 cache restore.
-
-## Dependencies
-
-| Direction | What | From/To |
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | Chat snapshots and transcript events from WebSocket/NATS client state | c3-110 |
-| IN | Shared transcript entry and tool result shapes | c3-204 |
-| OUT | Hydrated transcript messages and message-count/cache state | c3-119 |
-| OUT | Structured artifact tool results for present_content render path | c3-106 |
-## Container Connection
+| Actor / caller | Agent, command, or workflow asks transcript-lifecycle to deliver its documented responsibility. | ref-live-transcript-render-contract |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-live-transcript-render-contract |
+| Alternate paths | When a request falls outside transcript-lifecycle ownership, hand it to the parent or sibling component. | ref-live-transcript-render-contract |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-live-transcript-render-contract |
+## Governance
 
-Part of c3-1 (client). This component explains why live transcript state is not just route state: it bridges server event order into stable hydrated UI messages before rendering decisions happen.
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-live-transcript-render-contract | ref | Governs transcript-lifecycle behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
+
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| transcript-lifecycle input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| transcript-lifecycle output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import {
+  getAwaitingChatComposerPlaceholderText,
+  getChatComposerPlaceholderText,
+} from "../../lib/quirkyCopy"
+import {
   getComposerActionDisabledState,
   getQueueActionDisabledState,
   getComposerControlsKey,
@@ -29,6 +33,18 @@ describe("getComposerControlsKey", () => {
     expect(getComposerControlsKey("chat-1", "codex")).toBe("chat-1:codex")
     expect(getComposerControlsKey("chat-1", "claude")).toBe("chat-1:claude")
     expect(getComposerControlsKey("chat-1", "codex")).not.toBe(getComposerControlsKey("chat-1", "claude"))
+  })
+})
+
+describe("awaiting composer placeholder", () => {
+  test("rotates through the curated composer placeholder pool while preserving the stable first line", () => {
+    const first = getChatComposerPlaceholderText("chat-1")
+    const second = getAwaitingChatComposerPlaceholderText("chat-1", 1)
+    const later = getAwaitingChatComposerPlaceholderText("chat-1", 2)
+
+    expect(getAwaitingChatComposerPlaceholderText("chat-1", 0)).toBe(first)
+    expect(second).not.toBe(first)
+    expect(later).not.toBe(second)
   })
 })
 

@@ -1,6 +1,6 @@
 ---
 id: c3-107
-c3-seal: 9ccaf4739e58c34a414fd1a1ce4ec2bc648c7596a34bb4450dc74db79fdf2b29
+c3-seal: 53fc11c2049796e47f72045c27b44033214401038454843bbd72b0b5b1573a38
 title: rich-content
 type: component
 category: foundation
@@ -20,39 +20,58 @@ uses:
     - rule-transcript-boundary-regressions
 ---
 
+# rich-content
 ## Goal
 
 Shared rich-content viewer primitives for transcript and preview artifacts, including overlays, embedded renders, remote iframe-style embeds, toolbar controls, table of contents, and markdown hints.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-1 |
+| Role | Own rich-content behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep rich-content decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for rich-content so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | Rich artifact source payloads from transcript and file preview flows | c3-111 |
-| IN | Shared UI primitives used by overlays and toolbars | c3-104 |
-| OUT | Reusable overlay and viewer building blocks for transcript artifacts, including Diashort and other direct embeds | c3-106 |
-| OUT | Reusable overlay and viewer building blocks for local file preview and other message surfaces | c3-111 |
-## Related Refs
+| Preconditions | Parent container context is loaded before rich-content behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to rich-content ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-component-identity-mapping |  |
-| ref-responsive-modal-pattern |  |
-| ref-mcp-app-hosting |  |
-| ref-live-transcript-render-contract |  |
-| recipe-agent-turn-render-flow |  |
-| c3-204 |  |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks rich-content to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside rich-content ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
 
-| Rule | Constraint |
-| --- | --- |
-| rule-bun-test-conventions | Overlay, hint, render/source mode, and embed behavior stay regression-tested |
-| rule-react-no-effects | Viewer primitives stay declarative and reusable |
-| rule-rule-strict-typescript | Artifact viewer props and content modes stay strongly typed |
-| rule-error-extraction |  |
-| rule-transcript-boundary-regressions |  |
-## Container Connection
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs rich-content behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Part of c3-1 (client). This is the reusable rich-artifact rendering layer underneath transcript cards and preview modals, so new structured content features can reuse one visual/runtime contract instead of bespoke shells, including direct remote embeds when a hosted artifact is more useful than raw source.
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| rich-content input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| rich-content output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
 
-Pug support here is intentionally exposed only as a shorter form of HTML for rich-content authorship. Treat `format: "pug"` and fenced `pug` blocks as shorthand for static/safe HTML markup, not as a general Pug application engine. The supported subset is limited to the copied Puggy renderer: elements, selector shorthand, attributes, text/interpolation, simple conditionals/loops/mixins/virtual modules, and safety diagnostics. Do not promise arbitrary JavaScript, filters, filesystem includes, or full Pug compatibility.
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

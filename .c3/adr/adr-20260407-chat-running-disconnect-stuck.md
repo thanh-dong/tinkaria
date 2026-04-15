@@ -1,8 +1,14 @@
 ---
 id: adr-20260407-chat-running-disconnect-stuck
-c3-seal: 4220542bef4d451ac53d792123e20a8ff50ac33f2f121f35a4424b38c5e00c02
+c3-seal: eae1dccdf41d1f4c9f02b845abcd6e42009de67f038978cc4bd14ad9c7885d09
 title: chat-running-disconnect-stuck
 type: adr
+goal: Document chat-running-disconnect-stuck architecture decisions and responsibilities.
 status: implemented
 date: "2026-04-07"
 ---
+
+# chat-running-disconnect-stuck
+## Goal
+
+Document chat-running-disconnect-stuck architecture decisions and responsibilities.

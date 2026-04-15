@@ -1,6 +1,6 @@
 ---
 id: adr-20260409-speed-up-transcript-delivery
-c3-seal: 59ee3c907ee5f0c508bf930c22c1041ebadf36422a0a30e3d5c147cdfd1de09c
+c3-seal: 4250a32a72df614bd337942b8956c9b3e3d0cb9d6c5465f0b03aaee2805fa6a6
 title: speed-up-transcript-delivery
 type: adr
 goal: 'Speed up transcript delivery end-to-end by addressing three high-impact bottlenecks:'
@@ -44,7 +44,6 @@ Speed up transcript delivery end-to-end by addressing three high-impact bottlene
 **Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
 **Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
 **Decouple NATS publish from disk write** — `onMessageAppended` fires inside `writeChain.then()`, meaning every transcript entry waits for `appendFile` before NATS publish. Fire publish immediately, let disk I/O continue in background.
-
 2. **Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
 **Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
 **Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
@@ -77,7 +76,6 @@ Speed up transcript delivery end-to-end by addressing three high-impact bottlene
 **Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
 **Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
 **Batch client `setMessages()` calls** — Currently one React state update per NATS message (10-20/sec during streaming). Use `requestAnimationFrame` accumulator to batch hydrations and render once per frame (~60fps cap).
-
 3. **Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
 **Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
 **Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
@@ -110,7 +108,6 @@ Speed up transcript delivery end-to-end by addressing three high-impact bottlene
 **Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
 **Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
 **Replace `readFileSync` with async read** — `loadTranscriptFromDisk()` uses synchronous file read, blocking the Bun event loop during initial transcript load.
-
 ### Secondary Fixes
 
 1. Expand single-slot transcript cache to small LRU (5 chats)

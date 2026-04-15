@@ -1,6 +1,6 @@
 ---
 id: c3-120
-c3-seal: 8a74e8642a5c41908bf75474a2a74df7bbd9615ee32c45b245d09b36abede578
+c3-seal: f5769bdc7959bf208af97fe3d12235d94f790d6cf8f838d22b5b723ac4c32045
 title: extensions
 type: component
 category: feature
@@ -16,54 +16,58 @@ uses:
     - rule-ui-identity-composition
 ---
 
+# extensions
 ## Goal
 
 Extension host for the Project Page — auto-detects relevant project extensions via filesystem probes, renders them as SegmentedControl tabs, and renders selected C3 entity documents as full markdown from c3x read --full. Lazy-loads extension React components (c3 architecture, agents config, code overview). User preferences (enable/disable) override detection results globally.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-1 |
+| Role | Own extensions behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep extensions decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for extensions so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | SidebarData.workspaceGroups (localPath resolution) | c3-113 |
-| IN | DetectionResult[] from /api/ext/detect | c3-227 |
-| IN | Extension data from /api/ext/:id/* routes | c3-227 |
-| IN | ExtensionPreferencesSnapshot via WS subscription | c3-227 |
-| IN | SegmentedControl tab component | c3-104 |
-| OUT | Extension tab views rendered in ProjectPage | c3-101 |
-| OUT | ExtensionsTab settings UI in SettingsPage | c3-101 |
-## Related Refs
+| Preconditions | Parent container context is loaded before extensions behavior is changed. | ref-mobile-tabbed-page-pattern |
+| Inputs | Accept only the files, commands, data, or calls that belong to extensions ownership. | ref-mobile-tabbed-page-pattern |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-mobile-tabbed-page-pattern |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-mobile-tabbed-page-pattern |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-mobile-tabbed-page-pattern | Compact header, alwaysShowLabels, no duplicate headings |
-| ref-ref-tailwind-theming | Semantic CSS variable tokens only |
-| ref-screen-composition-patterns | Card vocabulary for browse/discovery surfaces |
-| ref-ref-event-sourcing | Extension preferences persisted as event-sourced JSONL |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks extensions to deliver its documented responsibility. | ref-mobile-tabbed-page-pattern |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-mobile-tabbed-page-pattern |
+| Alternate paths | When a request falls outside extensions ownership, hand it to the parent or sibling component. | ref-mobile-tabbed-page-pattern |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-mobile-tabbed-page-pattern |
+## Governance
 
-| Rule | Role |
-| --- | --- |
-| rule-ui-component-usage | Use shared UI primitives for form elements |
-| rule-error-extraction | error instanceof Error ? error.message : String(error) |
-| rule-prefixed-logging | LOG_PREFIX for console.warn |
-| rule-ui-identity-composition | C3-owned data-ui-id and data-ui-c3 metadata for project extension surfaces |
-## Extension Preferences (Client)
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-mobile-tabbed-page-pattern | ref | Governs extensions behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Three-level visibility hierarchy determines whether an extension appears in a ProjectPage:
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| extensions input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| extensions output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
 
-1. **Manifest declares** — extension exists in `clientExtensions` / `serverExtensions` registries
-2. **Filesystem detects** — `/api/ext/detect` probes the project path; only detected extensions proceed
-3. **User preferences override** — if `pref.enabled === false`, the extension is hidden even when detected
-`useExtensionPreferencesSubscription` subscribes to the `extension-preferences` WebSocket topic and returns an `ExtensionPreferencesSnapshot`. ProjectPage's `activeExtensions` memo combines detection results with preferences: `detectedIds.includes(ext.id) && pref?.enabled !== false`.
-`ExtensionsTab` (rendered in SettingsPage) lists all registered extensions with toggle switches. Toggling sends `extension.preference.set` command via the socket transport. Preferences are global (not per-project) in v1.
-## Code Map
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
 
-| File | Purpose |
-| --- | --- |
-| src/client/app/ProjectPage.tsx | Route component — detection fetch, preference-aware filtering, tab bar, Suspense |
-| src/client/app/ExtensionsTab.tsx | Settings UI — lists extensions with enable/disable toggles |
-| src/client/app/useExtensionPreferencesSubscription.ts | WS subscription hook for ExtensionPreferencesSnapshot |
-| src/client/extensions.config.ts | Extension registry with lazy import() |
-| src/client/extensions/c3/client.tsx | C3 architecture tree/grid viewer |
-| src/client/extensions/agents/client.tsx | Agent config structured cards |
-| src/client/extensions/code/client.tsx | Language-specific project dashboard |
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

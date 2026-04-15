@@ -1,6 +1,6 @@
 ---
 id: c3-104
-c3-seal: af6f392c375cbb381ee79dab3fe27aaa24b636bee4ee3996565ad1674d805d4c
+c3-seal: 9e443987ba31e09f8beb874dcd9d7b471b7ac51c834cd0923b65c9079346bf5e
 title: ui-primitives
 type: component
 category: foundation
@@ -16,32 +16,58 @@ uses:
     - rule-rule-strict-typescript
 ---
 
+# ui-primitives
 ## Goal
 
 Expose a library of Radix-based headless UI primitives (Button, Card, Dialog, Popover, ScrollArea, Textarea, Input, Select, Tooltip, Kbd, ContextMenu, Resizable, AppDialog, AnimatedShinyText, SegmentedControl, SettingsHeaderButton) styled with Tailwind and class-variance-authority.
 
-## Dependencies
+## Parent Fit
 
-| Direction | What | From/To |
+| Field | Value |
+| --- | --- |
+| Parent | c3-1 |
+| Role | Own ui-primitives behavior inside the parent container without taking over sibling responsibilities. |
+| Boundary | Keep ui-primitives decisions inside this component and escalate container-wide policy to the parent. |
+| Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
+## Purpose
+
+Provide durable agent-ready documentation for ui-primitives so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+
+## Foundational Flow
+
+| Aspect | Detail | Reference |
 | --- | --- | --- |
-| IN | CSS variables from theme | c3-103 |
-| OUT | UI components to all feature components | c3-110 |
-| OUT | TooltipProvider, AppDialogProvider to app shell | c3-101 |
-## Related Refs
+| Preconditions | Parent container context is loaded before ui-primitives behavior is changed. | ref-component-identity-mapping |
+| Inputs | Accept only the files, commands, data, or calls that belong to ui-primitives ownership. | ref-component-identity-mapping |
+| State / data | Preserve explicit state boundaries and avoid hidden cross-component ownership. | ref-component-identity-mapping |
+| Shared dependencies | Use lower-layer helpers and cited references instead of duplicating shared policy. | ref-component-identity-mapping |
+## Business Flow
 
-| Ref | Role |
-| --- | --- |
-| ref-ref-radix-primitives | Headless accessible UI primitives (tooltip, dialog, popover, scroll-area, context-menu, select) |
-| ref-ref-tailwind-theming | Tailwind class-based styling with dark mode support |
-| ref-component-identity-mapping |  |
-| ref-responsive-modal-pattern |  |
-| ref-mobile-tabbed-page-pattern |  |
-## Related Rules
+| Aspect | Detail | Reference |
+| --- | --- | --- |
+| Actor / caller | Agent, command, or workflow asks ui-primitives to deliver its documented responsibility. | ref-component-identity-mapping |
+| Primary path | Follow the component goal, honor parent fit, and emit behavior through the documented contract. | ref-component-identity-mapping |
+| Alternate paths | When a request falls outside ui-primitives ownership, hand it to the parent or sibling component. | ref-component-identity-mapping |
+| Failure behavior | Surface mismatch through check, tests, lookup, or review evidence before derived work ships. | ref-component-identity-mapping |
+## Governance
 
-| Rule | Constraint |
-| --- | --- |
-| rule-rule-strict-typescript | Strict typing enforced across all source files |
-| rule-react-no-effects |  |
-## Container Connection
+| Reference | Type | Governs | Precedence | Notes |
+| --- | --- | --- | --- | --- |
+| ref-component-identity-mapping | ref | Governs ui-primitives behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+## Contract
 
-Part of c3-1 (client). Foundation layer — every feature component imports from this library. No business logic lives here.
+| Surface | Direction | Contract | Boundary | Evidence |
+| --- | --- | --- | --- | --- |
+| ui-primitives input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
+| ui-primitives output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+## Change Safety
+
+| Risk | Trigger | Detection | Required Verification |
+| --- | --- | --- | --- |
+| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
+| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+## Derived Materials
+
+| Material | Must derive from | Allowed variance | Evidence |
+| --- | --- | --- | --- |
+| Code, docs, tests, prompts | Goal, Governance, Contract, and Change Safety sections. | Names and framework shape may vary; behavior and boundaries may not. | c3x check, c3x verify, and relevant tests. |

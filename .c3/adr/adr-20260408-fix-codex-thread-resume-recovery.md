@@ -1,6 +1,6 @@
 ---
 id: adr-20260408-fix-codex-thread-resume-recovery
-c3-seal: 3c8b414582c8462683e04369bb10b8be01eba8cda8e0d7968b31e7d852fc0847
+c3-seal: cd48a748c93120507467952a54957c1ac590e6765cf10f7d5ad837f915ef9370
 title: fix-codex-thread-resume-recovery
 type: adr
 goal: Fix codex thread resume failures that cause threads to appear "deleted" with errors like "thread is not rollable".
@@ -52,7 +52,6 @@ Additionally, `startTurnForChat` in `agent.ts` has no error handling for `startS
 **`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
 **`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
 **`src/server/codex-app-server.ts`**: Simplify `isRecoverableResumeError` — ANY `thread/resume` error is recoverable (fall back to `thread/start`). Auth/quota errors don't contain "thread/resume" in the message.
-
 2. **`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
 **`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
 **`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
@@ -85,7 +84,6 @@ Additionally, `startTurnForChat` in `agent.ts` has no error handling for `startS
 **`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
 **`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
 **`src/server/agent.ts`**: Wrap `codexRuntime.startSession()` + `startTurn()` in try/catch within `startTurnForChat`. On failure, record a turn error result and call `recordTurnFailed` so the chat doesn't get stuck.
-
 ## Affects
 
 - c3-216 (codex)
