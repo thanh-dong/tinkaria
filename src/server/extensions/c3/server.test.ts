@@ -5,6 +5,7 @@ import path from "node:path"
 import { buildC3EntityTree, c3Extension } from "./server"
 
 let tempDir: string
+const originalC3xMode = process.env.C3X_MODE
 
 async function makeTempProject(): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), "c3-test-"))
@@ -25,6 +26,11 @@ beforeAll(async () => {
 })
 
 afterEach(async () => {
+  if (originalC3xMode === undefined) {
+    delete process.env.C3X_MODE
+  } else {
+    process.env.C3X_MODE = originalC3xMode
+  }
   if (tempDir) {
     await rm(tempDir, { recursive: true, force: true })
   }
@@ -178,6 +184,29 @@ describe("c3x integration", () => {
           ]),
         }),
       ]),
+    })
+  })
+
+  test("list handler ignores inherited agent output mode", async () => {
+    if (!c3xAvailable) {
+      console.log("SKIP: c3x not available")
+      return
+    }
+
+    process.env.C3X_MODE = "agent"
+    const projectPath = path.resolve(import.meta.dir, "../../../..")
+    const routes = c3Extension.routes({ projectPath })
+    const list = routes.find((r) => r.path === "/list")!
+
+    const req = new Request("http://localhost/api/ext/c3/list?projectPath=" + encodeURIComponent(projectPath))
+    const res = await list.handler(req, {})
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(Array.isArray(body.data)).toBe(true)
+    expect(body.data[0]).toMatchObject({
+      id: "c3-0",
+      type: "system",
     })
   })
 

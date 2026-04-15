@@ -76,14 +76,28 @@ async function resolveC3xPath(): Promise<string | null> {
     // fall through
   }
 
-  const fallback = path.join(
-    homedir(),
-    ".claude/plugins/marketplaces/c3-skill-marketplace/skills/c3/bin/c3x.sh",
-  )
-  const file = Bun.file(fallback)
-  if (await file.exists()) return fallback
+  const fallbacks = [
+    path.join(homedir(), ".agents/skills/c3/bin/c3x.sh"),
+    path.join(
+      homedir(),
+      ".claude/plugins/marketplaces/c3-skill-marketplace/skills/c3/bin/c3x.sh",
+    ),
+  ]
+  for (const fallback of fallbacks) {
+    const file = Bun.file(fallback)
+    if (await file.exists()) return fallback
+  }
 
   return null
+}
+
+function c3xEnv(): Record<string, string> {
+  const env: Record<string, string> = {}
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key === "C3X_MODE" || value === undefined) continue
+    env[key] = value
+  }
+  return env
 }
 
 async function runC3x(
@@ -100,7 +114,7 @@ async function runC3x(
 
   const proc = Bun.spawn(cmd, {
     cwd: projectPath,
-    env: { ...process.env, C3X_MODE: "agent" },
+    env: c3xEnv(),
     stdout: "pipe",
     stderr: "pipe",
   })
@@ -141,7 +155,7 @@ function handleRead(projectPath: string): ExtensionRoute["handler"] {
     }
 
     try {
-      const { stdout, exitCode } = await runC3x(["read", id, "--full"], projectPath)
+      const { stdout, exitCode } = await runC3x(["read", id, "--full", "--json"], projectPath)
       if (exitCode !== 0) {
         console.warn(LOG_PREFIX, "c3x read exited with code", exitCode)
         return errorResponse("c3x execution failed", 503)
