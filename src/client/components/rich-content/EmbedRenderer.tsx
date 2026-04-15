@@ -1,7 +1,8 @@
 import { memo, useEffect, useRef, useState } from "react"
+import { render as renderPug } from "../../../shared/puggy"
 import { clampEmbedZoom, useContentViewer } from "./ContentViewerContext"
 
-const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort", "html"])
+const EMBED_LANGUAGES = new Set(["mermaid", "d2", "svg", "iframe", "diashort", "html", "pug"])
 const TAILWIND_BROWSER_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
 const DEFAULT_EMBED_STYLE = "html,body{margin:0;min-height:100%;background:transparent;}body{padding:1rem;font-family:Inter,ui-sans-serif,system-ui,sans-serif;}"
 
@@ -26,6 +27,10 @@ export const EmbedRenderer = memo(function EmbedRenderer({
 
   if (format === "html") {
     return <HtmlEmbed source={source} />
+  }
+
+  if (format === "pug") {
+    return <PugEmbed source={source} />
   }
 
   if (format === "svg") {
@@ -261,6 +266,28 @@ function HtmlEmbed({ source }: { source: string }) {
       )}
     </>
   )
+}
+
+function PugEmbed({ source }: { source: string }) {
+  const rendered = renderPug(source)
+
+  if (!rendered.ok) {
+    return (
+      <div className="space-y-2">
+        <div className="text-xs text-destructive">Pug render error</div>
+        <pre className="whitespace-pre-wrap break-all text-xs font-mono text-destructive">
+          {rendered.diagnostics.map((diagnostic) => (
+            `${diagnostic.code} at ${diagnostic.line}:${diagnostic.column} ${diagnostic.message}`
+          )).join("\n")}
+        </pre>
+        <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
+          {source}
+        </pre>
+      </div>
+    )
+  }
+
+  return <HtmlEmbed source={rendered.html} />
 }
 
 function RemoteEmbed({ format, source }: { format: string; source: string }) {

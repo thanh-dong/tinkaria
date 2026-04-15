@@ -59,6 +59,23 @@ describe("TextMessage", () => {
     expect(html.match(/data-remote-embed="true"/g)?.length).toBe(1)
   })
 
+  test("renders fenced pug blocks as sandboxed rich-content embeds", () => {
+    const html = renderToStaticMarkup(
+      <TextMessage
+        message={createMessage([
+          "```pug",
+          "main",
+          "  h1 Hello",
+          "```",
+        ].join("\n"))}
+      />
+    )
+
+    expect(html).toContain("group/rich-content")
+    expect(html).toContain("srcDoc")
+    expect(html).toContain("&lt;main&gt;&lt;h1&gt;Hello&lt;/h1&gt;&lt;/main&gt;")
+  })
+
 
   test("renders long assistant responses without the old response card title", () => {
     const html = renderToStaticMarkup(

@@ -115,6 +115,34 @@ describe("PresentContentMessage", () => {
     expect(html).toContain("diashort.apps.quickable.co/d/abc123")
   })
 
+  test("renders pug success content through the sandboxed embed renderer", () => {
+    const html = renderToStaticMarkup(
+      <PresentContentMessage
+        message={createMessage({
+          id: "tool-pug",
+          toolId: "tool-pug",
+          input: {
+            title: "Pug Preview",
+            kind: "diagram",
+            format: "pug",
+            source: "main\n  h1 Hello",
+          },
+          result: {
+            accepted: true,
+            title: "Pug Preview",
+            kind: "diagram",
+            format: "pug",
+            source: "main\n  h1 Hello",
+          },
+        })}
+      />
+    )
+
+    expect(html).toContain("Pug Preview")
+    expect(html).toContain("srcDoc")
+    expect(html).toContain("&lt;main&gt;&lt;h1&gt;Hello&lt;/h1&gt;&lt;/main&gt;")
+  })
+
   test("renders code success content in a RichContentBlock", () => {
     const html = renderToStaticMarkup(
       <PresentContentMessage

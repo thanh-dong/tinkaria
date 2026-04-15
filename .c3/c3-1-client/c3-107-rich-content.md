@@ -1,12 +1,13 @@
 ---
 id: c3-107
-c3-seal: 0afc412470af324cb08b311590a6c1a9ffed9381bed0d3d31b19c6cf692ab795
+c3-seal: 9ccaf4739e58c34a414fd1a1ce4ec2bc648c7596a34bb4450dc74db79fdf2b29
 title: rich-content
 type: component
 category: foundation
 parent: c3-1
 goal: Shared rich-content viewer primitives for transcript and preview artifacts, including overlays, embedded renders, remote iframe-style embeds, toolbar controls, table of contents, and markdown hints.
 uses:
+    - c3-204
     - recipe-agent-turn-render-flow
     - ref-component-identity-mapping
     - ref-live-transcript-render-contract
@@ -40,6 +41,7 @@ Shared rich-content viewer primitives for transcript and preview artifacts, incl
 | ref-mcp-app-hosting |  |
 | ref-live-transcript-render-contract |  |
 | recipe-agent-turn-render-flow |  |
+| c3-204 |  |
 ## Related Rules
 
 | Rule | Constraint |
@@ -52,3 +54,5 @@ Shared rich-content viewer primitives for transcript and preview artifacts, incl
 ## Container Connection
 
 Part of c3-1 (client). This is the reusable rich-artifact rendering layer underneath transcript cards and preview modals, so new structured content features can reuse one visual/runtime contract instead of bespoke shells, including direct remote embeds when a hosted artifact is more useful than raw source.
+
+Pug support here is intentionally exposed only as a shorter form of HTML for rich-content authorship. Treat `format: "pug"` and fenced `pug` blocks as shorthand for static/safe HTML markup, not as a general Pug application engine. The supported subset is limited to the copied Puggy renderer: elements, selector shorthand, attributes, text/interpolation, simple conditionals/loops/mixins/virtual modules, and safety diagnostics. Do not promise arbitrary JavaScript, filters, filesystem includes, or full Pug compatibility.

@@ -95,6 +95,7 @@ c3-204:
   - src/shared/dev-ports.ts
   - src/shared/ports.ts
   - src/shared/protocol.ts
+  - src/shared/puggy/**
   - src/shared/tools.ts
   - src/shared/types.ts
 c3-205:

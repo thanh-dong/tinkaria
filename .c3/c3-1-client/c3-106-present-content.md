@@ -1,6 +1,6 @@
 ---
 id: c3-106
-c3-seal: 27b0cce1d1a33e21f8e99e7abbfb8dd30730c87dd7791ace836ea5602ab10df4
+c3-seal: 3dd5c2f0ebf0613e9ddebb56eb8766d0f0c49bdb02ac63f00a0ee80e79880b8a
 title: present-content
 type: component
 category: feature
@@ -50,3 +50,5 @@ Dedicated present_content transcript feature that normalizes typed content artif
 ## Container Connection
 
 Part of c3-1 (client). This is the user-visible structured artifact path in the transcript: Codex or future runtimes can emit bounded content cards or direct embeds, and the client renders them through one dedicated feature instead of treating them as generic tool output.
+
+For `present_content` artifacts with `format: "pug"`, this component does not require server enrichment or a new transcript result shape. The corresponding update is local to the client render path: `c3-106` passes the original artifact source to `c3-107`, and `c3-107` treats Puggy as short-form static/safe HTML. `c3-204` remains the shared contract owner and owns the copied renderer files, but present_content payloads stay unchanged: no `compiledHtml`, no server precompile metadata, and no hydration contract expansion.
