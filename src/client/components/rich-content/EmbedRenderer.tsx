@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { render as renderPug } from "../../../shared/puggy"
 import { clampEmbedZoom, useContentViewer } from "./ContentViewerContext"
 
@@ -233,6 +233,43 @@ function useEmbedState() {
   return { mode, zoom, adjustZoom }
 }
 
+function getEmbedZoomContentStyle(zoom: number): CSSProperties | undefined {
+  return zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined
+}
+
+function ZoomableEmbedViewport({
+  zoom,
+  adjustZoom,
+  children,
+  className,
+}: {
+  zoom: number
+  adjustZoom: (direction: EmbedWheelZoomIntent) => void
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      onWheel={(event) => {
+        const direction = getEmbedWheelZoomIntent(event)
+        if (!direction) return
+        event.preventDefault()
+        adjustZoom(direction)
+      }}
+      data-embed-zoomable="true"
+      className={`overflow-auto overscroll-contain touch-pan-x touch-pan-y rounded-md border border-border/60 bg-background ${className ?? ""}`}
+    >
+      <div
+        data-embed-zoom-content="true"
+        style={getEmbedZoomContentStyle(zoom)}
+        className="min-w-full origin-top-left"
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function HtmlEmbed({ source }: { source: string }) {
   const { mode, zoom, adjustZoom } = useEmbedState()
   const htmlSource = createHtmlEmbedDocument(source)
@@ -240,17 +277,7 @@ function HtmlEmbed({ source }: { source: string }) {
   return (
     <>
       {mode === "render" ? (
-        <div
-          onWheel={(event) => {
-            const direction = getEmbedWheelZoomIntent(event)
-            if (!direction) return
-            event.preventDefault()
-            adjustZoom(direction)
-          }}
-          data-embed-zoomable="true"
-          style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
-          className="overflow-hidden rounded-md border border-border/60 bg-background"
-        >
+        <ZoomableEmbedViewport zoom={zoom} adjustZoom={adjustZoom}>
           <iframe
             data-html-embed="true"
             srcDoc={htmlSource}
@@ -258,7 +285,7 @@ function HtmlEmbed({ source }: { source: string }) {
             sandbox="allow-scripts"
             className="block h-[420px] w-full border-0 bg-background"
           />
-        </div>
+        </ZoomableEmbedViewport>
       ) : (
         <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
           {source}
@@ -306,17 +333,7 @@ function RemoteEmbed({ format, source }: { format: string; source: string }) {
   return (
     <>
       {mode === "render" && embedUrl ? (
-        <div
-          onWheel={(event) => {
-            const direction = getEmbedWheelZoomIntent(event)
-            if (!direction) return
-            event.preventDefault()
-            adjustZoom(direction)
-          }}
-          data-embed-zoomable="true"
-          style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
-          className="overflow-hidden rounded-md border border-border/60 bg-background"
-        >
+        <ZoomableEmbedViewport zoom={zoom} adjustZoom={adjustZoom}>
           <iframe
             data-remote-embed="true"
             data-remote-embed-url={embedUrl}
@@ -324,9 +341,9 @@ function RemoteEmbed({ format, source }: { format: string; source: string }) {
             title="Embedded content"
             sandbox="allow-scripts allow-same-origin"
             referrerPolicy="no-referrer"
-            className="block h-[420px] w-full border-0 bg-background"
+            className="block h-[420px] w-full min-w-[720px] border-0 bg-background sm:min-w-0"
           />
-        </div>
+        </ZoomableEmbedViewport>
       ) : (
         <div className="space-y-2">
           {!embedUrl ? (
@@ -445,26 +462,17 @@ function SvgEmbed({ source }: { source: string }) {
   return (
     <>
       {mode === "render" && parsed.ok ? (
-        <div
-          onWheel={(event) => {
-            const direction = getEmbedWheelZoomIntent(event)
-            if (!direction) return
-            event.preventDefault()
-            adjustZoom(direction)
-          }}
-          data-embed-zoomable="true"
-          style={zoom !== 1 ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : undefined}
-        >
+        <ZoomableEmbedViewport zoom={zoom} adjustZoom={adjustZoom} className="border-0 bg-transparent">
           <img
             data-svg-render="true"
             alt=""
             src={svgDataUrl ?? undefined}
-            className="block h-auto max-h-[320px] max-w-full rounded-md border border-border/60 bg-background p-3 w-auto"
+            className="block h-auto max-h-[320px] max-w-none rounded-md border border-border/60 bg-background p-3 w-auto"
           />
           <script type="text/plain" data-svg-source="true">
             {source}
           </script>
-        </div>
+        </ZoomableEmbedViewport>
       ) : (
         <div className="space-y-2">
           {!parsed.ok ? (
@@ -482,15 +490,20 @@ function SvgEmbed({ source }: { source: string }) {
 function MermaidDiagram({ source }: { source: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const { mode, zoom, adjustZoom } = useEmbedState()
 
   useEffect(() => {
     let cancelled = false
+    if (mode !== "render") return () => {
+      cancelled = true
+    }
 
     async function render() {
       const container = containerRef.current
       if (!container) return
 
       try {
+        setError(null)
         const mermaid = await import("mermaid")
         mermaid.default.initialize({
           startOnLoad: false,
@@ -514,7 +527,7 @@ function MermaidDiagram({ source }: { source: string }) {
     return () => {
       cancelled = true
     }
-  }, [source])
+  }, [mode, source])
 
   if (error) {
     return (
@@ -527,11 +540,21 @@ function MermaidDiagram({ source }: { source: string }) {
     )
   }
 
+  if (mode === "source") {
+    return (
+      <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all">
+        {source}
+      </pre>
+    )
+  }
+
   return (
-    <div
-      ref={containerRef}
-      data-mermaid-source={source}
-      className="flex items-center justify-center min-h-[60px] [&_svg]:max-w-full"
-    />
+    <ZoomableEmbedViewport zoom={zoom} adjustZoom={adjustZoom} className="border-0 bg-transparent">
+      <div
+        ref={containerRef}
+        data-mermaid-source={source}
+        className="inline-flex min-h-[60px] min-w-full items-center justify-center [&_svg]:h-auto [&_svg]:max-w-none"
+      />
+    </ZoomableEmbedViewport>
   )
 }

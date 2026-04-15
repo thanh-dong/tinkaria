@@ -46,6 +46,38 @@ describe("EmbedRenderer", () => {
     expect(html).toContain("data-mermaid-source")
   })
 
+  test("mermaid render participates in embed zoom and pan", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "render", zoom: 1.5 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="mermaid" source="graph TD\n  A --> B" />
+      </ContentViewerContext.Provider>
+    )
+
+    expect(html).toContain('data-embed-zoomable="true"')
+    expect(html).toContain('data-embed-zoom-content="true"')
+    expect(html).toContain("overflow-auto")
+    expect(html).toContain("scale(1.5)")
+  })
+
+  test("mermaid uses context renderMode", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "source", zoom: 1 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="mermaid" source="graph TD\n  A --> B" />
+      </ContentViewerContext.Provider>
+    )
+
+    expect(html).not.toContain("data-mermaid-source")
+    expect(html).toContain("graph TD")
+  })
+
   test("renders d2 fallback with raw source", () => {
     const html = renderToStaticMarkup(
       <EmbedRenderer format="d2" source="x -> y" />
@@ -118,6 +150,24 @@ describe("EmbedRenderer", () => {
 
     expect(html).toContain('data-remote-embed="true"')
     expect(html).toContain('data-remote-embed-url="https://diashort.apps.quickable.co/d/abc123"')
+  })
+
+  test("remote embeds scale inside a scrollable pan viewport", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "render", zoom: 1.5 },
+      dispatch: () => {},
+    }
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="diashort" source="https://diashort.apps.quickable.co/d/abc123" />
+      </ContentViewerContext.Provider>
+    )
+
+    expect(html).toContain('data-embed-zoomable="true"')
+    expect(html).toContain('data-embed-zoom-content="true"')
+    expect(html).toContain("overflow-auto")
+    expect(html).toContain("scale(1.5)")
+    expect(html).not.toContain("overflow-hidden")
   })
 
   test("shows source fallback for invalid remote embed URLs", () => {
