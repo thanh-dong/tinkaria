@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useReducer, useRef, useState, type PointerEvent, type ReactNode } from "react"
+import { createContext, memo, useCallback, useContext, useMemo, useReducer, useRef, useState, type PointerEvent, type ReactNode } from "react"
 import {
   Code,
   FileText,
@@ -37,17 +37,47 @@ const RICH_CONTENT_BLOCK_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
   c3ComponentLabel: "rich-content",
 })
 
+type RichContentChrome = "card" | "inline"
+type RichContentControlsVisibility = "always" | "hover-or-touch"
+
+interface RichContentChromeContextValue {
+  chrome: RichContentChrome
+  controlsVisibility: RichContentControlsVisibility
+}
+
+const DEFAULT_RICH_CONTENT_CHROME: RichContentChromeContextValue = {
+  chrome: "card",
+  controlsVisibility: "always",
+}
+
+const RichContentChromeContext = createContext<RichContentChromeContextValue>(DEFAULT_RICH_CONTENT_CHROME)
+
 interface RichContentBlockProps {
   type: RichContentType
   title?: string
   defaultExpanded?: boolean
   children: ReactNode
   rawContent?: string
-  chrome?: "card" | "inline"
-  controlsVisibility?: "always" | "hover-or-touch"
+  chrome?: RichContentChrome
+  controlsVisibility?: RichContentControlsVisibility
   bodyClassName?: string
 }
 
+function RichContentChromeProvider({
+  children,
+  chrome,
+  controlsVisibility = "always",
+}: {
+  children: ReactNode
+  chrome: RichContentChrome
+  controlsVisibility?: RichContentControlsVisibility
+}) {
+  return (
+    <RichContentChromeContext.Provider value={useMemo(() => ({ chrome, controlsVisibility }), [chrome, controlsVisibility])}>
+      {children}
+    </RichContentChromeContext.Provider>
+  )
+}
 
 export const RichContentBlock = memo(function RichContentBlock({
   type,
@@ -55,10 +85,13 @@ export const RichContentBlock = memo(function RichContentBlock({
   defaultExpanded = false,
   children,
   rawContent,
-  chrome = "card",
-  controlsVisibility = "always",
+  chrome,
+  controlsVisibility,
   bodyClassName,
 }: RichContentBlockProps) {
+  const chromeContext = useContext(RichContentChromeContext)
+  const resolvedChrome = chrome ?? chromeContext.chrome
+  const resolvedControlsVisibility = controlsVisibility ?? chromeContext.controlsVisibility
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [overlayOpen, setOverlayOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -73,11 +106,11 @@ export const RichContentBlock = memo(function RichContentBlock({
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   const handlePointerDownCapture = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    if (controlsVisibility !== "hover-or-touch" || event.pointerType !== "touch") {
+    if (resolvedControlsVisibility !== "hover-or-touch" || event.pointerType !== "touch") {
       return
     }
     rootRef.current?.focus()
-  }, [controlsVisibility])
+  }, [resolvedControlsVisibility])
 
   const handleCopy = useCallback(async () => {
     if (!rawContent) return
@@ -156,13 +189,13 @@ export const RichContentBlock = memo(function RichContentBlock({
         ref={rootRef}
         className={cn(
           "group/rich-content min-w-0",
-          chrome === "card" ? "rounded-lg border border-border overflow-hidden" : "relative w-full"
+          resolvedChrome === "card" ? "rounded-lg border border-border overflow-hidden" : "relative w-full"
         )}
         onPointerDownCapture={handlePointerDownCapture}
-        tabIndex={controlsVisibility === "hover-or-touch" ? -1 : undefined}
+        tabIndex={resolvedControlsVisibility === "hover-or-touch" ? -1 : undefined}
         {...getUiIdentityAttributeProps(RICH_CONTENT_BLOCK_UI_DESCRIPTOR)}
       >
-        {chrome === "card" ? (
+        {resolvedChrome === "card" ? (
           <>
             <div
               className={cn(
@@ -192,7 +225,7 @@ export const RichContentBlock = memo(function RichContentBlock({
             <div
               className={cn(
                 "absolute right-0 top-0 z-10",
-                controlsVisibility === "hover-or-touch" && "opacity-0 pointer-events-none transition-opacity duration-150 group-hover/rich-content:opacity-100 group-hover/rich-content:pointer-events-auto group-focus-within/rich-content:opacity-100 group-focus-within/rich-content:pointer-events-auto"
+                resolvedControlsVisibility === "hover-or-touch" && "opacity-0 pointer-events-none transition-opacity duration-150 group-hover/rich-content:opacity-100 group-hover/rich-content:pointer-events-auto group-focus-within/rich-content:opacity-100 group-focus-within/rich-content:pointer-events-auto"
               )}
             >
               <div className="inline-flex items-center gap-0.5 rounded-full border border-border/70 bg-background/85 px-1 py-0.5 shadow-sm backdrop-blur-sm">
@@ -223,3 +256,4 @@ function getRichContentBlockUiIdentityDescriptor() {
 }
 
 export { CONTENT_BLOCK_BODY_CLASS_NAME, getRichContentBlockUiIdentityDescriptor }
+export { RichContentChromeProvider }

@@ -5,6 +5,7 @@ import {
   CONTENT_BLOCK_BODY_CLASS_NAME,
   getRichContentBlockUiIdentityDescriptor,
   RichContentBlock,
+  RichContentChromeProvider,
 } from "./RichContentBlock"
 
 describe("RichContentBlock", () => {
@@ -168,5 +169,19 @@ describe("RichContentBlock", () => {
     expect(html).toContain('tabindex="-1"')
     expect(html).toContain('aria-label="Copy content"')
     expect(html).toContain('aria-label="Open in overlay"')
+  })
+
+  test("uses chrome context when a block does not pass explicit chrome", () => {
+    const html = renderToStaticMarkup(
+      <RichContentChromeProvider chrome="inline" controlsVisibility="hover-or-touch">
+        <RichContentBlock type="code" title="Code" rawContent="const x = 1">
+          <pre>const x = 1</pre>
+        </RichContentBlock>
+      </RichContentChromeProvider>
+    )
+
+    expect(html).not.toContain("rounded-lg border border-border overflow-hidden")
+    expect(html).toContain("group-hover/rich-content:opacity-100")
+    expect(html).toContain('tabindex="-1"')
   })
 })

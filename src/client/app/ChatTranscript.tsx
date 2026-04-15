@@ -24,6 +24,7 @@ import { StatusMessage } from "../components/messages/StatusMessage"
 import { CollapsedToolGroup } from "../components/messages/CollapsedToolGroup"
 import { WipBlock } from "../components/messages/WipBlock"
 import { OpenLocalLinkProvider } from "../components/messages/shared"
+import { RichContentChromeProvider } from "../components/rich-content/RichContentBlock"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
 import { SPECIAL_TOOL_NAMES } from "./derived"
 
@@ -165,6 +166,7 @@ interface ChatTranscriptProps {
     answers: AskUserQuestionAnswerMap
   ) => void
   onExitPlanModeConfirm: (toolUseId: string, confirmed: boolean, clearContext?: boolean, message?: string) => void
+  richContentChrome?: "card" | "inline"
 }
 
 export function ChatTranscript({
@@ -177,6 +179,7 @@ export function ChatTranscript({
   onOpenExternalLink,
   onAskUserQuestionSubmit,
   onExitPlanModeConfirm,
+  richContentChrome = "card",
 }: ChatTranscriptProps) {
   // Precompute first-occurrence indices to avoid O(n) findIndex per render
   const firstIndices = useMemo(() => {
@@ -280,6 +283,10 @@ export function ChatTranscript({
 
   return (
     <OpenLocalLinkProvider onOpenLocalLink={onOpenLocalLink} onOpenExternalLink={onOpenExternalLink}>
+      <RichContentChromeProvider
+        chrome={richContentChrome}
+        controlsVisibility={richContentChrome === "inline" ? "hover-or-touch" : "always"}
+      >
       <Suspense fallback={<div className="min-h-[24px]" />}>
       <div
         style={{
@@ -368,6 +375,7 @@ export function ChatTranscript({
         })}
       </div>
       </Suspense>
+      </RichContentChromeProvider>
     </OpenLocalLinkProvider>
   )
 }

@@ -6,6 +6,7 @@ import type { OrchestrationChildNode } from "../../../shared/types"
 import {
   SubagentIndicator,
   SUBAGENT_INSPECTOR_LAYOUT_CLASSES,
+  SUBAGENT_TRANSCRIPT_RICH_CONTENT_CHROME,
   SubagentInspectorTranscript,
   allTerminal,
   countNodes,
@@ -143,6 +144,10 @@ describe("SubagentInspectorTranscript", () => {
 
     expect(html).toContain("flex h-full min-h-0 flex-1 flex-col")
     expect(html).toContain("min-h-0 flex-1 overflow-y-auto")
+  })
+
+  test("uses inline rich-content chrome for subagent transcript previews", () => {
+    expect(SUBAGENT_TRANSCRIPT_RICH_CONTENT_CHROME).toBe("inline")
   })
 })
 

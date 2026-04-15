@@ -81,6 +81,8 @@ export const SUBAGENT_INSPECTOR_LAYOUT_CLASSES = {
   transcriptSlot: "flex min-h-0 flex-1 overflow-hidden",
 } as const
 
+export const SUBAGENT_TRANSCRIPT_RICH_CONTENT_CHROME = "inline" as const
+
 interface FlattenedChildNode extends OrchestrationChildNode {
   depth: number
 }
@@ -276,6 +278,7 @@ export function SubagentInspectorTranscript({
           onOpenExternalLink={onOpenExternalLink}
           onAskUserQuestionSubmit={() => {}}
           onExitPlanModeConfirm={() => {}}
+          richContentChrome={SUBAGENT_TRANSCRIPT_RICH_CONTENT_CHROME}
         />
       </div>
     </div>
