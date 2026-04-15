@@ -79,10 +79,24 @@ export function getUiIdentityOverlayPanelPosition(args: {
   }
 }
 
-function renderOverlayContent(props: UiIdentityOverlayProps) {
-  const rows = props.stack
+function getUiIdentityOverlayRows(stack: Element[]): UiIdentityDescriptor[] {
+  const seen = new Set<string>()
+
+  return stack
     .map((element) => getUiIdentityDescriptorFromElement(element))
     .filter((entry): entry is UiIdentityDescriptor => entry !== null)
+    .filter((entry) => {
+      const key = formatCopiedUiIdentity(entry)
+      if (seen.has(key)) {
+        return false
+      }
+      seen.add(key)
+      return true
+    })
+}
+
+function renderOverlayContent(props: UiIdentityOverlayProps) {
+  const rows = getUiIdentityOverlayRows(props.stack)
 
   if (!props.active || !props.anchorRect || rows.length === 0) {
     return null
@@ -165,3 +179,5 @@ export function UiIdentityOverlay(props: UiIdentityOverlayProps) {
 
   return createPortal(content, document.body)
 }
+
+export { getUiIdentityOverlayRows }

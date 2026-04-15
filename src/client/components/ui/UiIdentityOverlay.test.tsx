@@ -6,6 +6,7 @@ import { getDropdownMenuContentUiIdentityProps } from "./dropdown-menu"
 import {
   UI_IDENTITY_OVERLAY_ROOT_ATTRIBUTE,
   UiIdentityOverlay,
+  getUiIdentityOverlayRows,
   getUiIdentityOverlayPanelPosition,
   getOverlayCopyLabel,
 } from "./UiIdentityOverlay"
@@ -39,6 +40,32 @@ describe("UiIdentityOverlay", () => {
     expect(markup).toContain("message.assistant.response")
     expect(markup).toContain("transcript.message-list")
     expect(markup).toContain("Copy")
+  })
+
+  test("deduplicates repeated identity rows from nested matching surfaces", () => {
+    const stack = [
+      createStackElement("rich-content.block"),
+      createStackElement("rich-content.block"),
+      createStackElement("message.assistant.response"),
+    ]
+    const markup = renderToStaticMarkup(
+      <UiIdentityOverlay
+        active
+        anchorRect={{ top: 20, left: 30, width: 100, height: 40, right: 130, bottom: 60 }}
+        highlightRect={null}
+        stack={stack}
+        highlightedId="rich-content.block"
+        copiedId={null}
+        onCopy={() => {}}
+        onHighlight={() => {}}
+      />
+    )
+
+    expect(getUiIdentityOverlayRows(stack).map((row) => row.id)).toEqual([
+      "rich-content.block",
+      "message.assistant.response",
+    ])
+    expect(markup).toContain("message.assistant.response")
   })
 
   test("keeps the overlay card pointer-active so moving between rows stays inside the ignored shell", () => {
