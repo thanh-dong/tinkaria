@@ -6,11 +6,13 @@ import type { ViewerState, ViewerAction } from "./ContentViewerContext"
 interface ViewerToolbarProps {
   state: ViewerState
   dispatch: (action: ViewerAction) => void
+  showCodeLineNumbers?: boolean
 }
 
-export const ViewerToolbar = memo(function ViewerToolbar({ state, dispatch }: ViewerToolbarProps) {
+export const ViewerToolbar = memo(function ViewerToolbar({ state, dispatch, showCodeLineNumbers = true }: ViewerToolbarProps) {
   switch (state.type) {
     case "code":
+      if (!showCodeLineNumbers) return null
       return (
         <IconButton
           ariaLabel="Toggle line numbers"

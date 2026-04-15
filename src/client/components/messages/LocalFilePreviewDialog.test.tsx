@@ -4,8 +4,10 @@ import { getContentOverlayUiIdentityProps } from "../rich-content/ContentOverlay
 import {
   LOCAL_FILE_PREVIEW_DIALOG_UI_ID,
   LocalFilePreviewContent,
+  getDialogTitle,
   getLocalFilePreviewType,
   getLocalFilePreviewDialogUiIdentityProps,
+  normalizeLocalFilePreviewMarkdown,
 } from "./LocalFilePreviewDialog"
 
 describe("LocalFilePreviewContent", () => {
@@ -23,6 +25,34 @@ describe("LocalFilePreviewContent", () => {
     expect(html).toContain("Hello")
     expect(html).toContain("/tmp/next.md#L4")
     expect(html).not.toContain("group/rich-content")
+  })
+
+  test("preserves ASCII tree spacing in markdown previews", () => {
+    const content = [
+      "c3-design/",
+      "├── .claude-plugin/  # Plugin metadata",
+      "│   ├── plugin.json",
+      "│   └── marketplace.json",
+      "└── scripts/",
+      "    └── build.sh  # Cross-compile Go CLI",
+    ].join("\n")
+    const normalized = normalizeLocalFilePreviewMarkdown(content)
+    const html = renderToStaticMarkup(
+      <LocalFilePreviewContent
+        preview={{
+          path: "/tmp/README.md",
+          content,
+        }}
+        onOpenLocalLink={() => {}}
+      />
+    )
+
+    expect(normalized).toContain("```text\nc3-design/")
+    expect(html).toContain("<pre")
+    expect(html).toContain("whitespace-pre")
+    expect(html).toContain("├──")
+    expect(html).toContain("claude")
+    expect(html).toContain("plugin")
   })
 
   test("renders non-markdown previews in the code viewer without extra chrome", () => {
@@ -75,6 +105,16 @@ describe("LocalFilePreviewDialog", () => {
     expect(getLocalFilePreviewType("/tmp/README.md")).toBe("markdown")
     expect(getLocalFilePreviewType("/tmp/diagram.svg")).toBe("embed")
     expect(getLocalFilePreviewType("/tmp/app.ts")).toBe("code")
+  })
+
+  test("shows local file preview titles relative to the workspace path", () => {
+    expect(
+      getDialogTitle({
+        path: "/home/lagz0ne/dev/kanna/src/client/app.tsx",
+        line: 12,
+        column: 3,
+      }, "/home/lagz0ne/dev/kanna")
+    ).toBe("src/client/app.tsx:12:3")
   })
 
   test("reuses the rich content overlay identity contract for local file previews", () => {

@@ -5,6 +5,7 @@ import { ContentOverlay } from "../rich-content/ContentOverlay"
 import { remarkRichContentHint } from "../rich-content/remarkRichContentHint"
 import type { RichContentType } from "../rich-content/types"
 import { createMarkdownComponents } from "./shared"
+import { stripWorkspacePath } from "../../lib/pathUtils"
 
 export interface LocalFilePreview {
   path: string
@@ -64,10 +65,70 @@ function wrapPreviewCodeFence(path: string, content: string): string {
   return `\`\`\`${language}\n${content}\n\`\`\``
 }
 
-function getDialogTitle(preview: LocalFilePreview): string {
-  if (!preview.line) return preview.path
-  if (!preview.column) return `${preview.path}:${preview.line}`
-  return `${preview.path}:${preview.line}:${preview.column}`
+function isAsciiTreeLine(line: string): boolean {
+  return /[├└│─]/.test(line)
+}
+
+function isAsciiTreeRootLine(line: string): boolean {
+  return /^\S.*\/\s*$/.test(line)
+}
+
+function isFenceLine(line: string): boolean {
+  return /^\s*(```|~~~)/.test(line)
+}
+
+function normalizeLocalFilePreviewMarkdown(content: string): string {
+  const lines = content.split("\n")
+  const normalized: string[] = []
+  let index = 0
+  let inFence = false
+
+  while (index < lines.length) {
+    const line = lines[index] ?? ""
+    if (isFenceLine(line)) {
+      inFence = !inFence
+      normalized.push(line)
+      index += 1
+      continue
+    }
+
+    if (!inFence && isAsciiTreeLine(line)) {
+      const block: string[] = []
+      const previous = normalized[normalized.length - 1]
+      if (previous !== undefined && isAsciiTreeRootLine(previous)) {
+        normalized.pop()
+        block.push(previous)
+      }
+
+      while (index < lines.length && isAsciiTreeLine(lines[index] ?? "")) {
+        block.push(lines[index] ?? "")
+        index += 1
+      }
+
+      if (block.length > 1) {
+        const beforeBlock = normalized[normalized.length - 1]
+        if (beforeBlock !== undefined && beforeBlock.trim() !== "") normalized.push("")
+        normalized.push("```text", ...block, "```")
+        if ((lines[index] ?? "").trim() !== "") normalized.push("")
+        continue
+      }
+
+      normalized.push(...block)
+      continue
+    }
+
+    normalized.push(line)
+    index += 1
+  }
+
+  return normalized.join("\n")
+}
+
+function getDialogTitle(preview: LocalFilePreview, workspacePath?: string | null): string {
+  const displayPath = stripWorkspacePath(preview.path, workspacePath)
+  if (!preview.line) return displayPath
+  if (!preview.column) return `${displayPath}:${preview.line}`
+  return `${displayPath}:${preview.line}:${preview.column}`
 }
 
 function getLocalFilePreviewType(path: string): RichContentType {
@@ -82,6 +143,7 @@ function getLocalFilePreviewType(path: string): RichContentType {
 
 interface LocalFilePreviewDialogProps {
   preview: LocalFilePreview | null
+  workspacePath?: string | null
   onClose: () => void
   onOpenLocalLink: (target: { path: string; line?: number; column?: number }) => void
 }
@@ -98,13 +160,14 @@ export function LocalFilePreviewContent({
   onOpenLocalLink: (target: { path: string; line?: number; column?: number }) => void
 }) {
   if (isMarkdownFile(preview.path)) {
+    const content = normalizeLocalFilePreviewMarkdown(preview.content)
     return (
       <div className="text-pretty prose prose-sm dark:prose-invert px-0.5 w-full max-w-full space-y-4">
         <Markdown
           remarkPlugins={[remarkGfm]}
           components={createMarkdownComponents({ onOpenLocalLink, renderRichContentBlocks: false })}
         >
-          {preview.content}
+          {content}
         </Markdown>
       </div>
     )
@@ -124,6 +187,7 @@ export function LocalFilePreviewContent({
 
 export function LocalFilePreviewDialog({
   preview,
+  workspacePath,
   onClose,
   onOpenLocalLink,
 }: LocalFilePreviewDialogProps) {
@@ -135,7 +199,7 @@ export function LocalFilePreviewDialog({
           onClose()
         }
       }}
-      title={preview ? getDialogTitle(preview) : "File preview"}
+      title={preview ? getDialogTitle(preview, workspacePath) : "File preview"}
       type={preview ? getLocalFilePreviewType(preview.path) : "code"}
       rawContent={preview?.content}
       rootUiId={LOCAL_FILE_PREVIEW_DIALOG_UI_DESCRIPTOR}
@@ -145,4 +209,10 @@ export function LocalFilePreviewDialog({
   )
 }
 
-export { LOCAL_FILE_PREVIEW_DIALOG_UI_ID, getLocalFilePreviewDialogUiIdentityProps, getLocalFilePreviewType }
+export {
+  LOCAL_FILE_PREVIEW_DIALOG_UI_ID,
+  getDialogTitle,
+  getLocalFilePreviewDialogUiIdentityProps,
+  getLocalFilePreviewType,
+  normalizeLocalFilePreviewMarkdown,
+}

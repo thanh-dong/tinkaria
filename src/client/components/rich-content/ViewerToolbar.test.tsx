@@ -12,6 +12,11 @@ describe("ViewerToolbar", () => {
     expect(html).toContain('aria-label="Toggle line numbers"')
     expect(html).toContain('aria-pressed="false"')
   })
+  test("can omit the code line numbers toggle for previews where it has no effect", () => {
+    const state: ViewerState = { type: "code", lineNumbers: false }
+    const html = renderToStaticMarkup(<ViewerToolbar state={state} dispatch={noop} showCodeLineNumbers={false} />)
+    expect(html).not.toContain('aria-label="Toggle line numbers"')
+  })
   test("renders unified/split toggle for diff type", () => {
     const state: ViewerState = { type: "diff", viewMode: "unified" }
     const html = renderToStaticMarkup(<ViewerToolbar state={state} dispatch={noop} />)

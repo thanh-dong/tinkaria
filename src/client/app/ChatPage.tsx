@@ -572,6 +572,7 @@ export function ChatPage() {
         <Suspense fallback={null}>
           <LocalFilePreviewDialog
             preview={state.localFilePreview}
+            workspacePath={state.navbarLocalPath}
             onClose={state.closeLocalFilePreview}
             onOpenLocalLink={(target) => {
               void state.handleOpenLocalLink(target)

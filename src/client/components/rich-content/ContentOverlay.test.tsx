@@ -7,6 +7,8 @@ import {
   CONTENT_OVERLAY_ROOT_UI_ID,
   getContentOverlayUiIdentityProps,
   MOBILE_DIALOG_CLASSES,
+  CONTENT_OVERLAY_HEADER_CLASS_NAME,
+  CONTENT_OVERLAY_SHOW_CODE_LINE_NUMBER_CONTROL,
 } from "./ContentOverlay"
 import { DIALOG_BODY_INSET_CLASS_NAME } from "../ui/dialog"
 import { createInitialState } from "./ContentViewerContext"
@@ -44,6 +46,15 @@ describe("ContentOverlay", () => {
     expect(CONTENT_OVERLAY_DIALOG_SIZE).toBe("fullscreen")
     expect(CONTENT_OVERLAY_DIALOG_CLASS_NAME).toContain("h-[100dvh]")
     expect(CONTENT_OVERLAY_DIALOG_CLASS_NAME).toContain("max-h-none")
+  })
+
+  test("content overlay keeps fullscreen preview chrome compact", () => {
+    expect(CONTENT_OVERLAY_HEADER_CLASS_NAME).toContain("px-3")
+    expect(CONTENT_OVERLAY_HEADER_CLASS_NAME).toContain("py-2")
+  })
+
+  test("content overlay omits the unused code line number control", () => {
+    expect(CONTENT_OVERLAY_SHOW_CODE_LINE_NUMBER_CONTROL).toBe(false)
   })
 
   test("createInitialState produces correct state for each content type", () => {

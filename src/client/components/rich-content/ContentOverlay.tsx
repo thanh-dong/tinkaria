@@ -27,6 +27,7 @@ const typeIcons: Record<RichContentType, typeof Code> = {
 const CONTENT_OVERLAY_FRAME_CLASS_NAME = "mx-auto w-full max-w-[96rem]"
 const CONTENT_OVERLAY_DIALOG_CLASS_NAME = "h-[100dvh] max-h-none"
 const CONTENT_OVERLAY_INNER_CLASS_NAME = `${DIALOG_BODY_INSET_CLASS_NAME} pt-4`
+const CONTENT_OVERLAY_HEADER_CLASS_NAME = "space-y-0 px-3 py-2"
 const CONTENT_OVERLAY_ROOT_UI_ID = "rich-content.viewer.area"
 const CONTENT_OVERLAY_ROOT_UI_DESCRIPTOR = createUiIdentityDescriptor({
   id: CONTENT_OVERLAY_ROOT_UI_ID,
@@ -34,6 +35,7 @@ const CONTENT_OVERLAY_ROOT_UI_DESCRIPTOR = createUiIdentityDescriptor({
   c3ComponentLabel: "rich-content",
 })
 const CONTENT_OVERLAY_DIALOG_SIZE = "fullscreen" as const
+const CONTENT_OVERLAY_SHOW_CODE_LINE_NUMBER_CONTROL = false
 
 const MOBILE_DIALOG_CLASSES =
   "h-[100dvh] data-[state=open]:slide-in-from-bottom data-[state=open]:duration-300 data-[state=closed]:slide-out-to-bottom data-[state=closed]:duration-200 data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100"
@@ -80,7 +82,11 @@ export function ContentOverlay({
 
   const controls = (
     <div className="flex items-center gap-0.5" data-controls="true">
-      <ViewerToolbar state={viewerState} dispatch={dispatch} />
+      <ViewerToolbar
+        state={viewerState}
+        dispatch={dispatch}
+        showCodeLineNumbers={CONTENT_OVERLAY_SHOW_CODE_LINE_NUMBER_CONTROL}
+      />
       {rawContent ? (
         <>
           <div className="mx-0.5 h-3 w-px bg-border" aria-hidden="true" />
@@ -107,7 +113,7 @@ export function ContentOverlay({
         {...getContentOverlayUiIdentityProps(rootUiId)}
       >
         <ContentViewerContext.Provider key={type} value={{ state: viewerState, dispatch }}>
-          <DialogHeader className={cn(isMobile && RESPONSIVE_MODAL_HEADER_CLASS_NAME)}>
+          <DialogHeader className={cn(CONTENT_OVERLAY_HEADER_CLASS_NAME, isMobile && RESPONSIVE_MODAL_HEADER_CLASS_NAME)}>
             <div className={cn("flex w-full items-center gap-2", CONTENT_OVERLAY_FRAME_CLASS_NAME)}>
               {isMobile ? (
                 <DialogClose asChild>
@@ -178,8 +184,10 @@ export {
   CONTENT_OVERLAY_DIALOG_CLASS_NAME,
   CONTENT_OVERLAY_DIALOG_SIZE,
   CONTENT_OVERLAY_FRAME_CLASS_NAME,
+  CONTENT_OVERLAY_HEADER_CLASS_NAME,
   CONTENT_OVERLAY_INNER_CLASS_NAME,
   CONTENT_OVERLAY_ROOT_UI_ID,
+  CONTENT_OVERLAY_SHOW_CODE_LINE_NUMBER_CONTROL,
   MOBILE_DIALOG_CLASSES,
   getContentOverlayUiIdentityProps,
 }
