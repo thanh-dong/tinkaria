@@ -20,6 +20,7 @@ import { useIsMobile } from "../../hooks/useIsMobile"
 import { IconButton } from "./IconButton"
 import { ViewerToolbar } from "./ViewerToolbar"
 import type { RichContentType } from "./types"
+import { createC3UiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 
 const typeIcons: Record<RichContentType, typeof Code> = {
   code: Code,
@@ -30,6 +31,11 @@ const typeIcons: Record<RichContentType, typeof Code> = {
 
 const COLLAPSED_MAX_HEIGHT = "max-h-24"
 const CONTENT_BLOCK_BODY_CLASS_NAME = "px-4 pb-4 pt-3.5"
+const RICH_CONTENT_BLOCK_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
+  id: "rich-content.block",
+  c3ComponentId: "c3-107",
+  c3ComponentLabel: "rich-content",
+})
 
 interface RichContentBlockProps {
   type: RichContentType
@@ -154,6 +160,7 @@ export const RichContentBlock = memo(function RichContentBlock({
         )}
         onPointerDownCapture={handlePointerDownCapture}
         tabIndex={controlsVisibility === "hover-or-touch" ? -1 : undefined}
+        {...getUiIdentityAttributeProps(RICH_CONTENT_BLOCK_UI_DESCRIPTOR)}
       >
         {chrome === "card" ? (
           <>
@@ -211,4 +218,8 @@ export const RichContentBlock = memo(function RichContentBlock({
   )
 })
 
-export { CONTENT_BLOCK_BODY_CLASS_NAME }
+function getRichContentBlockUiIdentityDescriptor() {
+  return RICH_CONTENT_BLOCK_UI_DESCRIPTOR
+}
+
+export { CONTENT_BLOCK_BODY_CLASS_NAME, getRichContentBlockUiIdentityDescriptor }

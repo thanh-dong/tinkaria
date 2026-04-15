@@ -83,6 +83,11 @@ describe("TextMessage", () => {
     )
 
     expect(html).toContain('data-ui-id="message.assistant.response"')
+    expect(html).toContain('data-ui-c3="c3-111"')
+    expect(html).toContain('data-ui-c3-label="messages"')
+    expect(html).toContain('data-ui-id="rich-content.block"')
+    expect(html).toContain('data-ui-c3="c3-107"')
+    expect(html).toContain('data-ui-c3-label="rich-content"')
     expect(html).not.toContain(">Response<")
     expect(html).toContain("group-hover/rich-content:opacity-100")
     expect(html).toContain("group-focus-within/rich-content:opacity-100")

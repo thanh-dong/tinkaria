@@ -1,8 +1,21 @@
 import { describe, test, expect } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
-import { CONTENT_BLOCK_BODY_CLASS_NAME, RichContentBlock } from "./RichContentBlock"
+import { getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
+import {
+  CONTENT_BLOCK_BODY_CLASS_NAME,
+  getRichContentBlockUiIdentityDescriptor,
+  RichContentBlock,
+} from "./RichContentBlock"
 
 describe("RichContentBlock", () => {
+  test("exposes rich-content ownership for grab targets", () => {
+    expect(getUiIdentityAttributeProps(getRichContentBlockUiIdentityDescriptor())).toEqual({
+      "data-ui-id": "rich-content.block",
+      "data-ui-c3": "c3-107",
+      "data-ui-c3-label": "rich-content",
+    })
+  })
+
   test("renders children inside wrapper", () => {
     const html = renderToStaticMarkup(
       <RichContentBlock type="code" title="TypeScript">
@@ -10,6 +23,9 @@ describe("RichContentBlock", () => {
       </RichContentBlock>
     )
 
+    expect(html).toContain('data-ui-id="rich-content.block"')
+    expect(html).toContain('data-ui-c3="c3-107"')
+    expect(html).toContain('data-ui-c3-label="rich-content"')
     expect(html).toContain("const x = 1")
     expect(html).toContain("TypeScript")
   })
