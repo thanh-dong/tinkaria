@@ -205,6 +205,35 @@ function typeBadge(type: string) {
   )
 }
 
+export function C3TreeIndicator({ depth }: { depth: number }) {
+  if (depth <= 0) {
+    return <span aria-hidden="true" className="w-0 shrink-0" />
+  }
+
+  return (
+    <span
+      aria-label={`Tree depth ${depth}`}
+      className="flex h-7 shrink-0"
+      style={{ width: `${depth * 1.25}rem` }}
+    >
+      {Array.from({ length: depth }, (_item, index) => {
+        const isBranch = index === depth - 1
+        return (
+          <span
+            key={index}
+            aria-hidden="true"
+            className={
+              isBranch
+                ? "relative h-full w-5 shrink-0 before:absolute before:left-2 before:top-0 before:h-1/2 before:border-l before:border-border after:absolute after:left-2 after:top-1/2 after:w-3 after:border-t after:border-border"
+                : "relative h-full w-5 shrink-0 before:absolute before:inset-y-0 before:left-2 before:border-l before:border-border/70"
+            }
+          />
+        )
+      })}
+    </span>
+  )
+}
+
 export function C3MarkdownDocument({ source }: { source: string }) {
   return (
     <div className="prose prose-sm max-w-none text-foreground prose-headings:scroll-mt-4 prose-headings:font-semibold prose-p:leading-7 prose-pre:max-h-96 prose-pre:overflow-auto prose-table:text-sm dark:prose-invert">
@@ -305,12 +334,12 @@ function EntityCard({
   return (
     <div>
       <div
-        className={`w-full px-4 py-2.5 flex items-center gap-2.5 transition-colors hover:bg-accent/50 ${
+        className={`w-full px-4 py-2.5 flex items-center gap-2 transition-colors hover:bg-accent/50 ${
           isSelected ? "bg-accent/70" : ""
         }`}
-        style={{ paddingLeft: `${1 + depth * 1.25}rem` }}
         {...getUiIdentityAttributeProps(C3_EXTENSION_UI_DESCRIPTORS.entityItem)}
       >
+        <C3TreeIndicator depth={depth} />
         {hasChildren ? (
           <Button
             type="button"

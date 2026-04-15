@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach, beforeAll } from "bun:test"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { c3Extension } from "./server"
+import { buildC3EntityTree, c3Extension } from "./server"
 
 let tempDir: string
 
@@ -72,6 +72,44 @@ describe("c3Extension routes", () => {
   })
 })
 
+// ── Tree structure ─────────────────────────────────────────────────
+
+describe("buildC3EntityTree", () => {
+  test("nests parented entities while keeping unparented entities at the root", () => {
+    expect(
+      buildC3EntityTree([
+        { id: "c3-0", type: "system", title: "tinkaria" },
+        { id: "c3-1", type: "container", title: "client", parent: "c3-0" },
+        { id: "c3-120", type: "component", title: "extensions", parent: "c3-1" },
+        { id: "ref-project-context", type: "ref", title: "project-context" },
+      ]),
+    ).toEqual([
+      {
+        id: "c3-0",
+        type: "system",
+        title: "tinkaria",
+        children: [
+          {
+            id: "c3-1",
+            type: "container",
+            title: "client",
+            parent: "c3-0",
+            children: [
+              {
+                id: "c3-120",
+                type: "component",
+                title: "extensions",
+                parent: "c3-1",
+              },
+            ],
+          },
+        ],
+      },
+      { id: "ref-project-context", type: "ref", title: "project-context" },
+    ])
+  })
+})
+
 // ── Parameter validation ────────────────────────────────────────────
 
 describe("read handler validation", () => {
@@ -126,8 +164,20 @@ describe("c3x integration", () => {
     expect(Array.isArray(body.data)).toBe(true)
     expect(body.data.length).toBeGreaterThan(0)
     expect(body.data[0]).toMatchObject({
-      id: expect.any(String),
-      type: expect.any(String),
+      id: "c3-0",
+      type: "system",
+      children: expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.any(String),
+          type: "container",
+          children: expect.arrayContaining([
+            expect.objectContaining({
+              id: expect.any(String),
+              type: "component",
+            }),
+          ]),
+        }),
+      ]),
     })
   })
 

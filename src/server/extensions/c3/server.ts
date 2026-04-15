@@ -21,6 +21,39 @@ interface C3ListJsonOutput {
   [key: string]: unknown
 }
 
+export function buildC3EntityTree(entities: C3ListEntity[]): C3ListEntity[] {
+  const byId = new Map<string, C3ListEntity>()
+  const roots: C3ListEntity[] = []
+
+  for (const entity of entities) {
+    const { children: _children, ...rest } = entity
+    byId.set(entity.id, { ...rest })
+  }
+
+  for (const entity of entities) {
+    const node = byId.get(entity.id)
+    if (!node) continue
+
+    const parentId = typeof entity.parent === "string" ? entity.parent : null
+    const parent = parentId && parentId !== entity.id ? byId.get(parentId) : undefined
+
+    if (parent) {
+      parent.children = parent.children ?? []
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  }
+
+  return roots
+}
+
+function normalizeListData(parsed: C3ListJsonOutput): C3ListEntity[] | C3ListJsonOutput {
+  if (Array.isArray(parsed.entities)) return buildC3EntityTree(parsed.entities)
+  if (Array.isArray(parsed.items)) return buildC3EntityTree(parsed.items)
+  return parsed
+}
+
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -87,7 +120,7 @@ function handleList(projectPath: string): ExtensionRoute["handler"] {
       }
       try {
         const parsed = JSON.parse(stdout) as C3ListJsonOutput
-        return jsonResponse({ data: parsed.entities ?? parsed.items ?? parsed })
+        return jsonResponse({ data: normalizeListData(parsed) })
       } catch (_e: unknown) {
         return jsonResponse({ data: stdout.trim() })
       }

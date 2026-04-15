@@ -5,6 +5,7 @@ import { getUiIdentityAttributeProps } from "../lib/uiIdentityOverlay"
 import AgentsExtension, { getAgentsExtensionUiIdentityDescriptors } from "./agents/client"
 import C3Extension, {
   C3MarkdownDocument,
+  C3TreeIndicator,
   getC3ExtensionUiIdentityDescriptors,
   normalizeC3DetailDocument,
   normalizeC3Entities,
@@ -39,6 +40,59 @@ describe("project extension ui identity", () => {
       { id: "c3-1", title: "client", type: "container", name: "client" },
       { id: "c3-120", title: "extensions", type: "component", name: "extensions" },
     ])
+  })
+
+  test("preserves nested C3 topology when list data is tree-shaped", () => {
+    expect(
+      normalizeC3Entities({
+        entities: [
+          {
+            id: "c3-0",
+            title: "tinkaria",
+            type: "system",
+            children: [
+              {
+                id: "c3-1",
+                title: "client",
+                type: "container",
+                children: [{ id: "c3-120", title: "extensions", type: "component" }],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: "c3-0",
+        title: "tinkaria",
+        type: "system",
+        name: "tinkaria",
+        children: [
+          {
+            id: "c3-1",
+            title: "client",
+            type: "container",
+            name: "client",
+            children: [
+              {
+                id: "c3-120",
+                title: "extensions",
+                type: "component",
+                name: "extensions",
+              },
+            ],
+          },
+        ],
+      },
+    ])
+  })
+
+  test("renders a visible C3 tree depth indicator for nested rows", () => {
+    const html = renderToStaticMarkup(createElement(C3TreeIndicator, { depth: 2 }))
+
+    expect(html).toContain('aria-label="Tree depth 2"')
+    expect(html).toContain("border-l")
+    expect(html).toContain("border-t")
   })
 
   test("renders C3 detail documents as markdown", () => {
