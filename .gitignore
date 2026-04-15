@@ -53,3 +53,4 @@ src-tauri/target/
 # session-local working docs
 docs/superpowers/
 tasks/
+tmp/
