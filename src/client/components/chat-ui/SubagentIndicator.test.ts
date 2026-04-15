@@ -100,6 +100,8 @@ describe("SubagentInspectorTranscript", () => {
     expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.shell).toContain("h-full")
     expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.transcriptSlot).toContain("min-h-0")
     expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.transcriptSlot).toContain("flex-1")
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.transcriptSlot).not.toContain("p-3")
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.transcriptSlot).not.toContain("md:p-4")
   })
 
   test("renders loading state", () => {
@@ -111,6 +113,8 @@ describe("SubagentInspectorTranscript", () => {
     }))
 
     expect(html).toContain("Loading full transcript")
+    expect(html).toContain("flex-1")
+    expect(html).toContain("bg-muted/20")
   })
 
   test("renders empty state", () => {

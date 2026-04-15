@@ -13,6 +13,23 @@ describe("UserMessage", () => {
     expect(html).toContain("[overflow-wrap:break-word]")
   })
 
+  test("constrains rendered prompt content inside the mobile message shell", () => {
+    const html = renderToStaticMarkup(
+      <UserMessage
+        content={[
+          "```mermaid",
+          "graph TD",
+          "  A[wide rendered content with a very long label] --> B[another long label]",
+          "```",
+        ].join("\n")}
+      />
+    )
+
+    expect(html).toContain("w-full min-w-0")
+    expect(html).toContain("max-w-full")
+    expect(html).toContain("overflow-hidden")
+  })
+
   test("renders a copy button for the user prompt bubble", () => {
     const html = renderToStaticMarkup(<UserMessage content={"copy me"} />)
 

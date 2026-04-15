@@ -45,14 +45,14 @@ export const UserMessage = memo(function UserMessage({ content }: Props) {
 
   return (
     <div
-      className="flex flex-col items-end gap-1.5"
+      className="flex w-full min-w-0 flex-col items-end gap-1.5"
       {...getUiIdentityAttributeProps(userPromptDescriptor)}
     >
       {parsed.skills ? (
         <SkillBadgesReadonly skills={parsed.skills} />
       ) : null}
-      <div className="flex gap-2 justify-end pt-2">
-        <div className="group/user-message relative max-w-[85%] sm:max-w-[80%] min-w-[120px]">
+      <div className="flex w-full min-w-0 justify-end gap-2 pt-2">
+        <div className="group/user-message relative max-w-full min-w-0 sm:max-w-[80%] sm:min-w-[120px]">
           <Button
             type="button"
             variant="ghost"
@@ -70,7 +70,7 @@ export const UserMessage = memo(function UserMessage({ content }: Props) {
           >
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           </Button>
-          <div className="rounded-[20px] py-1.5 px-3.5 bg-muted text-primary border border-border prose prose-sm prose-invert break-normal [overflow-wrap:break-word] [&_p]:whitespace-pre-line [&_p]:break-normal [&_p]:[overflow-wrap:break-word]">
+          <div className="max-w-full overflow-hidden rounded-[20px] py-1.5 px-3.5 bg-muted text-primary border border-border prose prose-sm prose-invert break-normal [overflow-wrap:break-word] [&_p]:whitespace-pre-line [&_p]:break-normal [&_p]:[overflow-wrap:break-word]">
             <Markdown remarkPlugins={[remarkGfm]} components={createMarkdownComponents()}>{parsed.content}</Markdown>
           </div>
         </div>

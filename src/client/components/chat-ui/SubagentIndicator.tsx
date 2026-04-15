@@ -78,7 +78,7 @@ export const SUBAGENT_INSPECTOR_LAYOUT_CLASSES = {
   shell: "flex h-full min-h-0 flex-1 flex-col md:grid md:min-h-0 md:grid-cols-[18rem_minmax(0,1fr)]",
   list: "flex shrink-0 gap-2 overflow-x-auto border-b border-border/70 p-3 md:min-h-0 md:shrink md:flex-col md:overflow-y-auto md:border-b-0 md:border-r",
   transcriptPanel: "flex min-h-0 flex-1 flex-col overflow-hidden",
-  transcriptSlot: "flex min-h-0 flex-1 overflow-hidden p-3 md:p-4",
+  transcriptSlot: "flex min-h-0 flex-1 overflow-hidden",
 } as const
 
 interface FlattenedChildNode extends OrchestrationChildNode {
@@ -241,7 +241,7 @@ export function SubagentInspectorTranscript({
 }) {
   if (session.isLoading) {
     return (
-      <div className="flex h-full min-h-[16rem] items-center justify-center rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 text-sm text-muted-foreground">
+      <div className="flex h-full min-h-[16rem] flex-1 items-center justify-center bg-muted/20 px-4 text-sm text-muted-foreground">
         Loading full transcript…
       </div>
     )
@@ -249,7 +249,7 @@ export function SubagentInspectorTranscript({
 
   if (session.error) {
     return (
-      <div className="flex h-full min-h-[16rem] items-center justify-center rounded-2xl border border-dashed border-destructive/30 bg-destructive/5 px-4 text-sm text-destructive">
+      <div className="flex h-full min-h-[16rem] flex-1 items-center justify-center bg-destructive/5 px-4 text-sm text-destructive">
         {session.error}
       </div>
     )
@@ -257,7 +257,7 @@ export function SubagentInspectorTranscript({
 
   if (session.messages.length === 0) {
     return (
-      <div className="flex h-full min-h-[16rem] items-center justify-center rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 text-sm text-muted-foreground">
+      <div className="flex h-full min-h-[16rem] flex-1 items-center justify-center bg-muted/20 px-4 text-sm text-muted-foreground">
         This session has no transcript yet.
       </div>
     )
