@@ -658,11 +658,23 @@ export interface ChatRuntime {
   sessionToken: string | null
 }
 
+export interface QueuedChatTurnSnapshot {
+  chatId: string
+  provider?: AgentProvider
+  content: string
+  model?: string
+  modelOptions?: ModelOptions
+  effort?: string
+  planMode?: boolean
+  updatedAt: number
+}
+
 export interface ChatSnapshot {
   runtime: ChatRuntime
   messageCount: number
   availableProviders: ProviderCatalogEntry[]
   availableSkills: string[]
+  queuedTurn: QueuedChatTurnSnapshot | null
 }
 
 export interface CurrentSessionSnapshot {

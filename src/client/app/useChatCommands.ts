@@ -52,6 +52,7 @@ import {
   getSubmitPipelineMode,
   markPostFlushBusyObserved,
   startDirectSubmit,
+  syncServerQueuedSubmit,
   transitionProjectSelection,
   queueSubmit as queueSubmitTransition,
 } from "./useAppState.machine"
@@ -233,6 +234,24 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
   function updateSubmitPipelineFromSnapshot(snapshot: ChatSnapshot) {
     if (isProcessingStatus(snapshot.runtime.status)) {
       updateSubmitPipeline((current) => markPostFlushBusyObserved(current, snapshot.runtime.chatId))
+    }
+    const queuedTurn = snapshot.queuedTurn
+    if (queuedTurn) {
+      updateSubmitPipeline((current) => syncServerQueuedSubmit(current, {
+        chatId: snapshot.runtime.chatId,
+        content: queuedTurn.content,
+        options: {
+          provider: queuedTurn.provider,
+          model: queuedTurn.model,
+          modelOptions: queuedTurn.modelOptions,
+          planMode: queuedTurn.planMode,
+        },
+      }))
+    } else if (!isProcessingStatus(snapshot.runtime.status)) {
+      updateSubmitPipeline((current) => syncServerQueuedSubmit(current, {
+        chatId: snapshot.runtime.chatId,
+        content: null,
+      }))
     }
   }
 
@@ -421,7 +440,7 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       }))
       const queuedText = queuedState.queuedTextByChat[activeChatId] ?? content
       try {
-        await socket.command({
+        const result = await socket.command<{ queued: boolean }>({
           type: "chat.queue",
           chatId: activeChatId,
           provider: options?.provider,
@@ -430,7 +449,9 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
           modelOptions: options?.modelOptions,
           planMode: options?.planMode,
         })
-        updateSubmitPipeline((current) => clearQueuedSubmit(current, activeChatId))
+        if (!result.queued) {
+          updateSubmitPipeline((current) => clearQueuedSubmit(current, activeChatId))
+        }
       } catch (error) {
         setCommandError(error instanceof Error ? error.message : String(error))
         throw error

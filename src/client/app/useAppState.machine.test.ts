@@ -16,6 +16,7 @@ import {
   resolveProjectSelection,
   startDirectSubmit,
   startQueuedFlush,
+  syncServerQueuedSubmit,
   transitionProjectSelection,
 } from "./useAppState.machine"
 
@@ -197,5 +198,16 @@ describe("submitPipeline machine", () => {
     const cleared = clearQueuedSubmit(queued, "chat-1")
     expect(getQueuedText(cleared, "chat-1")).toBe("")
     expect(getSubmitPipelineMode(cleared, "chat-1")).toBe("idle")
+  })
+
+  test("syncs server-owned queued text into the visible queue", () => {
+    const state = syncServerQueuedSubmit(createSubmitPipelineState(), {
+      chatId: "chat-1",
+      content: "Queued follow-up",
+      options: { provider: "codex", model: "gpt-5.4", planMode: true },
+    })
+
+    expect(getQueuedText(state, "chat-1")).toBe("Queued follow-up")
+    expect(getSubmitPipelineMode(state, "chat-1")).toBe("queued")
   })
 })

@@ -96,6 +96,53 @@ describe("read models", () => {
     expect(chat?.availableSkills).toEqual(["skill-a", "skill-b"])
   })
 
+  test("includes a server-owned queued turn in chat snapshots", () => {
+    const state = createEmptyState()
+    state.workspacesById.set("project-1", {
+      id: "project-1",
+      localPath: "/tmp/project",
+      title: "Project",
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    state.workspaceIdsByPath.set("/tmp/project", "project-1")
+    state.chatsById.set("chat-1", {
+      id: "chat-1",
+      workspaceId: "project-1",
+      repoId: null,
+      title: "Chat",
+      createdAt: 1,
+      updatedAt: 1,
+      unread: false,
+      provider: "codex",
+      model: "gpt-5.4",
+      planMode: false,
+      sessionToken: "session-1",
+      lastTurnOutcome: null,
+    })
+    state.queuedTurnsByChat.set("chat-1", {
+      chatId: "chat-1",
+      provider: "codex",
+      content: "Queued follow-up",
+      model: "gpt-5.4",
+      planMode: true,
+      updatedAt: 2,
+    })
+
+    const chat = deriveChatSnapshot(state, new Map([["chat-1", "running"]]), "chat-1", 0)
+
+    expect(chat?.queuedTurn).toEqual({
+      chatId: "chat-1",
+      provider: "codex",
+      content: "Queued follow-up",
+      model: "gpt-5.4",
+      modelOptions: undefined,
+      effort: undefined,
+      planMode: true,
+      updatedAt: 2,
+    })
+  })
+
   test("includes the persisted chat model in chat runtime", () => {
     const state = createEmptyState()
     state.workspacesById.set("project-1", {

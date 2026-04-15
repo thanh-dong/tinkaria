@@ -389,6 +389,7 @@ describe("getActiveChatSnapshot", () => {
       messageCount: 0,
       availableProviders: [],
       availableSkills: [],
+      queuedTurn: null,
     }
 
     expect(getActiveChatSnapshot(snapshot, "chat-1")).toEqual(snapshot)
@@ -410,6 +411,7 @@ describe("getActiveChatSnapshot", () => {
       messageCount: 0,
       availableProviders: [],
       availableSkills: [],
+      queuedTurn: null,
     }
 
     expect(getActiveChatSnapshot(snapshot, "chat-new")).toBeNull()

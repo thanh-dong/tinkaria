@@ -127,12 +127,14 @@ export function deriveChatSnapshot(
     planMode: chat.planMode,
     sessionToken: chat.sessionToken,
   }
+  const queuedTurn = state.queuedTurnsByChat.get(chatId) ?? null
 
   return {
     runtime,
     messageCount,
     availableProviders: [...SERVER_PROVIDERS],
     availableSkills: availableSkills ?? [],
+    queuedTurn: queuedTurn ? { ...queuedTurn } : null,
   }
 }
 

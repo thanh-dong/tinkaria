@@ -283,3 +283,20 @@ export function clearQueuedSubmit(state: SubmitPipelineState, chatId: string): S
     blockedFlushKeyByChat: { ...state.blockedFlushKeyByChat, [chatId]: null },
   }
 }
+
+export function syncServerQueuedSubmit(
+  state: SubmitPipelineState,
+  args: { chatId: string; content: string | null; options?: SubmitPipelineOptions }
+): SubmitPipelineState {
+  const content = args.content?.trim() ?? ""
+  if (!content) {
+    return clearQueuedSubmit(state, args.chatId)
+  }
+
+  return {
+    ...state,
+    queuedTextByChat: { ...state.queuedTextByChat, [args.chatId]: content },
+    optionsByChat: { ...state.optionsByChat, [args.chatId]: args.options },
+    blockedFlushKeyByChat: { ...state.blockedFlushKeyByChat, [args.chatId]: null },
+  }
+}
