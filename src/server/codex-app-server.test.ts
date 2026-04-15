@@ -350,6 +350,7 @@ describe("CodexAppServerManager", () => {
         expect(message.params.dynamicTools).toContainEqual(
           expect.objectContaining({
             name: "ask_user_question",
+            description: expect.stringContaining("Default mode"),
             inputSchema: expect.objectContaining({
               type: "object",
               required: ["questions"],

@@ -333,7 +333,7 @@ function dynamicToolDefinitions(args: StartCodexTurnArgs): DynamicToolDefinition
     },
     {
       name: "ask_user_question",
-      description: "Ask the user one or more questions and wait for their response.",
+      description: "Ask the user one or more questions and wait for their response. Available in Default mode; use this instead of plan-mode-only request_user_input when progress needs user input.",
       inputSchema: {
         type: "object",
         properties: {

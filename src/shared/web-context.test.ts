@@ -91,6 +91,8 @@ describe("getWebContextPrompt", () => {
     expect(enabledPrompt).toContain("ask_user_question")
     expect(enabledPrompt).toContain("clarification")
     expect(enabledPrompt).toContain("user input")
+    expect(enabledPrompt).toContain("Default mode")
+    expect(enabledPrompt).toContain("request_user_input")
     expect(disabledPrompt).not.toContain("ask_user_question")
   })
 

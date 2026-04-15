@@ -51,7 +51,8 @@ export function getWebContextPrompt(
 
   if (provider === "codex" && options?.askUserQuestionEnabled) {
     promptLines.push(
-      "When you need clarification, a decision, or user input before proceeding, call the `ask_user_question` dynamic tool."
+      "When you need clarification, a decision, or user input before proceeding, call the `ask_user_question` dynamic tool.",
+      "`ask_user_question` is available in Default mode; do not use plan-mode-only `request_user_input` for Codex user questions."
     )
   }
 
