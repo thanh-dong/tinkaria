@@ -18,6 +18,7 @@ import { timestamped, discardedToolResult } from "../shared/transcript-entries"
 import type { CoordinationStore } from "../shared/coordination-store"
 
 const encoder = new TextEncoder()
+const CANCEL_INTERRUPT_TIMEOUT_MS = 2_000
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -237,14 +238,9 @@ export class RunnerAgent {
     this.publishEvent(chatId, { type: "turn_cancelled", chatId })
     active.cancelRecorded = true
     active.hasFinalResult = true
-
-    try {
-      await active.turn.interrupt()
-    } catch (_error) {
-      active.turn.close()
-    }
-
     this.activeTurns.delete(chatId)
+
+    void this.interruptTurnAfterCancel(active).catch(() => {})
   }
 
   async respondTool(chatId: string, toolUseId: string, result: unknown): Promise<void> {
@@ -304,9 +300,38 @@ export class RunnerAgent {
     }
   }
 
+  private async interruptTurnAfterCancel(active: ActiveTurn): Promise<void> {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let timedOut = false
+    let failed = false
+
+    try {
+      await Promise.race([
+        active.turn.interrupt(),
+        new Promise<void>((resolve) => {
+          timeoutId = setTimeout(() => {
+            timedOut = true
+            resolve()
+          }, CANCEL_INTERRUPT_TIMEOUT_MS)
+        }),
+      ])
+    } catch (_error) {
+      failed = true
+    } finally {
+      if (timeoutId !== null) clearTimeout(timeoutId)
+      if (timedOut || failed) {
+        active.turn.close()
+      }
+    }
+  }
+
   private async runTurn(active: ActiveTurn): Promise<void> {
     try {
       for await (const event of active.turn.stream) {
+        if (active.cancelRequested) {
+          continue
+        }
+
         if (event.type === "session_token" && event.sessionToken) {
           this.publishEvent(active.chatId, {
             type: "session_token",
@@ -317,11 +342,6 @@ export class RunnerAgent {
         }
 
         if (!event.entry) continue
-
-        // After cancel, suppress final-state entries
-        if (active.cancelRequested && (event.entry.kind === "result" || event.entry.kind === "interrupted")) {
-          continue
-        }
 
         this.publishTranscript(active.chatId, event.entry)
 

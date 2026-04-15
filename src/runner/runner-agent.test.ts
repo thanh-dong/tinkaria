@@ -236,6 +236,46 @@ describe("RunnerAgent", () => {
     expect(kinds).toContain("interrupted")
   })
 
+  test("cancel returns promptly and suppresses late stream events after cancellation", async () => {
+    let releaseLateEvent: (() => void) | null = null
+    let closed = false
+    const turn: HarnessTurn = {
+      provider: "claude",
+      stream: (async function* () {
+        await new Promise<void>((resolve) => { releaseLateEvent = resolve })
+        yield { type: "transcript" as const, entry: ts({ kind: "system_init", provider: "claude", model: "t", tools: [], agents: [], slashCommands: [], mcpServers: [] }) }
+        yield { type: "transcript" as const, entry: ts({ kind: "assistant_text", text: "late text" }) }
+      })(),
+      interrupt: async () => {
+        await new Promise<void>(() => {})
+      },
+      close: () => { closed = true },
+    }
+
+    const turnFactory: TurnFactory = async () => turn
+    const agent = new RunnerAgent({ nc, createTurn: turnFactory })
+    const collected = collectEvents(nc, "chat-1")
+
+    await agent.startTurn(makeCmd())
+    await new Promise((r) => setTimeout(r, 50))
+
+    const cancelResult = await Promise.race([
+      agent.cancel("chat-1").then(() => "cancelled" as const),
+      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 100)),
+    ])
+
+    expect(cancelResult).toBe("cancelled")
+    releaseLateEvent?.()
+    await new Promise((r) => setTimeout(r, 150))
+
+    const cancelledIndex = collected.findIndex((event) => event.type === "turn_cancelled")
+    expect(cancelledIndex).toBeGreaterThanOrEqual(0)
+    const afterCancel = collected.slice(cancelledIndex + 1)
+    expect(afterCancel.some((event) => event.type === "status_change" && event.status === "running")).toBe(false)
+    expect(afterCancel.some((event) => event.type === "transcript" && event.entry?.kind === "assistant_text")).toBe(false)
+    expect(closed).toBe(true)
+  })
+
   test("turn error publishes turn_failed", async () => {
     const turn: HarnessTurn = {
       provider: "claude",
