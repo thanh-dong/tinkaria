@@ -86,7 +86,6 @@ function AppSidebarInner({
   const location = useLocation()
   const navigate = useNavigate()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [nowMs, setNowMs] = useState(() => Date.now())
   const chatsPerProject = 10
@@ -142,18 +141,6 @@ function AppSidebarInner({
     () => data.workspaceGroups.reduce((count, group) => count + group.chats.length, 0),
     [data.workspaceGroups]
   )
-
-  const toggleSection = useCallback((key: string) => {
-    setCollapsedSections((previous) => {
-      const next = new Set(previous)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-      }
-      return next
-    })
-  }, [])
 
   const toggleExpandedGroup = useCallback((key: string) => {
     setExpandedGroups((previous) => {
@@ -375,9 +362,7 @@ function AppSidebarInner({
             <Suspense fallback={null}>
               <LocalProjectsSection
                 workspaceGroups={orderedProjectGroups}
-                collapsedSections={collapsedSections}
                 expandedGroups={expandedGroups}
-                onToggleSection={toggleSection}
                 onToggleExpandedGroup={toggleExpandedGroup}
                 renderChatRow={renderChatRow}
                 chatsPerProject={chatsPerProject}

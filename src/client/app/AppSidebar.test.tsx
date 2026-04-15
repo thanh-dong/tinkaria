@@ -156,6 +156,25 @@ describe("AppSidebar", () => {
     expect(html).not.toContain("Merge sessions")
   })
 
+  test("renders project-group as a project overview link", () => {
+    const html = renderSidebar({
+      data: {
+        independentWorkspaces: [],
+        workspaceGroups: [
+          {
+            groupKey: "project-1",
+            localPath: "/tmp/demo",
+            chats: [],
+          },
+        ],
+      },
+    })
+
+    expect(html).toContain('data-ui-id="sidebar.project-group"')
+    expect(html).toContain('href="/project/project-1"')
+    expect(html).toContain('aria-label="Open demo overview"')
+  })
+
   test("ignores handler identity churn when sidebar data is unchanged", () => {
     const previous = createSidebarProps({
       data: {

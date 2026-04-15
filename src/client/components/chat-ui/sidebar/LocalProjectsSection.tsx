@@ -1,5 +1,5 @@
-import { type ReactNode } from "react"
-import { ChevronRight, FolderOpen } from "lucide-react"
+import { type MouseEvent, type ReactNode } from "react"
+import { FolderOpen } from "lucide-react"
 import type { SidebarChatRow, SidebarWorkspaceGroup } from "../../../../shared/types"
 import { Button } from "../../ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
@@ -17,9 +17,7 @@ const PROJECT_GROUP_DESCRIPTOR = createUiIdentityDescriptor({
 
 interface Props {
   workspaceGroups: SidebarWorkspaceGroup[]
-  collapsedSections: Set<string>
   expandedGroups: Set<string>
-  onToggleSection: (key: string) => void
   onToggleExpandedGroup: (key: string) => void
   renderChatRow: (chat: SidebarChatRow) => ReactNode
   chatsPerProject: number
@@ -34,9 +32,7 @@ interface Props {
 
 interface ProjectGroupSectionProps {
   group: SidebarWorkspaceGroup
-  collapsedSections: Set<string>
   expandedGroups: Set<string>
-  onToggleSection: (key: string) => void
   onToggleExpandedGroup: (key: string) => void
   renderChatRow: (chat: SidebarChatRow) => ReactNode
   chatsPerProject: number
@@ -51,9 +47,7 @@ interface ProjectGroupSectionProps {
 
 function ProjectGroupSection({
   group,
-  collapsedSections,
   expandedGroups,
-  onToggleSection,
   onToggleExpandedGroup,
   renderChatRow,
   chatsPerProject,
@@ -79,29 +73,33 @@ function ProjectGroupSection({
     || onNewLocalChat
     || onRemoveProject
   )
+  const overviewHref = `/project/${groupKey}`
+  const projectName = getPathBasename(localPath)
+
+  function handleOpenProject(event: MouseEvent<HTMLAnchorElement>) {
+    if (!onOpenProject) return
+    event.preventDefault()
+    onOpenProject(groupKey)
+  }
 
   const header = (
-    <div
+    <a
+      href={overviewHref}
+      aria-label={`Open ${projectName} overview`}
       className={cn(
-        "sticky top-0 bg-background dark:bg-card z-10 relative p-[10px] flex items-center justify-between"
+        "sticky top-0 bg-background dark:bg-card z-10 relative p-[10px] flex items-center justify-between",
+        "rounded-lg text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       )}
-      onClick={() => onToggleSection(groupKey)}
+      onClick={handleOpenProject}
     >
       <div className="flex items-center gap-2">
-        <span className="relative size-3.5 shrink-0 cursor-pointer">
-          {collapsedSections.has(groupKey) ? (
-            <ChevronRight className="translate-y-[1px] size-3.5 shrink-0 text-slate-400 transition-all duration-200" />
-          ) : (
-            <>
-              <FolderOpen className="absolute inset-0 translate-y-[1px] size-3.5 shrink-0 text-slate-400 dark:text-slate-500 transition-all duration-200 group-hover/section:opacity-0" />
-              <ChevronRight className="absolute inset-0 translate-y-[1px] size-3.5 shrink-0 rotate-90 text-slate-400 opacity-0 transition-all duration-200 group-hover/section:opacity-100" />
-            </>
-          )}
+        <span className="relative size-3.5 shrink-0">
+          <FolderOpen className="translate-y-[1px] size-3.5 shrink-0 text-slate-400 dark:text-slate-500 transition-all duration-200" />
         </span>
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="truncate max-w-[150px] whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-              {getPathBasename(localPath)}
+              {projectName}
             </span>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={4}>
@@ -109,7 +107,7 @@ function ProjectGroupSection({
           </TooltipContent>
         </Tooltip>
       </div>
-    </div>
+    </a>
   )
 
   return (
@@ -131,7 +129,7 @@ function ProjectGroupSection({
         </ProjectSectionMenu>
       ) : header}
 
-      {!collapsedSections.has(groupKey) && (displayChats.length > 0 || hasMore) && (
+      {(displayChats.length > 0 || hasMore) && (
         <div className="space-y-[2px] mb-2 ">
           {displayChats.map(renderChatRow)}
           {hasMore && (
@@ -152,9 +150,7 @@ function ProjectGroupSection({
 
 export function LocalProjectsSection({
   workspaceGroups,
-  collapsedSections,
   expandedGroups,
-  onToggleSection,
   onToggleExpandedGroup,
   renderChatRow,
   chatsPerProject,
@@ -172,9 +168,7 @@ export function LocalProjectsSection({
         <ProjectGroupSection
           key={group.groupKey}
           group={group}
-          collapsedSections={collapsedSections}
           expandedGroups={expandedGroups}
-          onToggleSection={onToggleSection}
           onToggleExpandedGroup={onToggleExpandedGroup}
           renderChatRow={renderChatRow}
           chatsPerProject={chatsPerProject}
