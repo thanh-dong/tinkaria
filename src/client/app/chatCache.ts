@@ -1,5 +1,8 @@
 import type { IncrementalHydrator } from "../lib/parseTranscript"
 import type { HydratedTranscriptMessage } from "../../shared/types"
+import type { ScrollMode } from "./scrollMachine"
+
+export type CachedScrollMode = Exclude<ScrollMode, "anchoring">
 
 // --- Per-chat message cache ---
 // Preserves hydrator + messages across chat switches so stale content
@@ -12,6 +15,8 @@ export interface CachedChatState {
   cachedAt: number
   lastMessageAt: number | undefined
   stale: boolean
+  scrollTop: number
+  scrollMode: CachedScrollMode
 }
 
 const chatCache = new Map<string, CachedChatState>()

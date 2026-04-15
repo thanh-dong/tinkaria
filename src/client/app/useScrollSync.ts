@@ -4,6 +4,7 @@ import { shouldShowScrollButton } from "./scrollMachine"
 import type { ScrollMode } from "./scrollMachine"
 import type { ChatSnapshot, HydratedTranscriptMessage } from "../../shared/types"
 import { shouldStickToBottomOnComposerSubmit } from "./appState.helpers"
+import type { CachedScrollState } from "./useTranscriptLifecycle"
 
 const FIXED_TRANSCRIPT_PADDING_BOTTOM = 320
 
@@ -27,6 +28,7 @@ export function useScrollSync(args: {
   hasSidebarChat: boolean
   inputHeight: number
   runtime: ChatSnapshot["runtime"] | null
+  cachedScrollState: CachedScrollState | null
 }): {
   scrollRef: RefObject<HTMLDivElement | null>
   sentinelRef: RefObject<HTMLDivElement | null>
@@ -46,12 +48,16 @@ export function useScrollSync(args: {
     messages,
     inputHeight,
     runtime,
+    cachedScrollState,
   } = args
-
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const initialScrollCompletedRef = useRef(false)
+  // Stable ref for cachedScrollState so the layout effect can read it without re-triggering
+  const cachedScrollStateRef = useRef(cachedScrollState)
+  cachedScrollStateRef.current = cachedScrollState
+
   const {
     isFollowing,
     modeRef: scrollModeRef,
@@ -63,12 +69,37 @@ export function useScrollSync(args: {
   } = useScrollFollow(scrollRef, sentinelRef)
 
 
+  // ── Effect A: Session-switch scroll restore (BEFORE paint) ──────────
+  // Single authority for scroll positioning on session change.
+  // Runs synchronously before the browser paints — eliminates the "swoosh".
   useLayoutEffect(() => {
     initialScrollCompletedRef.current = false
     scrollFollowChatChanged()
-  }, [activeChatId, scrollFollowChatChanged])
+
+    const element = scrollRef.current
+    if (!element) return
+
+    const cached = cachedScrollStateRef.current
+    if (cached && cached.scrollMode === "detached") {
+      // Restore exact cached position — skip anchoring entirely
+      beginProgrammaticScroll()
+      element.scrollTop = cached.scrollTop
+      endProgrammaticScroll()
+      initialScrollCompletedRef.current = true
+      handleInitialScrollDone("block")
+    } else if (messages.length > 0) {
+      // Default: scroll to bottom synchronously (before paint)
+      beginProgrammaticScroll()
+      element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
+      endProgrammaticScroll()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChatId])
 
 
+  // ── Effect B: Anchoring stabilization (post-paint) ──────────────────
+  // Only runs when NOT already completed (i.e., not restored from detached cache).
+  // Handles the virtualizer's async height estimation by polling until stable.
   useEffect(() => {
     if (initialScrollCompletedRef.current) return
     if (messages.length === 0) return
@@ -88,12 +119,6 @@ export function useScrollSync(args: {
         lastScrollHeight = el.scrollHeight
         stableCount = 0
       }
-      // Only declare stable when scrollHeight stopped changing AND we're
-      // actually within the bottom follow band. The virtualizer reports
-      // estimated heights for off-screen items; scrollHeight can stabilise
-      // at a value that doesn't represent the true bottom yet. Requiring
-      // the follow-band check prevents declaring "done" while stuck in the
-      // middle of the transcript.
       const atBottom = isWithinBottomFollowBand(
         el.scrollHeight - el.scrollTop - el.clientHeight,
         el.clientHeight,
@@ -125,21 +150,15 @@ export function useScrollSync(args: {
   const showScrollButton = shouldShowScrollButton(scrollModeRef.current, messages.length)
 
 
+  // ── Effect C: Follow-mode auto-scroll on content changes ────────────
+  // Only fires after initial anchoring is complete and mode is "following".
+  // Does NOT trigger on activeChatId changes — session switches are Effect A only.
   useLayoutEffect(() => {
+    if (!initialScrollCompletedRef.current) return
     const element = scrollRef.current
     if (!element) return
 
-    const wantsTail = !initialScrollCompletedRef.current && messages.length > 0
-    const isAutoFollowing = initialScrollCompletedRef.current && scrollModeRef.current === "following"
-    const shouldReconcileDetachedMode = shouldReconcileDetachedScrollMode({
-      initialScrollCompleted: initialScrollCompletedRef.current,
-      scrollMode: scrollModeRef.current,
-      scrollHeight: element.scrollHeight,
-      scrollTop: element.scrollTop,
-      clientHeight: element.clientHeight,
-    })
-
-    if (wantsTail || isAutoFollowing) {
+    if (scrollModeRef.current === "following") {
       beginProgrammaticScroll()
       element.scrollTo({ top: element.scrollHeight, behavior: "auto" })
       const frameId = window.requestAnimationFrame(() => endProgrammaticScroll())
@@ -149,12 +168,22 @@ export function useScrollSync(args: {
       }
     }
 
-    if (shouldReconcileDetachedMode) {
+    if (shouldReconcileDetachedScrollMode({
+      initialScrollCompleted: initialScrollCompletedRef.current,
+      scrollMode: scrollModeRef.current,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+      clientHeight: element.clientHeight,
+    })) {
       scrollFollowToBottom("auto")
     }
-  }, [activeChatId, beginProgrammaticScroll, endProgrammaticScroll, inputHeight, messages.length, runtime?.status, scrollFollowToBottom, scrollModeRef])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beginProgrammaticScroll, endProgrammaticScroll, inputHeight, messages.length, runtime?.status, scrollFollowToBottom])
 
 
+  // ── Effect D: ResizeObserver for content reflow ─────────────────────
+  // Keeps scroll pinned to bottom when content resizes during following mode.
+  // Gated to post-initial-scroll only.
   useEffect(() => {
     const element = scrollRef.current
     if (!element || !activeChatId) return
@@ -163,7 +192,9 @@ export function useScrollSync(args: {
     const resizeTarget = scrollElement.firstElementChild instanceof HTMLElement ? scrollElement.firstElementChild : scrollElement
 
     function keepFollowPinnedOnResize() {
-      if (scrollModeRef.current === "following" && initialScrollCompletedRef.current) {
+      if (!initialScrollCompletedRef.current) return
+
+      if (scrollModeRef.current === "following") {
         scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: "auto" })
         return
       }

@@ -288,10 +288,26 @@ export function useAppState(activeChatId: string | null): AppState {
     snapshotCallbackRef.current(snapshot)
   }, [])
 
+  // Ref-based scroll state bridge: useScrollSync populates this, useTranscriptLifecycle reads it.
+  // Avoids circular dependency since lifecycle runs first but needs scroll state on departure.
+  const scrollStateRef = useRef<{ scrollRef: RefObject<HTMLDivElement | null>; scrollModeRef: RefObject<string> } | null>(null)
+  const getScrollState = useCallback(() => {
+    const bridge = scrollStateRef.current
+    if (!bridge) return null
+    const el = bridge.scrollRef.current
+    if (!el) return null
+    const mode = bridge.scrollModeRef.current
+    return {
+      scrollTop: el.scrollTop,
+      scrollMode: (mode === "detached" ? "detached" : "following") as "following" | "detached",
+    }
+  }, [])
+
   const {
     messages,
     chatSnapshot,
     orchestrationHierarchy,
+    cachedScrollState,
   } = useTranscriptLifecycle({
     socket,
     activeChatId,
@@ -304,6 +320,7 @@ export function useAppState(activeChatId: string | null): AppState {
     setProjectSelection,
     setCommandError,
     onChatSnapshotReceived: handleChatSnapshotReceived,
+    getScrollState,
   })
 
   useLayoutEffect(() => {
@@ -355,6 +372,7 @@ export function useAppState(activeChatId: string | null): AppState {
     transcriptPaddingBottom,
     scrollToBottom,
     keepComposerSubmitAnchored,
+    scrollModeRef,
   } = useScrollSync({
     activeChatId,
     messages,
@@ -362,7 +380,11 @@ export function useAppState(activeChatId: string | null): AppState {
     hasSidebarChat: hasResolvedActiveSidebarChat,
     inputHeight,
     runtime,
+    cachedScrollState,
   })
+
+  // Populate the bridge ref so useTranscriptLifecycle can read scroll state on departure
+  scrollStateRef.current = { scrollRef, scrollModeRef }
 
   const fallbackLocalProjectPath = localProjects?.workspaces[0]?.localPath ?? null
   const selectedProject = resolveProjectSelection(projectSelection)

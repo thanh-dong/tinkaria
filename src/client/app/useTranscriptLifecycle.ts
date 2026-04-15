@@ -9,7 +9,7 @@ import type {
 } from "../../shared/types"
 import { createIncrementalHydrator } from "../lib/parseTranscript"
 import type { IncrementalHydrator } from "../lib/parseTranscript"
-import { getCachedChat, setCachedChat } from "./chatCache"
+import { getCachedChat, setCachedChat, type CachedScrollMode } from "./chatCache"
 import {
   computeTailOffset,
   fetchTranscriptRange,
@@ -35,6 +35,11 @@ function log(message: string, details?: unknown) {
   console.info(`${LOG_PREFIX} ${message}`, details)
 }
 
+export interface CachedScrollState {
+  scrollTop: number
+  scrollMode: CachedScrollMode
+}
+
 export interface TranscriptLifecycleArgs {
   socket: AppTransport
   activeChatId: string | null
@@ -47,6 +52,7 @@ export interface TranscriptLifecycleArgs {
   setProjectSelection: React.Dispatch<React.SetStateAction<ProjectSelectionState>>
   setCommandError: (error: string | null) => void
   onChatSnapshotReceived: (snapshot: ChatSnapshot) => void
+  getScrollState: () => CachedScrollState | null
 }
 
 export interface TranscriptLifecycleResult {
@@ -56,6 +62,7 @@ export interface TranscriptLifecycleResult {
   chatSnapshot: ChatSnapshot | null
   orchestrationHierarchy: OrchestrationHierarchySnapshot | null
   chatReady: boolean
+  cachedScrollState: CachedScrollState | null
 }
 
 export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): TranscriptLifecycleResult {
@@ -71,11 +78,18 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
     setProjectSelection,
     setCommandError,
     onChatSnapshotReceived,
+    getScrollState,
   } = args
 
   // Stable ref for the callback to avoid re-triggering the subscription effect
   const onChatSnapshotReceivedRef = useRef(onChatSnapshotReceived)
   useLayoutEffect(() => { onChatSnapshotReceivedRef.current = onChatSnapshotReceived }, [onChatSnapshotReceived])
+
+  // Stable ref for scroll state getter — used in cleanup to capture scroll position on departure
+  const getScrollStateRef = useRef(getScrollState)
+  useLayoutEffect(() => { getScrollStateRef.current = getScrollState }, [getScrollState])
+
+  const [cachedScrollState, setCachedScrollState] = useState<CachedScrollState | null>(null)
 
   const hydratorRef = useRef<IncrementalHydrator>(createIncrementalHydrator())
   const [messages, setMessages] = useState<HydratedTranscriptMessage[]>([])
@@ -119,12 +133,16 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
         cachedMessages: cached.messages.length,
         cachedDiagnostics: summarizeTranscriptWindow(cached.messages),
         stale: cached.stale,
+        scrollTop: cached.scrollTop,
+        scrollMode: cached.scrollMode,
       })
       messagesChatIdRef.current = activeChatId
       messageCountRef.current = cached.messageCount
       setMessages(cached.messages)
+      setCachedScrollState({ scrollTop: cached.scrollTop, scrollMode: cached.scrollMode })
       setChatReady(true)    // show stale content immediately
     } else {
+      setCachedScrollState(null)
       if (shouldPreserveMessagesOnResubscribe({
         hasExistingMessages: messagesRef.current.length > 0,
         restoredFromCache: false,
@@ -351,6 +369,7 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
         .flatMap((g) => g.chats)
         .find((c) => c.chatId === chatId)
       if (chatId && messagesChatIdRef.current === chatId && messagesRef.current.length > 0) {
+        const scrollState = getScrollStateRef.current()
         setCachedChat(chatId, {
           hydrator,
           messages: messagesRef.current,
@@ -358,6 +377,8 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
           cachedAt: Date.now(),
           lastMessageAt: departingSidebarChat?.lastMessageAt,
           stale: false,
+          scrollTop: scrollState?.scrollTop ?? 0,
+          scrollMode: scrollState?.scrollMode ?? "following",
         })
       }
     }
@@ -395,5 +416,6 @@ export function useTranscriptLifecycle(args: TranscriptLifecycleArgs): Transcrip
     chatSnapshot,
     orchestrationHierarchy,
     chatReady,
+    cachedScrollState,
   }
 }

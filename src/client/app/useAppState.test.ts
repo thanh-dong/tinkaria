@@ -741,6 +741,8 @@ function createMockCachedState(messageCount = 5): {
   cachedAt: number
   lastMessageAt: number | undefined
   stale: boolean
+  scrollTop: number
+  scrollMode: "following" | "detached"
 } {
   return {
     hydrator: createIncrementalHydrator(),
@@ -749,6 +751,8 @@ function createMockCachedState(messageCount = 5): {
     cachedAt: Date.now(),
     lastMessageAt: Date.now(),
     stale: false,
+    scrollTop: 0,
+    scrollMode: "following",
   }
 }
 
@@ -867,5 +871,41 @@ describe("chatCache", () => {
 
     // Still stale (no unnecessary re-save)
     expect(getCachedChat("chat-1")?.stale).toBe(true)
+  })
+
+  test("scroll state round-trips through cache", () => {
+    const state = createMockCachedState()
+    state.scrollTop = 500
+    state.scrollMode = "detached"
+    setCachedChat("chat-1", state)
+
+    const retrieved = getCachedChat("chat-1")
+    expect(retrieved?.scrollTop).toBe(500)
+    expect(retrieved?.scrollMode).toBe("detached")
+  })
+
+  test("scroll state defaults to following at scrollTop 0", () => {
+    const state = createMockCachedState()
+    setCachedChat("chat-1", state)
+
+    const retrieved = getCachedChat("chat-1")
+    expect(retrieved?.scrollTop).toBe(0)
+    expect(retrieved?.scrollMode).toBe("following")
+  })
+
+  test("scroll state is preserved when markCachedChatsStale marks entry stale", () => {
+    const now = Date.now()
+    const state = createMockCachedState()
+    state.lastMessageAt = now - 5000
+    state.scrollTop = 300
+    state.scrollMode = "detached"
+    setCachedChat("chat-1", state)
+
+    markCachedChatsStale([{ chatId: "chat-1", lastMessageAt: now }])
+
+    const retrieved = getCachedChat("chat-1")
+    expect(retrieved?.stale).toBe(true)
+    expect(retrieved?.scrollTop).toBe(300)
+    expect(retrieved?.scrollMode).toBe("detached")
   })
 })
