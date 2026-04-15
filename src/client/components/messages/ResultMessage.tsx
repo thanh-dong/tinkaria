@@ -13,12 +13,35 @@ function getResultErrorHint(result: string | undefined): string {
   return "This usually means the CLI process crashed or was killed."
 }
 
+const SESSION_ENDED_TITLE = "Session ended unexpectedly"
+const SESSION_ENDED_HINT = "This usually means the CLI process crashed or was killed."
+
+export function getResultErrorDetail(result: string | undefined): string {
+  if (!result) return ""
+
+  const lines = result.split(/\r?\n/)
+  while (lines.length > 0 && lines[0]?.trim() === "") {
+    lines.shift()
+  }
+
+  if (lines[0]?.trim() === SESSION_ENDED_TITLE) {
+    lines.shift()
+  }
+
+  if (lines[0]?.trim() === SESSION_ENDED_HINT) {
+    lines.shift()
+  }
+
+  return lines.join("\n").trim()
+}
+
 interface Props {
   message: ProcessedResultMessage
 }
 
 export const ResultMessage = memo(function ResultMessage({ message }: Props) {
   const actions = useTranscriptActions()
+  const errorDetail = getResultErrorDetail(message.result)
 
   const formatDuration = (ms: number) => {
     if (ms < 1000) {
@@ -59,10 +82,10 @@ export const ResultMessage = memo(function ResultMessage({ message }: Props) {
         <div className="flex items-start gap-2">
           <AlertCircle className="size-4.5 text-destructive mt-0.5 flex-shrink-0" />
           <div className="flex flex-col gap-1">
-            <span className="font-medium text-destructive">Session ended unexpectedly</span>
+            <span className="font-medium text-destructive">{SESSION_ENDED_TITLE}</span>
             <span className="text-muted-foreground text-xs">{getResultErrorHint(message.result)}</span>
-            {message.result && (
-              <code className="text-xs text-muted-foreground/70 font-mono mt-0.5">{message.result}</code>
+            {errorDetail && (
+              <code className="text-xs text-muted-foreground/70 font-mono mt-0.5">{errorDetail}</code>
             )}
             <div className="flex gap-2 mt-1.5">
               <Button variant="default" size="sm" onClick={actions?.onNewChat}>
