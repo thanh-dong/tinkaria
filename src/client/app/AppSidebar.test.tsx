@@ -85,11 +85,21 @@ describe("AppSidebar", () => {
     expect(html).toContain('data-ui-c3-label="sidebar"')
   })
 
+  test("renders connection status next to the Tinkaria logo", () => {
+    const html = renderSidebar({
+      connectionStatus: "disconnected",
+      ready: false,
+    })
+
+    expect(html).toContain('data-sidebar-connection-indicator="disconnected"')
+    expect(html).toContain('aria-label="Connection status: Disconnected"')
+    expect(html).toContain(">Disconnected<")
+  })
+
   test("uses the Tinkaria footer entry without connection chrome", () => {
     const html = renderSidebar()
 
     expect(html).not.toContain(">Connection<")
-    expect(html).not.toContain(">Connected<")
     expect(html).toContain(">Tinkaria</button>")
   })
 

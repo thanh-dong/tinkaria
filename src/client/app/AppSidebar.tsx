@@ -58,6 +58,26 @@ const SIDEBAR_UI_DESCRIPTOR = createC3UiIdentityDescriptor({
   c3ComponentLabel: "sidebar",
 })
 
+type SidebarConnectionIndicatorState = "connected" | "connecting" | "disconnected"
+
+function getSidebarConnectionIndicatorState(connectionStatus: SocketStatus, ready: boolean): SidebarConnectionIndicatorState {
+  if (connectionStatus === "connected" && ready) return "connected"
+  if (connectionStatus === "disconnected") return "disconnected"
+  return "connecting"
+}
+
+const SIDEBAR_CONNECTION_LABELS: Record<SidebarConnectionIndicatorState, string> = {
+  connected: "Connected",
+  connecting: "Connecting",
+  disconnected: "Disconnected",
+}
+
+const SIDEBAR_CONNECTION_DOT_CLASSES: Record<SidebarConnectionIndicatorState, string> = {
+  connected: "bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.16)]",
+  connecting: "bg-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.18)]",
+  disconnected: "bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.16)]",
+}
+
 export function getSidebarUiIdentityDescriptor() {
   return SIDEBAR_UI_DESCRIPTOR
 }
@@ -208,6 +228,8 @@ function AppSidebarInner({
   const isLocalProjectsActive = location.pathname === "/"
   const isUtilityPageActive = isLocalProjectsActive
   const isConnecting = connectionStatus === "connecting" || !ready
+  const connectionIndicatorState = getSidebarConnectionIndicatorState(connectionStatus, ready)
+  const connectionIndicatorLabel = SIDEBAR_CONNECTION_LABELS[connectionIndicatorState]
   const showUpdateButton = updateSnapshot?.updateAvailable === true
   const showDevBadge = updateSnapshot
     ? updateSnapshot.latestVersion === `${updateSnapshot.currentVersion}-dev`
@@ -280,6 +302,18 @@ function AppSidebarInner({
               />
             </div>
             <TinkariaSidebarMark className="h-6 w-6 sm:h-7 sm:w-7 md:hidden" imageClassName="h-5 w-5 sm:h-5.5 sm:w-5.5" />
+            <span
+              data-sidebar-connection-indicator={connectionIndicatorState}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground"
+              aria-label={`Connection status: ${connectionIndicatorLabel}`}
+              title={`Connection status: ${connectionIndicatorLabel}`}
+            >
+              <span
+                aria-hidden="true"
+                className={cn("size-1.5 rounded-full", SIDEBAR_CONNECTION_DOT_CLASSES[connectionIndicatorState])}
+              />
+              <span className="hidden sm:inline">{connectionIndicatorLabel}</span>
+            </span>
             <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">
               {APP_NAME}
             </span>
