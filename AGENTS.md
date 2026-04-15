@@ -6,7 +6,7 @@ Web UI for Claude Code and Codex CLIs. Full-stack TypeScript: React 19 client + 
 
 C3 is the architecture source of truth and the project work harness. Do not rediscover project structure or pre-triage C3's scope yourself.
 
-- Send project questions, file paths, audits, impact checks, rules, refs, plans, and implementation work to `/c3`.
+- Send project questions, file paths, audits, impact checks, rules, refs, plans, and implementation work to `$c3`.
 - Let C3 classify the operation and provide topology, ownership, rules, refs, recipes, ADRs, and file context.
 - Read or edit source only after C3 has returned the relevant context and next steps.
 - If C3 is unavailable or check fails, stop and report the blocker instead of bypassing it.
