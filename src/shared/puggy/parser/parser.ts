@@ -277,7 +277,7 @@ function normalizeColonInlineElement(line: SourceLine): SourceLine {
 
 function parseElement(line: SourceLine): ParsedLine {
   const split = splitElementSource(line.text);
-  const attrStart = split.head.indexOf("(");
+  const attrStart = findAttrStart(split.head);
   const attrEnd = attrStart >= 0 ? findAttrEnd(split.head, attrStart) : -1;
   if (attrStart >= 0 && attrEnd < 0) {
     return {
@@ -324,6 +324,36 @@ function parseElement(line: SourceLine): ParsedLine {
   return { ok: true, node };
 }
 
+function findAttrStart(source: string): number {
+  let bracketDepth = 0;
+  let quote: string | null = null;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]!;
+    if (quote) {
+      if (char === quote && source[index - 1] !== "\\") {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === "[") {
+      bracketDepth += 1;
+      continue;
+    }
+    if (char === "]") {
+      bracketDepth -= 1;
+      continue;
+    }
+    if (bracketDepth === 0 && char === "(") {
+      return index;
+    }
+  }
+  return -1;
+}
+
 function getChildTarget(node: PuggyNode): PuggyNode[] | null {
   switch (node.kind) {
     case "element":
@@ -350,21 +380,88 @@ function parseSelector(selector: string):
 
   while (cursor < selector.length) {
     const char = selector[cursor];
-    const match = /^[.#]([A-Za-z0-9_-]+)/.exec(selector.slice(cursor));
-    if (!match || (char !== "." && char !== "#")) {
+    if (char === ".") {
+      const className = readClassName(selector, cursor + 1);
+      if (!className) {
+        return { ok: false, code: "PUGGY_UNSUPPORTED_SELECTOR", message: "Unsupported selector syntax." };
+      }
+      classes.push(className.value);
+      cursor = className.end;
+      continue;
+    }
+    if (char !== "#") {
       return { ok: false, code: "PUGGY_UNSUPPORTED_SELECTOR", message: "Unsupported selector syntax." };
     }
-    if (char === ".") {
-      classes.push(match[1]!);
-    } else if (id !== undefined) {
-      return { ok: false, code: "PUGGY_DUPLICATE_ID", message: "Duplicate id selector." };
-    } else {
-      id = match[1]!;
+
+    const idMatch = /^#([A-Za-z0-9_-]+)/.exec(selector.slice(cursor));
+    if (!idMatch) {
+      return { ok: false, code: "PUGGY_UNSUPPORTED_SELECTOR", message: "Unsupported selector syntax." };
     }
-    cursor += match[0].length;
+    if (id !== undefined) {
+      return { ok: false, code: "PUGGY_DUPLICATE_ID", message: "Duplicate id selector." };
+    }
+    id = idMatch[1]!;
+    cursor += idMatch[0].length;
   }
 
   return { ok: true, tag, classes, ...(id ? { id } : {}) };
+}
+
+function readClassName(selector: string, start: number): { value: string; end: number } | null {
+  let cursor = start;
+  let bracketDepth = 0;
+  let quote: string | null = null;
+
+  while (cursor < selector.length) {
+    const char = selector[cursor]!;
+    if (quote) {
+      if (char === quote && selector[cursor - 1] !== "\\") {
+        quote = null;
+      }
+      cursor += 1;
+      continue;
+    }
+
+    if (char === "\"" || char === "'") {
+      quote = char;
+      cursor += 1;
+      continue;
+    }
+    if (char === "[") {
+      bracketDepth += 1;
+      cursor += 1;
+      continue;
+    }
+    if (char === "]") {
+      bracketDepth -= 1;
+      if (bracketDepth < 0) {
+        return null;
+      }
+      cursor += 1;
+      continue;
+    }
+    if (bracketDepth === 0 && (char === "." || char === "#")) {
+      break;
+    }
+    if (/\s/.test(char)) {
+      return null;
+    }
+    cursor += 1;
+  }
+
+  if (quote || bracketDepth !== 0 || cursor === start) {
+    return null;
+  }
+
+  const value = selector.slice(start, cursor);
+  if (!isSupportedClassName(value)) {
+    return null;
+  }
+  return { value, end: cursor };
+}
+
+function isSupportedClassName(value: string): boolean {
+  return /^[A-Za-z0-9_!:[\]#@%/>&=$*~|'"().,+-]+$/.test(value);
 }
 
 function parseAttrs(
@@ -472,6 +569,7 @@ function findAttrEnd(source: string, start: number): number {
 
 function splitElementSource(source: string): { head: string; inline: string; inlineColumn: number; kind: "text" | "expr" } {
   let depth = 0;
+  let bracketDepth = 0;
   let quote: string | null = null;
   for (let index = 0; index < source.length; index += 1) {
     const char = source[index]!;
@@ -493,7 +591,15 @@ function splitElementSource(source: string): { head: string; inline: string; inl
       depth -= 1;
       continue;
     }
-    if (depth === 0 && char === "=") {
+    if (char === "[") {
+      bracketDepth += 1;
+      continue;
+    }
+    if (char === "]") {
+      bracketDepth -= 1;
+      continue;
+    }
+    if (depth === 0 && bracketDepth === 0 && char === "=") {
       return {
         head: source.slice(0, index),
         inline: source.slice(index + 1).trimStart(),
@@ -501,7 +607,7 @@ function splitElementSource(source: string): { head: string; inline: string; inl
         kind: "expr"
       };
     }
-    if (depth === 0 && /\s/.test(char)) {
+    if (depth === 0 && bracketDepth === 0 && /\s/.test(char)) {
       return {
         head: source.slice(0, index),
         inline: source.slice(index + 1),

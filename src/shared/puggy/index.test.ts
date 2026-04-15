@@ -74,4 +74,28 @@ describe("puggy render", () => {
       diagnostics: [],
     })
   })
+
+  test("supports Tailwind utility classes in selector shorthand", () => {
+    const result = render(
+      [
+        ".grid.md:grid-cols-3.gap-4",
+        "  .w-[320px].bg-[#0f172a].text-white/90.hover:bg-slate-100",
+        "    .data-[state=open]:opacity-100.[&>svg]:size-4.!mt-0",
+        "      .sm:max-w-[min(100%,42rem)].before:content-['ok'].[@media(min-width:900px)]:grid",
+      ].join("\n"),
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      html: '<div class="grid md:grid-cols-3 gap-4"><div class="w-[320px] bg-[#0f172a] text-white/90 hover:bg-slate-100"><div class="data-[state=open]:opacity-100 [&amp;&gt;svg]:size-4 !mt-0"><div class="sm:max-w-[min(100%,42rem)] before:content-[\'ok\'] [@media(min-width:900px)]:grid"></div></div></div></div>',
+      diagnostics: [],
+    })
+  })
+
+  test("rejects malformed Tailwind selector shorthand", () => {
+    const result = render(".w-[320px")
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics[0]?.code).toBe("PUGGY_UNSUPPORTED_SELECTOR")
+  })
 })
