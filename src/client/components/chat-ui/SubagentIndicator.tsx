@@ -72,6 +72,15 @@ const INDICATOR_DESCRIPTORS = {
   }),
 } as const
 
+export const SUBAGENT_INSPECTOR_LAYOUT_CLASSES = {
+  content: cn(RESPONSIVE_MODAL_CONTENT_CLASS_NAME, "h-[min(85vh,48rem)] max-w-5xl p-0"),
+  body: "min-h-0 overflow-hidden p-0",
+  shell: "flex h-full min-h-0 flex-1 flex-col md:grid md:min-h-0 md:grid-cols-[18rem_minmax(0,1fr)]",
+  list: "flex shrink-0 gap-2 overflow-x-auto border-b border-border/70 p-3 md:min-h-0 md:shrink md:flex-col md:overflow-y-auto md:border-b-0 md:border-r",
+  transcriptPanel: "flex min-h-0 flex-1 flex-col overflow-hidden",
+  transcriptSlot: "flex min-h-0 flex-1 overflow-hidden p-3 md:p-4",
+} as const
+
 interface FlattenedChildNode extends OrchestrationChildNode {
   depth: number
 }
@@ -508,7 +517,7 @@ export const SubagentIndicator = memo(function SubagentIndicator({
 
       <DialogContent
         {...getUiIdentityAttributeProps(INDICATOR_DESCRIPTORS.dialog)}
-        className={cn(RESPONSIVE_MODAL_CONTENT_CLASS_NAME, "max-w-5xl p-0")}
+        className={SUBAGENT_INSPECTOR_LAYOUT_CLASSES.content}
       >
         <DialogHeader className={cn(RESPONSIVE_MODAL_HEADER_CLASS_NAME, "gap-1")}>
           <DialogTitle>Subagent Sessions</DialogTitle>
@@ -517,11 +526,11 @@ export const SubagentIndicator = memo(function SubagentIndicator({
           </DialogDescription>
         </DialogHeader>
 
-        <DialogBody className="p-0 overflow-hidden">
-          <div className="flex min-h-0 h-full flex-col md:grid md:grid-cols-[18rem_minmax(0,1fr)]">
+        <DialogBody className={SUBAGENT_INSPECTOR_LAYOUT_CLASSES.body}>
+          <div className={SUBAGENT_INSPECTOR_LAYOUT_CLASSES.shell}>
             <div
               {...getUiIdentityAttributeProps(INDICATOR_DESCRIPTORS.list)}
-              className="flex gap-2 overflow-x-auto border-b border-border/70 p-3 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r"
+              className={SUBAGENT_INSPECTOR_LAYOUT_CLASSES.list}
             >
               {flattenedNodes.map((node) => (
                 <TreeNodeButton
@@ -534,8 +543,8 @@ export const SubagentIndicator = memo(function SubagentIndicator({
               ))}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col" {...getUiIdentityAttributeProps(INDICATOR_DESCRIPTORS.transcript)}>
-              <div className="border-b border-border/70 px-4 py-3">
+            <div className={SUBAGENT_INSPECTOR_LAYOUT_CLASSES.transcriptPanel} {...getUiIdentityAttributeProps(INDICATOR_DESCRIPTORS.transcript)}>
+              <div className="shrink-0 border-b border-border/70 px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">
@@ -569,7 +578,7 @@ export const SubagentIndicator = memo(function SubagentIndicator({
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-1 p-4">
+              <div className={SUBAGENT_INSPECTOR_LAYOUT_CLASSES.transcriptSlot}>
                 <SubagentInspectorTranscript
                   session={session}
                   scrollRef={transcriptScrollRef}

@@ -5,6 +5,7 @@ import type { AppTransport } from "../../app/socket-interface"
 import type { OrchestrationChildNode } from "../../../shared/types"
 import {
   SubagentIndicator,
+  SUBAGENT_INSPECTOR_LAYOUT_CLASSES,
   SubagentInspectorTranscript,
   allTerminal,
   countNodes,
@@ -91,6 +92,16 @@ describe("SubagentIndicator helpers", () => {
 })
 
 describe("SubagentInspectorTranscript", () => {
+  test("keeps the inspector shell height-bounded so the transcript can scroll", () => {
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.content).toContain("h-[min(85vh,48rem)]")
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.body).toContain("overflow-hidden")
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.body).toContain("min-h-0")
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.shell).toContain("min-h-0")
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.shell).toContain("h-full")
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.transcriptSlot).toContain("min-h-0")
+    expect(SUBAGENT_INSPECTOR_LAYOUT_CLASSES.transcriptSlot).toContain("flex-1")
+  })
+
   test("renders loading state", () => {
     const html = renderToStaticMarkup(createElement(SubagentInspectorTranscript, {
       session: { snapshot: null, messages: [], isLoading: true, error: null },
