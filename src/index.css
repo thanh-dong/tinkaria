@@ -474,11 +474,39 @@
   @keyframes tinkaria-composer-placeholder-breathe {
     0%,
     100% {
-      opacity: 0.58;
+      opacity: 0.52;
     }
 
     50% {
-      opacity: 0.88;
+      opacity: 0.78;
+    }
+  }
+
+  @keyframes tinkaria-composer-placeholder-rotate-breathe {
+    0%,
+    100% {
+      opacity: 0;
+      filter: blur(1.5px);
+    }
+
+    10% {
+      opacity: 0.82;
+      filter: blur(0);
+    }
+
+    50% {
+      opacity: 0.92;
+      filter: blur(0);
+    }
+
+    88% {
+      opacity: 0.82;
+      filter: blur(0);
+    }
+
+    96% {
+      opacity: 0;
+      filter: blur(1.5px);
     }
   }
 
@@ -516,12 +544,12 @@
   }
 
   .tinkaria-composer-placeholder::placeholder {
-    animation: tinkaria-composer-placeholder-breathe 7.5s ease-in-out infinite;
+    animation: tinkaria-composer-placeholder-breathe 9s ease-in-out infinite;
   }
 
   .tinkaria-composer-placeholder-rotating::placeholder {
-    animation-duration: 3.2s;
-    color: color-mix(in oklch, currentColor 64%, oklch(71.2% 0.194 13.428) 36%);
+    animation: tinkaria-composer-placeholder-rotate-breathe 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    color: color-mix(in oklch, currentColor 76%, oklch(71.2% 0.194 13.428) 24%);
   }
 
   .tinkaria-typewriter-cursor-slot {
@@ -580,12 +608,12 @@
 }
 
 @keyframes composer-running-pulse {
-  0%, 100% { border-color: oklch(71.2% 0.194 13.428 / 0.12); }
-  50% { border-color: oklch(71.2% 0.194 13.428 / 0.35); }
+  0%, 100% { border-color: oklch(71.2% 0.194 13.428 / 0.06); }
+  50% { border-color: oklch(71.2% 0.194 13.428 / 0.24); }
 }
 
 .animate-composer-running {
-  animation: composer-running-pulse 2.4s ease-in-out infinite;
+  animation: composer-running-pulse 8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .animate-wip-pulse {

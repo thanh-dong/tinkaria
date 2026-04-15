@@ -24,7 +24,7 @@ import { SkillRibbon } from "./SkillRibbon"
 import type { SocketStatus } from "../../app/socket-interface"
 
 const RECONNECT_SUCCESS_FADE_MS = 1200
-const AWAITING_PLACEHOLDER_ROTATE_MS = 3200
+const AWAITING_PLACEHOLDER_ROTATE_MS = 4000
 
 type ComposerReconnectVisualState = "idle" | "reconnecting" | "reconnected"
 
