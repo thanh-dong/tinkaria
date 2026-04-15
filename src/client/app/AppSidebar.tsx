@@ -302,9 +302,14 @@ function AppSidebarInner({
               />
             </div>
             <TinkariaSidebarMark className="h-6 w-6 sm:h-7 sm:w-7 md:hidden" imageClassName="h-5 w-5 sm:h-5.5 sm:w-5.5" />
+            <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">
+              {APP_NAME}
+            </span>
+          </Button>
+          <div className="flex items-center gap-1">
             <span
               data-sidebar-connection-indicator={connectionIndicatorState}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-muted-foreground/60"
               aria-label={`Connection status: ${connectionIndicatorLabel}`}
               title={`Connection status: ${connectionIndicatorLabel}`}
             >
@@ -314,11 +319,6 @@ function AppSidebarInner({
               />
               <span className="hidden sm:inline">{connectionIndicatorLabel}</span>
             </span>
-            <span className="font-logo text-base uppercase sm:text-md text-slate-600 dark:text-slate-100">
-              {APP_NAME}
-            </span>
-          </Button>
-          <div className="flex items-center">
             {showDevBadge ? (
               <span
                 className="mr-1 inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-bold tracking-wider text-muted-foreground"
