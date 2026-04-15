@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
 import { EmbedRenderer, isEmbedLanguage } from "./EmbedRenderer"
+import { ContentViewerContext, type ContentViewerContextValue } from "./ContentViewerContext"
 
 describe("EmbedRenderer pug embed", () => {
   test("treats pug as an embed language", () => {
@@ -34,5 +35,23 @@ describe("EmbedRenderer pug embed", () => {
     expect(html).toContain("PUGGY_UNSAFE_TAG")
     expect(html).toContain("script alert(1)")
     expect(html).not.toContain("srcDoc")
+  })
+
+  test("shows original pug source in source mode", () => {
+    const ctx: ContentViewerContextValue = {
+      state: { type: "embed", renderMode: "source", zoom: 1 },
+      dispatch: () => {},
+    }
+    const source = "main\n  h1 Hello"
+    const html = renderToStaticMarkup(
+      <ContentViewerContext.Provider value={ctx}>
+        <EmbedRenderer format="pug" source={source} />
+      </ContentViewerContext.Provider>,
+    )
+
+    expect(html).not.toContain("srcDoc")
+    expect(html).toContain("main")
+    expect(html).toContain("h1 Hello")
+    expect(html).not.toContain("&lt;main&gt;&lt;h1&gt;Hello&lt;/h1&gt;&lt;/main&gt;")
   })
 })

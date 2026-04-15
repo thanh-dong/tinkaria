@@ -269,6 +269,15 @@ function HtmlEmbed({ source }: { source: string }) {
 }
 
 function PugEmbed({ source }: { source: string }) {
+  const { mode } = useEmbedState()
+  if (mode === "source") {
+    return (
+      <pre className="whitespace-pre-wrap break-all text-xs font-mono text-foreground">
+        {source}
+      </pre>
+    )
+  }
+
   const rendered = renderPug(source)
 
   if (!rendered.ok) {
