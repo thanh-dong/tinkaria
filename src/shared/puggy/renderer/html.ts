@@ -28,6 +28,7 @@ const UNSAFE_TAGS = new Set([
   "xmp",
   "noscript"
 ]);
+const OMITTED_TAGS = new Set(["meta"]);
 const URL_ATTRS = new Set(["href", "src", "action", "formaction"]);
 
 export function renderHtml(
@@ -100,6 +101,8 @@ function renderNode(node: PuggyNode, state: RenderState): Rendered {
       const value = evaluateExpression(node.expression, state.data, node.line, node.column, state.options.expressions);
       return value.ok ? { ok: true, html: escapeHtml(stringify(value.value)) } : failure([value.diagnostic]);
     }
+    case "omit":
+      return { ok: true, html: "" };
     case "if": {
       const value = evaluateExpression(node.expression, state.data, node.line, node.column + 3, state.options.expressions);
       if (!value.ok) {
@@ -208,6 +211,9 @@ function renderElement(
   state: RenderState
 ): Rendered {
   if (UNSAFE_TAGS.has(node.tag.toLowerCase())) {
+    if (OMITTED_TAGS.has(node.tag.toLowerCase())) {
+      return { ok: true, html: "" };
+    }
     return failure([
       {
         code: "PUGGY_UNSAFE_TAG",
@@ -228,14 +234,16 @@ function renderElement(
 
   for (const attr of node.attrs) {
     if (isUnsafeAttrName(attr.name)) {
-      return failure([
-        {
-          code: "PUGGY_UNSAFE_ATTR",
-          message: "Unsafe attribute is not allowed.",
-          line: node.line,
-          column: attr.column
-        }
-      ]);
+      if (attr.name.toLowerCase() !== "style") {
+        return failure([
+          {
+            code: "PUGGY_UNSAFE_ATTR",
+            message: "Unsafe attribute is not allowed.",
+            line: node.line,
+            column: attr.column
+          }
+        ]);
+      }
     }
     if (attr.value === null) {
       attrs.push(attr.name);
@@ -262,6 +270,14 @@ function renderElement(
   }
 
   const attrText = attrs.length > 0 ? ` ${attrs.join(" ")}` : "";
+  if (node.tag.toLowerCase() === "style") {
+    const css = collectRawStyleText(node);
+    return { ok: true, html: `<${node.tag}${attrText}>${css}</${node.tag}>` };
+  }
+  if (node.rawText) {
+    return { ok: true, html: `<${node.tag}${attrText}>${escapeHtml(collectRawElementText(node))}</${node.tag}>` };
+  }
+
   let body = "";
   if (node.text) {
     const interpolated = interpolate(node.text, state, node.line, node.textColumn ?? node.column);
@@ -290,6 +306,23 @@ function renderElement(
 function isUnsafeAttrName(name: string): boolean {
   const lower = name.toLowerCase();
   return lower.startsWith("on") || lower === "srcdoc" || lower === "style";
+}
+
+function collectRawStyleText(node: Extract<PuggyNode, { kind: "element" }>): string {
+  return collectRawElementText(node).replace(/<\/style/gi, "<\\/style");
+}
+
+function collectRawElementText(node: Extract<PuggyNode, { kind: "element" }>): string {
+  const chunks: string[] = [];
+  if (node.text) {
+    chunks.push(stripInlineTagSyntax(node.text));
+  }
+  for (const child of node.children) {
+    if (child.kind === "text") {
+      chunks.push(child.value);
+    }
+  }
+  return chunks.join("\n");
 }
 
 function isUrlAttr(name: string): boolean {
@@ -381,7 +414,11 @@ function interpolate(
     cursor = (match.index ?? 0) + match[0].length;
   }
   value += text.slice(cursor);
-  return { ok: true, value };
+  return { ok: true, value: stripInlineTagSyntax(value) };
+}
+
+function stripInlineTagSyntax(value: string): string {
+  return value.replace(/#\[[A-Za-z][\w-]*(?:[.#][\w-]+)*\s+([^\]]*)\]/g, "$1");
 }
 
 function stringify(value: unknown): string {

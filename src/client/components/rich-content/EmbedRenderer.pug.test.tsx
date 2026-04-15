@@ -37,6 +37,30 @@ describe("EmbedRenderer pug embed", () => {
     expect(html).not.toContain("srcDoc")
   })
 
+  test("renders full-pug document noise by omitting non-visual tags", () => {
+    const html = renderToStaticMarkup(
+      <EmbedRenderer
+        format="pug"
+        source={[
+          "doctype html",
+          "html(lang=\"en\")",
+          "  head",
+          "    meta(charset=\"UTF-8\")",
+          "    style.",
+          "      :root { --t1: #6366f1; }",
+          "  body",
+          "    h1(style=\"color: var(--t1)\") Hello",
+        ].join("\n")}
+      />,
+    )
+
+    expect(html).toContain("srcDoc")
+    expect(html).toContain("&lt;style&gt;:root { --t1: #6366f1; }&lt;/style&gt;")
+    expect(html).toContain("&lt;h1 style=&quot;color: var(--t1)&quot;&gt;Hello&lt;/h1&gt;")
+    expect(html).not.toContain("Pug render error")
+    expect(html).not.toContain("&lt;meta")
+  })
+
   test("shows original pug source in source mode", () => {
     const ctx: ContentViewerContextValue = {
       state: { type: "embed", renderMode: "source", zoom: 1 },

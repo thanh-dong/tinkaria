@@ -11,6 +11,7 @@ export type PuggyNode =
   | ElementNode
   | TextNode
   | ExprTextNode
+  | OmitNode
   | IfNode
   | EachNode
   | IncludeNode
@@ -34,6 +35,7 @@ export interface ElementNode extends BaseNode {
   readonly textColumn?: number;
   readonly expr?: string;
   readonly exprColumn?: number;
+  readonly rawText?: boolean;
   readonly children: PuggyNode[];
 }
 
@@ -45,6 +47,11 @@ export interface TextNode extends BaseNode {
 export interface ExprTextNode extends BaseNode {
   readonly kind: "expr";
   readonly expression: string;
+}
+
+export interface OmitNode extends BaseNode {
+  readonly kind: "omit";
+  readonly children: PuggyNode[];
 }
 
 export interface IfNode extends BaseNode {

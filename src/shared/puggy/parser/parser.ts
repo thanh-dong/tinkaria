@@ -54,6 +54,23 @@ export function parsePuggy(source: string): ParseResult {
   let previousCanHaveChildren = true;
 
   for (const line of lines) {
+    while (stack.length > 1 && line.indent <= stack[stack.length - 1]!.indent) {
+      stack.pop();
+    }
+
+    const rawParent = stack[stack.length - 1]!;
+    if (rawParent.node?.kind === "element" && rawParent.node.rawText && line.indent > rawParent.indent) {
+      rawParent.children.push({
+        kind: "text",
+        value: line.raw.slice(Math.min(line.raw.length, rawParent.indent + 2)),
+        line: line.line,
+        column: rawParent.indent + 3
+      });
+      previousIndent = line.indent;
+      previousCanHaveChildren = true;
+      continue;
+    }
+
     if (
       line.indent % 2 !== 0 ||
       line.indent > previousIndent + 2 ||
@@ -63,10 +80,6 @@ export function parsePuggy(source: string): ParseResult {
         ok: false,
         diagnostics: [diagnostic("PUGGY_BAD_INDENT", "Invalid indentation level.", line.line, line.column)]
       };
-    }
-
-    while (stack.length > 1 && line.indent <= stack[stack.length - 1]!.indent) {
-      stack.pop();
     }
 
     const parsed = parseLine(line);
@@ -108,6 +121,18 @@ type ParsedLine =
 
 function parseLine(line: SourceLine): ParsedLine {
   const [head] = line.text.split(/\s+/, 1);
+
+  if (line.text.startsWith("//-") || /^doctype(?:\s+|$)/.test(line.text)) {
+    return {
+      ok: true,
+      node: {
+        kind: "omit",
+        children: [],
+        line: line.line,
+        column: line.column
+      }
+    };
+  }
 
   const textMatch = /^\|\s?(.*)$/.exec(line.text);
   if (textMatch) {
@@ -239,7 +264,15 @@ function parseLine(line: SourceLine): ParsedLine {
     };
   }
 
-  return parseElement(line);
+  return parseElement(normalizeColonInlineElement(line));
+}
+
+function normalizeColonInlineElement(line: SourceLine): SourceLine {
+  const colonMatch = /^([A-Za-z][\w.#-]*(?:\([^)]*\))?):\s+[A-Za-z][\w.#-]*(?:\([^)]*\))?\s+(.+)$/.exec(line.text);
+  if (!colonMatch) {
+    return line;
+  }
+  return { ...line, text: `${colonMatch[1]!} ${colonMatch[2]!}` };
 }
 
 function parseElement(line: SourceLine): ParsedLine {
@@ -256,8 +289,9 @@ function parseElement(line: SourceLine): ParsedLine {
   }
 
   const head = split.head.trimEnd();
-
-  const selector = attrStart >= 0 ? head.slice(0, attrStart) : head;
+  const rawText = attrStart < 0 && head.endsWith(".");
+  const selectorHead = rawText ? head.slice(0, -1) : head;
+  const selector = attrStart >= 0 ? selectorHead.slice(0, attrStart) : selectorHead;
   const attrSource = attrStart >= 0 && attrEnd >= 0 ? head.slice(attrStart + 1, attrEnd) : "";
   const parsedSelector = parseSelector(selector || "div");
   if (!parsedSelector.ok) {
@@ -279,6 +313,7 @@ function parseElement(line: SourceLine): ParsedLine {
     children: [],
     line: line.line,
     column: line.column,
+    ...(rawText ? { rawText } : {}),
     ...(split.kind === "expr"
       ? { expr: split.inline, exprColumn: line.column + split.inlineColumn - 1 }
       : split.inline
@@ -292,6 +327,7 @@ function parseElement(line: SourceLine): ParsedLine {
 function getChildTarget(node: PuggyNode): PuggyNode[] | null {
   switch (node.kind) {
     case "element":
+    case "omit":
     case "each":
     case "block":
     case "mixin":
