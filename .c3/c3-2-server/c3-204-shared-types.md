@@ -1,11 +1,11 @@
 ---
 id: c3-204
-c3-seal: 258fd2197a3caaf3d87dc421d62b249cd21ad5be4c22ff535c7ff32d60be1706
+c3-seal: 5032e8c5f46dec3f7b3d605319bf5ef4525050cfb3dbb92bf6826b0ca065e12c
 title: shared-types
 type: component
 category: foundation
 parent: c3-2
-goal: Shared type definitions, WebSocket protocol envelope schema, tool normalization, port constants, and branding used by both client and server.
+goal: Shared type definitions, WebSocket/NATS command protocol envelope schema, tool normalization, port constants, and branding used by both client and server.
 uses:
     - recipe-agent-turn-render-flow
     - ref-component-identity-mapping
@@ -21,7 +21,14 @@ uses:
 
 ## Goal
 
-Shared type definitions, WebSocket protocol envelope schema, tool normalization, port constants, and branding used by both client and server.
+Shared type definitions, WebSocket/NATS command protocol envelope schema, tool normalization, port constants, and branding used by both client and server.
+
+Protocol responsibilities:
+
+- Define typed client commands such as `chat.send`, `chat.queue`, `chat.cancel`, `chat.respondTool`, snapshots, and workspace/runtime commands.
+- Keep command payloads provider-neutral where possible while preserving provider/model/modelOptions fields at the boundary.
+- Keep shared protocol types pure TypeScript with no server/client runtime dependency.
+`chat.queue` is the durable follow-up command. The client uses it only for an existing chat; the server either sends immediately when idle or persists a queued turn for later drain when a turn is active or just-started.
 
 ## Dependencies
 

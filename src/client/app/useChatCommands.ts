@@ -47,13 +47,11 @@ import type { AppTransport } from "./socket-interface"
 import type { SubmitPipelineState } from "./useAppState.machine"
 import {
   completeDirectSubmit,
-  completeQueuedFlush,
+  clearQueuedSubmit,
   failDirectSubmit,
-  failQueuedFlush,
   getSubmitPipelineMode,
   markPostFlushBusyObserved,
   startDirectSubmit,
-  startQueuedFlush,
   transitionProjectSelection,
   queueSubmit as queueSubmitTransition,
 } from "./useAppState.machine"
@@ -144,7 +142,6 @@ export interface ChatCommandsArgs {
   activeQueuedText: string
   updateSubmitPipeline: (updater: (current: SubmitPipelineState) => SubmitPipelineState) => SubmitPipelineState
   submitPipeline: SubmitPipelineState
-  submitPipelineRef: React.MutableRefObject<SubmitPipelineState>
   pendingDeletedChatIdsRef: React.MutableRefObject<Set<string>>
 }
 
@@ -195,7 +192,7 @@ export interface ChatCommandsReturn {
   ) => Promise<void>
 
   // For useAppState subscription effect — command handlers update the submit pipeline
-  // when snapshots arrive, so we expose the internal maybeFlushQueuedSubmit
+  // when snapshots arrive.
   updateSubmitPipelineFromSnapshot: (snapshot: ChatSnapshot) => void
 }
 
@@ -222,7 +219,6 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
     activeQueuedText,
     updateSubmitPipeline,
     submitPipeline,
-    submitPipelineRef,
     pendingDeletedChatIdsRef,
   } = args
 
@@ -234,32 +230,9 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
   const [pendingSessionBootstrap, setPendingSessionBootstrap] = useState<PendingSessionBootstrap | null>(null)
   // --- Internal helpers ---
 
-  function maybeFlushQueuedSubmit(chatId: string, chatIsProcessing: boolean) {
-    const { state: nextState, flushRequest } = startQueuedFlush(submitPipelineRef.current, {
-      chatId,
-      isProcessing: chatIsProcessing,
-    })
-    if (!flushRequest) return
-
-    updateSubmitPipeline(() => nextState)
-
-    void handleSend(flushRequest.text, flushRequest.options)
-      .then(() => {
-        updateSubmitPipeline((current) => completeQueuedFlush(current, chatId))
-      })
-      .catch(() => {
-        updateSubmitPipeline((current) => failQueuedFlush(current, {
-          chatId,
-          flushedText: flushRequest.text,
-        }))
-      })
-  }
-
   function updateSubmitPipelineFromSnapshot(snapshot: ChatSnapshot) {
     if (isProcessingStatus(snapshot.runtime.status)) {
       updateSubmitPipeline((current) => markPostFlushBusyObserved(current, snapshot.runtime.chatId))
-    } else {
-      maybeFlushQueuedSubmit(snapshot.runtime.chatId, false)
     }
   }
 
@@ -441,13 +414,26 @@ export function useChatCommands(args: ChatCommandsArgs): ChatCommandsReturn {
       || getSubmitPipelineMode(submitPipeline, activeChatId) === "flushing"
       || getSubmitPipelineMode(submitPipeline, activeChatId) === "awaiting_busy_ack"
     ) {
-      updateSubmitPipeline((current) => queueSubmitTransition(current, {
+      const queuedState = updateSubmitPipeline((current) => queueSubmitTransition(current, {
         chatId: activeChatId,
         content,
         options: options ?? undefined,
       }))
-      if (!isProcessing) {
-        maybeFlushQueuedSubmit(activeChatId, false)
+      const queuedText = queuedState.queuedTextByChat[activeChatId] ?? content
+      try {
+        await socket.command({
+          type: "chat.queue",
+          chatId: activeChatId,
+          provider: options?.provider,
+          content: queuedText,
+          model: options?.model,
+          modelOptions: options?.modelOptions,
+          planMode: options?.planMode,
+        })
+        updateSubmitPipeline((current) => clearQueuedSubmit(current, activeChatId))
+      } catch (error) {
+        setCommandError(error instanceof Error ? error.message : String(error))
+        throw error
       }
       return "queued" as const
     }

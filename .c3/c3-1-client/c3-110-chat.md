@@ -1,6 +1,6 @@
 ---
 id: c3-110
-c3-seal: ab06ba7543d8d64bbf1bdffeb6686935a1e02c78a6d36968bcffa418f55dd9a1
+c3-seal: d6fd3ef7bca0f8e4cb0676f6dde815ee20f13a46b5476c867bd1a8063f9ea39d
 title: chat
 type: component
 category: feature
@@ -44,88 +44,56 @@ Three states govern auto-scroll behavior:
 | --- | --- | --- |
 | anchoring | Initial load. Polling scroll height every 50ms until 5 consecutive stable cycles (250ms). Timeout at 2000ms. | Hidden |
 | following | At bottom. Auto-scrolls on new content via useLayoutEffect watching messages.length + status + inputHeight. | Hidden |
-| detached | User scrolled away manually. No auto-scroll. | Visible (if messageCount > 0) |
-| Transitions: |  |  |
-- `anchoring` + initial-scroll-done(tail) → `following`
-- `anchoring` + initial-scroll-done(block) → `detached`
-- `anchoring` + chat-changed → `anchoring` (reset)
-- `following` + manual-scroll-away → `detached`
-- `following` + chat-changed → `anchoring`
-- `detached` + scroll-to-bottom (user click) → `following`
-- `detached` + IntersectionObserver sentinel visible → `following`
-- `detached` + chat-changed → `anchoring`
-**Bottom Detection:** IntersectionObserver watches a sentinel element at transcript tail. "Within bottom follow band" = within 2% of viewport height (minimum 2px). Programmatic scrolls (marked via `beginProgrammaticScroll()`) bypass manual-scroll detection to prevent false detach.
-**Scroll Button:** Positioned at 120px from bottom (+ 52px if skill ribbon visible). CSS scale transition: `scale-100` visible, `scale-60 opacity-0` hidden.
+| detached | User scrolled away manually. No auto-scroll. | Visible if messageCount > 0 |
+Transitions:
 
-### Read Signal (Unread/Read)
+- `anchoring` + initial-scroll-done(tail) -> `following`
+- `anchoring` + initial-scroll-done(block) -> `detached`
+- `following` + manual-scroll-away -> `detached`
+- `detached` + scroll-to-bottom or tail sentinel visible -> `following`
+- any state + chat-changed -> `anchoring`
+### Read Signal
 
-Chats carry an `unread` boolean from the server sidebar snapshot.
+Chats carry an `unread` boolean from the server sidebar snapshot. `chat.markRead` is sent only when the active chat is visible, focused, loaded in sidebar data, and unread. Background queue processing does not mark a chat read; read state remains tied to actual user focus.
 
-**Marking as read** happens automatically when ALL of:
-
-1. `activeChatId` exists (user is viewing the chat)
-2. Sidebar data has loaded (`sidebarReady`)
-3. `chat.unread === true`
-4. `document.visibilityState === "visible"`
-5. `document.hasFocus() === true`
-Action: `socket.command({ type: "chat.markRead", chatId })`. No manual UI trigger needed — purely passive on navigation and tab focus events.
 ### Submit Pipeline
 
-Five-state machine governing message submission with queuing:
+The client pipeline owns composer-local UX only: queued text preview, duplicate-blocking state, direct-submit busy acknowledgement, and local draft clearing. It no longer owns queued turn execution.
 
 | Mode | Meaning |
 | --- | --- |
 | idle | No queued text, not submitting. Ready for new submission. |
-| queued | Text queued while agent is processing. Waiting for turn to finish. |
-| flushing | Sending queued text. Text is in flight. |
-| awaiting_busy_ack | Submitted, waiting for server to report busy status back. |
-| blocked | Duplicate submission detected (same text). Prevents re-sending. |
-| Decision tree on submit: |  |
-1. No activeChatId → `handleSend()` directly (creates new chat)
-2. Agent processing OR already queued → `queueSubmit()` → mode = "queued"
-3. Pipeline in flushing/awaiting_busy_ack → `queueSubmit()` → mode = "queued"
-4. Otherwise → `startDirectSubmit()` → `handleSend()` → mode = "awaiting_busy_ack"
-**Queue flush:** When processing ends (snapshot arrives with idle status), `maybeFlushQueuedSubmit()` calls `startQueuedFlush()` → sends queued text → on success: `completeQueuedFlush()` clears queue. On failure: `failQueuedFlush()` restores text back to queue.
-**Blocked prevention:** `getQueuedFlushKey(chatId, text)` tracks last-failed text. If next submit matches the failed key, mode = "blocked" to prevent infinite retry loops.
+| queued | Text accepted locally while the agent is processing. Client is awaiting backend queue acceptance. |
+| flushing | Legacy machine state retained for failure recovery tests; queued execution is now server-owned. |
+| awaiting_busy_ack | Direct submit sent, waiting for server to report busy status back. |
+| blocked | Duplicate failed flush text detected by the local state machine. |
+Decision tree on submit:
+
+1. No activeChatId -> `handleSend()` directly, creating or targeting a chat.
+2. Agent processing, queue exists, flushing, or awaiting busy ack -> `queueSubmit()` updates local preview, then `socket.command({ type: "chat.queue", chatId, content, provider, model, modelOptions, planMode })` sends the queued turn to the server.
+3. Backend accepts `chat.queue` -> `clearQueuedSubmit()` clears the local queued preview; server owns eventual execution.
+4. Otherwise -> `startDirectSubmit()` -> `handleSend()` -> mode = `awaiting_busy_ack` until runtime status arrives.
+Queue execution is server-owned: `RunnerProxy.queue()` persists/coalesces queued content in c3-201, and `RunnerProxy.drainQueuedTurn()` starts it after c3-226 observes the active turn settle. This keeps queued work moving when the user leaves the chat screen or the frontend subscription is gone.
 
 ### handleSend Flow
 
-1. Resolve project/workspace (from chat snapshot, sidebar, or open fallback path)
-2. Check provider compatibility — if active chat has incompatible provider, fork instead
-3. `scrollFollowToBottom("auto")` — ensure user sees the response
-4. `socket.command({ type: "chat.send", chatId, workspaceId, provider, content, model, modelOptions, planMode })`
-5. If new chat created → `navigate(/chat/{chatId})`
+1. Resolve project/workspace from chat snapshot, sidebar, or fallback path.
+2. Check provider compatibility; incompatible active sessions fork instead of mutating provider identity.
+3. `scrollFollowToBottom("auto")` for visible direct submits.
+4. `socket.command({ type: "chat.send", chatId, workspaceId, provider, content, model, modelOptions, planMode })`.
+5. If a new chat is created, navigate to `/chat/{chatId}`.
 ### Fork Session Flow
 
-1. User opens ForkSessionDialog from navbar
-2. Selects preset (6 presets: implementation_branch, alternative_approach, bug_investigation, cleanup_refactor, tests, docs_spec)
-3. Edits intent text (textarea, pre-filled from preset defaultIntent)
-4. Optionally changes provider/model
-5. Clicks "Create Session"
-6. Client creates new chat, renames it with preview title, navigates immediately
-7. Background: calls `chat.generateForkPrompt` (120s timeout) — server compacts parent transcript, applies preset generatorHint, returns seed prompt
-8. Sends seed prompt as first message in forked chat
-9. Forked chat runs independently — no parent-child orchestration link
+Fork creates a new chat, generates a compact seed prompt from the parent session, and sends that prompt as the first message in the fork. Forked chats run independently without parent-child orchestration ownership.
+
 ### Merge Session Flow
 
-1. User opens MergeSessionDialog from navbar
-2. Searches and selects 1-5 source chats (checkbox toggle)
-3. Selects preset (4 presets: synthesis, compare_decide, consolidate_progress, knowledge_base)
-4. Edits intent text
-5. Optionally checks "Close source sessions after merge"
-6. Client creates new chat, renames, navigates immediately
-7. Background: calls `chat.generateMergePrompt` (120s timeout) — server compacts each source into summary, synthesizes unified brief
-8. Sends merge prompt as first message
-9. If closeSources=true: deletes each source chat (errors logged, not blocking)
+Merge creates a new chat, compacts selected source sessions into a synthesized brief, sends it as the first message, and optionally deletes source chats after the merge session is created.
+
 ### Sticky Chat Focus
 
-`useStickyChatFocus` auto-restores composer focus after pointer interactions:
+`useStickyChatFocus` restores composer focus after safe pointer interactions, Escape during generation, or `tinkaria:restore-chat-input-focus`, while respecting overlays, text selection, focus-fallback opt-outs, and mobile sidebar state.
 
-- Pointer down/up outside focusable elements → focus textarea
-- Escape key during generation → focus textarea
-- Custom event `tinkaria:restore-chat-input-focus` → focus textarea
-- Disabled when: overlay open, text selection active, element has `data-focus-fallback-ignore`, sidebar open (mobile)
-Focus cycling: Tab key cycles between chat input textareas. `data-chat-input` attribute marks cycle targets.
 ## Dependencies
 
 | Direction | What | From/To |

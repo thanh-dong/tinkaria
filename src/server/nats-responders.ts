@@ -27,6 +27,7 @@ import { resolveProfile } from "../shared/profile-types"
 /** Session coordinator interface — RunnerProxy delegates turn execution to the runner process */
 interface Coordinator {
   send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }>
+  queue(command: Extract<ClientCommand, { type: "chat.queue" }>): Promise<{ chatId: string; queued: boolean }>
   cancel(chatId: string): Promise<void>
   respondTool(command: Extract<ClientCommand, { type: "chat.respondTool" }>): Promise<void>
   disposeChat(chatId: string): Promise<void>
@@ -112,6 +113,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.delete",
   "chat.markRead",
   "chat.send",
+  "chat.queue",
   "chat.cancel",
   "chat.respondTool",
   "chat.generateForkPrompt",
@@ -339,6 +341,9 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
 
       case "chat.send":
         return agent.send(command)
+
+      case "chat.queue":
+        return agent.queue(command)
 
       case "chat.cancel": {
         await agent.cancel(command.chatId)

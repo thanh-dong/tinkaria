@@ -33,6 +33,8 @@ c3-110:
   - src/client/app/derived.ts
   - src/client/app/nats-socket.ts
   - src/client/app/socket-interface.ts
+  - src/client/app/useAppState.ts
+  - src/client/app/useChatCommands.ts
   - src/client/app/useStickyChatFocus.ts
   - src/client/app/useTinkariaState.machine.ts
   - src/client/app/useTinkariaState.ts
@@ -133,6 +135,8 @@ c3-210:
   - src/server/codex-harness.ts
   - src/server/codex-turn.test.ts
   - src/server/harness-types.ts
+  - src/server/runner-proxy.test.ts
+  - src/server/runner-proxy.ts
 c3-211:
   - src/server/provider-catalog.ts
 c3-213:

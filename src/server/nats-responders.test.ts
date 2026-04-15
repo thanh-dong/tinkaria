@@ -47,6 +47,7 @@ function createMockStore() {
 function createMockAgent() {
   return {
     send: async () => ({ chatId: "chat-1" }),
+    queue: async () => ({ chatId: "chat-1", queued: true }),
     cancel: async () => {},
     disposeChat: async () => {},
     respondTool: async () => {},
@@ -498,6 +499,30 @@ describe("nats-responders", () => {
     })
     expect(res.ok).toBe(true)
     expect(res.result).toEqual({ chatId: "chat-1" })
+  })
+
+  test("chat.queue returns agent queue result", async () => {
+    const queued: unknown[] = []
+    const mockAgent = {
+      ...createMockAgent(),
+      queue: async (cmd: unknown) => {
+        queued.push(cmd)
+        return { chatId: "chat-1", queued: true }
+      },
+    }
+    const { clientNc } = await setup({ agent: mockAgent as never })
+    const res = await sendCommand(clientNc, {
+      type: "chat.queue",
+      chatId: "chat-1",
+      content: "Follow-up",
+    })
+    expect(res.ok).toBe(true)
+    expect(res.result).toEqual({ chatId: "chat-1", queued: true })
+    expect(queued).toEqual([{
+      type: "chat.queue",
+      chatId: "chat-1",
+      content: "Follow-up",
+    }])
   })
 
   test("chat.cancel calls agent.cancel", async () => {

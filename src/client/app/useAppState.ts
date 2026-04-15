@@ -187,7 +187,6 @@ export function useAppState(activeChatId: string | null): AppState {
   const [commandError, setCommandError] = useState<string | null>(null)
   const [pendingChatId, setPendingChatId] = useState<string | null>(null)
   const {
-    submitPipelineRef,
     submitPipeline,
     activeQueuedText,
     updateSubmitPipeline,
@@ -449,7 +448,6 @@ export function useAppState(activeChatId: string | null): AppState {
     activeQueuedText,
     updateSubmitPipeline,
     submitPipeline,
-    submitPipelineRef,
     pendingDeletedChatIdsRef,
   })
 

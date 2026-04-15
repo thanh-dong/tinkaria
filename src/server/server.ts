@@ -334,6 +334,8 @@ export interface ServerHealthcheck {
 /** Session coordinator interface — satisfied by RunnerProxy which delegates turn execution to the runner process. */
 interface SessionCoordinator {
   send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }>
+  queue(command: Extract<ClientCommand, { type: "chat.queue" }>): Promise<{ chatId: string; queued: boolean }>
+  drainQueuedTurn(chatId: string): Promise<boolean>
   cancel(chatId: string): Promise<void>
   respondTool(command: Extract<ClientCommand, { type: "chat.respondTool" }>): Promise<void>
   disposeChat(chatId: string): Promise<void>
@@ -534,6 +536,10 @@ export async function startServer(options: StartServerOptions = {}) {
               tag: `turn-${chatId}`,
             })
           }
+
+          void coordinator.drainQueuedTurn(chatId).catch((error) => {
+            console.warn(LOG_PREFIX, "queued chat drain failed:", error instanceof Error ? error.message : String(error))
+          })
         }
       }
       // Sync previousStatuses

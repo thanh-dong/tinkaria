@@ -22,6 +22,7 @@ import {
   type RepoEvent,
   type RepoRecord,
   type TurnEvent,
+  type QueuedChatTurnRecord,
   cloneTranscriptEntries,
   createEmptyCoordinationState,
   createEmptyState,
@@ -153,6 +154,11 @@ export class EventStore {
       for (const chat of parsed.chats) {
         this.state.chatsById.set(chat.id, { ...chat, unread: chat.unread ?? false, model: chat.model ?? null })
       }
+      if (parsed.queuedTurns?.length) {
+        for (const queued of parsed.queuedTurns) {
+          this.state.queuedTurnsByChat.set(queued.chatId, { ...queued })
+        }
+      }
       if (parsed.coordination?.length) {
         for (const entry of parsed.coordination) {
           const coord = createEmptyCoordinationState()
@@ -221,6 +227,7 @@ export class EventStore {
     this.state.workspacesById.clear()
     this.state.workspaceIdsByPath.clear()
     this.state.chatsById.clear()
+    this.state.queuedTurnsByChat.clear()
     this.state.coordinationByWorkspace.clear()
     this.state.agentConfigsByWorkspace.clear()
     this.state.reposById.clear()
@@ -367,6 +374,7 @@ export class EventStore {
         if (!chat) break
         chat.deletedAt = event.timestamp
         chat.updatedAt = event.timestamp
+        this.state.queuedTurnsByChat.delete(event.chatId)
         break
       }
       case "chat_provider_set": {
@@ -438,6 +446,28 @@ export class EventStore {
         if (!chat) break
         chat.sessionToken = event.sessionToken
         chat.updatedAt = event.timestamp
+        break
+      }
+      case "chat_turn_queued": {
+        const existing = this.state.queuedTurnsByChat.get(event.chatId)
+        const current = existing?.content.trim() ?? ""
+        const next = event.content.trim()
+        const content = current && next ? `${current}\n\n${next}` : next || current
+        if (!content) break
+        this.state.queuedTurnsByChat.set(event.chatId, {
+          chatId: event.chatId,
+          provider: event.provider ?? existing?.provider,
+          content,
+          model: event.model ?? existing?.model,
+          modelOptions: event.modelOptions ?? existing?.modelOptions,
+          effort: event.effort ?? existing?.effort,
+          planMode: event.planMode ?? existing?.planMode,
+          updatedAt: event.timestamp,
+        })
+        break
+      }
+      case "chat_queued_turn_cleared": {
+        this.state.queuedTurnsByChat.delete(event.chatId)
         break
       }
       case "todo_added": {
@@ -1131,6 +1161,49 @@ export class EventStore {
     await this.append(this.turnsLogPath, event)
   }
 
+  async enqueueQueuedTurn(args: {
+    chatId: string
+    provider?: AgentProvider
+    content: string
+    model?: string
+    modelOptions?: import("../shared/types").ModelOptions
+    effort?: string
+    planMode?: boolean
+  }) {
+    this.requireChat(args.chatId)
+    const content = args.content.trim()
+    if (!content) return
+    const event: TurnEvent = {
+      v: STORE_VERSION,
+      type: "chat_turn_queued",
+      timestamp: Date.now(),
+      chatId: args.chatId,
+      provider: args.provider,
+      content,
+      model: args.model,
+      modelOptions: args.modelOptions,
+      effort: args.effort,
+      planMode: args.planMode,
+    }
+    await this.append(this.turnsLogPath, event)
+  }
+
+  getQueuedTurn(chatId: string): QueuedChatTurnRecord | null {
+    const queued = this.state.queuedTurnsByChat.get(chatId)
+    return queued ? { ...queued } : null
+  }
+
+  async clearQueuedTurn(chatId: string) {
+    if (!this.state.queuedTurnsByChat.has(chatId)) return
+    const event: TurnEvent = {
+      v: STORE_VERSION,
+      type: "chat_queued_turn_cleared",
+      timestamp: Date.now(),
+      chatId,
+    }
+    await this.append(this.turnsLogPath, event)
+  }
+
   async setSessionToken(chatId: string, sessionToken: string | null) {
     const chat = this.requireChat(chatId)
     if (chat.sessionToken === sessionToken) return
@@ -1491,6 +1564,9 @@ export class EventStore {
       chats: [...this.state.chatsById.values()]
         .filter((chat) => !chat.deletedAt)
         .map((chat) => ({ ...chat })),
+      ...(this.state.queuedTurnsByChat.size > 0 ? {
+        queuedTurns: [...this.state.queuedTurnsByChat.values()].map((queued) => ({ ...queued })),
+      } : {}),
       ...(coordination.length > 0 ? { coordination } : {}),
       ...(agentConfigs.length > 0 ? { agentConfigs } : {}),
       ...(this.state.reposById.size > 0 ? { repos: [...this.state.reposById.values()] } : {}),

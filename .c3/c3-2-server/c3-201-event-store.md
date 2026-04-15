@@ -1,11 +1,11 @@
 ---
 id: c3-201
-c3-seal: ef85f7f6b1e65d7606c2c9733910a120a1968cd5f80ce1cceda3b86f424f5201
+c3-seal: 0e4753888f06c4f69e6e848da34e0d260b6606941c1ca9f9ce35bd6b2f5d027f
 title: event-store
 type: component
 category: foundation
 parent: c3-2
-goal: JSONL-based append-only event log with snapshot compaction for persisting all project, chat, and transcript state.
+goal: JSONL-based append-only event log with snapshot compaction for persisting all project, chat, queued-turn, and transcript state.
 uses:
     - ref-component-identity-mapping
     - ref-ref-event-sourcing
@@ -20,8 +20,21 @@ uses:
 
 ## Goal
 
-JSONL-based append-only event log with snapshot compaction for persisting all project, chat, and transcript state.
+JSONL-based append-only event log with snapshot compaction for persisting all project, chat, queued-turn, and transcript state.
 
+Persistent domains:
+
+- Projects and independent workspaces in the projects log.
+- Chat metadata in the chats log.
+- Turn lifecycle, session tokens, and queued chat turns in the turns log.
+- Per-chat transcript files for durable message history.
+- Coordination, repo, workflow, sandbox, profile, and extension-preference logs for their respective projections.
+Queued turn contract:
+
+- `chat_turn_queued` appends/coalesces one queued follow-up per chat in `queuedTurnsByChat`.
+- `chat_queued_turn_cleared` removes the queued turn when `RunnerProxy.drainQueuedTurn()` claims it for execution.
+- Snapshot compaction includes pending queued turns so a queued follow-up survives store replay and restart.
+- Tests for queued turns must prove append/coalesce, replay, and clear behavior.
 ## Dependencies
 
 - src/shared/types.ts (STORE_VERSION, AgentProvider, TranscriptEntry)

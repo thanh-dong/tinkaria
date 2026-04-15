@@ -1,6 +1,6 @@
 ---
 id: c3-112
-c3-seal: fdc87918843744f4cc1951c9ba6899ee72f0c170d049c35da724ac739abf2a26
+c3-seal: 1799ac646484b4654ab87881bbba2c12669c717486c2fc2d0087c8c082fa0336
 title: chat-input
 type: component
 category: feature
@@ -25,70 +25,46 @@ Multi-line chat input with auto-resize, submit on Enter, cancel/queue behavior, 
 
 | Context | Key | Action |
 | --- | --- | --- |
-| Agent running (canCancel=true) | Enter | Queue message |
+| Agent running (canCancel=true) | Enter | Queue message through onSubmit / chat.queue path |
 | Agent running | Shift+Enter | Insert newline |
-| Idle (canCancel=false) | Enter (non-touch) | Submit |
-| Idle | Ctrl/Cmd+Enter | Submit |
+| Idle (canCancel=false) | Enter (non-touch) | Submit immediately |
+| Idle | Ctrl/Cmd+Enter | Submit immediately |
 | Idle (touch device) | Enter | Insert newline |
 | Any state | Shift+Enter | Always insert newline |
-| Composer empty | Arrow Up | Restore queued text |
+| Composer empty | Arrow Up | Restore queued text preview |
 | Any | Tab | Focus next chat input |
 | Any | Shift+Tab | Toggle plan mode |
 | Agent running | Escape | Cancel generation |
 ### Send States
 
-Three visual states for the submit button:
-
 | State | Visual | Trigger |
 | --- | --- | --- |
 | idle | Arrow-up icon | Default, connection healthy |
 | reconnecting | Spinner animation | WebSocket disconnected |
-| reconnected | Checkmark icon (1.2s) | Just reconnected, then auto-resets to idle |
+| reconnected | Checkmark icon for 1.2s | Just reconnected, then auto-resets to idle |
 ### Queue vs Submit UX
 
-**Submit mode** (agent idle, `canCancel=false`):
+Submit mode (`canCancel=false`): the arrow button sends immediately and no cancel button is shown.
 
-- Button: arrow-up icon, sends immediately
-Button: arrow-up icon, sends immediately
+Queue mode (`canCancel=true`): the stop button cancels the current generation and the queue button submits a follow-up to the parent chat command layer. The composer may show a queued text block above the textarea while the backend queue command is being accepted. Once `chat.queue` succeeds, c3-110 clears the local preview; c3-210/c3-201 own durable queued execution behind the screen.
 
-- No cancel button shown
-**Queue mode** (agent running, `canCancel=true`):
-No cancel button shown
-**Queue mode** (agent running, `canCancel=true`):
+Disabled states:
 
-- Button: clock icon + "Queue" label, holds message until turn finishes
-Button: clock icon + "Queue" label, holds message until turn finishes
-
-- Cancel button shown (square stop icon) to abort current generation
-Cancel button shown (square stop icon) to abort current generation
-
-- Queued text block appears above composer: amber dashed border, message preview + "Clear" button
-**Disabled states:**
-Queued text block appears above composer: amber dashed border, message preview + "Clear" button
-**Disabled states:**
-
-- `composerActionsDisabled`: disabled prop OR connectionStatus !== "connected"
-`composerActionsDisabled`: disabled prop OR connectionStatus !== "connected"
-
-- `submitActionDisabled`: composerActionsDisabled OR no text
-`submitActionDisabled`: composerActionsDisabled OR no text
-
-- `queueActionDisabled`: composerActionsDisabled OR no text
-`queueActionDisabled`: composerActionsDisabled OR no text
-
+- `composerActionsDisabled`: disabled prop or `connectionStatus !== "connected"`
+- `submitActionDisabled`: composer disabled or no text
+- `queueActionDisabled`: composer disabled or no text
 ### Draft Persistence
 
-- Reads from `chatInputStore.getDraft(chatId)` on mount/chat-switch
-- Writes on every keystroke via `setDraft(chatId, value)`
-- Clears on successful submit (both "queued" and "sent" results)
-- Preserved across chat switching — each chat has independent draft
+- Reads from `chatInputStore.getDraft(chatId)` on mount/chat-switch.
+- Writes on every keystroke via `setDraft(chatId, value)`.
+- Clears on successful submit result (`queued` or `sent`).
+- Preserved across chat switching; each chat has independent draft.
+- Queued draft persistence is UI recovery only. Durable queued execution lives on the server after `chat.queue` succeeds.
 ### Auto-Resize
 
-Textarea expands to fit content up to 200px max height. Recalculates on window resize and value change.
+Textarea expands to fit content up to 200px max height. It recalculates on window resize and value change.
 
 ### Preference Controls
-
-Rendered below textarea via `ComposerPreferenceControls`:
 
 | Control | Scope |
 | --- | --- |
@@ -100,7 +76,7 @@ Rendered below textarea via `ComposerPreferenceControls`:
 | Plan mode toggle | Shift+Tab shortcut |
 ### Skill Ribbon
 
-When available slash commands exist (`availableSkills`), a `SkillRibbon` renders above the preference controls showing clickable skill chips that insert `/skillName` into the composer.
+When slash commands exist, `SkillRibbon` renders above preference controls with clickable skill chips that insert `/skillName` into the composer.
 
 ## Dependencies
 

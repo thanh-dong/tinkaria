@@ -267,6 +267,26 @@ describe("queue action", () => {
     expect(html).toContain("aria-label=\"Queue\"")
   })
 
+  test("keeps awaiting actions from stealing the mobile textarea shrink space", () => {
+    const html = renderToStaticMarkup(
+      createElement(ChatInput, {
+        onSubmit: async () => "queued",
+        onCancel: () => {},
+        disabled: false,
+        canCancel: true,
+        chatId: "chat-1",
+        connectionStatus: "connected",
+        activeProvider: null,
+        availableProviders: PROVIDERS,
+      })
+    )
+
+    expect(html).toContain("min-w-0")
+    expect(html).toContain("flex-shrink-0 mb-1 -mr-0.5")
+    expect(html).toContain("aria-label=\"Queue\"")
+    expect(html).toContain("flex-shrink-0 h-10 w-10")
+  })
+
   test("renders queued drafts with a distinct pending-state treatment", () => {
     const html = renderToStaticMarkup(
       createElement(ChatInput, {

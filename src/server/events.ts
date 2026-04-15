@@ -1,4 +1,4 @@
-import type { AgentProvider, IndependentWorkspace, WorkspaceSummary, TranscriptEntry } from "../shared/types"
+import type { AgentProvider, IndependentWorkspace, ModelOptions, WorkspaceSummary, TranscriptEntry } from "../shared/types"
 import type { WorkspaceTodo, WorkspaceClaim, WorkspaceWorktree, WorkspaceRule } from "../shared/workspace-types"
 import type { AgentConfig, AgentConfigRecord } from "../shared/agent-config-types"
 import type { ProviderProfile, ProviderProfileRecord, WorkspaceProfileOverride } from "../shared/profile-types"
@@ -39,6 +39,17 @@ export interface ChatRecord {
   lastTurnOutcome: "success" | "failed" | "cancelled" | null
 }
 
+export interface QueuedChatTurnRecord {
+  chatId: string
+  provider?: AgentProvider
+  content: string
+  model?: string
+  modelOptions?: ModelOptions
+  effort?: string
+  planMode?: boolean
+  updatedAt: number
+}
+
 export interface WorkspaceCoordinationState {
   todos: Map<string, WorkspaceTodo>
   claims: Map<string, WorkspaceClaim>
@@ -52,6 +63,7 @@ export interface StoreState {
   workspaceIdsByPath: Map<string, string>
   independentWorkspacesById: Map<string, IndependentWorkspace>
   chatsById: Map<string, ChatRecord>
+  queuedTurnsByChat: Map<string, QueuedChatTurnRecord>
   coordinationByWorkspace: Map<string, WorkspaceCoordinationState>
   agentConfigsByWorkspace: Map<string, Map<string, AgentConfigRecord>>
   reposById: Map<string, RepoRecord>
@@ -79,6 +91,7 @@ export interface SnapshotFile {
   workspaces: WorkspaceRecord[]
   independentWorkspaces?: IndependentWorkspace[]
   chats: ChatRecord[]
+  queuedTurns?: QueuedChatTurnRecord[]
   messages?: Array<{ chatId: string; entries: TranscriptEntry[] }>
   coordination?: Array<{ workspaceId: string; todos: WorkspaceTodo[]; claims: WorkspaceClaim[]; worktrees: WorkspaceWorktree[]; rules: WorkspaceRule[] }>
   agentConfigs?: Array<{ workspaceId: string; records: AgentConfigRecord[] }>
@@ -208,6 +221,24 @@ export type TurnEvent =
       chatId: string
       sessionToken: string | null
     }
+  | {
+      v: 3
+      type: "chat_turn_queued"
+      timestamp: number
+      chatId: string
+      provider?: AgentProvider
+      content: string
+      model?: string
+      modelOptions?: ModelOptions
+      effort?: string
+      planMode?: boolean
+    }
+  | {
+      v: 3
+      type: "chat_queued_turn_cleared"
+      timestamp: number
+      chatId: string
+    }
 
 export type CoordinationEvent =
   | { v: 3; type: "todo_added"; timestamp: number; workspaceId: string; todoId: string; description: string; priority: "high" | "normal" | "low"; createdBy: string }
@@ -270,6 +301,7 @@ export function createEmptyState(): StoreState {
     workspaceIdsByPath: new Map(),
     independentWorkspacesById: new Map(),
     chatsById: new Map(),
+    queuedTurnsByChat: new Map(),
     coordinationByWorkspace: new Map(),
     agentConfigsByWorkspace: new Map(),
     reposById: new Map(),

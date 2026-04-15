@@ -70,6 +70,16 @@ export type ClientCommand =
       effort?: string
       planMode?: boolean
     }
+  | {
+      type: "chat.queue"
+      chatId: string
+      provider?: AgentProvider
+      content: string
+      model?: string
+      modelOptions?: ModelOptions
+      effort?: string
+      planMode?: boolean
+    }
   | { type: "chat.cancel"; chatId: string }
   | { type: "chat.respondTool"; chatId: string; toolUseId: string; result: unknown }
   | { type: "chat.generateForkPrompt"; chatId: string; intent: string; preset?: string }

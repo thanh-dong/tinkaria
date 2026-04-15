@@ -1,6 +1,6 @@
 ---
 id: ref-ref-websocket-protocol
-c3-seal: 91acf994786d2b3f0300046580db18ddd8475ce51ac61132da73952df4d8264a
+c3-seal: 51b446c01f3d4ce56a8e0e45de74afa2ffc89ab27aac703038a45b3d982c976d
 title: websocket-protocol
 type: ref
 goal: 'Document the NATS WebSocket protocol for Tinkaria: /nats-ws routing, typed live subscriptions, reconnect/backfill behavior, and single-connection client/server streaming.'
@@ -24,12 +24,14 @@ Single NATS WebSocket connection routed through the Bun HTTP server at `/nats-ws
 - Efficient for high-frequency updates (terminal output, chat streaming)
 ## How
 
-Use the shared socket/NATS protocol boundary for every live client/server stream.
+Use the shared socket/NATS protocol boundary for every live client/server stream and command.
 
 Implementation contract:
 
 - Browser code connects through `/nats-ws`; never expose or hard-code the internal NATS WebSocket port.
 - Subjects and stream names come from shared constants, not string literals in features.
 - Each subscription must define snapshot shape, event shape, and reconnect/backfill behavior.
+- Client commands must be declared in `ClientCommand`, registered by server responders, and covered by request/reply tests.
+- `chat.send` starts immediate turns; `chat.queue` accepts follow-up turns for existing chats and delegates durable execution ownership to the server.
 - Server-side proxy and responders must log failures with the shared prefix and preserve auth/lazy-open ordering.
-- Tests must cover subscription shape, reconnect or fallback behavior, and typed payload handling for new channels.
+- Tests must cover subscription shape, reconnect or fallback behavior, and typed payload handling for new channels/commands.

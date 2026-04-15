@@ -1,6 +1,6 @@
 ---
 id: ref-ref-event-sourcing
-c3-seal: 3dd07095e5ced5fc622cd020060c5fbd7c9685907ccc96410b53e97a1871e33f
+c3-seal: 510769534fd1c6137a227880590ff0fa7537cccd70f3436604b98e1696b434c8
 title: event-sourcing
 type: ref
 goal: 'Document the event sourcing pattern for Tinkaria: append-only JSONL events, snapshot compaction, replay, repair, and verification without a database dependency.'
@@ -32,3 +32,4 @@ Implementation contract:
 - Snapshot compaction is an optimization only; replayed events remain the source of truth.
 - Tests for new events must prove append, replay, and snapshot restore behavior.
 - Manual recovery should prefer replay/repair paths over hand-editing derived snapshots.
+- Queued work that must continue without a mounted frontend must be represented as store events, not only in React/Zustand state or process-local maps. `chat_turn_queued` and `chat_queued_turn_cleared` are the current queued-turn example.

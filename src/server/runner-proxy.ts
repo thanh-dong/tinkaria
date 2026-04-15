@@ -16,6 +16,9 @@ import {
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
+type ChatSendCommand = Extract<ClientCommand, { type: "chat.send" }>
+type ChatQueueCommand = Extract<ClientCommand, { type: "chat.queue" }>
+
 export interface RunnerProxyOptions {
   nc: NatsConnection
   store: EventStore
@@ -31,6 +34,7 @@ export class RunnerProxy {
   private readonly runnerId: string
   private readonly _getActiveStatuses: () => Map<string, SessionStatus>
   private readonly runtimeRegistry: RuntimeRegistry | null
+  private readonly recentlyStartedChats = new Set<string>()
 
   /** Orchestration compatibility: check if a chat has an active turn */
   readonly activeTurns: { has(chatId: string): boolean }
@@ -77,6 +81,10 @@ export class RunnerProxy {
     return this._getActiveStatuses()
   }
 
+  private hasActiveOrJustStartedTurn(chatId: string): boolean {
+    return this.activeTurns.has(chatId) || this.recentlyStartedChats.has(chatId)
+  }
+
   private async sendCommand(cmd: string, payload: unknown): Promise<unknown> {
     const reply = await this.nc.request(
       runnerCmdSubject(this.runnerId, cmd),
@@ -89,7 +97,7 @@ export class RunnerProxy {
   }
 
   /** Send a chat message — creates chat if needed, delegates turn to runner */
-  async send(command: Extract<ClientCommand, { type: "chat.send" }>): Promise<{ chatId: string }> {
+  async send(command: ChatSendCommand): Promise<{ chatId: string }> {
     let chatId = command.chatId
     if (!chatId) {
       if (!command.workspaceId) throw new Error("Missing workspaceId for new chat")
@@ -145,7 +153,55 @@ export class RunnerProxy {
     await this.store.setPlanMode(chatId, planMode)
 
     await this.sendCommand("start_turn", startCmd)
+    this.recentlyStartedChats.add(chatId)
     return { chatId }
+  }
+
+  async queue(command: ChatQueueCommand): Promise<{ chatId: string; queued: boolean }> {
+    if (!this.hasActiveOrJustStartedTurn(command.chatId)) {
+      await this.send({
+        ...command,
+        type: "chat.send",
+      })
+      return { chatId: command.chatId, queued: false }
+    }
+
+    await this.store.enqueueQueuedTurn({
+      chatId: command.chatId,
+      provider: command.provider,
+      content: command.content,
+      model: command.model,
+      modelOptions: command.modelOptions,
+      effort: command.effort,
+      planMode: command.planMode,
+    })
+    return { chatId: command.chatId, queued: true }
+  }
+
+  async drainQueuedTurn(chatId: string): Promise<boolean> {
+    this.recentlyStartedChats.delete(chatId)
+    if (this.activeTurns.has(chatId)) return false
+
+    const queued = this.store.getQueuedTurn(chatId)
+    if (!queued) return false
+
+    await this.store.clearQueuedTurn(chatId)
+    try {
+      await this.send({
+        type: "chat.send",
+        chatId,
+        provider: queued.provider,
+        content: queued.content,
+        model: queued.model,
+        modelOptions: queued.modelOptions,
+        effort: queued.effort,
+        planMode: queued.planMode,
+      })
+      return true
+    } catch (error) {
+      await this.store.enqueueQueuedTurn(queued)
+      throw error
+    }
   }
 
   /** Start a turn for a specific chat — used by orchestration */
@@ -192,6 +248,7 @@ export class RunnerProxy {
       ...profileOverrides,
     }
     await this.sendCommand("start_turn", startCmd)
+    this.recentlyStartedChats.add(args.chatId)
   }
 
   async cancel(chatId: string): Promise<void> {

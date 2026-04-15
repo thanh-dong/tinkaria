@@ -827,7 +827,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                 </div>
               </div>
             ) : null}
-            <div className="flex items-end gap-2">
+            <div className="flex min-w-0 items-end gap-2">
               <Textarea
                 ref={setTextareaRefs}
                 placeholder={composerPlaceholder}
@@ -841,10 +841,10 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                 }}
                 onKeyDown={handleKeyDown}
                 disabled={disabled}
-                className="tinkaria-composer-placeholder flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
+                className="tinkaria-composer-placeholder min-w-0 flex-1 text-base p-3 md:p-4 pl-4.5 md:pl-6 resize-none max-h-[200px] outline-none bg-transparent border-0 shadow-none"
               />
               {showQueueAction ? (
-                <div className="mb-1 flex items-center gap-2 md:mb-1.5">
+                <div className="flex-shrink-0 mb-1 -mr-0.5 flex items-center gap-2 md:mr-0 md:mb-1.5">
                   <Button
                     {...getUiIdentityAttributeProps(cancelActionDescriptor)}
                     type="button"
@@ -881,7 +881,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                     disabled={queueActionDisabled}
                     size="icon"
                     className={cn(
-                      "h-10 w-10 rounded-full md:h-11 md:w-11 transition-colors",
+                      "flex-shrink-0 h-10 w-10 rounded-full md:h-11 md:w-11 transition-colors",
                       reconnectVisualState === "reconnecting" && "disabled:opacity-60",
                     )}
                   >

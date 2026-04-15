@@ -1,11 +1,11 @@
 ---
 id: c3-210
-c3-seal: 6882d80faf5bab941378823baf69b2107b3af472caeb18a0e38737d3f0013826
+c3-seal: a6453fe552b09f4d063ba07ce6ff2060ff7f789646311314c515f616941f3016
 title: agent
 type: component
 category: feature
 parent: c3-2
-goal: RunnerProxy and provider harness seams manage multi-turn AI agent sessions, prompt shaping, tool gating, plan mode, transcript event flow, and provider handoff without leaking provider transport details across the server.
+goal: RunnerProxy and provider harness seams manage multi-turn AI agent sessions, prompt shaping, tool gating, plan mode, transcript event flow, queued follow-up ownership, and provider handoff without leaking provider transport details across the server.
 uses:
     - c3-206
     - c3-207
@@ -27,18 +27,26 @@ uses:
 
 ## Goal
 
-RunnerProxy and provider harness seams manage multi-turn AI agent sessions, prompt shaping, tool gating, plan mode, transcript event flow, and provider handoff without leaking provider transport details across the server.
+RunnerProxy and provider harness seams manage multi-turn AI agent sessions, prompt shaping, tool gating, plan mode, transcript event flow, queued follow-up ownership, and provider handoff without leaking provider transport details across the server.
 
+`RunnerProxy` is the command-facing runtime coordinator:
+
+- `send(chat.send)` starts an immediate runner turn, creating a chat if needed and persisting provider/model/plan-mode selection.
+- `queue(chat.queue)` is the server-owned follow-up path for existing chats. If the chat is idle it sends immediately; if the chat is active or just-started it persists/coalesces the queued turn in c3-201.
+- `drainQueuedTurn(chatId)` claims the persisted queued turn, clears it before execution, and starts a new turn. If start fails, it re-enqueues the queued turn so retry/replay remains possible.
+- Recently-started chat ids cover the race between `chat.send` returning and the transcript runtime publishing a busy status, so fast follow-ups do not bypass the queue.
+Provider harness details stay behind dedicated runtime boundaries; client code only sees command results and transcript snapshots.
 ## Dependencies
 
-| Direction | What | From/To |
+| From/To | Direction | What |
 | --- | --- | --- |
-| IN | Transcript persistence and turn lifecycle state | c3-201 |
-| IN | Provider model normalization and capability lookup | c3-211 |
-| IN | Cross-session delegation tooling and wait/cancel semantics | c3-206 |
-| IN | Shared web-context prompt composition and developer-instructions guidance | c3-207 |
-| IN | Codex provider backend returning HarnessTurn streams | c3-216 |
-| OUT | Transcript entries, session tokens, and account info persisted to the store | c3-201 |
+| c3-201 | IN | Transcript persistence, queued turn records, and turn lifecycle state |
+| c3-211 | IN | Provider model normalization and capability lookup |
+| c3-206 | IN | Cross-session delegation tooling and wait/cancel semantics |
+| c3-207 | IN | Shared web-context prompt composition and developer-instructions guidance |
+| c3-216 | IN | Codex provider backend returning HarnessTurn streams |
+| c3-208 | OUT | Runner start/cancel/respond commands over the kit/runtime bridge |
+| c3-201 | OUT | Transcript entries, session tokens, account info, and queued turn mutations persisted to the store |
 ## Related Refs
 
 | Ref | Role |

@@ -26,6 +26,16 @@ function createMockRunner(nc: NatsConnection, runnerId: string) {
 
 function createMockStore() {
   const calls: Array<{ method: string; args: unknown[] }> = []
+  const queuedTurns = new Map<string, {
+    chatId: string
+    provider?: "claude" | "codex"
+    content: string
+    model?: string
+    modelOptions?: unknown
+    effort?: string
+    planMode?: boolean
+    updatedAt: number
+  }>()
   const store = {
     requireChat: (chatId: string) => ({
       id: chatId,
@@ -62,6 +72,39 @@ function createMockStore() {
     },
     setSessionToken: async (chatId: string, token: string | null) => {
       calls.push({ method: "setSessionToken", args: [chatId, token] })
+    },
+    enqueueQueuedTurn: async (args: {
+      chatId: string
+      provider?: "claude" | "codex"
+      content: string
+      model?: string
+      modelOptions?: unknown
+      effort?: string
+      planMode?: boolean
+    }) => {
+      calls.push({ method: "enqueueQueuedTurn", args: [args] })
+      const existing = queuedTurns.get(args.chatId)
+      const current = existing?.content.trim() ?? ""
+      const next = args.content.trim()
+      const content = current && next ? `${current}\n\n${next}` : next || current
+      queuedTurns.set(args.chatId, {
+        chatId: args.chatId,
+        provider: args.provider ?? existing?.provider,
+        content,
+        model: args.model ?? existing?.model,
+        modelOptions: args.modelOptions ?? existing?.modelOptions,
+        effort: args.effort ?? existing?.effort,
+        planMode: args.planMode ?? existing?.planMode,
+        updatedAt: Date.now(),
+      })
+    },
+    getQueuedTurn: (chatId: string) => {
+      const queued = queuedTurns.get(chatId)
+      return queued ? { ...queued } : null
+    },
+    clearQueuedTurn: async (chatId: string) => {
+      calls.push({ method: "clearQueuedTurn", args: [chatId] })
+      queuedTurns.delete(chatId)
     },
     state: {
       providerProfiles: new Map(),
@@ -166,6 +209,55 @@ describe("RunnerProxy", () => {
         content: "No context",
       }),
     ).rejects.toThrow("Missing workspaceId")
+  })
+
+  test("queue() holds follow-up while active and drainQueuedTurn starts it after the turn ends", async () => {
+    const { activeStatuses } = await setup()
+    activeStatuses.set("chat-queued", "running")
+
+    await expect(proxy!.queue({
+      type: "chat.queue",
+      chatId: "chat-queued",
+      content: "First follow-up",
+      model: "sonnet",
+    })).resolves.toEqual({ chatId: "chat-queued", queued: true })
+
+    await proxy!.queue({
+      type: "chat.queue",
+      chatId: "chat-queued",
+      content: "Second follow-up",
+      model: "opus",
+      planMode: true,
+    })
+
+    expect(mockRunner!.received).toHaveLength(0)
+
+    activeStatuses.delete("chat-queued")
+    await expect(proxy!.drainQueuedTurn("chat-queued")).resolves.toBe(true)
+
+    expect(mockRunner!.received).toHaveLength(1)
+    const msg = mockRunner!.received[0] as { subject: string; data: Record<string, unknown> }
+    expect(msg.subject).toBe(`runtime.runner.cmd.${RUNNER_ID}.start_turn`)
+    expect(msg.data).toMatchObject({
+      chatId: "chat-queued",
+      content: "First follow-up\n\nSecond follow-up",
+      model: "opus",
+      planMode: true,
+    })
+  })
+
+  test("queue() sends immediately when the chat is already idle", async () => {
+    await setup()
+
+    await expect(proxy!.queue({
+      type: "chat.queue",
+      chatId: "chat-idle",
+      content: "Run now",
+    })).resolves.toEqual({ chatId: "chat-idle", queued: false })
+
+    expect(mockRunner!.received).toHaveLength(1)
+    const msg = mockRunner!.received[0] as { data: Record<string, unknown> }
+    expect(msg.data.content).toBe("Run now")
   })
 
   test("cancel() forwards CancelTurnCommand", async () => {

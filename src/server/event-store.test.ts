@@ -252,4 +252,45 @@ describe("EventStore", () => {
     expect(reloadedStore.getChat(chat.id)?.provider).toBe("codex")
     expect(reloadedStore.getChat(chat.id)?.model).toBe("gpt-5.4")
   })
+
+  test("persists queued chat turns across replay and clears them after drain", async () => {
+    const dataDir = await createTempDataDir()
+    const store = new EventStore(dataDir)
+    await store.initialize()
+
+    const project = await store.openProject("/tmp/project")
+    const chat = await store.createChat(project.id)
+
+    await store.enqueueQueuedTurn({
+      chatId: chat.id,
+      provider: "claude",
+      content: "First follow-up",
+      model: "sonnet",
+    })
+    await store.enqueueQueuedTurn({
+      chatId: chat.id,
+      content: "Second follow-up",
+      model: "opus",
+      planMode: true,
+    })
+
+    expect(store.getQueuedTurn(chat.id)).toMatchObject({
+      chatId: chat.id,
+      provider: "claude",
+      content: "First follow-up\n\nSecond follow-up",
+      model: "opus",
+      planMode: true,
+    })
+
+    const replayed = new EventStore(dataDir)
+    await replayed.initialize()
+    expect(replayed.getQueuedTurn(chat.id)).toMatchObject({
+      chatId: chat.id,
+      content: "First follow-up\n\nSecond follow-up",
+      model: "opus",
+    })
+
+    await replayed.clearQueuedTurn(chat.id)
+    expect(replayed.getQueuedTurn(chat.id)).toBeNull()
+  })
 })

@@ -1,6 +1,6 @@
 ---
 id: c3-205
-c3-seal: a46b723e9546851418294ea6d7f6c8c7bf91052cc3b23179c87ece603f5a2dec
+c3-seal: 6583ccfaab671f9057d2bfef29f2cd0fcef68431c2421e3e2ea440a73c461d77
 title: nats-transport
 type: component
 category: foundation
@@ -32,11 +32,11 @@ Embedded NATS transport layer — starts nats-server subprocess (TCP + WebSocket
 
 | Direction | What | From/To |
 | --- | --- | --- |
-| IN | Store state and domain events | c3-201 |
-| IN | Agent status updates | c3-210 |
+| IN | Store state and domain events, including queued turn records | c3-201 |
+| IN | Agent status updates and command handling for chat.send/chat.queue/chat.cancel/chat.respondTool | c3-210 |
 | IN | Read model projections | c3-214 |
 | OUT | Snapshot subjects for clients | c3-110 |
-| OUT | Command replies for clients | c3-110 |
+| OUT | Command replies for clients, including backend queue acceptance | c3-110 |
 | IN | Session discovery snapshots and resume/import helpers | c3-217 |
 ## Container Connection
 
