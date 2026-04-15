@@ -1,6 +1,6 @@
 ---
 id: ref-ref-websocket-protocol
-c3-seal: 51b446c01f3d4ce56a8e0e45de74afa2ffc89ab27aac703038a45b3d982c976d
+c3-seal: 13eb3e7c75431fa4a26b58ba7c9316853fa30a329dba069865188a309065560f
 title: websocket-protocol
 type: ref
 goal: 'Document the NATS WebSocket protocol for Tinkaria: /nats-ws routing, typed live subscriptions, reconnect/backfill behavior, and single-connection client/server streaming.'
@@ -17,7 +17,7 @@ Single NATS WebSocket connection routed through the Bun HTTP server at `/nats-ws
 ## Why
 
 - Single connection avoids overhead of multiple WS connections or HTTP polling
-- Path-based routing (`/nats-ws`) avoids exposing the NATS WS port externally and works uniformly in dev (Vite proxy), production, and local companion contexts
+- Path-based routing (`/nats-ws`) avoids exposing the NATS WS port externally and works uniformly in dev (Vite proxy), production, browser, and PWA contexts
 - Topic-based routing keeps concerns separated without separate endpoints
 - Typed message protocol provides compile-time safety on both client and server
 - Subscriptions allow clients to opt into only the data streams they need
