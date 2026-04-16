@@ -132,12 +132,13 @@ const HOME_TAB_OPTIONS: SegmentedOption<HomeTab>[] = [
   { value: "workspaces", label: "Workspaces", icon: CodeXml },
   { value: "settings", label: "Settings", icon: Settings },
 ]
-const ACTIVE_SESSION_STATUSES = new Set(["starting", "running", "waiting_for_user"])
+const ACTIVE_SESSION_STATUSES = new Set(["starting", "running", "waiting_for_user", "awaiting_agents"])
 const SESSION_STATUS_LABELS: Record<string, string> = {
   idle: "Idle",
   starting: "Starting",
   running: "Running",
   waiting_for_user: "Waiting",
+  awaiting_agents: "Awaiting agents",
   failed: "Failed",
 }
 

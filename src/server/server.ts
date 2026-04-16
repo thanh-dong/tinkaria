@@ -35,6 +35,7 @@ import { BunDockerClient, SandboxManager } from "./sandbox-manager"
 import { RuntimeRegistry } from "./runtime-registry"
 import { createExtensionRouter } from "./extension-router"
 import { serverExtensions } from "./extensions.config"
+import { DelegationCoordinator, type DelegationStore } from "./delegation-coordinator"
 
 export interface StartServerOptions {
   port?: number
@@ -475,6 +476,7 @@ export async function startServer(options: StartServerOptions = {}) {
     })
   }
   let publishMessage: (chatId: string, entry: TranscriptEntry) => void = () => {}
+  let reconcileDelegation: (workspaceId: string, chatId: string, outcome: "success" | "failed" | "cancelled") => void = () => {}
 
   const onMessageAppended = (chatId: string, entry: TranscriptEntry) => {
     publishMessage(chatId, entry)
@@ -537,6 +539,12 @@ export async function startServer(options: StartServerOptions = {}) {
             })
           }
 
+          // Delegation reconciliation: if this chat was a delegation child, reconcile and possibly resume the parent
+          const chatRecord = store.state.chatsById.get(chatId)
+          if (chatRecord?.lastTurnOutcome) {
+            reconcileDelegation(chatRecord.workspaceId, chatId, chatRecord.lastTurnOutcome)
+          }
+
           void coordinator.drainQueuedTurn(chatId).catch((error) => {
             console.warn(LOG_PREFIX, "queued chat drain failed:", error instanceof Error ? error.message : String(error))
           })
@@ -565,9 +573,24 @@ export async function startServer(options: StartServerOptions = {}) {
 
   console.warn(LOG_PREFIX, "Runner process handles turn execution")
 
+  // ── Durable delegation coordinator ──
+  const delegationStoreAdapter: DelegationStore = {
+    appendMessage: (chatId, entry) => store.appendMessage(chatId, entry),
+    chatExists: (chatId) => {
+      const chat = store.state.chatsById.get(chatId)
+      return chat != null && chat.deletedAt == null
+    },
+    getChatWorkspaceId: (chatId) => store.state.chatsById.get(chatId)?.workspaceId,
+    getLastTurnOutcome: (chatId) => store.state.chatsById.get(chatId)?.lastTurnOutcome ?? undefined,
+  }
+  const delegationCoordinator = new DelegationCoordinator(natsConnector.nc, delegationStoreAdapter)
+  await delegationCoordinator.initialize()
+  await delegationCoordinator.bootReconciliation()
+
   const orchestrator = new SessionOrchestrator({
     store,
     coordinator,
+    delegationCoordinator,
   })
 
   const publisher = await createNatsPublisher({
@@ -582,10 +605,25 @@ export async function startServer(options: StartServerOptions = {}) {
     skillCache,
     orchestrator,
     runtimeRegistry,
+    hasActiveBlockingDelegations: delegationCoordinator.hasActiveBlockingDelegations.bind(delegationCoordinator),
   })
 
   broadcastFn = (types) => publisher.broadcastSnapshots(types)
   publishMessage = (chatId, entry) => publisher.publishChatMessage(chatId, entry)
+  reconcileDelegation = (workspaceId, chatId, outcome) => {
+    void delegationCoordinator
+      .reconcileChildTerminal(workspaceId, chatId, { outcome })
+      .then((result) => {
+        if (result && !("alreadyReconciled" in result) && result.resumeEligible) {
+          void coordinator.drainQueuedTurn(result.parentChatId).catch((err) => {
+            console.warn(LOG_PREFIX, "delegation parent drain failed:", err instanceof Error ? err.message : String(err))
+          })
+        }
+      })
+      .catch((err) => {
+        console.warn(LOG_PREFIX, "delegation reconciliation failed:", err instanceof Error ? err.message : String(err))
+      })
+  }
 
   const responders = registerCommandResponders({
     nc: natsConnector.nc,

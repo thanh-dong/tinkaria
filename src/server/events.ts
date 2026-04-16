@@ -239,6 +239,27 @@ export type TurnEvent =
       timestamp: number
       chatId: string
     }
+  | {
+      v: 3
+      type: "delegation_initiated"
+      timestamp: number
+      delegationId: string
+      parentChatId: string
+      childChatId: string
+      workspaceId: string
+      mode: "blocking" | "background"
+      resume: "immediate" | "gate"
+    }
+  | {
+      v: 3
+      type: "delegation_completed"
+      timestamp: number
+      delegationId: string
+      parentChatId: string
+      childChatId: string
+      workspaceId: string
+      outcome: "completed" | "failed" | "orphaned" | "stale"
+    }
 
 export type CoordinationEvent =
   | { v: 3; type: "todo_added"; timestamp: number; workspaceId: string; todoId: string; description: string; priority: "high" | "normal" | "low"; createdBy: string }

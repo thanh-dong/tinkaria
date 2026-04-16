@@ -9,7 +9,7 @@ import type { ChatMessageEvent, TranscriptEntry } from "../shared/types"
 import type { SessionStatus } from "../shared/types"
 import type { DiscoveredProject } from "./discovery"
 import type { EventStore } from "./event-store"
-import { deriveChatSnapshot, deriveLocalWorkspacesSnapshot, deriveWorkspaceCoordinationSnapshot, deriveSidebarData, deriveAgentConfigSnapshot, deriveRepoListSnapshot, deriveWorkflowRunsSnapshot, deriveSandboxSnapshot } from "./read-models"
+import { deriveChatSnapshot, deriveLocalWorkspacesSnapshot, deriveWorkspaceCoordinationSnapshot, deriveSidebarData, deriveAgentConfigSnapshot, deriveRepoListSnapshot, deriveWorkflowRunsSnapshot, deriveSandboxSnapshot, deriveTranscriptRenderUnits, TRANSCRIPT_RENDER_WINDOW_SIZE } from "./read-models"
 import type { TerminalManager } from "./terminal-manager"
 import type { UpdateManager } from "./update-manager"
 import type { SkillCache } from "./skill-discovery"
@@ -46,6 +46,7 @@ export interface CreateNatsPublisherArgs {
   skillCache?: SkillCache
   orchestrator?: SessionOrchestrator
   runtimeRegistry?: RuntimeRegistry
+  hasActiveBlockingDelegations?: (chatId: string) => boolean
 }
 
 function deriveProfileSnapshot(store: EventStore): ProfileSnapshot {
@@ -75,6 +76,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
     skillCache,
     orchestrator,
     runtimeRegistry,
+    hasActiveBlockingDelegations,
   } = args
 
   const js = jetstream(nc)
@@ -107,7 +109,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
   async function computeSnapshot(topic: SubscriptionTopic): Promise<unknown> {
     switch (topic.type) {
       case "sidebar":
-        return deriveSidebarData(store.state, agent.getActiveStatuses())
+        return deriveSidebarData(store.state, agent.getActiveStatuses(), hasActiveBlockingDelegations)
       case "local-workspaces":
         return deriveLocalWorkspacesSnapshot(store.state, getDiscoveredProjects(), machineDisplayName)
       case "update":
@@ -116,12 +118,20 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         const chat = store.state.chatsById.get(topic.chatId)
         const project = chat ? store.state.workspacesById.get(chat.workspaceId) : undefined
         const skills = project && skillCache ? await skillCache.get(project.localPath) : []
+        const messageCount = await store.getMessageCount(topic.chatId)
+        const renderEntries = await store.getMessages(topic.chatId, {
+          offset: Math.max(0, messageCount - TRANSCRIPT_RENDER_WINDOW_SIZE),
+          limit: TRANSCRIPT_RENDER_WINDOW_SIZE,
+        })
+        const activeStatus = agent.getActiveStatuses().get(topic.chatId)
         return deriveChatSnapshot(
           store.state,
           agent.getActiveStatuses(),
           topic.chatId,
-          await store.getMessageCount(topic.chatId),
+          messageCount,
           skills,
+          hasActiveBlockingDelegations,
+          deriveTranscriptRenderUnits(renderEntries, activeStatus),
         )
       }
       case "terminal":

@@ -116,6 +116,7 @@ const STATUS_COLORS: Record<string, string> = {
   running: "bg-emerald-500",
   starting: "bg-yellow-500",
   waiting_for_user: "bg-amber-500",
+  awaiting_agents: "bg-blue-500",
   idle: "bg-muted-foreground/40",
   failed: "bg-destructive",
 }

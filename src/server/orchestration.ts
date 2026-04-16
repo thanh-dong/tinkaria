@@ -1,6 +1,7 @@
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk"
 import { z } from "zod/v4"
-import type { AgentProvider, OrchestrationChildNode, OrchestrationChildStatus, OrchestrationHierarchySnapshot, TranscriptEntry, SessionStatus } from "../shared/types"
+import type { AgentProvider, DelegationMode, DelegationResumeMode, OrchestrationChildNode, OrchestrationChildStatus, OrchestrationHierarchySnapshot, TranscriptEntry, SessionStatus } from "../shared/types"
+import type { DelegationCoordinator } from "./delegation-coordinator"
 import { LOG_PREFIX } from "../shared/branding"
 import { normalizeServerModel } from "./provider-catalog"
 import { toTranscriptLine } from "./transcript-utils"
@@ -52,6 +53,7 @@ interface OrchestratorStore {
 export interface SessionOrchestratorArgs {
   store: OrchestratorStore
   coordinator: OrchestratorCoordinator
+  delegationCoordinator?: DelegationCoordinator
   onMessageAppended?: (chatId: string, entry: TranscriptEntry) => void
   maxDepth?: number
   maxConcurrency?: number
@@ -124,6 +126,7 @@ function buildDelegatedContext(entries: TranscriptEntry[]): string | undefined {
 export class SessionOrchestrator {
   private readonly store: OrchestratorStore
   private readonly coordinator: OrchestratorCoordinator
+  private readonly delegationCoordinator?: DelegationCoordinator
   private readonly maxDepth: number
   private readonly maxConcurrency: number
   private readonly origins = new Map<string, OriginRecord>()
@@ -134,14 +137,23 @@ export class SessionOrchestrator {
   constructor(args: SessionOrchestratorArgs) {
     this.store = args.store
     this.coordinator = args.coordinator
+    this.delegationCoordinator = args.delegationCoordinator
     this.maxDepth = args.maxDepth ?? 3
     this.maxConcurrency = args.maxConcurrency ?? 10
   }
 
   async spawnAgent(
     callerChatId: string,
-    args: { instruction: string; provider?: AgentProvider; model?: string; forkContext?: boolean },
-  ): Promise<{ chatId: string }> {
+    args: {
+      instruction: string
+      provider?: AgentProvider
+      model?: string
+      forkContext?: boolean
+      mode?: DelegationMode
+      resume?: DelegationResumeMode
+      resumeHint?: string
+    },
+  ): Promise<{ chatId: string; delegationId?: string }> {
     const callerChat = this.store.requireChat(callerChatId)
     const provider = args.provider ?? callerChat.provider ?? "claude"
     const callerDepth = this.origins.get(callerChatId)?.depth ?? 0
@@ -187,6 +199,29 @@ export class SessionOrchestrator {
     const delegatedContext = args.forkContext
       ? buildDelegatedContext(await this.store.getMessages(callerChatId))
       : undefined
+
+    // Create durable delegation record if coordinator is present
+    let delegationId: string | undefined
+    if (this.delegationCoordinator) {
+      const mode = args.mode ?? "blocking"
+      const resume = args.resume ?? "gate"
+      const parentMessages = await this.store.getMessages(callerChatId)
+      const resumeHint = args.resumeHint ?? this.delegationCoordinator.generateResumeHint(parentMessages)
+
+      const result = await this.delegationCoordinator.createDelegation({
+        workspaceId: callerChat.workspaceId,
+        parentChatId: callerChatId,
+        childChatId: newChat.id,
+        childProvider: provider,
+        instructionPreview: args.instruction,
+        mode,
+        resume,
+        depth: newDepth,
+        resumeHint,
+      })
+      delegationId = result.delegationId
+    }
+
     console.warn(`${LOG_PREFIX} spawnAgent: ${callerChatId} -> ${newChat.id} (depth=${newDepth}, provider=${provider})`)
 
     await this.coordinator.startTurnForChat({
@@ -200,7 +235,9 @@ export class SessionOrchestrator {
       appendUserPrompt: true,
     })
 
-    return { chatId: newChat.id }
+    const result: { chatId: string; delegationId?: string } = { chatId: newChat.id }
+    if (delegationId) result.delegationId = delegationId
+    return result
   }
 
   async sendInput(
@@ -592,19 +629,37 @@ export function createOrchestrationMcpServer(
     tools: [
       tool(
         "spawn_agent",
-        "Spawn a new agent session in the same project. Returns the new session's chatId. Use wait_agent to get the result.",
+        "Spawn a new agent session in the same project. Returns the new session's chatId and delegationId. " +
+          "Delegation persists across session boundaries: blocking children auto-resume the parent when done; " +
+          "background children inject results passively. Use wait_agent for synchronous result, or rely on auto-resume for durable async workflows.",
         {
           instruction: z.string().describe("Task instruction for the new agent"),
           provider: z.enum(["claude", "codex"]).optional().describe("AI provider — defaults to caller's provider"),
           fork_context: z.boolean().optional().describe(
             "When true, seed the new agent with a bounded snapshot of the current chat transcript before its first task message.",
           ),
+          mode: z
+            .enum(["blocking", "background"])
+            .optional()
+            .describe(
+              "Delegation mode. 'blocking' (default): parent auto-resumes when child completes. " +
+                "'background': fire-and-forget — result injected into parent transcript but no auto-resume.",
+            ),
+          resume: z
+            .enum(["immediate", "gate"])
+            .optional()
+            .describe(
+              "Multi-child resume strategy. 'gate' (default): parent resumes only after ALL blocking children complete. " +
+                "'immediate': parent resumes after EACH child completes.",
+            ),
         },
         async (args) => {
           const result = await orchestrator.spawnAgent(callerChatId, {
             instruction: args.instruction,
             provider: args.provider as AgentProvider | undefined,
             forkContext: args.fork_context,
+            mode: args.mode,
+            resume: args.resume,
           })
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] }
         },

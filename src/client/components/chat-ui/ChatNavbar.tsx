@@ -174,6 +174,8 @@ function getStatusDotClass(status: SessionStatus | undefined): string {
       return "bg-emerald-500 animate-pulse"
     case "waiting_for_user":
       return "bg-amber-500"
+    case "awaiting_agents":
+      return "bg-blue-500 animate-pulse"
     case "failed":
       return "bg-red-500"
     default:

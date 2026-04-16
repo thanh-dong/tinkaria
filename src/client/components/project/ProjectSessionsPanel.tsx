@@ -84,6 +84,7 @@ const STATUS_COLORS: Record<string, string> = {
   starting: "bg-amber-400",
   running: "bg-emerald-400",
   waiting_for_user: "bg-blue-400",
+  awaiting_agents: "bg-blue-400",
   failed: "bg-red-400",
 }
 
@@ -92,6 +93,7 @@ const STATUS_LABELS: Record<string, string> = {
   starting: "Starting",
   running: "Running",
   waiting_for_user: "Waiting",
+  awaiting_agents: "Awaiting agents",
   failed: "Failed",
 }
 

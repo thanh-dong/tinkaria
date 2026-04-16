@@ -208,6 +208,40 @@ export class RunnerProxy {
     }
   }
 
+  /** Resume parent chat after a delegated child agent completes */
+  async drainDelegationResult(chatId: string, delegationId: string): Promise<boolean> {
+    if (this.hasObservedActiveTurn(chatId)) return false
+
+    const queued = this.store.getQueuedTurn(chatId)
+    if (queued) return false
+
+    const chat = this.store.requireChat(chatId)
+    const project = this.store.getProject(chat.workspaceId)
+    if (!project) throw new Error("Project not found")
+
+    const profileOverrides = this.resolveProfileOverrides(chat.workspaceId, chat.provider ?? "claude")
+    const existingMessages = await this.store.getMessages(chatId)
+
+    const startCmd: StartTurnCommand = {
+      chatId,
+      provider: chat.provider ?? "claude",
+      content: `[Delegation result ready] The delegated agent has completed. Review the agent_result entry above and continue.`,
+      model: chat.model ?? "sonnet",
+      planMode: chat.planMode ?? false,
+      appendUserPrompt: false,
+      workspaceLocalPath: project.localPath,
+      sessionToken: chat.sessionToken,
+      chatTitle: chat.title,
+      existingMessageCount: existingMessages.length,
+      workspaceId: chat.workspaceId,
+      ...profileOverrides,
+    }
+
+    await this.sendCommand("start_turn", startCmd)
+    this.recentlyStartedChats.add(chatId)
+    return true
+  }
+
   /** Start a turn for a specific chat — used by orchestration */
   async startTurnForChat(args: {
     chatId: string

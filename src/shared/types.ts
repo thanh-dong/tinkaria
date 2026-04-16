@@ -158,6 +158,7 @@ export type SessionStatus =
   | "running"
   | "waiting_for_user"
   | "failed"
+  | "awaiting_agents"
 
 export interface RepoSummary {
   id: string
@@ -475,6 +476,30 @@ export interface ContextUsageEntry extends TranscriptEntryBase {
   }
 }
 
+export type DelegationMode = "blocking" | "background"
+export type DelegationResumeMode = "immediate" | "gate"
+export type DelegationStatus =
+  | "active"
+  | "completing"
+  | "completed"
+  | "failed"
+  | "orphaned"
+  | "stale"
+
+export interface AgentResultEntry extends TranscriptEntryBase {
+  kind: "agent_result"
+  delegationId: string
+  childChatId: string
+  childProvider: AgentProvider
+  mode: DelegationMode
+  instructionPreview: string
+  resumeHint?: string
+  resultSummary: string
+  resultRef?: string
+  isError: boolean
+  completedAt: number
+}
+
 export type TranscriptEntry =
   | UserPromptEntry
   | SystemInitEntry
@@ -489,6 +514,7 @@ export type TranscriptEntry =
   | ContextClearedEntry
   | InterruptedEntry
   | ContextUsageEntry
+  | AgentResultEntry
 
 export interface HydratedToolCallBase<TKind extends string, TInput, TResult> {
   id: string
@@ -646,6 +672,49 @@ export type HydratedTranscriptMessage =
   | ({ kind: "unknown"; json: string; id: string; messageId?: string; timestamp: string; hidden?: boolean })
   | ({ id: string; messageId?: string; hidden?: boolean } & HydratedToolCall)
 
+export type TranscriptRenderUnitKind =
+  | "user_prompt"
+  | "system_init"
+  | "account_info"
+  | "assistant_response"
+  | "wip_block"
+  | "tool_group"
+  | "standalone_tool"
+  | "artifact"
+  | "status"
+  | "result"
+  | "compact_boundary"
+  | "compact_summary"
+  | "context_cleared"
+  | "interrupted"
+  | "unknown"
+
+export interface TranscriptRenderUnitBase<TKind extends TranscriptRenderUnitKind> {
+  kind: TKind
+  id: string
+  sourceEntryIds: string[]
+}
+
+export type TranscriptSingleRenderUnit =
+  | (TranscriptRenderUnitBase<"user_prompt"> & { message: Extract<HydratedTranscriptMessage, { kind: "user_prompt" }> })
+  | (TranscriptRenderUnitBase<"system_init"> & { message: Extract<HydratedTranscriptMessage, { kind: "system_init" }> })
+  | (TranscriptRenderUnitBase<"account_info"> & { message: Extract<HydratedTranscriptMessage, { kind: "account_info" }> })
+  | (TranscriptRenderUnitBase<"assistant_response"> & { message: Extract<HydratedTranscriptMessage, { kind: "assistant_text" }> })
+  | (TranscriptRenderUnitBase<"standalone_tool"> & { tool: HydratedToolCall })
+  | (TranscriptRenderUnitBase<"artifact"> & { artifact: HydratedPresentContentToolCall })
+  | (TranscriptRenderUnitBase<"status"> & { message: Extract<HydratedTranscriptMessage, { kind: "status" }> })
+  | (TranscriptRenderUnitBase<"result"> & { message: Extract<HydratedTranscriptMessage, { kind: "result" }> })
+  | (TranscriptRenderUnitBase<"compact_boundary"> & { message: Extract<HydratedTranscriptMessage, { kind: "compact_boundary" }> })
+  | (TranscriptRenderUnitBase<"compact_summary"> & { message: Extract<HydratedTranscriptMessage, { kind: "compact_summary" }> })
+  | (TranscriptRenderUnitBase<"context_cleared"> & { message: Extract<HydratedTranscriptMessage, { kind: "context_cleared" }> })
+  | (TranscriptRenderUnitBase<"interrupted"> & { message: Extract<HydratedTranscriptMessage, { kind: "interrupted" }> })
+  | (TranscriptRenderUnitBase<"unknown"> & { message: Extract<HydratedTranscriptMessage, { kind: "unknown" }> })
+
+export type TranscriptRenderUnit =
+  | TranscriptSingleRenderUnit
+  | (TranscriptRenderUnitBase<"wip_block"> & { steps: HydratedTranscriptMessage[] })
+  | (TranscriptRenderUnitBase<"tool_group"> & { tools: HydratedToolCall[] })
+
 export interface ChatRuntime {
   chatId: string
   workspaceId: string
@@ -672,6 +741,7 @@ export interface QueuedChatTurnSnapshot {
 export interface ChatSnapshot {
   runtime: ChatRuntime
   messageCount: number
+  renderUnits: TranscriptRenderUnit[]
   availableProviders: ProviderCatalogEntry[]
   availableSkills: string[]
   queuedTurn: QueuedChatTurnSnapshot | null
@@ -727,4 +797,24 @@ export interface OrchestrationChildNode {
 
 export interface OrchestrationHierarchySnapshot {
   children: OrchestrationChildNode[]
+}
+
+export interface DurableDelegation {
+  delegationId: string
+  workspaceId: string
+  parentChatId: string
+  childChatId: string
+  childProvider: AgentProvider
+  instructionPreview: string
+  mode: DelegationMode
+  resume: DelegationResumeMode
+  status: DelegationStatus
+  depth: number
+  resumeHint?: string
+  resultSummary?: string
+  resultRef?: string
+  isError?: boolean
+  agentResultEntryId?: string
+  createdAt: number
+  updatedAt: number
 }

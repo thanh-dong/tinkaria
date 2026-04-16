@@ -7,6 +7,8 @@ import type {
   SidebarChatRow,
   SidebarData,
   SidebarWorkspaceGroup,
+  TranscriptEntry,
+  TranscriptRenderUnit,
 } from "../shared/types"
 import type { ChatRecord, StoreState, WorkspaceCoordinationState } from "./events"
 import { createEmptyCoordinationState } from "./events"
@@ -15,16 +17,36 @@ import type { AgentConfigSnapshot } from "../shared/agent-config-types"
 import type { WorkflowRunsSnapshot } from "../shared/workflow-types"
 import { resolveLocalPath } from "./paths"
 import { SERVER_PROVIDERS } from "./provider-catalog"
+import { foldTranscriptRenderUnits } from "../shared/transcript-render"
 
-export function deriveStatus(chat: ChatRecord, activeStatus?: SessionStatus): SessionStatus {
+export const TRANSCRIPT_RENDER_WINDOW_SIZE = 200
+
+export function isTranscriptRenderLoadingStatus(status: SessionStatus | undefined): boolean {
+  return status === "starting" || status === "running" || status === "waiting_for_user" || status === "awaiting_agents"
+}
+
+export function deriveTranscriptRenderUnits(
+  entries: TranscriptEntry[],
+  status?: SessionStatus,
+): TranscriptRenderUnit[] {
+  return foldTranscriptRenderUnits(entries, { isLoading: isTranscriptRenderLoadingStatus(status) })
+}
+
+export function deriveStatus(
+  chat: ChatRecord,
+  activeStatus?: SessionStatus,
+  hasActiveBlockingDelegations?: (chatId: string) => boolean,
+): SessionStatus {
   if (activeStatus) return activeStatus
   if (chat.lastTurnOutcome === "failed") return "failed"
+  if (hasActiveBlockingDelegations?.(chat.id)) return "awaiting_agents"
   return "idle"
 }
 
 export function deriveSidebarData(
   state: StoreState,
-  activeStatuses: Map<string, SessionStatus>
+  activeStatuses: Map<string, SessionStatus>,
+  hasActiveBlockingDelegations?: (chatId: string) => boolean,
 ): SidebarData {
   const projects = [...state.workspacesById.values()]
     .filter((project) => !project.deletedAt)
@@ -39,7 +61,7 @@ export function deriveSidebarData(
         _creationTime: chat.createdAt,
         chatId: chat.id,
         title: chat.title,
-        status: deriveStatus(chat, activeStatuses.get(chat.id)),
+        status: deriveStatus(chat, activeStatuses.get(chat.id), hasActiveBlockingDelegations),
         unread: chat.unread,
         localPath: project.localPath,
         provider: chat.provider,
@@ -110,6 +132,8 @@ export function deriveChatSnapshot(
   chatId: string,
   messageCount: number,
   availableSkills?: string[],
+  hasActiveBlockingDelegations?: (chatId: string) => boolean,
+  renderUnits: TranscriptRenderUnit[] = [],
 ): ChatSnapshot | null {
   const chat = state.chatsById.get(chatId)
   if (!chat || chat.deletedAt) return null
@@ -121,7 +145,7 @@ export function deriveChatSnapshot(
     workspaceId: project.id,
     localPath: project.localPath,
     title: chat.title,
-    status: deriveStatus(chat, activeStatuses.get(chat.id)),
+    status: deriveStatus(chat, activeStatuses.get(chat.id), hasActiveBlockingDelegations),
     provider: chat.provider,
     model: chat.model ?? null,
     planMode: chat.planMode,
@@ -132,6 +156,7 @@ export function deriveChatSnapshot(
   return {
     runtime,
     messageCount,
+    renderUnits,
     availableProviders: [...SERVER_PROVIDERS],
     availableSkills: availableSkills ?? [],
     queuedTurn: queuedTurn ? { ...queuedTurn } : null,

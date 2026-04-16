@@ -11,6 +11,7 @@ const STATUS_LABELS: Record<string, string> = {
   starting: "Starting...",
   running: "Running...",
   waiting_for_user: "Waiting...",
+  awaiting_agents: "Awaiting agents...",
   failed: "Failed",
 }
 

@@ -115,8 +115,15 @@ interface PendingTurn {
 interface CodexOrchestrationToolHost {
   spawnAgent(
     callerChatId: string,
-    args: { instruction: string; provider?: "claude" | "codex"; model?: string; forkContext?: boolean },
-  ): Promise<{ chatId: string }>
+    args: {
+      instruction: string
+      provider?: "claude" | "codex"
+      model?: string
+      forkContext?: boolean
+      mode?: "blocking" | "background"
+      resume?: "immediate" | "gate"
+    },
+  ): Promise<{ chatId: string; delegationId?: string }>
   listAgents(chatId: string): unknown
   sendInput(
     callerChatId: string,
@@ -375,13 +382,20 @@ function dynamicToolDefinitions(args: StartCodexTurnArgs): DynamicToolDefinition
     tools.push(
       {
         name: "spawn_agent",
-        description: "Spawn a new agent session in the same project. Returns the new session's chatId.",
+        description:
+          "Spawn a new agent session in the same project. Returns the new session's chatId. " +
+          "Use mode to control resume behavior: 'blocking' (default) auto-resumes parent when child completes; " +
+          "'background' is fire-and-forget (result injected passively). " +
+          "Use resume to control multi-child gating: 'gate' (default) waits for all blocking children; " +
+          "'immediate' resumes parent per-child completion.",
         inputSchema: {
           type: "object",
           properties: {
             instruction: { type: "string" },
             provider: { type: "string", enum: ["claude", "codex"] },
             fork_context: { type: "boolean" },
+            mode: { type: "string", enum: ["blocking", "background"], description: "blocking auto-resumes parent; background is fire-and-forget" },
+            resume: { type: "string", enum: ["immediate", "gate"], description: "immediate resumes per-child; gate waits for all blocking children" },
           },
           required: ["instruction"],
           additionalProperties: false,
@@ -1505,6 +1519,8 @@ export class CodexAppServerManager {
             provider: payload.provider === "claude" || payload.provider === "codex" ? payload.provider : undefined,
             model: typeof payload.model === "string" ? payload.model : undefined,
             forkContext: typeof payload.fork_context === "boolean" ? payload.fork_context : undefined,
+            mode: payload.mode === "blocking" || payload.mode === "background" ? payload.mode : undefined,
+            resume: payload.resume === "immediate" || payload.resume === "gate" ? payload.resume : undefined,
           })
           break
         case "list_agents":

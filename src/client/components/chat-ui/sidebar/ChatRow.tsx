@@ -138,6 +138,13 @@ function ChatRowInner({
               <div className=" rounded-full z-0 size-2.5 bg-blue-400 ring-2 ring-muted/20 dark:ring-muted/50" />
             </div>
           </div>
+        ) : chat.status === "awaiting_agents" ? (
+          <div className="relative ">
+            <div className=" rounded-full z-0 size-3.5 flex items-center justify-center ">
+              <div className="absolute rounded-full z-0 size-2.5 bg-blue-500/80 animate-ping" />
+              <div className=" rounded-full z-0 size-2.5 bg-blue-500 ring-2 ring-muted/20 dark:ring-muted/50" />
+            </div>
+          </div>
         ) : chat.unread ? (
           <div className="relative">
             <div className="rounded-full z-0 size-3.5 flex items-center justify-center">
@@ -177,7 +184,7 @@ function ChatRowInner({
               startEditing()
             }}
           >
-            {chat.status !== "idle" && chat.status !== "waiting_for_user" ? (
+            {chat.status !== "idle" && chat.status !== "waiting_for_user" && chat.status !== "awaiting_agents" ? (
               <AnimatedShinyText
                 animate={chat.status === "running"}
                 shimmerWidth={Math.max(20, chat.title.length * 3)}

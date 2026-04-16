@@ -1,6 +1,7 @@
 import { describe, expect, test, afterEach } from "bun:test"
 import { createOrchestrationMcpServer, SessionOrchestrator } from "./orchestration"
 import type { TranscriptEntry } from "../shared/types"
+import type { CreateDelegationArgs } from "./delegation-coordinator"
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -126,12 +127,42 @@ function createFakeCoordinator() {
 }
 
 // ---------------------------------------------------------------------------
+// Fake delegation coordinator — tracks createDelegation calls
+// ---------------------------------------------------------------------------
+
+function createFakeDelegationCoordinator() {
+  const createdDelegations: CreateDelegationArgs[] = []
+  return {
+    createdDelegations,
+    async createDelegation(args: CreateDelegationArgs) {
+      createdDelegations.push(args)
+      return { delegationId: `del-${createdDelegations.length}` }
+    },
+    generateResumeHint(entries: TranscriptEntry[]) {
+      return entries.length > 0 ? "generated-hint" : undefined
+    },
+    async initialize() {},
+    async getDelegation() { return null },
+    async getDelegationsForChild() { return [] },
+    async getBlockingDelegationsForParent() { return [] },
+    hasActiveBlockingDelegations() { return false },
+    async reconcileChildTerminal() { return null },
+    async bootReconciliation() {},
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Factory for orchestrator under test
 // ---------------------------------------------------------------------------
 
-function createOrchestrator(overrides?: { maxDepth?: number; maxConcurrency?: number }) {
+function createOrchestrator(overrides?: {
+  maxDepth?: number
+  maxConcurrency?: number
+  delegationCoordinator?: ReturnType<typeof createFakeDelegationCoordinator>
+}) {
   const store = createFakeStore()
   const coordinator = createFakeCoordinator()
+  const delegationCoordinator = overrides?.delegationCoordinator
   const appendedMessages: Array<{ chatId: string; entry: TranscriptEntry }> = []
 
   let onMessageAppendedCallback: ((chatId: string, entry: TranscriptEntry) => void) | undefined
@@ -139,6 +170,7 @@ function createOrchestrator(overrides?: { maxDepth?: number; maxConcurrency?: nu
   const orchestrator = new SessionOrchestrator({
     store: store as never,
     coordinator: coordinator as never,
+    delegationCoordinator: delegationCoordinator as never,
     onMessageAppended(chatId: string, entry: TranscriptEntry) {
       appendedMessages.push({ chatId, entry })
       onMessageAppendedCallback?.(chatId, entry)
@@ -151,6 +183,7 @@ function createOrchestrator(overrides?: { maxDepth?: number; maxConcurrency?: nu
     orchestrator,
     store,
     coordinator,
+    delegationCoordinator,
     appendedMessages,
     /** Allow tests to hook into message delivery for simulating delayed results */
     setOnMessageAppended(cb: (chatId: string, entry: TranscriptEntry) => void) {
@@ -888,6 +921,143 @@ describe("SessionOrchestrator", () => {
         "wait_agent",
         "close_agent",
       ])
+    })
+  })
+
+  // =========================================================================
+  // delegation
+  // =========================================================================
+
+  describe("delegation", () => {
+    test("spawnAgent with blocking mode creates delegation via coordinator", async () => {
+      const dc = createFakeDelegationCoordinator()
+      ctx = createOrchestrator({ delegationCoordinator: dc })
+      const caller = await seedCallerChat(ctx.store)
+
+      const { chatId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Do blocking work",
+        mode: "blocking",
+        resume: "gate",
+      })
+
+      expect(dc.createdDelegations).toHaveLength(1)
+      expect(dc.createdDelegations[0]!.parentChatId).toBe(caller.id)
+      expect(dc.createdDelegations[0]!.childChatId).toBe(chatId)
+      expect(dc.createdDelegations[0]!.mode).toBe("blocking")
+      expect(dc.createdDelegations[0]!.resume).toBe("gate")
+      expect(dc.createdDelegations[0]!.workspaceId).toBe("project-1")
+    })
+
+    test("spawnAgent defaults mode=blocking, resume=gate", async () => {
+      const dc = createFakeDelegationCoordinator()
+      ctx = createOrchestrator({ delegationCoordinator: dc })
+      const caller = await seedCallerChat(ctx.store)
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Default modes",
+      })
+
+      expect(dc.createdDelegations).toHaveLength(1)
+      expect(dc.createdDelegations[0]!.mode).toBe("blocking")
+      expect(dc.createdDelegations[0]!.resume).toBe("gate")
+    })
+
+    test("spawnAgent with background creates delegation with mode=background", async () => {
+      const dc = createFakeDelegationCoordinator()
+      ctx = createOrchestrator({ delegationCoordinator: dc })
+      const caller = await seedCallerChat(ctx.store)
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Fire and forget",
+        mode: "background",
+      })
+
+      expect(dc.createdDelegations).toHaveLength(1)
+      expect(dc.createdDelegations[0]!.mode).toBe("background")
+    })
+
+    test("spawnAgent generates resumeHint when not provided", async () => {
+      const dc = createFakeDelegationCoordinator()
+      ctx = createOrchestrator({ delegationCoordinator: dc })
+      const caller = await seedCallerChat(ctx.store)
+      // Seed transcript so generateResumeHint returns a value
+      ctx.store.messagesByChatId.set(caller.id, [
+        timestamped({ kind: "user_prompt", content: "Some parent context" }),
+      ])
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Needs hint",
+      })
+
+      expect(dc.createdDelegations).toHaveLength(1)
+      expect(dc.createdDelegations[0]!.resumeHint).toBe("generated-hint")
+    })
+
+    test("spawnAgent passes explicit resumeHint", async () => {
+      const dc = createFakeDelegationCoordinator()
+      ctx = createOrchestrator({ delegationCoordinator: dc })
+      const caller = await seedCallerChat(ctx.store)
+      ctx.store.messagesByChatId.set(caller.id, [
+        timestamped({ kind: "user_prompt", content: "Some parent context" }),
+      ])
+
+      await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "Has explicit hint",
+        resumeHint: "my-custom-hint",
+      })
+
+      expect(dc.createdDelegations).toHaveLength(1)
+      expect(dc.createdDelegations[0]!.resumeHint).toBe("my-custom-hint")
+    })
+
+    test("spawnAgent without delegationCoordinator skips delegation creation", async () => {
+      ctx = createOrchestrator() // no delegationCoordinator
+      const caller = await seedCallerChat(ctx.store)
+
+      const { chatId } = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "No coordinator",
+      })
+
+      // Should still work fine — just no delegation tracking
+      expect(chatId).toBeDefined()
+    })
+
+    test("spawnAgent passes correct depth to delegation", async () => {
+      const dc = createFakeDelegationCoordinator()
+      ctx = createOrchestrator({ maxDepth: 3, delegationCoordinator: dc })
+      const caller = await seedCallerChat(ctx.store)
+
+      const child1 = await ctx.orchestrator.spawnAgent(caller.id, {
+        instruction: "depth-1",
+      })
+      await ctx.orchestrator.spawnAgent(child1.chatId, {
+        instruction: "depth-2",
+      })
+
+      expect(dc.createdDelegations).toHaveLength(2)
+      expect(dc.createdDelegations[0]!.depth).toBe(1)
+      expect(dc.createdDelegations[1]!.depth).toBe(2)
+    })
+
+    test("spawn_agent MCP tool accepts mode + resume params", async () => {
+      const dc = createFakeDelegationCoordinator()
+      ctx = createOrchestrator({ delegationCoordinator: dc })
+      const caller = await seedCallerChat(ctx.store)
+
+      const server = createOrchestrationMcpServer(ctx.orchestrator, caller.id)
+      // Call spawn_agent through MCP with mode + resume
+      const result = await (server.instance as unknown as {
+        _registeredTools: Record<string, { handler: (args: Record<string, unknown>) => Promise<unknown> }>
+      })._registeredTools["spawn_agent"]!.handler({
+        instruction: "MCP delegation task",
+        mode: "background",
+        resume: "immediate",
+      })
+
+      expect(dc.createdDelegations).toHaveLength(1)
+      expect(dc.createdDelegations[0]!.mode).toBe("background")
+      expect(dc.createdDelegations[0]!.resume).toBe("immediate")
+      expect(result).toBeDefined()
     })
   })
 })

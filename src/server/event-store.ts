@@ -857,6 +857,10 @@ export class EventStore {
         })
         break
       }
+      case "delegation_initiated":
+      case "delegation_completed":
+        // Audit-only — KV is the source of truth for delegation state
+        break
     }
   }
 
@@ -1200,6 +1204,35 @@ export class EventStore {
       type: "chat_queued_turn_cleared",
       timestamp: Date.now(),
       chatId,
+    }
+    await this.append(this.turnsLogPath, event)
+  }
+
+  async recordDelegationInitiated(workspaceId: string, args: { delegationId: string; parentChatId: string; childChatId: string; mode: "blocking" | "background"; resume: "immediate" | "gate" }) {
+    const event: TurnEvent = {
+      v: STORE_VERSION,
+      type: "delegation_initiated",
+      timestamp: Date.now(),
+      delegationId: args.delegationId,
+      parentChatId: args.parentChatId,
+      childChatId: args.childChatId,
+      workspaceId,
+      mode: args.mode,
+      resume: args.resume,
+    }
+    await this.append(this.turnsLogPath, event)
+  }
+
+  async recordDelegationCompleted(workspaceId: string, args: { delegationId: string; parentChatId: string; childChatId: string; outcome: "completed" | "failed" | "orphaned" | "stale" }) {
+    const event: TurnEvent = {
+      v: STORE_VERSION,
+      type: "delegation_completed",
+      timestamp: Date.now(),
+      delegationId: args.delegationId,
+      parentChatId: args.parentChatId,
+      childChatId: args.childChatId,
+      workspaceId,
+      outcome: args.outcome,
     }
     await this.append(this.turnsLogPath, event)
   }

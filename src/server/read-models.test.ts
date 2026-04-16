@@ -1,6 +1,50 @@
 import { describe, expect, test } from "bun:test"
-import { deriveChatSnapshot, deriveLocalWorkspacesSnapshot, deriveSidebarData } from "./read-models"
+import { deriveChatSnapshot, deriveLocalWorkspacesSnapshot, deriveSidebarData, deriveStatus } from "./read-models"
 import { createEmptyState } from "./events"
+import type { ChatRecord } from "./events"
+
+function makeChatRecord(overrides?: Partial<ChatRecord>): ChatRecord {
+  return {
+    id: "chat-1",
+    workspaceId: "project-1",
+    repoId: null,
+    title: "Chat",
+    createdAt: 1,
+    updatedAt: 1,
+    unread: false,
+    provider: "claude",
+    planMode: false,
+    sessionToken: null,
+    lastTurnOutcome: null,
+    ...overrides,
+  }
+}
+
+describe("deriveStatus", () => {
+  test("returns 'awaiting_agents' when idle and has active blocking delegations", () => {
+    const chat = makeChatRecord()
+    const lookup = (id: string) => id === "chat-1"
+    expect(deriveStatus(chat, undefined, lookup)).toBe("awaiting_agents")
+  })
+
+  test("returns 'idle' when delegation lookup returns false", () => {
+    const chat = makeChatRecord()
+    const lookup = (_id: string) => false
+    expect(deriveStatus(chat, undefined, lookup)).toBe("idle")
+  })
+
+  test("returns active status even with active delegations (active status takes priority)", () => {
+    const chat = makeChatRecord()
+    const lookup = (id: string) => id === "chat-1"
+    expect(deriveStatus(chat, "running", lookup)).toBe("running")
+  })
+
+  test("returns 'failed' even with active delegations (failed takes priority)", () => {
+    const chat = makeChatRecord({ lastTurnOutcome: "failed" })
+    const lookup = (id: string) => id === "chat-1"
+    expect(deriveStatus(chat, undefined, lookup)).toBe("failed")
+  })
+})
 
 describe("read models", () => {
   test("include provider and model data in sidebar rows", () => {
@@ -141,6 +185,48 @@ describe("read models", () => {
       planMode: true,
       updatedAt: 2,
     })
+  })
+
+  test("includes folded render units in chat snapshots", () => {
+    const state = createEmptyState()
+    state.workspacesById.set("project-1", {
+      id: "project-1",
+      localPath: "/tmp/project",
+      title: "Project",
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    state.workspaceIdsByPath.set("/tmp/project", "project-1")
+    state.chatsById.set("chat-1", {
+      id: "chat-1",
+      workspaceId: "project-1",
+      repoId: null,
+      title: "Chat",
+      createdAt: 1,
+      updatedAt: 1,
+      unread: false,
+      provider: "codex",
+      model: "gpt-5.4",
+      planMode: false,
+      sessionToken: "session-1",
+      lastTurnOutcome: null,
+    })
+
+    const chat = deriveChatSnapshot(state, new Map(), "chat-1", 3, [], undefined, [
+      {
+        kind: "assistant_response",
+        id: "assistant_response:e1",
+        sourceEntryIds: ["e1"],
+        message: {
+          kind: "assistant_text",
+          id: "e1",
+          timestamp: "2026-04-16T00:00:00.000Z",
+          text: "Done",
+        },
+      },
+    ])
+
+    expect(chat?.renderUnits.map((unit) => unit.id)).toEqual(["assistant_response:e1"])
   })
 
   test("includes the persisted chat model in chat runtime", () => {

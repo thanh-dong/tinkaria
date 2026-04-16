@@ -40,9 +40,10 @@ function createMockStore() {
     requireChat: (chatId: string) => ({
       id: chatId,
       workspaceId: "p1",
-    repoId: null,
+      repoId: null,
       title: "Test Chat",
       provider: "claude" as const,
+      model: "sonnet" as string | null,
       sessionToken: null,
       planMode: false,
     }),
@@ -369,6 +370,52 @@ describe("RunnerProxy", () => {
     expect(mockRunner!.received).toHaveLength(1)
     const msg = mockRunner!.received[0] as { subject: string; data: Record<string, unknown> }
     expect(msg.subject).toBe(`runtime.runner.cmd.${RUNNER_ID}.cancel_turn`)
+  })
+
+  describe("drainDelegationResult", () => {
+    test("drainDelegationResult starts parent turn when idle + no user queued turn", async () => {
+      await setup()
+
+      const result = await proxy!.drainDelegationResult("parent-chat", "deleg-1")
+
+      expect(result).toBe(true)
+      expect(mockRunner!.received).toHaveLength(1)
+      const msg = mockRunner!.received[0] as { subject: string; data: Record<string, unknown> }
+      expect(msg.subject).toBe(`runtime.runner.cmd.${RUNNER_ID}.start_turn`)
+      expect(msg.data).toMatchObject({
+        chatId: "parent-chat",
+        appendUserPrompt: false,
+      })
+      expect(msg.data.content).toContain("Delegation result ready")
+    })
+
+    test("drainDelegationResult does NOT fire when parent has active turn", async () => {
+      const { activeStatuses } = await setup()
+      activeStatuses.set("parent-chat", "running")
+
+      const result = await proxy!.drainDelegationResult("parent-chat", "deleg-1")
+
+      expect(result).toBe(false)
+      expect(mockRunner!.received).toHaveLength(0)
+    })
+
+    test("drainDelegationResult does NOT fire when parent has user queued turn", async () => {
+      const { activeStatuses } = await setup()
+      // Queue a user turn while the chat is active
+      activeStatuses.set("parent-chat", "running")
+      await proxy!.queue({
+        type: "chat.queue",
+        chatId: "parent-chat",
+        content: "User follow-up",
+      })
+      // Turn ends — but there's a queued user turn
+      activeStatuses.delete("parent-chat")
+
+      const result = await proxy!.drainDelegationResult("parent-chat", "deleg-1")
+
+      expect(result).toBe(false)
+      expect(mockRunner!.received).toHaveLength(0)
+    })
   })
 
   test("sendCommand throws on runner error response", async () => {
