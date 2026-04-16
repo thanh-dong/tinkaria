@@ -1067,7 +1067,9 @@ export class CodexAppServerManager {
           turnId: pendingTurn.turnId,
         } satisfies TurnInterruptParams)
       },
-      close: () => {},
+      close: () => {
+        this.stopSession(context.chatId)
+      },
     }
   }
 
@@ -1110,8 +1112,11 @@ export class CodexAppServerManager {
       const candidate = assistantText.trim() || resultText.trim()
       return candidate || null
     } finally {
-      turn?.close()
-      this.stopSession(chatId)
+      if (turn) {
+        turn.close() // kills session via stopSession
+      } else {
+        this.stopSession(chatId) // fallback when turn was never created
+      }
     }
   }
 
@@ -1119,6 +1124,11 @@ export class CodexAppServerManager {
     const context = this.sessions.get(chatId)
     if (!context) return
     context.closed = true
+    // Reject pending RPC promises before killing — prevents leaked awaits
+    for (const [, pending] of context.pendingRequests) {
+      pending.reject(new Error("Session stopped"))
+    }
+    context.pendingRequests.clear()
     context.pendingTurn?.queue.finish()
     this.sessions.delete(chatId)
     try {

@@ -387,10 +387,10 @@ export class RunnerAgent {
       if (active.cancelRequested && !active.cancelRecorded) {
         this.publishEvent(active.chatId, { type: "turn_cancelled", chatId: active.chatId })
       }
-      active.turn.close()
       this.activeTurns.delete(active.chatId)
 
-      // Handle follow-up turn (Codex exit_plan_mode)
+      // Handle follow-up turn (Codex exit_plan_mode) — close() deferred so
+      // the follow-up can reuse the live session (avoids re-spawn cost).
       if (active.postToolFollowUp && !active.cancelRequested) {
         try {
           await this.startTurn({
@@ -400,6 +400,7 @@ export class RunnerAgent {
             appendUserPrompt: false,
           })
         } catch (error) {
+          active.turn.close()
           const message = error instanceof Error ? error.message : String(error)
           this.publishTranscript(
             active.chatId,
@@ -407,6 +408,8 @@ export class RunnerAgent {
           )
           this.publishEvent(active.chatId, { type: "turn_failed", chatId: active.chatId, error: message })
         }
+      } else {
+        active.turn.close()
       }
     }
   }

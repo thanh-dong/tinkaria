@@ -371,6 +371,54 @@ describe("RunnerAgent", () => {
     expect(finalStatuses.has("chat-1")).toBe(false)
   })
 
+  test("follow-up turn runs before close() is called on the original turn", async () => {
+    let followUpStarted = false
+    let closeCalledBeforeFollowUp = false
+    let turnIndex = 0
+
+    const createTurn: TurnFactory = async (args) => {
+      turnIndex++
+      if (turnIndex === 1) {
+        // First turn: sends exit_plan_mode tool request via onToolRequest, then completes
+        return {
+          provider: "codex",
+          stream: (async function* () {
+            yield { type: "transcript" as const, entry: ts({ kind: "system_init", provider: "codex", model: "t", tools: [], agents: [], slashCommands: [], mcpServers: [] }) }
+            // Trigger exit_plan_mode tool request through the harness callback
+            await args.onToolRequest({
+              tool: { toolId: "exit-plan", toolKind: "exit_plan_mode" as const, input: {} } as any,
+            })
+            yield { type: "transcript" as const, entry: ts({ kind: "result", subtype: "success", isError: false, durationMs: 10, result: "ok" }) }
+          })(),
+          interrupt: async () => {},
+          close: () => {
+            if (!followUpStarted) {
+              closeCalledBeforeFollowUp = true
+            }
+          },
+        }
+      }
+      // Follow-up turn (turnIndex === 2)
+      followUpStarted = true
+      return createMockTurn([
+        { type: "transcript", entry: ts({ kind: "result", subtype: "success", isError: false, durationMs: 10, result: "follow-up done" }) },
+      ])
+    }
+
+    const agent = new RunnerAgent({ nc, createTurn })
+    await agent.startTurn(makeCmd({ provider: "codex", planMode: true }))
+    await new Promise((r) => setTimeout(r, 200))
+
+    // Respond to the exit_plan_mode tool with confirmed=true to trigger follow-up
+    await agent.respondTool("chat-1", "exit-plan", { confirmed: true })
+    await new Promise((r) => setTimeout(r, 500))
+
+    // With current code (close before follow-up), closeCalledBeforeFollowUp is true.
+    // After the fix, it should be false.
+    expect(closeCalledBeforeFollowUp).toBe(false)
+    expect(followUpStarted).toBe(true)
+  })
+
   test("passes coordinationStore to createTurn when provided", async () => {
     const mockStore = {
       state: { coordinationByWorkspace: new Map() },

@@ -2814,4 +2814,207 @@ describe("CodexAppServerManager", () => {
     const resultEvent = events.find((event) => event.type === "transcript" && event.entry.kind === "result")
     expect(resultEvent?.entry.isError).toBe(true)
   })
+
+  test("close() kills the codex session subprocess", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+      } else if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+      } else if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "do something",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+
+    await collectStream(turn.stream)
+    turn.close()
+
+    expect(process.killed).toBe(true)
+  })
+
+  test("close() is idempotent — calling twice does not throw", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+      } else if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+      } else if (message.method === "turn/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { turn: { id: "turn-1", status: "inProgress", error: null } },
+        })
+        child.writeServerMessage({
+          method: "turn/completed",
+          params: {
+            threadId: "thread-1",
+            turn: { id: "turn-1", status: "completed", error: null },
+          },
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "do something",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+
+    await collectStream(turn.stream)
+    expect(() => {
+      turn.close()
+      turn.close()
+    }).not.toThrow()
+  })
+
+  test("stopSession rejects pending RPC promises", async () => {
+    const process = new FakeCodexProcess((message, child) => {
+      if (message.method === "initialize") {
+        child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+      } else if (message.method === "thread/start") {
+        child.writeServerMessage({
+          id: message.id,
+          result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+        })
+      } else if (message.method === "turn/start") {
+        // Don't respond — leave the request pending, then kill the session
+        queueMicrotask(() => {
+          manager.stopSession("chat-1")
+        })
+      }
+    })
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => process as never,
+    })
+
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    // startTurn sends turn/start which will never get a response — stopSession should reject it
+    await expect(
+      manager.startTurn({
+        chatId: "chat-1",
+        model: "gpt-5.4",
+        content: "pending request",
+        planMode: false,
+        onToolRequest: async () => ({}),
+      })
+    ).rejects.toThrow("Session stopped")
+  })
+
+  test("new session re-spawns a fresh process after close()", async () => {
+    let spawnCount = 0
+
+    function createProcess() {
+      spawnCount++
+      return new FakeCodexProcess((message, child) => {
+        if (message.method === "initialize") {
+          child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
+        } else if (message.method === "thread/start" || message.method === "thread/resume") {
+          child.writeServerMessage({
+            id: message.id,
+            result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
+          })
+        } else if (message.method === "turn/start") {
+          child.writeServerMessage({
+            id: message.id,
+            result: { turn: { id: `turn-${spawnCount}`, status: "inProgress", error: null } },
+          })
+          child.writeServerMessage({
+            method: "turn/completed",
+            params: {
+              threadId: "thread-1",
+              turn: { id: `turn-${spawnCount}`, status: "completed", error: null },
+            },
+          })
+        }
+      })
+    }
+
+    const manager = new CodexAppServerManager({
+      spawnProcess: () => createProcess() as never,
+    })
+
+    // First session + turn
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: null,
+    })
+
+    const turn1 = await manager.startTurn({
+      chatId: "chat-1",
+      model: "gpt-5.4",
+      content: "first",
+      planMode: false,
+      onToolRequest: async () => ({}),
+    })
+    await collectStream(turn1.stream)
+    turn1.close()
+
+    expect(spawnCount).toBe(1)
+
+    // Second session should spawn a new process since close() killed the first
+    await manager.startSession({
+      chatId: "chat-1",
+      cwd: "/tmp/project",
+      model: "gpt-5.4",
+      sessionToken: "thread-1",
+    })
+
+    expect(spawnCount).toBe(2)
+  })
 })
