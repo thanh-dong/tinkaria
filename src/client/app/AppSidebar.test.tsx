@@ -102,6 +102,13 @@ describe("AppSidebar", () => {
     expect(html).not.toContain(">Connected<")
   })
 
+  test("links footer settings into the unified home settings tab", () => {
+    const html = renderSidebar()
+
+    expect(html).toContain('href="/?tab=settings"')
+    expect(html).not.toContain('href="/tinkaria"')
+  })
+
   test("keeps the header free of connection chrome", () => {
     const html = renderSidebar()
     const headerEndIndex = html.indexOf('class="flex-1 min-h-0 overflow-y-auto scrollbar-hide"')

@@ -1,13 +1,14 @@
 import { useState } from "react"
 import { useNavigate, useOutletContext } from "react-router-dom"
 import { ArrowLeft, Box, Puzzle, Settings, User } from "lucide-react"
+import { Button } from "../components/ui/button"
 import { SegmentedControl, type SegmentedOption } from "../components/ui/segmented-control"
 import { ProvidersTab } from "./ProvidersTab"
 import { ProfilesTab } from "./ProfilesTab"
 import { ExtensionsTab } from "./ExtensionsTab"
 import type { AppState } from "./useAppState"
 
-type TinkariaTab = "providers" | "profiles" | "extensions"
+export type TinkariaTab = "providers" | "profiles" | "extensions"
 
 const TAB_OPTIONS: SegmentedOption<TinkariaTab>[] = [
   { value: "providers", label: "Providers", icon: Box, tooltip: "Providers" },
@@ -15,24 +16,22 @@ const TAB_OPTIONS: SegmentedOption<TinkariaTab>[] = [
   { value: "extensions", label: "Extensions", icon: Puzzle, tooltip: "Extensions" },
 ]
 
-export function TinkariaPage() {
-  const state = useOutletContext<AppState>()
-  const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<TinkariaTab>("providers")
+export function normalizeTinkariaTab(value: string | null): TinkariaTab {
+  return value === "profiles" || value === "extensions" ? value : "providers"
+}
+
+export function TinkariaSettingsPanel({
+  state,
+  initialTab = "providers",
+}: {
+  state: AppState
+  initialTab?: TinkariaTab
+}) {
+  const [activeTab, setActiveTab] = useState<TinkariaTab>(initialTab)
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 relative">
-      <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3">
-        <button
-          onClick={() => navigate("/")}
-          className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 md:hidden"
-        >
-          <ArrowLeft className="size-4" />
-        </button>
-        <Settings className="size-4 text-muted-foreground hidden md:block" />
-        <h1 className="text-base font-semibold text-foreground md:text-lg">Tinkaria</h1>
-      </div>
-      <div className="px-4 mb-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-3">
         <SegmentedControl
           value={activeTab}
           onValueChange={setActiveTab}
@@ -43,10 +42,36 @@ export function TinkariaPage() {
           alwaysShowLabels
         />
       </div>
-      <div className="flex-1 min-h-0 px-4 pb-4 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {activeTab === "providers" && <ProvidersTab state={state} />}
         {activeTab === "profiles" && <ProfilesTab state={state} />}
         {activeTab === "extensions" && <ExtensionsTab state={state} />}
+      </div>
+    </div>
+  )
+}
+
+export function TinkariaPage() {
+  const state = useOutletContext<AppState>()
+  const navigate = useNavigate()
+
+  return (
+    <div className="flex-1 flex flex-col min-w-0 relative">
+      <div className="flex items-center gap-2 px-4 pt-3 pb-2 md:pt-4 md:pb-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => navigate("/")}
+          className="size-7 border-0 md:hidden"
+        >
+          <ArrowLeft className="size-4" />
+        </Button>
+        <Settings className="size-4 text-muted-foreground hidden md:block" />
+        <h1 className="text-base font-semibold text-foreground md:text-lg">Tinkaria</h1>
+      </div>
+      <div className="flex-1 min-h-0 px-4 pb-4 overflow-y-auto">
+        <TinkariaSettingsPanel state={state} />
       </div>
     </div>
   )

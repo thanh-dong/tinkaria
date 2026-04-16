@@ -408,13 +408,18 @@ function AppSidebarInner({
 
         <div data-sidebar-footer="true" className="border-t border-border p-2">
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => { navigate("/tinkaria"); onClose() }}
+            <a
+              href="/?tab=settings"
+              onClick={(event) => {
+                event.preventDefault()
+                navigate("/?tab=settings")
+                onClose()
+              }}
               className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50"
             >
               <Settings className="h-4 w-4" />
               Tinkaria
-            </button>
+            </a>
             <span
               data-sidebar-connection-indicator={connectionIndicatorState}
               className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground/60"

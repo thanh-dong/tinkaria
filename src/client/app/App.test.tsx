@@ -57,10 +57,10 @@ describe("getNextProvider", () => {
 })
 
 describe("getLegacyTinkariaRedirectTarget", () => {
-  test("maps legacy settings URLs onto the Tinkaria route", () => {
-    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings" })).toBe("/tinkaria")
-    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings/providers" })).toBe("/tinkaria/providers")
-    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings", search: "?tab=providers", hash: "#profiles" })).toBe("/tinkaria?tab=providers#profiles")
+  test("maps legacy settings URLs onto the unified home settings tab", () => {
+    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings" })).toBe("/?tab=settings")
+    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings/providers" })).toBe("/?tab=settings&settingsTab=providers")
+    expect(getLegacyTinkariaRedirectTarget({ pathname: "/settings", search: "?tab=profiles", hash: "#profiles" })).toBe("/?tab=settings&settingsTab=profiles#profiles")
   })
 })
 

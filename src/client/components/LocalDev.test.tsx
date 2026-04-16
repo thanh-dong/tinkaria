@@ -75,8 +75,10 @@ describe("LocalDev homepage", () => {
     expect(identities).toEqual({
       page: "home.page",
       header: "home.header",
+      tabs: "home.tabs",
       status: "home.status",
       setup: "home.setup",
+      settingsPanel: "home.settings.panel",
       workspaceGrid: "home.workspace-grid",
       addProjectAction: "home.add-project.action",
       projectOverview: "home.project-overview",
@@ -121,6 +123,39 @@ describe("LocalDev homepage", () => {
           commandError={null}
           onOpenProject={async () => {}}
           onCreateProject={async () => {}}
+          projectGroups={[{
+            groupKey: "alpha",
+            localPath: "/workspace/alpha",
+            chats: [
+              {
+                _id: "chat-1",
+                _creationTime: 1,
+                chatId: "chat-1",
+                title: "Running checks",
+                status: "running",
+                unread: false,
+                localPath: "/workspace/alpha",
+                provider: "codex",
+                model: "gpt-5.4",
+                hasAutomation: false,
+                lastMessageAt: 12,
+              },
+              {
+                _id: "chat-2",
+                _creationTime: 2,
+                chatId: "chat-2",
+                title: "Waiting review",
+                status: "waiting_for_user",
+                unread: true,
+                localPath: "/workspace/alpha",
+                provider: "claude",
+                model: "sonnet",
+                hasAutomation: false,
+                lastMessageAt: 11,
+              },
+            ],
+          }]}
+          onOpenProjectPage={() => {}}
         />
       </TooltipProvider>
       </ThemeProvider>
@@ -128,22 +163,94 @@ describe("LocalDev homepage", () => {
 
     expect(html).toContain('data-ui-id="home.page"')
     expect(html).toContain('data-ui-id="home.header"')
+    expect(html).toContain('data-ui-id="home.tabs"')
+    expect(html).toContain(">Projects<")
+    expect(html).toContain(">Workspaces<")
+    expect(html).toContain(">Settings<")
 
-    // Workspaces: clickable cards with actions revealed on hover/select
+    // Projects: cards link to project pages and preview a couple current sessions.
     expect(html).toContain('data-ui-id="home.workspace-grid"')
     expect(html).toContain('data-ui-id="home.add-project.action"')
     expect(html).toContain('data-ui-id="home.project-card"')
     expect(html).toContain('data-ui-id="home.project-overview"')
     expect(html).toContain('data-ui-id="home.project-primary.action"')
     expect(html).toContain('data-ui-id="home.project-secondary.action"')
+    expect(html).toContain('href="/project/alpha"')
+    expect(html).toContain("Running checks")
+    expect(html).toContain("Waiting review")
     expect(html).toContain("Alpha")
     expect(html).toContain("/workspace/alpha")
 
-    // Preferences footer
-    expect(html).toContain('data-ui-id="home.preferences"')
-
     // Entrance animation applied to cards and overview
     expect(html).toContain("animate-homepage-enter")
+  })
+
+  test("renders combined settings inside the home page", () => {
+    const html = renderToStaticMarkup(
+      <ThemeProvider>
+      <TooltipProvider>
+        <LocalDev
+          connectionStatus="connected"
+          ready
+          snapshot={{
+            machine: { id: "local", displayName: "Local Projects" },
+            workspaces: [],
+          }}
+          startingLocalPath={null}
+          commandError={null}
+          onOpenProject={async () => {}}
+          onCreateProject={async () => {}}
+          activeTab="settings"
+          onActiveTabChange={() => {}}
+          settingsPanel={<div data-testid="settings-slot">Unified settings</div>}
+        />
+      </TooltipProvider>
+      </ThemeProvider>
+    )
+
+    expect(html).toContain('data-ui-id="home.settings.panel"')
+    expect(html).toContain("Unified settings")
+    expect(html).toContain("Home settings")
+  })
+
+  test("prioritizes project-page-linked projects on the homepage", () => {
+    const html = renderToStaticMarkup(
+      <ThemeProvider>
+      <TooltipProvider>
+        <LocalDev
+          connectionStatus="connected"
+          ready
+          snapshot={{
+            machine: { id: "local", displayName: "Local Projects" },
+            workspaces: [
+              {
+                localPath: "/workspace/unlinked",
+                title: "Unlinked",
+                source: "discovered",
+                lastOpenedAt: 100,
+                chatCount: 0,
+              },
+              {
+                localPath: "/workspace/linked",
+                title: "Linked",
+                source: "saved",
+                lastOpenedAt: 1,
+                chatCount: 1,
+              },
+            ],
+          }}
+          projectGroups={[{ groupKey: "linked", localPath: "/workspace/linked", chats: [] }]}
+          startingLocalPath={null}
+          commandError={null}
+          onOpenProject={async () => {}}
+          onCreateProject={async () => {}}
+          onOpenProjectPage={() => {}}
+        />
+      </TooltipProvider>
+      </ThemeProvider>
+    )
+
+    expect(html.indexOf('href="/project/linked"')).toBeLessThan(html.indexOf("Unlinked"))
   })
 
   test("renders a clearer disconnected setup state with next steps", () => {

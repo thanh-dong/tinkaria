@@ -7,7 +7,9 @@ import {
   Copy,
   FolderOpen,
   Loader2,
+  MessageSquare,
   Plus,
+  Settings,
   Sparkles,
   ArrowRight,
 } from "lucide-react"
@@ -15,6 +17,8 @@ import { APP_NAME, getCliInvocation, SDK_CLIENT_APP } from "../../shared/brandin
 import type {
   IndependentWorkspace,
   LocalWorkspacesSnapshot,
+  SidebarChatRow,
+  SidebarWorkspaceGroup,
 } from "../../shared/types"
 import type { SocketStatus } from "../app/socket-interface"
 import { PageHeader } from "../app/PageHeader"
@@ -28,6 +32,9 @@ import { cn } from "../lib/utils"
 import { HomepagePreferences } from "./HomepagePreferences"
 import { NewProjectModal } from "./NewWorkspaceModal"
 import { Button } from "./ui/button"
+import { SegmentedControl, type SegmentedOption } from "./ui/segmented-control"
+
+export type HomeTab = "projects" | "workspaces" | "settings"
 
 interface LocalDevProps {
   connectionStatus: SocketStatus
@@ -40,6 +47,11 @@ interface LocalDevProps {
   independentWorkspaces?: IndependentWorkspace[]
   onCreateWorkspace?: () => void
   onOpenWorkspace?: (workspaceId: string) => void
+  projectGroups?: SidebarWorkspaceGroup[]
+  onOpenProjectPage?: (groupKey: string) => void
+  activeTab?: HomeTab
+  onActiveTabChange?: (tab: HomeTab) => void
+  settingsPanel?: ReactNode
 }
 
 const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
@@ -50,6 +62,11 @@ const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
   }),
   header: createC3UiIdentityDescriptor({
     id: "home.header",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
+  tabs: createC3UiIdentityDescriptor({
+    id: "home.tabs",
     c3ComponentId: "c3-117",
     c3ComponentLabel: "projects",
   }),
@@ -98,6 +115,11 @@ const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
     c3ComponentId: "c3-117",
     c3ComponentLabel: "projects",
   }),
+  settingsPanel: createC3UiIdentityDescriptor({
+    id: "home.settings.panel",
+    c3ComponentId: "c3-117",
+    c3ComponentLabel: "projects",
+  }),
   preferences: createC3UiIdentityDescriptor({
     id: "home.preferences",
     c3ComponentId: "c3-117",
@@ -105,6 +127,19 @@ const LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS = {
   }),
 } as const
 const LOCAL_PROJECTS_PAGE_UI_IDENTITIES = getUiIdentityIdMap(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS)
+const HOME_TAB_OPTIONS: SegmentedOption<HomeTab>[] = [
+  { value: "projects", label: "Projects", icon: FolderOpen },
+  { value: "workspaces", label: "Workspaces", icon: CodeXml },
+  { value: "settings", label: "Settings", icon: Settings },
+]
+const ACTIVE_SESSION_STATUSES = new Set(["starting", "running", "waiting_for_user"])
+const SESSION_STATUS_LABELS: Record<string, string> = {
+  idle: "Idle",
+  starting: "Starting",
+  running: "Running",
+  waiting_for_user: "Waiting",
+  failed: "Failed",
+}
 
 export function getLocalProjectsPageUiIdentities() {
   return LOCAL_PROJECTS_PAGE_UI_IDENTITIES
@@ -147,6 +182,109 @@ export function getSortedHomepageProjects(snapshot: LocalWorkspacesSnapshot | nu
 
     return left.title.localeCompare(right.title)
   })
+}
+
+function getSessionRank(chat: SidebarChatRow) {
+  const activityRank = chat.lastMessageAt ?? chat._creationTime
+  const statusRank = ACTIVE_SESSION_STATUSES.has(chat.status) ? 1_000_000_000 : 0
+
+  return statusRank + activityRank
+}
+
+function getProjectPreviewSessions(projectGroup: SidebarWorkspaceGroup | null) {
+  return [...(projectGroup?.chats ?? [])]
+    .filter((chat) => ACTIVE_SESSION_STATUSES.has(chat.status))
+    .sort((left, right) => getSessionRank(right) - getSessionRank(left))
+    .slice(0, 2)
+}
+
+function getProjectLastActivity(projectGroup: SidebarWorkspaceGroup) {
+  return Math.max(0, ...projectGroup.chats.map((chat) => chat.lastMessageAt ?? chat._creationTime))
+}
+
+function ProjectPageLink({
+  href,
+  disabled,
+  onNavigate,
+  onFallbackOpen,
+  children,
+  className,
+}: {
+  href: string | null
+  disabled: boolean
+  onNavigate?: () => void
+  onFallbackOpen?: () => void
+  children: ReactNode
+  className?: string
+}) {
+  if (!href) {
+    return (
+      <Button
+        size="sm"
+        className={cn("flex-1", className)}
+        disabled={disabled}
+        onClick={(event) => {
+          event.stopPropagation()
+          onFallbackOpen?.()
+        }}
+        {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectPrimaryAction)}
+      >
+        {children}
+      </Button>
+    )
+  }
+
+  return (
+    <a
+      href={href}
+      aria-disabled={disabled}
+      className={cn(
+        "touch-manipulation inline-flex h-9 flex-1 cursor-pointer items-center justify-center whitespace-nowrap rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground ring-offset-background transition-all hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        disabled && "pointer-events-none bg-primary/50 text-primary-foreground/90",
+        className,
+      )}
+      onClick={(event) => {
+        event.stopPropagation()
+        if (disabled) {
+          event.preventDefault()
+          return
+        }
+        if (onNavigate) {
+          event.preventDefault()
+          onNavigate()
+        }
+      }}
+      {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectPrimaryAction)}
+    >
+      {children}
+    </a>
+  )
+}
+
+function SessionPreviewList({ sessions }: { sessions: SidebarChatRow[] }) {
+  if (sessions.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mt-3 space-y-1.5">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase text-muted-foreground/70">
+        <MessageSquare className="h-3 w-3" />
+        Running sessions
+      </div>
+      {sessions.map((chat) => (
+        <div
+          key={chat.chatId}
+          className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border/70 bg-background/50 px-2 py-1.5 text-xs"
+        >
+          <span className="min-w-0 truncate text-foreground/85">{chat.title}</span>
+          <span className="shrink-0 text-muted-foreground">
+            {SESSION_STATUS_LABELS[chat.status] ?? chat.status}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -294,24 +432,27 @@ function ProjectCard({
   projectTitle,
   localPath,
   chatCount,
+  projectHref,
+  previewSessions,
   loading,
   selected,
   onSelect,
-  onContinue,
+  onOpenProjectPage,
   onStartTask,
   index,
 }: {
   projectTitle: string
   localPath: string
   chatCount: number
+  projectHref: string | null
+  previewSessions: SidebarChatRow[]
   loading: boolean
   selected: boolean
   onSelect: () => void
-  onContinue: () => void
+  onOpenProjectPage?: () => void
   onStartTask: () => void
   index: number
 }) {
-  const primaryLabel = getProjectPrimaryLabel()
   const secondaryLabel = getProjectSecondaryLabel()
 
   return (
@@ -340,21 +481,21 @@ function ProjectCard({
       <div className="mt-2 text-xs text-muted-foreground">
         {`${chatCount} ${chatCount === 1 ? "chat" : "chats"}`}
       </div>
+      <SessionPreviewList sessions={previewSessions} />
 
       <div className={cn(
         "mt-3 flex gap-2 transition-opacity duration-150",
         selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
       )}>
-        <Button
-          size="sm"
-          className="flex-1"
+        <ProjectPageLink
+          href={projectHref}
           disabled={loading}
-          onClick={(e) => { e.stopPropagation(); onContinue() }}
-          {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectPrimaryAction)}
+          onNavigate={onOpenProjectPage}
+          onFallbackOpen={onStartTask}
         >
           <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
-          {primaryLabel}
-        </Button>
+          {getProjectPrimaryLabel()}
+        </ProjectPageLink>
         <Button
           size="sm"
           variant="outline"
@@ -372,17 +513,20 @@ function ProjectCard({
 
 function ProjectOverviewPanel({
   project,
+  projectHref,
+  previewSessions,
   loading,
-  onContinue,
+  onOpenProjectPage,
   onStartTask,
 }: {
   project: LocalWorkspacesSnapshot["workspaces"][number]
+  projectHref: string | null
+  previewSessions: SidebarChatRow[]
   loading: boolean
-  onContinue: () => void
+  onOpenProjectPage?: () => void
   onStartTask: () => void
 }) {
   const projectTitle = getProjectTitle(project)
-  const primaryLabel = getProjectPrimaryLabel()
   const secondaryLabel = getProjectSecondaryLabel()
   const summary = getProjectOverviewSummary(project)
 
@@ -402,19 +546,19 @@ function ProjectOverviewPanel({
             {project.chatCount} {project.chatCount === 1 ? "chat" : "chats"}
           </span>
         </div>
+        <SessionPreviewList sessions={previewSessions} />
 
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button
-            className="flex-1 min-w-[10rem]"
+          <ProjectPageLink
+            href={projectHref}
             disabled={loading}
-            onClick={() => {
-              onContinue()
-            }}
-            {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.projectPrimaryAction)}
+            onNavigate={onOpenProjectPage}
+            onFallbackOpen={onStartTask}
+            className="min-w-[10rem]"
           >
             <ArrowRight className="mr-1.5 h-4 w-4" />
-            {primaryLabel}
-          </Button>
+            {getProjectPrimaryLabel()}
+          </ProjectPageLink>
           <Button
             variant="outline"
             className="flex-1 min-w-[10rem]"
@@ -444,15 +588,65 @@ export function LocalDev({
   independentWorkspaces,
   onCreateWorkspace,
   onOpenWorkspace,
+  projectGroups,
+  onOpenProjectPage,
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
+  settingsPanel,
 }: LocalDevProps) {
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null)
   const [showAllProjects, setShowAllProjects] = useState(false)
+  const [localActiveTab, setLocalActiveTab] = useState<HomeTab>("projects")
 
-  const projects = useMemo(() => getSortedHomepageProjects(snapshot), [snapshot])
+  const projectGroupByPath = useMemo(() => {
+    return new Map((projectGroups ?? []).map((group) => [group.localPath, group]))
+  }, [projectGroups])
+  const projects = useMemo(() => {
+    const projectByPath = new Map(getSortedHomepageProjects(snapshot).map((project) => [project.localPath, project]))
+
+    for (const group of projectGroups ?? []) {
+      if (!projectByPath.has(group.localPath)) {
+        projectByPath.set(group.localPath, {
+          localPath: group.localPath,
+          title: getPathBasename(group.localPath),
+          source: "saved",
+          chatCount: group.chats.length,
+          lastOpenedAt: getProjectLastActivity(group),
+        })
+      }
+    }
+
+    return [...projectByPath.values()].sort((left, right) => {
+      const leftHasProjectPage = projectGroupByPath.has(left.localPath) ? 1 : 0
+      const rightHasProjectPage = projectGroupByPath.has(right.localPath) ? 1 : 0
+
+      if (leftHasProjectPage !== rightHasProjectPage) {
+        return rightHasProjectPage - leftHasProjectPage
+      }
+
+      const leftRank = left.lastOpenedAt ?? 0
+      const rightRank = right.lastOpenedAt ?? 0
+
+      if (leftRank !== rightRank) {
+        return rightRank - leftRank
+      }
+
+      return left.title.localeCompare(right.title)
+    })
+  }, [projectGroupByPath, projectGroups, snapshot])
   const selectedProject = projects.find((project) => project.localPath === selectedProjectPath) ?? projects[0] ?? null
   const isConnecting = connectionStatus === "connecting" || (connectionStatus === "connected" && !ready)
   const isConnected = connectionStatus === "connected" && ready
+  const activeTab = controlledActiveTab ?? localActiveTab
+
+  function setActiveTab(nextTab: HomeTab) {
+    if (onActiveTabChange) {
+      onActiveTabChange(nextTab)
+    } else {
+      setLocalActiveTab(nextTab)
+    }
+  }
 
   return (
     <div
@@ -515,18 +709,32 @@ export function LocalDev({
         </>
       ) : (
         <>
-          <PageHeader
-            uiId={LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.header}
-            title={snapshot?.machine.displayName ?? "Local Projects"}
-            subtitle="Your workspaces and projects."
-          />
-
-          <div className="px-6 mb-4">
-            <HomepagePreferences />
+          <div className="px-4 pt-3 pb-2 md:pt-4 md:pb-3" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.header)}>
+            <div className="flex items-center gap-2">
+              <FolderOpen className="size-4 text-muted-foreground" />
+              <h1 className="truncate text-base font-semibold text-foreground md:text-lg">
+                {snapshot?.machine.displayName ?? "Local Projects"}
+              </h1>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage projects, workspaces, sessions, and Tinkaria settings.
+            </p>
           </div>
 
-          <div className="w-full px-6 mb-10">
-            {(independentWorkspaces?.length ?? 0) > 0 || onCreateWorkspace ? (
+          <div className="px-4 mb-3" {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.tabs)}>
+            <SegmentedControl
+              value={activeTab}
+              onValueChange={setActiveTab}
+              options={HOME_TAB_OPTIONS}
+              size="sm"
+              className="w-full md:w-auto"
+              optionClassName="flex-1 md:flex-initial justify-center"
+              alwaysShowLabels
+            />
+          </div>
+
+          <div className="w-full px-4 pb-10">
+            {activeTab === "workspaces" && ((independentWorkspaces?.length ?? 0) > 0 || onCreateWorkspace) ? (
               <div className="mb-6">
                 <div className="mb-2 flex items-baseline justify-between gap-4">
                   <SectionHeader>Workspaces</SectionHeader>
@@ -558,6 +766,23 @@ export function LocalDev({
               </div>
             ) : null}
 
+            {activeTab === "settings" ? (
+              <div
+                className="space-y-4"
+                {...getUiIdentityAttributeProps(LOCAL_PROJECTS_PAGE_UI_DESCRIPTORS.settingsPanel)}
+              >
+                <div className="flex items-baseline justify-between gap-4">
+                  <SectionHeader>Home settings</SectionHeader>
+                </div>
+                <InfoCard>
+                  <HomepagePreferences />
+                </InfoCard>
+                {settingsPanel ?? null}
+              </div>
+            ) : null}
+
+            {activeTab === "projects" ? (
+              <>
             <div className="mb-2 flex items-baseline justify-between gap-4">
               <SectionHeader>Projects</SectionHeader>
               <Button
@@ -578,6 +803,7 @@ export function LocalDev({
                 >
                   {(showAllProjects ? projects : projects.slice(0, 6)).map((project, index) => {
                     const projectTitle = getProjectTitle(project)
+                    const projectGroup = projectGroupByPath.get(project.localPath) ?? null
 
                     return (
                       <ProjectCard
@@ -586,14 +812,14 @@ export function LocalDev({
                         projectTitle={projectTitle}
                         localPath={project.localPath}
                         chatCount={project.chatCount}
+                        projectHref={projectGroup ? `/project/${projectGroup.groupKey}` : null}
+                        previewSessions={getProjectPreviewSessions(projectGroup)}
                         loading={startingLocalPath === project.localPath}
                         selected={selectedProject?.localPath === project.localPath}
                         onSelect={() => {
                           setSelectedProjectPath(project.localPath)
                         }}
-                        onContinue={() => {
-                          void onOpenProject(project.localPath)
-                        }}
+                        onOpenProjectPage={projectGroup ? () => onOpenProjectPage?.(projectGroup.groupKey) : undefined}
                         onStartTask={() => {
                           void onOpenProject(project.localPath)
                         }}
@@ -602,24 +828,32 @@ export function LocalDev({
                   })}
                 </div>
                 {projects.length > 6 ? (
-                  <button
-                    className="mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors lg:col-span-2"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 justify-start text-xs text-muted-foreground hover:text-foreground lg:col-span-2"
                     onClick={() => setShowAllProjects(!showAllProjects)}
                   >
-                    {showAllProjects ? "Show less" : `Show all ${projects.length} workspaces`}
-                  </button>
+                    {showAllProjects ? "Show less" : `Show all ${projects.length} projects`}
+                  </Button>
                 ) : null}
                 {selectedProject ? (
-                  <ProjectOverviewPanel
-                    project={selectedProject}
-                    loading={startingLocalPath === selectedProject.localPath}
-                    onContinue={() => {
-                      void onOpenProject(selectedProject.localPath)
-                    }}
-                    onStartTask={() => {
-                      void onOpenProject(selectedProject.localPath)
-                    }}
-                  />
+                  (() => {
+                    const projectGroup = projectGroupByPath.get(selectedProject.localPath) ?? null
+
+                    return (
+                      <ProjectOverviewPanel
+                        project={selectedProject}
+                        projectHref={projectGroup ? `/project/${projectGroup.groupKey}` : null}
+                        previewSessions={getProjectPreviewSessions(projectGroup)}
+                        loading={startingLocalPath === selectedProject.localPath}
+                        onOpenProjectPage={projectGroup ? () => onOpenProjectPage?.(projectGroup.groupKey) : undefined}
+                        onStartTask={() => {
+                          void onOpenProject(selectedProject.localPath)
+                        }}
+                      />
+                    )
+                  })()
                 ) : null}
               </div>
             ) : (
@@ -633,6 +867,8 @@ export function LocalDev({
               <div className="text-sm text-destructive border border-destructive/20 bg-destructive/5 rounded-xl px-4 py-3 mt-4">
                 {commandError}
               </div>
+            ) : null}
+              </>
             ) : null}
           </div>
         </>

@@ -62,13 +62,18 @@ interface LegacySettingsRedirectArgs {
 }
 
 export function getLegacyTinkariaRedirectTarget({ pathname, search = "", hash = "" }: LegacySettingsRedirectArgs) {
-  const suffix = pathname === "/settings"
-    ? ""
-    : pathname.startsWith("/settings/")
-      ? pathname.slice("/settings".length)
-      : ""
+  const sourceParams = new URLSearchParams(search)
+  const pathTab = pathname.startsWith("/settings/")
+    ? pathname.slice("/settings/".length).split("/")[0]
+    : null
+  const requestedTab = pathTab || sourceParams.get("tab")
+  const targetParams = new URLSearchParams({ tab: "settings" })
 
-  return `/tinkaria${suffix}${search}${hash}`
+  if (requestedTab === "providers" || requestedTab === "profiles" || requestedTab === "extensions") {
+    targetParams.set("settingsTab", requestedTab)
+  }
+
+  return `/?${targetParams.toString()}${hash}`
 }
 
 export function getGlobalUiIdentityIds() {
