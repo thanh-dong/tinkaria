@@ -1,0 +1,298 @@
+import { afterEach, describe, expect, mock, test } from "bun:test"
+import type { ScrollMode } from "./scrollMachine"
+
+type IntersectionCallback = (entries: IntersectionObserverEntry[]) => void
+
+let observerCallback: IntersectionCallback | null = null
+let observedElements: unknown[] = []
+let disconnected = false
+let pendingIntersecting: boolean | null = null
+class MockIntersectionObserver {
+  constructor(callback: IntersectionCallback, _options?: IntersectionObserverInit) {
+    observerCallback = callback
+    disconnected = false
+  }
+  observe(target: Element) {
+    observedElements.push(target)
+    // When re-observing, deliver pending intersection state (simulates browser behavior)
+    if (pendingIntersecting !== null && observerCallback) {
+      const state = pendingIntersecting
+      pendingIntersecting = null
+      queueMicrotask(() => observerCallback?.([{ isIntersecting: state } as IntersectionObserverEntry]))
+    }
+  }
+  unobserve(_target: Element) { /* noop */ }
+  disconnect() { disconnected = true }
+}
+
+function fireIntersection(isIntersecting: boolean) {
+  if (!observerCallback) throw new Error("No observer registered")
+  observerCallback([{ isIntersecting } as IntersectionObserverEntry])
+}
+
+function resetMocks() {
+  observerCallback = null
+  observedElements = []
+  disconnected = false
+  pendingIntersecting = null
+}
+
+function mockElements() {
+  const scrollEl = {
+    scrollHeight: 1000,
+    scrollTop: 0,
+    clientHeight: 400,
+    scrollTo: (_opts?: ScrollToOptions) => { /* noop */ },
+  } as unknown as HTMLElement
+  const sentinelEl = {} as HTMLElement
+  return { scrollEl, sentinelEl }
+}
+
+const savedIO = globalThis.IntersectionObserver
+
+describe("scrollFollowStore — createScrollFollowStore", () => {
+  afterEach(() => {
+    resetMocks()
+    globalThis.IntersectionObserver = savedIO
+  })
+
+  function setup() {
+    // @ts-expect-error -- simplified mock
+    globalThis.IntersectionObserver = MockIntersectionObserver
+    const { scrollEl, sentinelEl } = mockElements()
+    return import("./scrollFollowStore").then(({ createScrollFollowStore }) => {
+      const store = createScrollFollowStore(scrollEl, sentinelEl)
+      return { store, scrollEl, sentinelEl }
+    })
+  }
+
+  test("initial mode is anchoring", async () => {
+    const { store } = await setup()
+    expect(store.getSnapshot()).toBe("anchoring" satisfies ScrollMode)
+    store.destroy()
+  })
+
+  test("transitions to following after initial tail scroll", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail")
+    expect(store.getSnapshot()).toBe("following" satisfies ScrollMode)
+    store.destroy()
+  })
+
+  test("transitions to detached after initial block scroll", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("block")
+    expect(store.getSnapshot()).toBe("detached" satisfies ScrollMode)
+    store.destroy()
+  })
+
+  test("detaches when sentinel exits viewport from user scroll", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail") // → following
+    fireIntersection(false) // sentinel exits
+    expect(store.getSnapshot()).toBe("detached" satisfies ScrollMode)
+    store.destroy()
+  })
+
+  test("stays following when sentinel exits during programmatic scroll", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail") // → following
+    store.beginProgrammaticScroll()
+    fireIntersection(false) // sentinel exits during programmatic scroll
+    expect(store.getSnapshot()).toBe("following" satisfies ScrollMode)
+    store.endProgrammaticScroll()
+    store.destroy()
+  })
+
+  test("re-engages following on scrollToBottom from detached", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail")
+    fireIntersection(false) // → detached
+    expect(store.getSnapshot()).toBe("detached")
+    store.handleScrollToBottom()
+    expect(store.getSnapshot()).toBe("following" satisfies ScrollMode)
+    store.destroy()
+  })
+
+  test("resets to anchoring on chat change", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail") // → following
+    store.handleChatChanged()
+    expect(store.getSnapshot()).toBe("anchoring" satisfies ScrollMode)
+    store.destroy()
+  })
+
+  test("notifies subscriber on every mode transition", async () => {
+    const { store } = await setup()
+    const onChange = mock(() => {})
+    store.subscribe(onChange)
+
+    // anchoring → following → notify
+    store.handleInitialScrollDone("tail")
+    expect(onChange).toHaveBeenCalledTimes(1)
+
+    // following → detached → notify
+    fireIntersection(false)
+    expect(onChange).toHaveBeenCalledTimes(2)
+
+    // detached + sentinel still not intersecting → same mode → no notify
+    fireIntersection(false)
+    expect(onChange).toHaveBeenCalledTimes(2)
+
+    // detached → following → notify
+    store.handleScrollToBottom()
+    expect(onChange).toHaveBeenCalledTimes(3)
+
+    store.destroy()
+  })
+
+  test("notifies subscriber when mode changes even if isFollowing stays the same", async () => {
+    const { store } = await setup()
+    const onChange = mock(() => {})
+    store.subscribe(onChange)
+
+    // anchoring → detached (block anchor) — both are !following, but mode changes
+    store.handleInitialScrollDone("block")
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(store.getSnapshot()).toBe("detached")
+
+    store.destroy()
+  })
+
+  test("observes sentinel element on creation", async () => {
+    const { sentinelEl } = await setup()
+    expect(observedElements).toContain(sentinelEl)
+  })
+
+  test("disconnects observer on destroy", async () => {
+    const { store } = await setup()
+    store.destroy()
+    expect(disconnected).toBe(true)
+  })
+
+  test("re-engages following when sentinel becomes visible again (user scrolls to bottom)", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail")
+    fireIntersection(false)
+    expect(store.getSnapshot()).toBe("detached")
+
+    // IO fires isIntersecting:true when sentinel enters the rootMargin follow band
+    fireIntersection(true)
+
+    expect(store.getSnapshot()).toBe("following")
+    store.destroy()
+  })
+
+  test("reconciles to following when sentinel is already visible after block anchor scroll", async () => {
+    const { store } = await setup()
+    // Sentinel is visible during anchoring (ignored by state machine)
+    fireIntersection(true)
+    expect(store.getSnapshot()).toBe("anchoring")
+
+    // Set up pending intersection for re-observe
+    pendingIntersecting = true
+
+    // Block anchor completes → detached, but sentinel is already visible
+    store.handleInitialScrollDone("block")
+
+    // After microtask (re-observe fires), should reconcile to following
+    await new Promise((resolve) => queueMicrotask(resolve))
+    expect(store.getSnapshot()).toBe("following")
+    store.destroy()
+  })
+
+  test("overlapping beginProgrammaticScroll calls do not clobber each other", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail") // → following
+
+    // Two overlapping programmatic operations
+    store.beginProgrammaticScroll()
+    store.beginProgrammaticScroll()
+
+    // First one ends — should still be programmatic
+    store.endProgrammaticScroll()
+
+    // User scroll during the gap should NOT detach (still programmatic)
+    fireIntersection(false)
+    expect(store.getSnapshot()).toBe("following")
+
+    // Second one ends — now truly done
+    store.endProgrammaticScroll()
+
+    // User scroll now SHOULD detach
+    fireIntersection(false)
+    expect(store.getSnapshot()).toBe("detached")
+
+    store.destroy()
+  })
+
+  test("scrollToBottom with auto behavior decrements guard synchronously", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail")
+    fireIntersection(false) // → detached
+
+    store.scrollToBottom("auto")
+    expect(store.getSnapshot()).toBe("following")
+
+    // Guard was decremented synchronously — user scroll should detach
+    fireIntersection(false)
+    expect(store.getSnapshot()).toBe("detached")
+
+    store.destroy()
+  })
+
+  test("scrollToBottom with smooth behavior keeps guard until IO confirms arrival", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail")
+    fireIntersection(false) // → detached
+
+    store.scrollToBottom("smooth")
+    expect(store.getSnapshot()).toBe("following")
+
+    // During smooth scroll, sentinel exits — should stay following (guard active)
+    fireIntersection(false)
+    expect(store.getSnapshot()).toBe("following")
+
+    // IO confirms arrival — guard clears
+    fireIntersection(true)
+
+    // Now user scroll SHOULD detach
+    fireIntersection(false)
+    expect(store.getSnapshot()).toBe("detached")
+
+    store.destroy()
+  })
+
+  test("smooth scroll guard times out if IO never fires", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail")
+    fireIntersection(false) // → detached
+
+    store.scrollToBottom("smooth")
+    expect(store.getSnapshot()).toBe("following")
+
+    // Wait for timeout (500ms + margin)
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    // Guard should be cleared by timeout — user scroll detaches
+    fireIntersection(false)
+    expect(store.getSnapshot()).toBe("detached")
+
+    store.destroy()
+  })
+
+  test("endProgrammaticScroll never goes below zero", async () => {
+    const { store } = await setup()
+    store.handleInitialScrollDone("tail") // → following
+
+    // Call end without begin — should not crash or go negative
+    store.endProgrammaticScroll()
+    store.endProgrammaticScroll()
+
+    // Still following, user scroll detaches normally
+    fireIntersection(false)
+    expect(store.getSnapshot()).toBe("detached")
+
+    store.destroy()
+  })
+})

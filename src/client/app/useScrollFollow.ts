@@ -1,103 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { nextScrollMode, shouldAutoFollow, type ScrollMode } from "./scrollMachine"
+import { shouldAutoFollow, type ScrollMode } from "./scrollMachine"
+import { createScrollFollowStore, type ScrollFollowStore } from "./scrollFollowStore"
 import type { RefObject } from "react"
 
-export interface ScrollFollowStore {
-  getSnapshot: () => ScrollMode
-  subscribe: (onChange: () => void) => () => void
-  handleInitialScrollDone: (anchor: "tail" | "block") => void
-  handleScrollToBottom: () => void
-  handleChatChanged: () => void
-  beginProgrammaticScroll: () => void
-  endProgrammaticScroll: () => void
-  destroy: () => void
-}
-
-const BOTTOM_FOLLOW_DISTANCE_RATIO = 0.02
-
-export function isWithinBottomFollowBand(bottomGap: number, clientHeight: number): boolean {
-  const followBand = Math.max(2, clientHeight * BOTTOM_FOLLOW_DISTANCE_RATIO)
-  return bottomGap <= followBand
-}
-
-export function isScrolledToBottom(element: HTMLElement): boolean {
-  const bottomGap = element.scrollHeight - element.scrollTop - element.clientHeight
-  return isWithinBottomFollowBand(bottomGap, element.clientHeight)
-}
-
-export function createScrollFollowStore(
-  scrollEl: HTMLElement,
-  sentinelEl: HTMLElement,
-): ScrollFollowStore {
-  let mode: ScrollMode = "anchoring"
-  let isProgrammatic = false
-  let listener: (() => void) | null = null
-
-  function transition(event: Parameters<typeof nextScrollMode>[1]) {
-    const prev = mode
-    mode = nextScrollMode(prev, event)
-    if (mode !== prev) {
-      listener?.()
-    }
-  }
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      const entry = entries[0]
-      if (!entry) return
-      transition({
-        type: "intersection-change",
-        isIntersecting: entry.isIntersecting,
-        isProgrammatic,
-      })
-    },
-    { root: scrollEl, threshold: 0 },
-  )
-  observer.observe(sentinelEl)
-
-  function handleScroll() {
-    if (!isScrolledToBottom(scrollEl)) return
-    transition({
-      type: "intersection-change",
-      isIntersecting: true,
-      isProgrammatic,
-    })
-  }
-
-  scrollEl.addEventListener("scroll", handleScroll, { passive: true })
-
-  return {
-    getSnapshot: () => mode,
-
-    subscribe(onChange) {
-      listener = onChange
-      return () => { listener = null }
-    },
-
-    handleInitialScrollDone(anchor) {
-      transition({ type: "initial-scroll-done", anchor })
-      observer.unobserve(sentinelEl)
-      observer.observe(sentinelEl)
-    },
-
-    handleScrollToBottom() {
-      transition({ type: "scroll-to-bottom" })
-    },
-
-    handleChatChanged() {
-      transition({ type: "chat-changed" })
-    },
-
-    beginProgrammaticScroll() { isProgrammatic = true },
-    endProgrammaticScroll() { isProgrammatic = false },
-
-    destroy() {
-      observer.disconnect()
-      scrollEl.removeEventListener("scroll", handleScroll)
-      listener = null
-    },
-  }
-}
+// Re-export for existing consumers
+export { isWithinBottomFollowBand, type ScrollFollowStore } from "./scrollFollowStore"
 
 export function useScrollFollow(
   scrollRef: RefObject<HTMLElement | null>,
@@ -113,7 +20,6 @@ export function useScrollFollow(
 } {
   const storeRef = useRef<ScrollFollowStore | null>(null)
   const modeRef = useRef<ScrollMode>("anchoring")
-  const rafRef = useRef<number | null>(null)
   const [scrollMode, setScrollMode] = useState<ScrollMode>("anchoring")
 
   function getStore(): ScrollFollowStore | null {
@@ -126,7 +32,6 @@ export function useScrollFollow(
     return storeRef.current
   }
 
-  // Subscribe to mode changes via effect — avoids useSyncExternalStore timing issues
   useEffect(() => {
     const store = getStore()
     if (!store) return
@@ -135,17 +40,14 @@ export function useScrollFollow(
       modeRef.current = mode
       setScrollMode(mode)
     })
-    // Sync initial mode
     modeRef.current = store.getSnapshot()
     setScrollMode(store.getSnapshot())
 
     return () => {
       unsubscribe()
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       storeRef.current?.destroy()
       storeRef.current = null
     }
-  // Re-subscribe when refs change (effectively on mount/unmount)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRef.current, sentinelRef.current])
 
@@ -153,19 +55,11 @@ export function useScrollFollow(
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const store = getStore()
-    const element = scrollRef.current
-    if (!store || !element) return
-    store.beginProgrammaticScroll()
-    store.handleScrollToBottom()
+    if (!store) return
+    store.scrollToBottom(behavior)
     modeRef.current = store.getSnapshot()
-    element.scrollTo({ top: element.scrollHeight, behavior })
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null
-      store.endProgrammaticScroll()
-    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollRef])
+  }, [scrollRef, sentinelRef])
 
   const handleInitialScrollDone = useCallback((anchor: "tail" | "block") => {
     const store = getStore()
