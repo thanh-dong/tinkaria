@@ -35,6 +35,7 @@ export class RuntimeRegistry {
     try {
       const raw = await readFile(join(this.runtimesDir, REGISTRY_FILE), "utf-8")
       this.state = JSON.parse(raw) as RuntimeRegistryState
+      this.deduplicateSystemEntries()
     } catch (err) {
       console.warn(LOG_PREFIX, "no registry found, starting fresh:", err instanceof Error ? err.message : String(err))
       this.state = { entries: [], defaults: {} }
@@ -218,6 +219,22 @@ export class RuntimeRegistry {
 
     if (!this.state.defaults[entry.provider] || (entry.source === "system" && replacedDefault)) {
       this.state.defaults[entry.provider] = entry.version
+    }
+  }
+
+  /** Remove duplicate system entries left by the old upsert logic — keep the most recent per provider */
+  private deduplicateSystemEntries(): void {
+    const latest = new Map<string, RuntimeEntry>()
+    for (const e of this.state.entries) {
+      if (e.source !== "system") continue
+      const prev = latest.get(e.provider)
+      if (!prev || e.installedAt > prev.installedAt) latest.set(e.provider, e)
+    }
+    this.state.entries = this.state.entries.filter(
+      (e) => e.source !== "system" || e === latest.get(e.provider),
+    )
+    for (const [provider, entry] of latest) {
+      this.state.defaults[provider] = entry.version
     }
   }
 

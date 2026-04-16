@@ -232,5 +232,38 @@ describe("RuntimeRegistry", () => {
       expect(result!.version).toBe("2.0.0")
       expect(result!.source).toBe("system")
     })
+
+    test("deduplicates stale system entries on load", async () => {
+      const dir = await createTempDir()
+      const { writeFile } = await import("node:fs/promises")
+      const { join } = await import("node:path")
+
+      // Simulate a registry written by the old buggy code
+      await writeFile(join(dir, "registry.json"), JSON.stringify({
+        entries: [
+          { provider: "claude", version: "2.1.105", source: "system", binaryPath: "/usr/bin/claude", installedAt: 1000, packageName: "@anthropic-ai/claude-code" },
+          { provider: "claude", version: "2.1.109", source: "system", binaryPath: "/usr/bin/claude", installedAt: 2000, packageName: "@anthropic-ai/claude-code" },
+          { provider: "claude", version: "2.1.112", source: "system", binaryPath: "/usr/bin/claude", installedAt: 3000, packageName: "@anthropic-ai/claude-code" },
+          { provider: "codex", version: "0.118.0", source: "system", binaryPath: "/usr/bin/codex", installedAt: 1000, packageName: "@openai/codex" },
+          { provider: "codex", version: "0.120.0", source: "system", binaryPath: "/usr/bin/codex", installedAt: 2000, packageName: "@openai/codex" },
+        ],
+        defaults: { claude: "2.1.105", codex: "0.118.0" },
+      }))
+
+      const registry = new RuntimeRegistry(dir)
+      await registry.initialize()
+
+      const snapshot = registry.getSnapshot()
+      const claudeEntries = snapshot.runtimes.filter((r) => r.provider === "claude" && r.source === "system")
+      const codexEntries = snapshot.runtimes.filter((r) => r.provider === "codex" && r.source === "system")
+      expect(claudeEntries).toHaveLength(1)
+      expect(claudeEntries[0].version).toBe("2.1.112")
+      expect(codexEntries).toHaveLength(1)
+      expect(codexEntries[0].version).toBe("0.120.0")
+
+      // Defaults should also point to the latest
+      expect(registry.resolve("claude")!.version).toBe("2.1.112")
+      expect(registry.resolve("codex")!.version).toBe("0.120.0")
+    })
   })
 })
