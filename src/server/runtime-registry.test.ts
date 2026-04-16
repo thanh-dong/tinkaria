@@ -69,7 +69,75 @@ describe("RuntimeRegistry", () => {
 
       const result = registry.resolve("claude")
       expect(result).toBeDefined()
-      expect(result!.version).toBe("1.0.0") // First detected becomes default
+      expect(result!.version).toBe("1.0.1") // Re-detect replaces stale system entry
+    })
+
+    test("re-detecting system runtime replaces the old entry instead of accumulating", async () => {
+      const dir = await createTempDir()
+      const registry = new RuntimeRegistry(dir)
+      await registry.initialize()
+
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "1.0.0",
+      })
+
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "1.0.1",
+      })
+
+      const snapshot = registry.getSnapshot()
+      const claudeEntries = snapshot.runtimes.filter((r) => r.provider === "claude" && r.source === "system")
+      expect(claudeEntries).toHaveLength(1)
+      expect(claudeEntries[0].version).toBe("1.0.1")
+    })
+
+    test("default updates to newly detected system version", async () => {
+      const dir = await createTempDir()
+      const registry = new RuntimeRegistry(dir)
+      await registry.initialize()
+
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "1.0.0",
+      })
+
+      expect(registry.resolve("claude")!.version).toBe("1.0.0")
+
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "2.0.0",
+      })
+
+      expect(registry.resolve("claude")!.version).toBe("2.0.0")
+    })
+
+    test("defaults persist correctly after system re-detect across instances", async () => {
+      const dir = await createTempDir()
+
+      const registry1 = new RuntimeRegistry(dir)
+      await registry1.initialize()
+      await registry1.detectSystemRuntime("codex", {
+        binaryName: "echo",
+        packageName: "@openai/codex",
+        versionParser: () => "0.118.0",
+      })
+      await registry1.detectSystemRuntime("codex", {
+        binaryName: "echo",
+        packageName: "@openai/codex",
+        versionParser: () => "0.121.0",
+      })
+
+      const registry2 = new RuntimeRegistry(dir)
+      await registry2.initialize()
+      const resolved = registry2.resolve("codex")
+      expect(resolved).toBeDefined()
+      expect(resolved!.version).toBe("0.121.0")
     })
 
     test("returns null for unknown provider", async () => {

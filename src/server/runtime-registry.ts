@@ -201,15 +201,22 @@ export class RuntimeRegistry {
   }
 
   private upsertEntry(entry: RuntimeEntry): void {
-    const idx = this.state.entries.findIndex(
-      (e) => e.provider === entry.provider && e.version === entry.version && e.source === entry.source,
+    // System binaries: one entry per (provider, source) — re-detect replaces the old version
+    // Managed binaries: one entry per (provider, version, source) — multiple versions coexist
+    const idx = this.state.entries.findIndex((e) =>
+      entry.source === "system"
+        ? e.provider === entry.provider && e.source === "system"
+        : e.provider === entry.provider && e.version === entry.version && e.source === entry.source,
     )
+
+    const replacedDefault = idx >= 0 && this.state.defaults[entry.provider] === this.state.entries[idx].version
     if (idx >= 0) {
       this.state.entries[idx] = entry
     } else {
       this.state.entries.push(entry)
     }
-    if (!this.state.defaults[entry.provider]) {
+
+    if (!this.state.defaults[entry.provider] || (entry.source === "system" && replacedDefault)) {
       this.state.defaults[entry.provider] = entry.version
     }
   }
