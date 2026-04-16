@@ -767,6 +767,43 @@ describe("nats-responders", () => {
     expect(res.result).toEqual({ messageCount: 3 })
   })
 
+  test("chat.getRenderUnits returns folded transcript render units", async () => {
+    const { clientNc } = await setup({
+      store: {
+        ...createMockStore(),
+        getMessages: async () => [
+          { _id: "e1", kind: "assistant_text", createdAt: 1, text: "Checking" },
+          {
+            _id: "e2",
+            kind: "tool_call",
+            createdAt: 2,
+            tool: {
+              kind: "tool",
+              toolKind: "bash",
+              toolName: "Bash",
+              toolId: "tool-1",
+              input: { command: "pwd" },
+            },
+          },
+          { _id: "e3", kind: "assistant_text", createdAt: 3, text: "Done" },
+        ],
+      } as never,
+    })
+
+    const res = await sendCommand(clientNc, {
+      type: "chat.getRenderUnits",
+      chatId: "chat-1",
+      offset: 0,
+      limit: 3,
+    })
+
+    expect(res.ok).toBe(true)
+    expect((res.result as Array<{ id: string; kind: string }>).map((unit) => [unit.id, unit.kind])).toEqual([
+      ["wip:e1:e2", "wip_block"],
+      ["assistant_response:e3", "assistant_response"],
+    ])
+  })
+
   test("chat.getExternalSessionMessages returns transcript entries for a provider session", async () => {
     const sessionId = `responders-codex-${Date.now()}`
     const codexSessionsDir = path.join(process.env.HOME ?? "", ".codex", "sessions")

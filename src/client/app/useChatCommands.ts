@@ -21,7 +21,7 @@ import { useChatPreferencesStore } from "../stores/chatPreferencesStore"
 import { useChatInputStore } from "../stores/chatInputStore"
 import { useTerminalLayoutStore } from "../stores/terminalLayoutStore"
 import { useRightSidebarStore } from "../stores/rightSidebarStore"
-import type { ChatSnapshot, HydratedTranscriptMessage, LocalWorkspacesSnapshot, SidebarChatRow, SidebarData } from "../../shared/types"
+import type { ChatSnapshot, LocalWorkspacesSnapshot, SidebarChatRow, SidebarData, TranscriptRenderUnit } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import type { useAppDialog } from "../components/ui/app-dialog"
 import { deleteCachedChat } from "./chatCache"
@@ -130,7 +130,7 @@ export interface ChatCommandsArgs {
   selectedProjectId: string | null
   fallbackLocalProjectPath: string | null
   isProcessing: boolean
-  messages: HydratedTranscriptMessage[]
+  messages: TranscriptRenderUnit[]
   localProjects: LocalWorkspacesSnapshot | null
   setProjectSelection: React.Dispatch<React.SetStateAction<import("./useAppState.machine").ProjectSelectionState>>
   setSidebarData: React.Dispatch<React.SetStateAction<SidebarData>>

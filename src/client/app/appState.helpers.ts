@@ -1,5 +1,5 @@
 import { APP_NAME } from "../../shared/branding"
-import type { ChatSnapshot, HydratedTranscriptMessage, SidebarChatRow, SidebarData, TranscriptEntry } from "../../shared/types"
+import type { ChatSnapshot, HydratedTranscriptMessage, SidebarChatRow, SidebarData, TranscriptEntry, TranscriptRenderUnit } from "../../shared/types"
 import type { AppTransport, SocketStatus } from "./socket-interface"
 
 export interface ErrorAction {
@@ -215,6 +215,23 @@ export async function fetchTranscriptMessageCount(args: {
   }, args.timeoutMs ? { timeoutMs: args.timeoutMs } : undefined)
 
   return result.messageCount
+}
+
+export async function fetchTranscriptRenderUnits(args: {
+  socket: AppTransport
+  chatId: string
+  offset?: number
+  limit?: number
+  isLoading?: boolean
+  timeoutMs?: number
+}): Promise<TranscriptRenderUnit[]> {
+  return await args.socket.command<TranscriptRenderUnit[]>({
+    type: "chat.getRenderUnits",
+    chatId: args.chatId,
+    offset: args.offset,
+    limit: args.limit,
+    isLoading: args.isLoading,
+  }, args.timeoutMs ? { timeoutMs: args.timeoutMs } : undefined)
 }
 
 export async function fetchExternalSessionTranscript(args: {

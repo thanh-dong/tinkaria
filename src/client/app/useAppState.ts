@@ -13,7 +13,7 @@ import {
   type UpdateSnapshot,
 } from "../../shared/types"
 import { useChatInputStore } from "../stores/chatInputStore"
-import type { ChatSnapshot, HydratedTranscriptMessage, LocalWorkspacesSnapshot, SidebarChatRow, SidebarData } from "../../shared/types"
+import type { ChatSnapshot, LocalWorkspacesSnapshot, SidebarChatRow, SidebarData, TranscriptRenderUnit } from "../../shared/types"
 import type { LocalFilePreview } from "../components/messages/LocalFilePreviewDialog"
 import { useAppDialog } from "../components/ui/app-dialog"
 import { useSessionPolling } from "./useSessionPolling"
@@ -87,12 +87,12 @@ export interface AppState {
   scrollRef: RefObject<HTMLDivElement | null>
   sentinelRef: RefObject<HTMLDivElement | null>
   inputRef: RefObject<HTMLDivElement | null>
-  messages: HydratedTranscriptMessage[]
+  messages: TranscriptRenderUnit[]
   latestToolIds: ReturnType<typeof getLatestToolIds>
   runtime: ChatSnapshot["runtime"] | null
   currentSessionRuntime: CurrentSessionSnapshot["runtime"]
   currentRepoStatus: CurrentRepoStatusSnapshot | null
-  currentAccountInfo: Extract<HydratedTranscriptMessage, { kind: "account_info" }>["accountInfo"] | null
+  currentAccountInfo: Extract<TranscriptRenderUnit, { kind: "account_info" }>["message"]["accountInfo"] | null
   availableProviders: ProviderCatalogEntry[]
   isProcessing: boolean
   canCancel: boolean
@@ -357,7 +357,7 @@ export function useAppState(activeChatId: string | null): AppState {
   const runtime = activeChatSnapshot?.runtime ?? null
   const currentAccountInfo = useMemo(() => {
     const firstAccountInfo = messages.find((message) => message.kind === "account_info")
-    return firstAccountInfo?.accountInfo ?? null
+    return firstAccountInfo?.message.accountInfo ?? null
   }, [messages])
   const availableProviders = activeChatSnapshot?.availableProviders ?? PROVIDERS
   const isProcessing = isProcessingStatus(runtime?.status)

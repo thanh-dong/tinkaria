@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
-import type { HydratedTranscriptMessage } from "../../shared/types"
+import type { HydratedTranscriptMessage, TranscriptRenderUnit } from "../../shared/types"
 import { ChatNavbar, getChatNavbarUiIdentityDescriptors } from "../components/chat-ui/ChatNavbar"
 import { TextMessage } from "../components/messages/TextMessage"
 import type { ProcessedTextMessage } from "../components/messages/types"
@@ -42,6 +42,15 @@ function systemInitMessage(args: {
   } as HydratedTranscriptMessage
 }
 
+function renderUnit(message: HydratedTranscriptMessage): TranscriptRenderUnit {
+  return {
+    id: `${message.kind}:${message.id}`,
+    kind: message.kind === "assistant_text" ? "assistant_response" : message.kind,
+    sourceEntryIds: [message.id],
+    message,
+  } as TranscriptRenderUnit
+}
+
 function interactiveTarget(): EventTarget {
   return {
     closest: () => ({ tagName: "BUTTON" }),
@@ -66,13 +75,13 @@ function createAssistantTextMessage(text: string): ProcessedTextMessage {
 describe("getAvailableSkillsFromMessages", () => {
   test("prefers the narrower skills list from system init debug payload", () => {
     const messages = [
-      systemInitMessage({
+      renderUnit(systemInitMessage({
         slashCommands: ["debug", "review-pr", "release"],
         debugRaw: JSON.stringify({
           slash_commands: ["debug", "review-pr", "release"],
           skills: ["debug", "frontend-design:frontend-design"],
         }),
-      }),
+      })),
     ]
 
     expect(getAvailableSkillsFromMessages(messages)).toEqual([
@@ -83,9 +92,9 @@ describe("getAvailableSkillsFromMessages", () => {
 
   test("falls back to slashCommands when debug payload has no skills", () => {
     const messages = [
-      systemInitMessage({
+      renderUnit(systemInitMessage({
         slashCommands: ["debug", "review-pr"],
-      }),
+      })),
     ]
 
     expect(getAvailableSkillsFromMessages(messages)).toEqual(["debug", "review-pr"])
@@ -93,9 +102,9 @@ describe("getAvailableSkillsFromMessages", () => {
 
   test("returns an empty list when neither skills nor slashCommands exist", () => {
     const messages = [
-      systemInitMessage({
+      renderUnit(systemInitMessage({
         slashCommands: [],
-      }),
+      })),
     ]
 
     expect(getAvailableSkillsFromMessages(messages)).toEqual([])

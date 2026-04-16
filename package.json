@@ -46,6 +46,7 @@
     "start": "bun run ./src/server/cli.ts",
     "test": "bun test",
     "verify:journey": "bun run ./scripts/verify-journey.ts",
+    "copy:legacy-transcripts": "bun run ./scripts/copy-legacy-transcripts.ts",
     "prepublishOnly": "vite build"
   },
   "dependencies": {

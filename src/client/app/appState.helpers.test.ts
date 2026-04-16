@@ -5,6 +5,7 @@ import {
   fetchExternalSessionTranscript,
   fetchTranscriptMessageCount,
   fetchTranscriptRange,
+  fetchTranscriptRenderUnits,
   filterPendingDeletedChats,
   MIN_TRANSCRIPT_FETCH_CHUNK_SIZE,
   normalizeSessionBootstrapErrorMessage,
@@ -45,6 +46,17 @@ function createMockGetMessageCountCommand(
 ): AppTransport["command"] {
   return async <TResult = unknown>(command: Parameters<AppTransport["command"]>[0]) => {
     if (command.type !== "chat.getMessageCount") {
+      throw new Error(`Unexpected command ${command.type}`)
+    }
+    return await handler(command) as TResult
+  }
+}
+
+function createMockGetRenderUnitsCommand(
+  handler: (command: Extract<Parameters<AppTransport["command"]>[0], { type: "chat.getRenderUnits" }>) => Promise<unknown>
+): AppTransport["command"] {
+  return async <TResult = unknown>(command: Parameters<AppTransport["command"]>[0]) => {
+    if (command.type !== "chat.getRenderUnits") {
       throw new Error(`Unexpected command ${command.type}`)
     }
     return await handler(command) as TResult
@@ -357,6 +369,41 @@ describe("fetchTranscriptMessageCount", () => {
       socket,
       chatId: "chat-1",
     })).resolves.toBe(7)
+  })
+})
+
+describe("fetchTranscriptRenderUnits", () => {
+  test("requests ready-to-render units with window and loading state", async () => {
+    const socket = createTransportWithCommand(createMockGetRenderUnitsCommand(async (command) => {
+      expect(command).toEqual({
+        type: "chat.getRenderUnits",
+        chatId: "chat-1",
+        offset: 10,
+        limit: 20,
+        isLoading: true,
+      })
+      return [{
+        id: "assistant_response:e1",
+        kind: "assistant_response",
+        sourceEntryIds: ["e1"],
+        message: {
+          id: "e1",
+          kind: "assistant_text",
+          timestamp: new Date(1).toISOString(),
+          text: "Ready",
+        },
+      }]
+    }))
+
+    const result = await fetchTranscriptRenderUnits({
+      socket,
+      chatId: "chat-1",
+      offset: 10,
+      limit: 20,
+      isLoading: true,
+    })
+
+    expect(result.map((unit) => unit.id)).toEqual(["assistant_response:e1"])
   })
 })
 

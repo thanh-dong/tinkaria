@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, type RefObject } from "react"
 import { isWithinBottomFollowBand, useScrollFollow } from "./useScrollFollow"
 import { shouldShowScrollButton } from "./scrollMachine"
 import type { ScrollMode } from "./scrollMachine"
-import type { ChatSnapshot, HydratedTranscriptMessage } from "../../shared/types"
+import type { ChatSnapshot, TranscriptRenderUnit } from "../../shared/types"
 import { shouldStickToBottomOnComposerSubmit } from "./appState.helpers"
 import type { CachedScrollState } from "./useTranscriptLifecycle"
 
@@ -23,7 +23,7 @@ export function shouldReconcileDetachedScrollMode(args: {
 
 export function useScrollSync(args: {
   activeChatId: string | null
-  messages: HydratedTranscriptMessage[]
+  messages: TranscriptRenderUnit[]
   sidebarReady: boolean
   hasSidebarChat: boolean
   inputHeight: number

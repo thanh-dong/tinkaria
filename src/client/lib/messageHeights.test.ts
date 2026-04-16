@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
-import type { HydratedTranscriptMessage } from "../../shared/types"
+import type { HydratedTranscriptMessage, TranscriptRenderUnit } from "../../shared/types"
 
 const mockPrepare = mock(() => ({ __brand: true }))
 const mockLayout = mock(() => ({ height: 120, lineCount: 5 }))
@@ -164,20 +164,25 @@ describe("prepared cache LRU eviction", () => {
 
 describe("estimateRenderItemHeight", () => {
   test("tool-group returns group fallback height", () => {
-    const item = {
-      type: "tool-group" as const,
-      messages: [makeToolCall(), makeToolCall()],
-      startIndex: 0,
+    const item: TranscriptRenderUnit = {
+      kind: "tool_group",
+      id: "tools:a:b",
+      sourceEntryIds: ["a", "b"],
+      tools: [makeToolCall(), makeToolCall()].map((message) => {
+        if (message.kind !== "tool") throw new Error("expected tool")
+        return message
+      }),
     }
 
     expect(estimateRenderItemHeight(item, 800, true)).toBe(64)
   })
 
   test("single item delegates to estimateMessageHeight", () => {
-    const item = {
-      type: "single" as const,
+    const item: TranscriptRenderUnit = {
+      kind: "assistant_response",
+      id: "assistant_response:a",
+      sourceEntryIds: ["a"],
       message: makeText("Hello world"),
-      index: 0,
     }
 
     const height = estimateRenderItemHeight(item, 800, true)
@@ -185,10 +190,11 @@ describe("estimateRenderItemHeight", () => {
   })
 
   test("wip-block returns fixed fallback height", () => {
-    const item = {
-      type: "wip-block" as const,
+    const item: TranscriptRenderUnit = {
+      kind: "wip_block",
+      id: "wip:a:b",
+      sourceEntryIds: ["a", "b"],
       steps: [makeText("Narration"), makeToolCall()],
-      startIndex: 0,
     }
 
     expect(estimateRenderItemHeight(item, 800, true)).toBe(72)

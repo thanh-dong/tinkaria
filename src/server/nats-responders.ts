@@ -17,6 +17,7 @@ import { readRepoStatus } from "./repo-status"
 import { generateForkPromptForChat } from "./generate-fork-context"
 import { generateMergePromptForChats as defaultGenerateMergePrompt } from "./generate-merge-context"
 import type { TranscriptEntry } from "../shared/types"
+import { deriveTranscriptRenderUnits } from "./read-models"
 import { deriveCoordinationSnapshot, deriveAgentConfigSnapshot } from "./read-models"
 import type { WorkspaceDirectoryPolicy } from "./workspace-directory-policy"
 import type { RepoManager } from "./repo-manager"
@@ -79,6 +80,7 @@ const NON_MUTATING: ReadonlySet<ClientCommand["type"]> = new Set([
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
   "chat.getMessageCount",
+  "chat.getRenderUnits",
   "chat.getExternalSessionMessages",
   "snapshot.subscribe",
   "snapshot.unsubscribe",
@@ -121,6 +123,7 @@ const SERVER_COMMANDS: readonly ClientCommand["type"][] = [
   "chat.getSessionRuntime",
   "chat.getRepoStatus",
   "chat.getMessageCount",
+  "chat.getRenderUnits",
   "chat.getExternalSessionMessages",
   "terminal.create",
   "terminal.input",
@@ -427,6 +430,14 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
           offset: command.offset,
           limit: command.limit,
         })
+      }
+
+      case "chat.getRenderUnits": {
+        const entries = await store.getMessages(command.chatId, {
+          offset: command.offset,
+          limit: command.limit,
+        })
+        return deriveTranscriptRenderUnits(entries, command.isLoading ? "running" : undefined)
       }
 
       case "chat.getSessionRuntime": {

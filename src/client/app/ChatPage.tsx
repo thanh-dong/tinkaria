@@ -35,7 +35,7 @@ import { enrichCommandError } from "./appState.helpers"
 import { getChatEmptyStateText } from "../lib/quirkyCopy"
 import { ChatTranscript } from "./ChatTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
-import type { HydratedTranscriptMessage } from "../../shared/types"
+import type { TranscriptRenderUnit } from "../../shared/types"
 import { useEventCallback } from "../hooks/useEventCallback"
 
 // Navbar is now a flow element — no offset constant needed
@@ -165,11 +165,11 @@ function getSkillsFromDebugRaw(debugRaw?: string): string[] | null {
   }
 }
 
-export function getAvailableSkillsFromMessages(messages: HydratedTranscriptMessage[]): string[] {
+export function getAvailableSkillsFromMessages(messages: TranscriptRenderUnit[]): string[] {
   for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    if (message.kind !== "system_init") continue
-    return getSkillsFromDebugRaw(message.debugRaw) ?? message.slashCommands
+    const unit = messages[i]
+    if (unit.kind !== "system_init") continue
+    return getSkillsFromDebugRaw(unit.message.debugRaw) ?? unit.message.slashCommands
   }
   return []
 }

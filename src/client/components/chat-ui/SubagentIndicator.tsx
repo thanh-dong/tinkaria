@@ -2,20 +2,19 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject
 import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react"
 import { Button } from "../ui/button"
 import { ChatTranscript } from "../../app/ChatTranscript"
-import { fetchExternalSessionTranscript, fetchTranscriptMessageCount, fetchTranscriptRange } from "../../app/appState.helpers"
+import { fetchExternalSessionTranscript, fetchTranscriptRenderUnits } from "../../app/appState.helpers"
 import { getLatestToolIds } from "../../app/derived"
 import type { AppTransport } from "../../app/socket-interface"
-import { createIncrementalHydrator } from "../../lib/parseTranscript"
 import { createUiIdentityDescriptor, getUiIdentityAttributeProps } from "../../lib/uiIdentityOverlay"
 import { cn } from "../../lib/utils"
+import { foldTranscriptRenderUnits } from "../../../shared/transcript-render"
 import type {
   ChatMessageEvent,
   ChatSnapshot,
-  HydratedTranscriptMessage,
   OrchestrationChildNode,
   OrchestrationChildStatus,
   OrchestrationHierarchySnapshot,
-  TranscriptEntry,
+  TranscriptRenderUnit,
 } from "../../../shared/types"
 import {
   Dialog,
@@ -89,7 +88,7 @@ interface FlattenedChildNode extends OrchestrationChildNode {
 
 interface InspectorSessionState {
   snapshot: ChatSnapshot | null
-  messages: HydratedTranscriptMessage[]
+  messages: TranscriptRenderUnit[]
   isLoading: boolean
   error: string | null
 }
@@ -365,13 +364,9 @@ export const SubagentIndicator = memo(function SubagentIndicator({
         timeoutMs: 120_000,
       }).then((entries) => {
         if (cancelled) return
-        const hydrator = createIncrementalHydrator()
-        for (const entry of entries) {
-          hydrator.hydrate(entry)
-        }
         setSession({
           snapshot: null,
-          messages: hydrator.getMessages(),
+          messages: foldTranscriptRenderUnits(entries),
           isLoading: false,
           error: null,
         })
@@ -390,38 +385,30 @@ export const SubagentIndicator = memo(function SubagentIndicator({
       }
     }
 
-    const hydrator = createIncrementalHydrator()
     let cancelled = false
     let initialFetchDone = false
     let initialFetchRequested = false
     let pendingRaf: number | null = null
-    const bufferedEntries: TranscriptEntry[] = []
+    let latestMessageCount: number | null = null
+    let latestIsLoading = false
 
     async function fetchAllMessages(messageCount: number | null) {
       if (initialFetchRequested) return
       initialFetchRequested = true
       try {
-        const resolvedMessageCount = messageCount ?? await fetchTranscriptMessageCount({
-          socket,
-          chatId,
-          timeoutMs: 120_000,
-        })
-        const entries = await fetchTranscriptRange({
+        const units = await fetchTranscriptRenderUnits({
           socket,
           chatId,
           offset: 0,
-          limit: Math.max(resolvedMessageCount, 1),
+          limit: Math.max(messageCount ?? 1, 1),
+          isLoading: latestIsLoading,
           timeoutMs: 120_000,
         })
         if (cancelled) return
         initialFetchDone = true
-        hydrator.reset()
-        for (const entry of entries) hydrator.hydrate(entry)
-        for (const entry of bufferedEntries) hydrator.hydrate(entry)
-        bufferedEntries.length = 0
         setSession((current) => ({
           ...current,
-          messages: hydrator.getMessages(),
+          messages: units,
           isLoading: false,
           error: null,
         }))
@@ -441,27 +428,47 @@ export const SubagentIndicator = memo(function SubagentIndicator({
       { type: "chat", chatId },
       (snapshot) => {
         if (cancelled) return
+        latestMessageCount = snapshot?.messageCount ?? latestMessageCount
+        latestIsLoading = snapshot?.runtime.status === "starting"
+          || snapshot?.runtime.status === "running"
+          || snapshot?.runtime.status === "waiting_for_user"
+          || snapshot?.runtime.status === "awaiting_agents"
         setSession((current) => ({ ...current, snapshot }))
         if (!initialFetchDone && !initialFetchRequested) {
-          void fetchAllMessages(snapshot?.messageCount ?? null)
+          void fetchAllMessages(latestMessageCount)
         }
       },
       (event) => {
         if (cancelled || event.chatId !== chatId) return
-        if (!initialFetchDone) {
-          bufferedEntries.push(event.entry)
+        latestMessageCount = (latestMessageCount ?? 0) + 1
+        if (!initialFetchDone && !initialFetchRequested) {
+          void fetchAllMessages(latestMessageCount)
           return
         }
-        hydrator.hydrate(event.entry)
         if (pendingRaf === null) {
           pendingRaf = requestAnimationFrame(() => {
             pendingRaf = null
-            if (!cancelled) {
+            if (cancelled || !initialFetchDone) return
+            void fetchTranscriptRenderUnits({
+              socket,
+              chatId,
+              offset: 0,
+              limit: Math.max(latestMessageCount ?? 1, 1),
+              isLoading: latestIsLoading,
+              timeoutMs: 120_000,
+            }).then((units) => {
+              if (cancelled) return
               setSession((current) => ({
                 ...current,
-                messages: hydrator.getMessages(),
+                messages: units,
               }))
-            }
+            }).catch((error) => {
+              if (cancelled) return
+              setSession((current) => ({
+                ...current,
+                error: describeTranscriptError(error),
+              }))
+            })
           })
         }
       },

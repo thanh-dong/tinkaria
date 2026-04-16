@@ -1,5 +1,4 @@
-import type { IncrementalHydrator } from "../lib/parseTranscript"
-import type { HydratedTranscriptMessage } from "../../shared/types"
+import type { TranscriptRenderUnit } from "../../shared/types"
 import type { ScrollMode } from "./scrollMachine"
 
 export type CachedScrollMode = Exclude<ScrollMode, "anchoring">
@@ -9,8 +8,7 @@ export type CachedScrollMode = Exclude<ScrollMode, "anchoring">
 // renders instantly while fresh data is fetched (stale-while-revalidate).
 
 export interface CachedChatState {
-  hydrator: IncrementalHydrator
-  messages: HydratedTranscriptMessage[]
+  messages: TranscriptRenderUnit[]
   messageCount: number
   cachedAt: number
   lastMessageAt: number | undefined

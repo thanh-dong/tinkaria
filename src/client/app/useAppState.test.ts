@@ -6,6 +6,7 @@ import {
   clearChatCache,
   markCachedChatsStale,
   MAX_CACHED_CHATS,
+  type CachedChatState,
 } from "./chatCache"
 import {
   computeTailOffset,
@@ -30,7 +31,6 @@ import {
 } from "./appState.helpers"
 import { shouldMarkActiveChatRead } from "./useAppState"
 import type { ChatSnapshot, HydratedTranscriptMessage, SidebarData } from "../../shared/types"
-import { createIncrementalHydrator } from "../lib/parseTranscript"
 
 function createSidebarData(): SidebarData {
   return {
@@ -387,6 +387,7 @@ describe("getActiveChatSnapshot", () => {
         sessionToken: null,
       },
       messageCount: 0,
+      renderUnits: [],
       availableProviders: [],
       availableSkills: [],
       queuedTurn: null,
@@ -409,6 +410,7 @@ describe("getActiveChatSnapshot", () => {
         sessionToken: null,
       },
       messageCount: 0,
+      renderUnits: [],
       availableProviders: [],
       availableSkills: [],
       queuedTurn: null,
@@ -736,19 +738,9 @@ describe("prependQueuedText", () => {
   })
 })
 
-function createMockCachedState(messageCount = 5): {
-  hydrator: ReturnType<typeof createIncrementalHydrator>
-  messages: HydratedTranscriptMessage[]
-  messageCount: number
-  cachedAt: number
-  lastMessageAt: number | undefined
-  stale: boolean
-  scrollTop: number
-  scrollMode: "following" | "detached"
-} {
+function createMockCachedState(messageCount = 5): CachedChatState {
   return {
-    hydrator: createIncrementalHydrator(),
-    messages: [] as HydratedTranscriptMessage[],
+    messages: [],
     messageCount,
     cachedAt: Date.now(),
     lastMessageAt: Date.now(),

@@ -1,5 +1,5 @@
 import { prepare, layout, type PreparedText } from "@chenglou/pretext"
-import type { HydratedTranscriptMessage } from "../../shared/types"
+import type { HydratedTranscriptMessage, TranscriptRenderUnit } from "../../shared/types"
 
 // CSS constants matching prose-sm + message wrappers
 const BODY_FONT = "14px Body"
@@ -91,18 +91,17 @@ export function estimateMessageHeight(
   return KIND_FALLBACKS[message.kind] ?? DEFAULT_FALLBACK
 }
 
-export type RenderItem =
-  | { type: "single"; message: HydratedTranscriptMessage; index: number }
-  | { type: "tool-group"; messages: HydratedTranscriptMessage[]; startIndex: number }
-  | { type: "wip-block"; steps: HydratedTranscriptMessage[]; startIndex: number }
+export type RenderItem = TranscriptRenderUnit
 
 export function estimateRenderItemHeight(
   item: RenderItem,
   containerWidth: number,
   fontReady: boolean,
 ): number {
-  if (item.type === "tool-group") return TOOL_GROUP_FALLBACK
-  if (item.type === "wip-block") return WIP_BLOCK_FALLBACK
+  if (item.kind === "tool_group") return TOOL_GROUP_FALLBACK
+  if (item.kind === "wip_block") return WIP_BLOCK_FALLBACK
+  if (item.kind === "standalone_tool") return estimateMessageHeight(item.tool, containerWidth, fontReady)
+  if (item.kind === "artifact") return estimateMessageHeight(item.artifact, containerWidth, fontReady)
   return estimateMessageHeight(item.message, containerWidth, fontReady)
 }
 
