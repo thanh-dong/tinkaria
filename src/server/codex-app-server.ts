@@ -23,7 +23,6 @@ import {
   type CommandExecutionApprovalDecision,
   type CommandExecutionRequestApprovalParams,
   type CommandExecutionRequestApprovalResponse,
-  type DynamicToolDefinition,
   type DynamicToolCallOutputContentItem,
   type DynamicToolCallResponse,
   type FileChangeApprovalDecision,
@@ -163,7 +162,6 @@ export interface StartCodexTurnArgs {
   model: string
   effort?: CodexReasoningEffort
   serviceTier?: ServiceTier
-  advertiseDynamicTools?: boolean
   content: string
   planMode: boolean
   skills?: string[]
@@ -312,146 +310,6 @@ function dynamicToolPayload(value: Record<string, unknown> | unknown[] | string 
   const record = asRecord(value)
   if (record) return record
   return { value }
-}
-
-function dynamicToolDefinitions(args: StartCodexTurnArgs): DynamicToolDefinition[] | undefined {
-  if (args.advertiseDynamicTools === false) return undefined
-
-  const tools: DynamicToolDefinition[] = [
-    {
-      name: "present_content",
-      description: "Present a structured content artifact in the transcript.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          kind: { type: "string", enum: ["markdown", "code", "diagram"] },
-          format: {
-            type: "string",
-            description: "Content format such as markdown, typescript, mermaid, svg, html, iframe, or diashort.",
-          },
-          source: { type: "string" },
-          summary: { type: "string" },
-          collapsed: { type: "boolean" },
-        },
-        required: ["title", "kind", "format", "source"],
-        additionalProperties: false,
-      },
-    },
-    {
-      name: "ask_user_question",
-      description: "Ask the user one or more questions and wait for their response. Available in Default mode; use this instead of plan-mode-only request_user_input when progress needs user input.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          questions: {
-            type: "array",
-            minItems: 1,
-            items: {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                question: { type: "string" },
-                header: { type: "string" },
-                options: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      label: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["label"],
-                    additionalProperties: false,
-                  },
-                },
-                multiSelect: { type: "boolean" },
-              },
-              required: ["question"],
-              additionalProperties: false,
-            },
-          },
-        },
-        required: ["questions"],
-        additionalProperties: false,
-      },
-    },
-  ]
-
-  if (args.orchestrator && args.orchestrationChatId) {
-    tools.push(
-      {
-        name: "spawn_agent",
-        description:
-          "Spawn a new agent session in the same project. Returns the new session's chatId. " +
-          "Use mode to control resume behavior: 'blocking' (default) auto-resumes parent when child completes; " +
-          "'background' is fire-and-forget (result injected passively). " +
-          "Use resume to control multi-child gating: 'gate' (default) waits for all blocking children; " +
-          "'immediate' resumes parent per-child completion.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            instruction: { type: "string" },
-            provider: { type: "string", enum: ["claude", "codex"] },
-            fork_context: { type: "boolean" },
-            mode: { type: "string", enum: ["blocking", "background"], description: "blocking auto-resumes parent; background is fire-and-forget" },
-            resume: { type: "string", enum: ["immediate", "gate"], description: "immediate resumes per-child; gate waits for all blocking children" },
-          },
-          required: ["instruction"],
-          additionalProperties: false,
-        },
-      },
-      {
-        name: "list_agents",
-        description: "List the current caller's spawned agent tree and statuses.",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          additionalProperties: false,
-        },
-      },
-      {
-        name: "send_input",
-        description: "Send a follow-up message to an existing steered session.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            targetChatId: { type: "string" },
-            content: { type: "string" },
-          },
-          required: ["targetChatId", "content"],
-          additionalProperties: false,
-        },
-      },
-      {
-        name: "wait_agent",
-        description: "Block until a steered session completes its current turn.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            targetChatId: { type: "string" },
-            timeoutMs: { type: "number" },
-          },
-          required: ["targetChatId"],
-          additionalProperties: false,
-        },
-      },
-      {
-        name: "close_agent",
-        description: "Dispose a steered session and free resources.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            targetChatId: { type: "string" },
-          },
-          required: ["targetChatId"],
-          additionalProperties: false,
-        },
-      },
-    )
-  }
-
-  return tools
 }
 
 const presentContentSchema = z.object({
@@ -1024,8 +882,6 @@ export class CodexAppServerManager {
     context.pendingTurn = pendingTurn
 
     try {
-      const dynamicTools = dynamicToolDefinitions(args)
-      const shouldAdvertiseDynamicTools = Boolean(dynamicTools?.length)
       const response = await this.sendRequest<TurnStartResponse>(context, "turn/start", {
         threadId: context.sessionToken ?? "",
         input: [
@@ -1039,15 +895,13 @@ export class CodexAppServerManager {
         model: args.model,
         effort: args.effort,
         serviceTier: args.serviceTier,
-        ...(shouldAdvertiseDynamicTools ? { dynamicTools } : {}),
         collaborationMode: {
           mode: args.planMode ? "plan" : "default",
           settings: {
             model: args.model,
             reasoning_effort: null,
             developer_instructions: getWebContextPrompt("codex", {
-              askUserQuestionEnabled: shouldAdvertiseDynamicTools,
-              presentContentEnabled: shouldAdvertiseDynamicTools,
+              codexNativeSubagentsEnabled: Boolean(args.orchestrator && args.orchestrationChatId),
             }),
           },
         },
@@ -1107,7 +961,6 @@ export class CodexAppServerManager {
         model: args.model ?? "gpt-5.4",
         effort: args.effort,
         serviceTier: args.serviceTier ?? "fast",
-        advertiseDynamicTools: false,
         content: args.prompt,
         planMode: false,
         onToolRequest: async () => ({}),

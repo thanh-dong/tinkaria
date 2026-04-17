@@ -269,7 +269,7 @@ describe("CodexAppServerManager", () => {
     expect(turnStart?.params.collaborationMode?.settings?.reasoning_effort).toBeNull()
   })
 
-  test("advertises present_content as a dynamic tool on turn start", async () => {
+  test("does not advertise removed dynamic content tools on turn start", async () => {
     const process = new FakeCodexProcess((message, child) => {
       if (message.method === "initialize") {
         child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
@@ -279,28 +279,14 @@ describe("CodexAppServerManager", () => {
           result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
         })
       } else if (message.method === "turn/start") {
-        expect(message.params.dynamicTools).toBeDefined()
-        expect(message.params.dynamicTools).toContainEqual(
-          expect.objectContaining({
-            name: "present_content",
-            inputSchema: expect.objectContaining({
-              type: "object",
-              required: ["title", "kind", "format", "source"],
-            }),
-          })
-        )
-        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("its final turn result is what wait_agent returns")
-        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
-          "Do not assume delegated chats share live intermediate reasoning"
-        )
+        expect(message.params).not.toHaveProperty("dynamicTools")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).not.toContain("present_content")
         expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
           "Use structured rich transcript output when it improves clarity"
         )
         expect(message.params.collaborationMode?.settings?.developer_instructions).toContain(
           "Prefer direct rich embeds or structured artifact cards over bare links"
         )
-        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("implementation plans")
-        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("comparison tables")
         child.writeServerMessage({
           id: message.id,
           result: { turn: { id: "turn-1", status: "completed", error: null } },
@@ -337,7 +323,7 @@ describe("CodexAppServerManager", () => {
     await collectStream(turn.stream)
   })
 
-  test("advertises ask_user_question as a dynamic tool on turn start", async () => {
+  test("does not advertise removed dynamic ask_user_question tool on turn start", async () => {
     const process = new FakeCodexProcess((message, child) => {
       if (message.method === "initialize") {
         child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
@@ -347,18 +333,8 @@ describe("CodexAppServerManager", () => {
           result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
         })
       } else if (message.method === "turn/start") {
-        expect(message.params.dynamicTools).toContainEqual(
-          expect.objectContaining({
-            name: "ask_user_question",
-            description: expect.stringContaining("Default mode"),
-            inputSchema: expect.objectContaining({
-              type: "object",
-              required: ["questions"],
-            }),
-          })
-        )
-        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("ask_user_question")
-        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("user input")
+        expect(message.params).not.toHaveProperty("dynamicTools")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).not.toContain("ask_user_question")
         child.writeServerMessage({
           id: message.id,
           result: { turn: { id: "turn-1", status: "completed", error: null } },
@@ -395,7 +371,7 @@ describe("CodexAppServerManager", () => {
     await collectStream(turn.stream)
   })
 
-  test("advertises session orchestration tools on turn start when available", async () => {
+  test("uses codex-native collaboration mode instead of removed dynamicTools on turn start", async () => {
     const process = new FakeCodexProcess((message, child) => {
       if (message.method === "initialize") {
         child.writeServerMessage({ id: message.id, result: { userAgent: "codex-test" } })
@@ -405,16 +381,10 @@ describe("CodexAppServerManager", () => {
           result: { thread: { id: "thread-1" }, model: "gpt-5.4", reasoningEffort: "high" },
         })
       } else if (message.method === "turn/start") {
-        expect(message.params.dynamicTools).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ name: "present_content" }),
-            expect.objectContaining({ name: "spawn_agent" }),
-            expect.objectContaining({ name: "list_agents" }),
-            expect.objectContaining({ name: "send_input" }),
-            expect.objectContaining({ name: "wait_agent" }),
-            expect.objectContaining({ name: "close_agent" }),
-          ]),
-        )
+        expect(message.params).not.toHaveProperty("dynamicTools")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("Codex-native subagent collaboration")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).toContain("collabAgentToolCall")
+        expect(message.params.collaborationMode?.settings?.developer_instructions).not.toContain("spawn_agent creates")
         child.writeServerMessage({
           id: message.id,
           result: { turn: { id: "turn-1", status: "completed", error: null } },

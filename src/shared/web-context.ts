@@ -15,6 +15,7 @@ export function getWebContextPrompt(
   provider: AgentProvider,
   options?: {
     askUserQuestionEnabled?: boolean
+    codexNativeSubagentsEnabled?: boolean
     presentContentEnabled?: boolean
   }
 ): string {
@@ -29,17 +30,31 @@ export function getWebContextPrompt(
     "Prefer direct rich embeds or structured artifact cards over bare links when the content is embeddable and the embedded form is more useful than a plain link.",
     "The user has a sidebar with chat history and project management — multiple concurrent chats are supported.",
     "Plan mode renders a visual approval UI with approve/reject controls.",
-    "Cross-session agent work is explicit orchestration between separate chats in the same project, not hidden shared memory.",
-    "spawn_agent creates a child session — its final turn result is what wait_agent returns. Instruct children to end with a structured report.",
-    "list_agents returns the caller's current spawned-agent tree with statuses so you can inspect what is running before steering or waiting.",
-    "send_input sends follow-up messages to a child to steer, accumulate incremental results, or request a summary. The child resumes with full context.",
-    "wait_agent blocks until the child completes its current turn. Call it after each send_input for iterative exchanges.",
-    "close_agent disposes the child session — always close when done.",
-    "You can run multiple children concurrently: spawn all, then wait each.",
-    "Set `fork_context` on spawn_agent when the child session should start with a bounded snapshot of the current chat transcript.",
-    "Do not assume delegated chats share live intermediate reasoning or mutable context — communicate needed context explicitly.",
-    "Delegated chats may already be busy, and orchestration is bounded by depth and concurrency limits.",
   ]
+
+  if (provider === "claude") {
+    promptLines.push(
+      "Cross-session agent work is explicit orchestration between separate chats in the same project, not hidden shared memory.",
+      "spawn_agent creates a child session — its final turn result is what wait_agent returns. Instruct children to end with a structured report.",
+      "list_agents returns the caller's current spawned-agent tree with statuses so you can inspect what is running before steering or waiting.",
+      "send_input sends follow-up messages to a child to steer, accumulate incremental results, or request a summary. The child resumes with full context.",
+      "wait_agent blocks until the child completes its current turn. Call it after each send_input for iterative exchanges.",
+      "close_agent disposes the child session — always close when done.",
+      "You can run multiple children concurrently: spawn all, then wait each.",
+      "Set `fork_context` on spawn_agent when the child session should start with a bounded snapshot of the current chat transcript.",
+      "Do not assume delegated chats share live intermediate reasoning or mutable context — communicate needed context explicitly.",
+      "Delegated chats may already be busy, and orchestration is bounded by depth and concurrency limits.",
+    )
+  } else if (options?.codexNativeSubagentsEnabled) {
+    promptLines.push(
+      "Cross-session agent work uses Codex-native subagent collaboration, surfaced to Tinkaria as collabAgentToolCall transcript items.",
+      "Use the native subagent tools for spawnAgent, sendInput, wait, and closeAgent behavior; do not invent snake_case dynamic-tool calls.",
+      "A spawned child should finish with a structured report so the parent can use the result after waiting.",
+      "You can run multiple children concurrently: spawn all useful children first, then wait for the needed results.",
+      "Do not assume delegated chats share live intermediate reasoning or mutable context — communicate needed context explicitly.",
+      "Delegated chats may already be busy, and orchestration is bounded by depth and concurrency limits.",
+    )
+  }
 
   if (provider === "codex" && options?.presentContentEnabled) {
     promptLines.push(

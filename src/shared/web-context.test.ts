@@ -37,27 +37,34 @@ describe("getWebContextPrompt", () => {
   })
 
   test("describes cross-session orchestration as explicit tool-mediated chat coordination", () => {
-    for (const provider of ["claude", "codex"] as const) {
-      const prompt = getWebContextPrompt(provider)
-      expect(prompt).toContain("spawn_agent")
-      expect(prompt).toContain("list_agents")
-      expect(prompt).toContain("fork_context")
-      expect(prompt).toContain("send_input")
-      expect(prompt).toContain("wait_agent")
-      expect(prompt).toContain("close_agent")
-      expect(prompt).toContain("not hidden shared memory")
-      expect(prompt).toContain("Do not assume delegated chats share")
-    }
+    const claudePrompt = getWebContextPrompt("claude")
+    expect(claudePrompt).toContain("spawn_agent")
+    expect(claudePrompt).toContain("list_agents")
+    expect(claudePrompt).toContain("fork_context")
+    expect(claudePrompt).toContain("send_input")
+    expect(claudePrompt).toContain("wait_agent")
+    expect(claudePrompt).toContain("close_agent")
+    expect(claudePrompt).toContain("not hidden shared memory")
+    expect(claudePrompt).toContain("Do not assume delegated chats share")
+
+    const codexPrompt = getWebContextPrompt("codex", { codexNativeSubagentsEnabled: true })
+    expect(codexPrompt).toContain("Codex-native subagent collaboration")
+    expect(codexPrompt).toContain("collabAgentToolCall")
+    expect(codexPrompt).toContain("spawnAgent")
+    expect(codexPrompt).toContain("sendInput")
+    expect(codexPrompt).toContain("closeAgent")
+    expect(codexPrompt).not.toContain("spawn_agent creates")
+    expect(codexPrompt).toContain("Do not assume delegated chats share")
   })
 
   test("orchestration block describes workflow semantics and accumulation pattern", () => {
     for (const provider of ["claude", "codex"] as const) {
-      const prompt = getWebContextPrompt(provider)
+      const prompt = getWebContextPrompt(provider, { codexNativeSubagentsEnabled: true })
       // Workflow: spawn creates child, wait returns its result
-      expect(prompt).toContain("child session")
-      // Accumulation: send_input for follow-ups and iterative refinement
-      expect(prompt).toContain("send_input")
-      expect(prompt).toMatch(/follow-up|steer|accumulate/i)
+      expect(prompt).toMatch(/child session|spawned child/i)
+      // Accumulation: send_input/sendInput for follow-ups and iterative refinement
+      expect(prompt).toMatch(/send_input|sendInput/)
+      expect(prompt).toMatch(/follow-up|steer|accumulate|native subagent/i)
       // Report instruction: child should end with a structured report
       expect(prompt).toMatch(/report/i)
       // Concurrency: multiple children

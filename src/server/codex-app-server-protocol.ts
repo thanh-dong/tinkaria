@@ -64,12 +64,6 @@ export interface CollaborationMode {
 
 export type ReasoningEffort = CodexReasoningEffort
 
-export interface DynamicToolDefinition {
-  name: string
-  description: string
-  inputSchema: Record<string, unknown>
-}
-
 export interface TurnStartParams {
   threadId: string
   input: CodexUserInput[]
@@ -78,7 +72,6 @@ export interface TurnStartParams {
   effort?: ReasoningEffort | null
   serviceTier?: ServiceTier | null
   collaborationMode?: CollaborationMode | null
-  dynamicTools?: DynamicToolDefinition[] | null
 }
 
 export interface TurnInterruptParams {
@@ -337,6 +330,8 @@ export interface CollabAgentToolCallItem {
   senderThreadId: string
   receiverThreadIds: string[]
   prompt?: string | null
+  model?: string | null
+  reasoningEffort?: ReasoningEffort | null
   agentsStates?: Record<string, { status: string; message: string | null }> | null
 }
 
