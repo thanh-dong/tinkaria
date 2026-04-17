@@ -28,6 +28,8 @@ export function useScrollSync(args: {
   scrollToBottom: () => void
   keepComposerSubmitAnchored: () => void
   scrollModeRef: RefObject<string>
+  beginProgrammaticScroll: () => void
+  endProgrammaticScroll: () => void
 } {
   const {
     activeChatId,
@@ -105,5 +107,7 @@ export function useScrollSync(args: {
     scrollToBottom,
     keepComposerSubmitAnchored,
     scrollModeRef,
+    beginProgrammaticScroll,
+    endProgrammaticScroll,
   }
 }

@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, type RefObject } from "react"
-import { useVirtualizer } from "@tanstack/react-virtual"
+import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual"
 import type { AskUserQuestionItem } from "../components/messages/types"
 import type { AskUserQuestionAnswerMap, HydratedTranscriptMessage, TranscriptRenderUnit } from "../../shared/types"
 import { useMessageHeights } from "../lib/useMessageHeights"
@@ -26,6 +26,7 @@ import { WipBlock } from "../components/messages/WipBlock"
 import { OpenLocalLinkProvider } from "../components/messages/shared"
 import { RichContentChromeProvider } from "../components/rich-content/RichContentBlock"
 import { CHAT_SELECTION_ZONE_ATTRIBUTE } from "./chatFocusPolicy"
+import { getUnitDomId } from "./chatWaypoints"
 
 export function getRenderItemIndexForMessageId(renderItems: RenderItem[], messageId: string): number {
   return renderItems.findIndex((item) => {
@@ -37,6 +38,8 @@ export function getRenderItemIndexForMessageId(renderItems: RenderItem[], messag
     return item.message.id === messageId
   })
 }
+
+export type ChatVirtualizer = Virtualizer<HTMLDivElement, Element>
 
 interface ChatTranscriptProps {
   messages: TranscriptRenderUnit[]
@@ -53,6 +56,7 @@ interface ChatTranscriptProps {
   ) => void
   onExitPlanModeConfirm: (toolUseId: string, confirmed: boolean, clearContext?: boolean, message?: string) => void
   richContentChrome?: "card" | "inline"
+  virtualizerRef?: RefObject<ChatVirtualizer | null>
 }
 
 export function ChatTranscript({
@@ -66,6 +70,7 @@ export function ChatTranscript({
   onAskUserQuestionSubmit,
   onExitPlanModeConfirm,
   richContentChrome = "card",
+  virtualizerRef,
 }: ChatTranscriptProps) {
   const renderItems = messages
 
@@ -76,7 +81,10 @@ export function ChatTranscript({
     getScrollElement: () => scrollRef.current,
     estimateSize,
     overscan: 5,
+    getItemKey: (index) => renderItems[index]?.id ?? index,
   })
+
+  if (virtualizerRef) virtualizerRef.current = virtualizer
 
   function renderMessage(message: HydratedTranscriptMessage): React.ReactNode {
     if (message.kind === "user_prompt") {
@@ -172,17 +180,6 @@ export function ChatTranscript({
     }
   }
 
-  function getUnitDomId(item: TranscriptRenderUnit): string | undefined {
-    if (item.kind === "wip_block" || item.kind === "tool_group") return item.id
-    if (item.kind === "standalone_tool") return `msg-${item.tool.id}`
-    if (item.kind === "artifact") return `msg-${item.artifact.id}`
-    return `msg-${item.message.id}`
-  }
-
-  function isAnimatingUnit(item: TranscriptRenderUnit): boolean {
-    return isLoading && item.kind === "assistant_response"
-  }
-
   const virtualItems = virtualizer.getVirtualItems()
 
   return (
@@ -244,7 +241,7 @@ export function ChatTranscript({
               {rendered ? (
                 <div
                   id={getUnitDomId(item)}
-                  className={`group relative pb-5${isAnimatingUnit(item) ? " animate-narration-guard" : ""}`}
+                  className="group relative pb-5"
                   {...{ [CHAT_SELECTION_ZONE_ATTRIBUTE]: "" }}
                 >
                   {rendered}

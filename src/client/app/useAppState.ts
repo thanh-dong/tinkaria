@@ -109,6 +109,8 @@ export interface AppState {
   expandSidebar: () => void
   closeLocalFilePreview: () => void
   scrollToBottom: () => void
+  beginProgrammaticScroll: () => void
+  endProgrammaticScroll: () => void
   handleCreateChat: (workspaceId: string) => Promise<void>
   handleOpenLocalProject: (localPath: string) => Promise<void>
   handleCreateProject: (project: ProjectRequest) => Promise<void>
@@ -373,6 +375,8 @@ export function useAppState(activeChatId: string | null): AppState {
     scrollToBottom,
     keepComposerSubmitAnchored,
     scrollModeRef,
+    beginProgrammaticScroll,
+    endProgrammaticScroll,
   } = useScrollSync({
     activeChatId,
     messages,
@@ -521,6 +525,8 @@ export function useAppState(activeChatId: string | null): AppState {
     expandSidebar: () => setSidebarCollapsed(false),
     closeLocalFilePreview: commands.closeLocalFilePreview,
     scrollToBottom,
+    beginProgrammaticScroll,
+    endProgrammaticScroll,
     handleCreateChat: commands.handleCreateChat,
     handleOpenLocalProject: commands.handleOpenLocalProject,
     handleCreateProject: commands.handleCreateProject,

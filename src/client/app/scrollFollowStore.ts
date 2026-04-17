@@ -14,7 +14,7 @@ export interface ScrollFollowStore {
 }
 
 const BOTTOM_FOLLOW_DISTANCE_RATIO = 0.02
-const SMOOTH_SCROLL_TIMEOUT_MS = 500
+export const SMOOTH_SCROLL_TIMEOUT_MS = 500
 
 export function isWithinBottomFollowBand(bottomGap: number, clientHeight: number): boolean {
   const followBand = Math.max(2, clientHeight * BOTTOM_FOLLOW_DISTANCE_RATIO)

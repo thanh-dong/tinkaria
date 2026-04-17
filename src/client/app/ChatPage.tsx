@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
-import { AlertCircle, ArrowDown, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2 } from "lucide-react"
 import { useLocation, useNavigate, useOutletContext } from "react-router-dom"
 import { TinkariaSidebarMark } from "../components/branding/TinkariaSidebarMark"
 import { ChatInput } from "../components/chat-ui/ChatInput"
@@ -33,10 +33,12 @@ import type { AppState } from "./useAppState"
 import { TranscriptActionsContext } from "./TranscriptActionsContext"
 import { enrichCommandError } from "./appState.helpers"
 import { getChatEmptyStateText } from "../lib/quirkyCopy"
-import { ChatTranscript } from "./ChatTranscript"
+import { ChatTranscript, type ChatVirtualizer } from "./ChatTranscript"
 import { useStickyChatFocus } from "./useStickyChatFocus"
 import type { TranscriptRenderUnit } from "../../shared/types"
 import { useEventCallback } from "../hooks/useEventCallback"
+import { ChatNavigator } from "./ChatNavigator"
+import { useChatNavigator } from "./useChatNavigator"
 
 // Navbar is now a flow element — no offset constant needed
 const SCROLL_BUTTON_BASE_BOTTOM_PX = 120
@@ -333,6 +335,17 @@ export function ChatPage() {
   const toggleRightSidebar = useRightSidebarStore((store) => store.toggleVisibility)
   const setRightSidebarSize = useRightSidebarStore((store) => store.setSize)
   const skillsRibbonVisible = useSkillCompositionStore((store) => store.ribbonVisible)
+
+  const virtualizerRef = useRef<ChatVirtualizer | null>(null)
+
+  const chatNav = useChatNavigator({
+    messages: state.messages,
+    scrollRef: state.scrollRef,
+    virtualizerRef,
+    scrollToBottom: state.scrollToBottom,
+    beginProgrammaticScroll: state.beginProgrammaticScroll,
+    endProgrammaticScroll: state.endProgrammaticScroll,
+  })
 
   const availableSkills = useMemo(() => {
     const fromMessages = getAvailableSkillsFromMessages(state.messages)
@@ -643,6 +656,7 @@ export function ChatPage() {
                     onOpenExternalLink={state.handleOpenExternalLink}
                     onAskUserQuestionSubmit={state.handleAskUserQuestion}
                     onExitPlanModeConfirm={state.handleExitPlanMode}
+                    virtualizerRef={virtualizerRef}
                   />
                   {state.isProcessing ? <ProcessingMessage status={state.runtime?.status} /> : null}
                   {shouldRenderTranscriptCommandError({
@@ -778,14 +792,7 @@ export function ChatPage() {
               : "scale-60 duration-300 ease-out pointer-events-none blur-sm opacity-0"
           )}
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={state.scrollToBottom}
-            className="rounded-full border border-border bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600 dark:hover:bg-slate-600"
-          >
-            <ArrowDown className="h-5 w-5" />
-          </Button>
+          <ChatNavigator nav={chatNav} onScrollToBottom={state.scrollToBottom} />
         </div>
       </CardContent>
 
