@@ -3,6 +3,7 @@ import type {
   ChatSnapshot,
   SessionStatus,
   LocalWorkspacesSnapshot,
+  ProviderCatalogEntry,
   RepoSummary,
   SidebarChatRow,
   SidebarData,
@@ -134,6 +135,7 @@ export function deriveChatSnapshot(
   availableSkills?: string[],
   hasActiveBlockingDelegations?: (chatId: string) => boolean,
   renderUnits: TranscriptRenderUnit[] = [],
+  availableProviders: ProviderCatalogEntry[] = [...SERVER_PROVIDERS],
 ): ChatSnapshot | null {
   const chat = state.chatsById.get(chatId)
   if (!chat || chat.deletedAt) return null
@@ -157,7 +159,7 @@ export function deriveChatSnapshot(
     runtime,
     messageCount,
     renderUnits,
-    availableProviders: [...SERVER_PROVIDERS],
+    availableProviders,
     availableSkills: availableSkills ?? [],
     queuedTurn: queuedTurn ? { ...queuedTurn } : null,
   }

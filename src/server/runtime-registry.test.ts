@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { RuntimeRegistry } from "./runtime-registry"
+import type { DiscoveredModel } from "../shared/runtime-types"
 
 const tempDirs: string[] = []
 
@@ -264,6 +265,172 @@ describe("RuntimeRegistry", () => {
       // Defaults should also point to the latest
       expect(registry.resolve("claude")!.version).toBe("2.1.112")
       expect(registry.resolve("codex")!.version).toBe("0.120.0")
+    })
+  })
+
+  describe("probeCapabilities", () => {
+    const FAKE_MODELS: DiscoveredModel[] = [
+      { value: "default", displayName: "Default", description: "Opus 4.6", supportsEffort: true, supportedEffortLevels: ["low", "high", "max"] },
+      { value: "sonnet", displayName: "Sonnet", description: "Sonnet 4.6" },
+    ]
+
+    async function createRegistryWithClaude(dir: string, probeResult: DiscoveredModel[] | Error) {
+      const probeFn = async (_binaryPath: string) => {
+        if (probeResult instanceof Error) throw probeResult
+        return probeResult
+      }
+      const registry = new RuntimeRegistry(dir, { probeClaudeModels: probeFn })
+      await registry.initialize()
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "1.0.0",
+      })
+      return registry
+    }
+
+    test("caches discovered models on success", async () => {
+      const dir = await createTempDir()
+      const registry = await createRegistryWithClaude(dir, FAKE_MODELS)
+
+      await registry.probeCapabilities("claude")
+
+      const caps = registry.getProviderCapabilities("claude")
+      expect(caps).not.toBeNull()
+      expect(caps!.models).toEqual(FAKE_MODELS)
+      expect(caps!.runtimeVersion).toBe("1.0.0")
+      expect(caps!.error).toBeUndefined()
+    })
+
+    test("stores error on failure but keeps empty models", async () => {
+      const dir = await createTempDir()
+      const registry = await createRegistryWithClaude(dir, new Error("SDK timeout"))
+
+      await registry.probeCapabilities("claude")
+
+      const caps = registry.getProviderCapabilities("claude")
+      expect(caps).not.toBeNull()
+      expect(caps!.models).toEqual([])
+      expect(caps!.error).toBe("SDK timeout")
+    })
+
+    test("is a no-op for codex", async () => {
+      const dir = await createTempDir()
+      let probeCalled = false
+      const registry = new RuntimeRegistry(dir, {
+        probeClaudeModels: async () => { probeCalled = true; return [] },
+      })
+      await registry.initialize()
+      await registry.detectSystemRuntime("codex", {
+        binaryName: "echo",
+        packageName: "@openai/codex",
+        versionParser: () => "0.118.0",
+      })
+
+      await registry.probeCapabilities("codex")
+      expect(probeCalled).toBe(false)
+    })
+
+    test("skips probe when already probed for same version", async () => {
+      const dir = await createTempDir()
+      let probeCount = 0
+      const registry = new RuntimeRegistry(dir, {
+        probeClaudeModels: async () => { probeCount++; return FAKE_MODELS },
+      })
+      await registry.initialize()
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "1.0.0",
+      })
+
+      await registry.probeCapabilities("claude")
+      await registry.probeCapabilities("claude")
+      expect(probeCount).toBe(1)
+    })
+
+    test("de-dupes concurrent probes — same promise returned", async () => {
+      const dir = await createTempDir()
+      let probeCount = 0
+      const registry = new RuntimeRegistry(dir, {
+        probeClaudeModels: async () => {
+          probeCount++
+          await new Promise((r) => setTimeout(r, 50))
+          return FAKE_MODELS
+        },
+      })
+      await registry.initialize()
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "1.0.0",
+      })
+
+      await Promise.all([
+        registry.probeCapabilities("claude"),
+        registry.probeCapabilities("claude"),
+        registry.probeCapabilities("claude"),
+      ])
+      expect(probeCount).toBe(1)
+    })
+
+    test("version change clears capabilities and re-probes", async () => {
+      const dir = await createTempDir()
+      let probeCount = 0
+      const registry = new RuntimeRegistry(dir, {
+        probeClaudeModels: async () => { probeCount++; return FAKE_MODELS },
+      })
+      await registry.initialize()
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "1.0.0",
+      })
+      await registry.probeCapabilities("claude")
+      expect(probeCount).toBe(1)
+
+      // Re-detect with new version
+      await registry.detectSystemRuntime("claude", {
+        binaryName: "echo",
+        packageName: "@anthropic-ai/claude-code",
+        versionParser: () => "2.0.0",
+      })
+      // Capabilities should be cleared
+      expect(registry.getProviderCapabilities("claude")).toBeNull()
+
+      await registry.probeCapabilities("claude")
+      expect(probeCount).toBe(2)
+      expect(registry.getProviderCapabilities("claude")!.runtimeVersion).toBe("2.0.0")
+    })
+
+    test("getProviderCapabilities returns null when no data", async () => {
+      const dir = await createTempDir()
+      const registry = new RuntimeRegistry(dir)
+      await registry.initialize()
+      expect(registry.getProviderCapabilities("claude")).toBeNull()
+    })
+
+    test("capabilities persist across registry instances", async () => {
+      const dir = await createTempDir()
+      const registry1 = await createRegistryWithClaude(dir, FAKE_MODELS)
+      await registry1.probeCapabilities("claude")
+
+      const registry2 = new RuntimeRegistry(dir)
+      await registry2.initialize()
+      const caps = registry2.getProviderCapabilities("claude")
+      expect(caps).not.toBeNull()
+      expect(caps!.models).toEqual(FAKE_MODELS)
+    })
+
+    test("snapshot includes capabilities", async () => {
+      const dir = await createTempDir()
+      const registry = await createRegistryWithClaude(dir, FAKE_MODELS)
+      await registry.probeCapabilities("claude")
+
+      const snapshot = registry.getSnapshot()
+      const claudeEntry = snapshot.runtimes.find((r) => r.provider === "claude")
+      expect(claudeEntry?.capabilities).toBeDefined()
+      expect(claudeEntry?.capabilities?.models).toEqual(FAKE_MODELS)
     })
   })
 })

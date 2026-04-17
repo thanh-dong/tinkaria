@@ -294,6 +294,7 @@ export const ChatPreferenceControls = memo(function ChatPreferenceControls({
               selected={model === candidate.id}
               icon={<Icon className="h-4 w-4 text-muted-foreground" />}
               label={candidate.label}
+              description={candidate.description}
             />
           )
         })}

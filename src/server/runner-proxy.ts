@@ -8,6 +8,7 @@ import { runnerCmdSubject, type StartTurnCommand } from "../shared/runner-protoc
 import type { EventStore } from "./event-store"
 import type { RuntimeRegistry } from "./runtime-registry"
 import {
+  deriveServerProviderCatalog,
   getServerProviderCatalog,
   normalizeClaudeModelOptions,
   normalizeServerModel,
@@ -112,17 +113,20 @@ export class RunnerProxy {
     const chat = this.store.requireChat(chatId)
     const provider = chat.provider ?? command.provider ?? "claude"
 
+    const dynamicCatalog = this.runtimeRegistry
+      ? deriveServerProviderCatalog(this.runtimeRegistry.getProviderCapabilities("claude"))
+      : undefined
     const catalog = getServerProviderCatalog(provider)
     let model: string
     let planMode: boolean
 
     if (provider === "claude") {
-      model = normalizeServerModel(provider, command.model)
+      model = normalizeServerModel(provider, command.model, dynamicCatalog)
       const modelOptions = normalizeClaudeModelOptions(model, command.modelOptions, command.effort)
       model = resolveClaudeApiModelId(model, modelOptions.contextWindow)
       planMode = catalog.supportsPlanMode ? Boolean(command.planMode) : false
     } else {
-      model = normalizeServerModel(provider, command.model)
+      model = normalizeServerModel(provider, command.model, dynamicCatalog)
       planMode = catalog.supportsPlanMode ? Boolean(command.planMode) : false
     }
 

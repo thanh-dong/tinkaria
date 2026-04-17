@@ -15,6 +15,7 @@ import type { UpdateManager } from "./update-manager"
 import type { SkillCache } from "./skill-discovery"
 import type { SessionOrchestrator } from "./orchestration"
 import type { RuntimeRegistry } from "./runtime-registry"
+import { deriveServerProviderCatalog } from "./provider-catalog"
 import type { ProfileSnapshot } from "../shared/profile-types"
 import type { ExtensionPreferencesSnapshot } from "../shared/extension-types"
 
@@ -124,6 +125,9 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
           limit: TRANSCRIPT_RENDER_WINDOW_SIZE,
         })
         const activeStatus = agent.getActiveStatuses().get(topic.chatId)
+        const providerCatalog = runtimeRegistry
+          ? deriveServerProviderCatalog(runtimeRegistry.getProviderCapabilities("claude"))
+          : undefined
         return deriveChatSnapshot(
           store.state,
           agent.getActiveStatuses(),
@@ -132,6 +136,7 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
           skills,
           hasActiveBlockingDelegations,
           deriveTranscriptRenderUnits(renderEntries, activeStatus),
+          providerCatalog,
         )
       }
       case "terminal":
@@ -231,6 +236,13 @@ export async function createNatsPublisher(args: CreateNatsPublisherArgs) {
         }
       }, 60_000)
     : null
+
+  if (runtimeRegistry) {
+    void runtimeRegistry.probeCapabilities("claude").then(() => {
+      publishSnapshot({ type: "runtime-status" }, runtimeRegistry.getSnapshot())
+      broadcastSnapshots()
+    })
+  }
 
   return {
     addSubscription,

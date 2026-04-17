@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process"
 import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { join } from "node:path"
-import type { RuntimeEntry, RuntimeHealthStatus, RuntimeRegistryState, RuntimeSnapshot } from "../shared/runtime-types"
+import type { DiscoveredModel, RuntimeCapabilities, RuntimeEntry, RuntimeHealthStatus, RuntimeRegistryState, RuntimeSnapshot } from "../shared/runtime-types"
+import type { AgentProvider } from "../shared/types"
 
 const LOG_PREFIX = "[RuntimeRegistry]"
 const REGISTRY_FILE = "registry.json"
@@ -24,11 +25,22 @@ interface InstallResult {
   error?: string
 }
 
+export interface RuntimeRegistryOptions {
+  probeClaudeModels?: (binaryPath: string) => Promise<DiscoveredModel[]>
+}
+
 export class RuntimeRegistry {
   private state: RuntimeRegistryState = { entries: [], defaults: {} }
   private healthCache = new Map<string, RuntimeHealthStatus>()
+  private readonly probeClaudeModels: ((binaryPath: string) => Promise<DiscoveredModel[]>) | null
+  private readonly inFlightProbes = new Map<string, Promise<void>>()
 
-  constructor(private readonly runtimesDir: string) {}
+  constructor(
+    private readonly runtimesDir: string,
+    options?: RuntimeRegistryOptions,
+  ) {
+    this.probeClaudeModels = options?.probeClaudeModels ?? null
+  }
 
   async initialize(): Promise<void> {
     await mkdir(this.runtimesDir, { recursive: true })
@@ -180,6 +192,49 @@ export class RuntimeRegistry {
     return { success: true, entry }
   }
 
+  async probeCapabilities(provider: AgentProvider): Promise<void> {
+    if (provider !== "claude" || !this.probeClaudeModels) return
+
+    const entry = this.resolve(provider)
+    if (!entry) return
+
+    // Already probed for this version
+    if (entry.capabilities?.runtimeVersion === entry.version) return
+
+    // De-dupe concurrent probes
+    const key = `${entry.provider}:${entry.version}`
+    const existing = this.inFlightProbes.get(key)
+    if (existing) { await existing; return }
+
+    const probe = (async () => {
+      try {
+        const models = await this.probeClaudeModels!(entry.binaryPath)
+        entry.capabilities = {
+          models,
+          probedAt: Date.now(),
+          runtimeVersion: entry.version,
+        }
+      } catch (err) {
+        entry.capabilities = {
+          models: [],
+          probedAt: Date.now(),
+          runtimeVersion: entry.version,
+          error: err instanceof Error ? err.message : String(err),
+        }
+      } finally {
+        this.inFlightProbes.delete(key)
+      }
+      await this.persist()
+    })()
+
+    this.inFlightProbes.set(key, probe)
+    await probe
+  }
+
+  getProviderCapabilities(provider: string): RuntimeCapabilities | null {
+    return this.resolve(provider)?.capabilities ?? null
+  }
+
   async removeManaged(provider: string, version: string): Promise<boolean> {
     const installDir = join(this.runtimesDir, provider, version)
     try {
@@ -209,6 +264,14 @@ export class RuntimeRegistry {
         ? e.provider === entry.provider && e.source === "system"
         : e.provider === entry.provider && e.version === entry.version && e.source === entry.source,
     )
+
+    // Clear capabilities when version or binaryPath changes
+    if (idx >= 0) {
+      const prev = this.state.entries[idx]
+      if (prev.version !== entry.version || prev.binaryPath !== entry.binaryPath) {
+        delete entry.capabilities
+      }
+    }
 
     const replacedDefault = idx >= 0 && this.state.defaults[entry.provider] === this.state.entries[idx].version
     if (idx >= 0) {

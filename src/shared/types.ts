@@ -8,6 +8,8 @@ export interface ProviderModelOption {
   label: string
   supportsEffort: boolean
   contextWindowOptions?: readonly ProviderContextWindowOption[]
+  description?: string
+  supportedEffortLevels?: string[]
 }
 
 export interface ProviderEffortOption {

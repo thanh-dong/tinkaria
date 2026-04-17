@@ -291,6 +291,7 @@ function ForkSessionDialogBody({
                   selected={model === m.id}
                   icon={<Box className="h-4 w-4 text-muted-foreground" />}
                   label={m.label}
+                  description={m.description}
                 />
               ))
             }

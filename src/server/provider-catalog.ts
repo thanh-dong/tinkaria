@@ -16,6 +16,7 @@ import {
   isClaudeReasoningEffort,
   isCodexReasoningEffort,
 } from "../shared/types"
+import type { RuntimeCapabilities, DiscoveredModel } from "../shared/runtime-types"
 
 const HARD_CODED_CODEX_MODELS: ProviderModelOption[] = [
   { id: "gpt-5.4", label: "GPT-5.4", supportsEffort: false },
@@ -41,12 +42,18 @@ export function getServerProviderCatalog(provider: AgentProvider): ProviderCatal
   return entry
 }
 
-export function normalizeServerModel(provider: AgentProvider, model?: string): string {
-  const catalog = getServerProviderCatalog(provider)
-  if (model && catalog.models.some((candidate) => candidate.id === model)) {
+export function normalizeServerModel(
+  provider: AgentProvider,
+  model?: string,
+  dynamicCatalog?: ProviderCatalogEntry[],
+): string {
+  const providers = dynamicCatalog ?? SERVER_PROVIDERS
+  const entry = providers.find((candidate) => candidate.id === provider)
+  if (!entry) return getServerProviderCatalog(provider).defaultModel
+  if (model && entry.models.some((candidate) => candidate.id === model)) {
     return model
   }
-  return catalog.defaultModel
+  return entry.defaultModel
 }
 
 export function normalizeClaudeModelOptions(
@@ -81,4 +88,58 @@ export function normalizeCodexModelOptions(modelOptions?: ModelOptions, legacyEf
 
 export function codexServiceTierFromModelOptions(modelOptions: CodexModelOptions): ServiceTier | undefined {
   return modelOptions.fastMode ? "fast" : undefined
+}
+
+/** SDK returns "default" for the recommended model — map it to the static "opus" alias */
+const DISCOVERED_TO_STATIC_ALIAS: Record<string, string> = { default: "opus" }
+
+function enrichModel(
+  staticModel: ProviderModelOption,
+  discovered: DiscoveredModel,
+): ProviderModelOption {
+  return {
+    ...staticModel,
+    label: discovered.displayName || staticModel.label,
+    description: discovered.description,
+    supportedEffortLevels: discovered.supportedEffortLevels,
+  }
+}
+
+export function deriveServerProviderCatalog(
+  claudeCapabilities?: RuntimeCapabilities | null,
+): ProviderCatalogEntry[] {
+  if (!claudeCapabilities?.models.length) return SERVER_PROVIDERS
+
+  const staticClaude = SERVER_PROVIDERS.find((p) => p.id === "claude")!
+
+  const discoveredByAlias = new Map<string, DiscoveredModel>()
+  for (const m of claudeCapabilities.models) {
+    discoveredByAlias.set(DISCOVERED_TO_STATIC_ALIAS[m.value] ?? m.value, m)
+  }
+
+  const enrichedModels: ProviderModelOption[] = staticClaude.models.map((staticModel) => {
+    const match = discoveredByAlias.get(staticModel.id)
+    return match ? enrichModel(staticModel, match) : staticModel
+  })
+
+  const staticIds = new Set(staticClaude.models.map((m) => m.id))
+  for (const m of claudeCapabilities.models) {
+    const alias = DISCOVERED_TO_STATIC_ALIAS[m.value] ?? m.value
+    if (!staticIds.has(alias)) {
+      enrichedModels.push({
+        id: m.value,
+        label: m.displayName || m.value,
+        description: m.description,
+        supportsEffort: m.supportsEffort ?? false,
+        supportedEffortLevels: m.supportedEffortLevels,
+      })
+    }
+  }
+
+  const dynamicClaude: ProviderCatalogEntry = {
+    ...staticClaude,
+    models: enrichedModels,
+  }
+
+  return SERVER_PROVIDERS.map((p) => (p.id === "claude" ? dynamicClaude : p))
 }

@@ -723,7 +723,9 @@ export function registerCommandResponders(args: RegisterRespondersArgs): { dispo
         if (!args.runtimeRegistry) throw new Error("Runtime registry not available")
         const detectOpts = DETECT_OPTIONS[command.provider]
         if (!detectOpts) throw new Error(`Unknown provider: ${command.provider}`)
-        return args.runtimeRegistry.detectSystemRuntime(command.provider, detectOpts)
+        const result = await args.runtimeRegistry.detectSystemRuntime(command.provider, detectOpts)
+        void args.runtimeRegistry.probeCapabilities(command.provider)
+        return result
       }
 
       case "runtime.install": {

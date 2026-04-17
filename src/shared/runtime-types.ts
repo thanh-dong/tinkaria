@@ -7,6 +7,7 @@ export interface RuntimeEntry {
   binaryPath: string
   installedAt: number
   packageName: string
+  capabilities?: RuntimeCapabilities
 }
 
 export interface RuntimeHealthStatus {
@@ -17,6 +18,24 @@ export interface RuntimeHealthStatus {
   lastChecked: number
   error?: string
   latencyMs: number
+}
+
+export interface DiscoveredModel {
+  value: string
+  displayName: string
+  description: string
+  supportsEffort?: boolean
+  supportedEffortLevels?: string[]
+  supportsAdaptiveThinking?: boolean
+  supportsFastMode?: boolean
+  supportsAutoMode?: boolean
+}
+
+export interface RuntimeCapabilities {
+  models: DiscoveredModel[]
+  probedAt: number
+  runtimeVersion: string
+  error?: string
 }
 
 export interface RuntimeRegistryState {

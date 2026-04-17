@@ -33,6 +33,8 @@ import { WorkflowEngine } from "./workflow-engine"
 import { initVapid, PushSubscriptionStore, createPushRouter, sendPushToAll } from "./push-notifications"
 import { BunDockerClient, SandboxManager } from "./sandbox-manager"
 import { RuntimeRegistry } from "./runtime-registry"
+import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk"
+import type { DiscoveredModel } from "../shared/runtime-types"
 import { createExtensionRouter } from "./extension-router"
 import { serverExtensions } from "./extensions.config"
 import { DelegationCoordinator, type DelegationStore } from "./delegation-coordinator"
@@ -560,7 +562,41 @@ export async function startServer(options: StartServerOptions = {}) {
   })
   await transcriptConsumer.start()
 
-  const runtimeRegistry = new RuntimeRegistry(path.join(store.dataDir, "runtimes"))
+  const runtimeRegistry = new RuntimeRegistry(path.join(store.dataDir, "runtimes"), {
+    probeClaudeModels: async (binaryPath: string): Promise<DiscoveredModel[]> => {
+      const q = sdkQuery({
+        prompt: "",
+        options: {
+          pathToClaudeCodeExecutable: binaryPath,
+          tools: [],
+          permissionMode: "bypassPermissions",
+          persistSession: false,
+        },
+      })
+      let timer: ReturnType<typeof setTimeout>
+      try {
+        const models = await Promise.race([
+          q.supportedModels(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("Model probe timed out")), 15_000)
+          }),
+        ])
+        return models.map((m) => ({
+          value: m.value,
+          displayName: m.displayName,
+          description: m.description,
+          supportsEffort: m.supportsEffort,
+          supportedEffortLevels: m.supportedEffortLevels,
+          supportsAdaptiveThinking: m.supportsAdaptiveThinking,
+          supportsFastMode: m.supportsFastMode,
+          supportsAutoMode: m.supportsAutoMode,
+        }))
+      } finally {
+        clearTimeout(timer!)
+        try { q.close() } catch (_) { /* close may fail on timed-out probes */ }
+      }
+    },
+  })
   await runtimeRegistry.initialize()
 
   const coordinator: SessionCoordinator = new RunnerProxy({
