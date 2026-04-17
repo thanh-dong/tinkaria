@@ -12,6 +12,7 @@ import {
   getUiIdentityOverlayCopyDurationMs,
   getUiIdentityOverlayHighlightRect,
   getUiIdentityOverlayPointerHandoffDelayMs,
+  shouldDeactivateMobileFabAfterCopyTargetSelection,
   shouldIgnoreUiIdentityOverlayPointerTarget,
   handleMobileTapCapture,
   getMobileTapAnchorRect,
@@ -45,6 +46,17 @@ describe("getUiIdentityOverlayCopyDurationMs", () => {
 describe("getUiIdentityOverlayPointerHandoffDelayMs", () => {
   test("uses a short handoff delay before clearing the current target", () => {
     expect(getUiIdentityOverlayPointerHandoffDelayMs()).toBe(320)
+  })
+})
+
+describe("shouldDeactivateMobileFabAfterCopyTargetSelection", () => {
+  test("deactivates the mobile FAB after a successful copy target selection", () => {
+    expect(shouldDeactivateMobileFabAfterCopyTargetSelection({ mobileActive: true, didCopy: true })).toBe(true)
+  })
+
+  test("keeps the mobile FAB state when copy fails or mobile mode is inactive", () => {
+    expect(shouldDeactivateMobileFabAfterCopyTargetSelection({ mobileActive: true, didCopy: false })).toBe(false)
+    expect(shouldDeactivateMobileFabAfterCopyTargetSelection({ mobileActive: false, didCopy: true })).toBe(false)
   })
 })
 

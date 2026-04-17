@@ -55,6 +55,13 @@ export function getUiIdentityOverlayPointerHandoffDelayMs() {
   return UI_IDENTITY_OVERLAY_POINTER_HANDOFF_DELAY_MS
 }
 
+export function shouldDeactivateMobileFabAfterCopyTargetSelection(args: {
+  mobileActive: boolean
+  didCopy: boolean
+}): boolean {
+  return args.mobileActive && args.didCopy
+}
+
 interface LegacySettingsRedirectArgs {
   pathname: string
   search?: string
@@ -391,6 +398,13 @@ function UiIdentityOverlayController() {
     void copyUiIdentityToClipboard(descriptor).then((didCopy) => {
       if (!didCopy) {
         return
+      }
+
+      if (shouldDeactivateMobileFabAfterCopyTargetSelection({ mobileActive, didCopy })) {
+        setMobileActive(false)
+        setPointerTarget(null)
+        setPointerPosition(null)
+        setHighlightedId(null)
       }
 
       setCopiedId(descriptor.id)
