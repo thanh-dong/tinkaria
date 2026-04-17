@@ -857,7 +857,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                 )}
               />
               {showQueueAction ? (
-                <div className="flex-shrink-0 mb-1 -mr-0.5 flex items-center gap-2 md:mr-0 md:mb-1.5">
+                <div className="flex-shrink-0 mb-1 -mr-0.5 flex items-center gap-1.5 md:gap-2 md:mr-0 md:mb-1.5">
                   <Button
                     {...getUiIdentityAttributeProps(cancelActionDescriptor)}
                     type="button"

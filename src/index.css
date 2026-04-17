@@ -550,6 +550,9 @@
   .tinkaria-composer-placeholder-rotating::placeholder {
     animation: tinkaria-composer-placeholder-rotate-breathe 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     color: color-mix(in oklch, currentColor 76%, oklch(71.2% 0.194 13.428) 24%);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tinkaria-typewriter-cursor-slot {
