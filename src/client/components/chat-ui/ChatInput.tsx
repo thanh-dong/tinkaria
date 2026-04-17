@@ -840,7 +840,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
                   )}
                 >
                   {reconnectVisualState === "reconnecting" ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Loader2 className="h-3 w-3" />
                   ) : (
                     <Check className="h-3 w-3" />
                   )}
