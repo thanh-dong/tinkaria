@@ -781,7 +781,7 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
   const cancelActionDisabled = reconnectVisualState !== "idle" || connectionStatus !== "connected"
   const queueActionDisabled = composerActionsDisabled || !hasText
   const submitActionDisabled = composerActionsDisabled || !hasText
-  const showConnectionBadge = reconnectVisualState !== "idle"
+  const showConnectionBadge = reconnectVisualState === "reconnected"
   return (
     <div>
       {shouldShowQueuedBlock(queuedText) ? (
@@ -831,19 +831,9 @@ const ChatInputInner = forwardRef<HTMLTextAreaElement, Props>(function ChatInput
               <div className="flex justify-end pt-1.5 pr-3">
                 <div
                   {...getUiIdentityAttributeProps(connectionBadgeDescriptor)}
-                  className={cn(
-                    "inline-flex items-center transition-opacity duration-300",
-                    reconnectVisualState === "reconnecting"
-                      && "text-amber-600 dark:text-amber-300/70",
-                    reconnectVisualState === "reconnected"
-                      && "text-emerald-600 dark:text-emerald-300/60 opacity-60",
-                  )}
+                  className="inline-flex items-center transition-opacity duration-300 text-emerald-600 dark:text-emerald-300/60 opacity-60"
                 >
-                  {reconnectVisualState === "reconnecting" ? (
-                    <Loader2 className="h-3 w-3" />
-                  ) : (
-                    <Check className="h-3 w-3" />
-                  )}
+                  <Check className="h-3 w-3" />
                 </div>
               </div>
             ) : null}
