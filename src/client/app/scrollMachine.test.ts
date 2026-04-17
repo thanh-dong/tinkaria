@@ -114,12 +114,12 @@ describe("nextScrollMode", () => {
       expect(nextScrollMode(current, { type: "chat-changed" })).toBe("anchoring")
     })
 
-    test("transitions to following when sentinel enters during programmatic scroll", () => {
+    test("stays detached when sentinel enters during programmatic scroll (navigator waypoint scroll)", () => {
       expect(nextScrollMode(current, {
         type: "intersection-change",
         isIntersecting: true,
         isProgrammatic: true,
-      })).toBe("following")
+      })).toBe("detached")
     })
   })
 })

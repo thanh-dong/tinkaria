@@ -23,8 +23,8 @@ export function nextScrollMode(current: ScrollMode, event: ScrollEvent): ScrollM
   if (event.type === "scroll-to-bottom") return "following"
 
   if (event.type === "intersection-change") {
-    if (event.isIntersecting) return "following"
     if (event.isProgrammatic) return current
+    if (event.isIntersecting) return "following"
     return "detached"
   }
 
