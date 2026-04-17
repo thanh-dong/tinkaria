@@ -1,6 +1,6 @@
 ---
 id: adr-20260410-transcript-payload-budgeted-paging
-c3-seal: c486c7310c1eb8668e1b4d9e759acffc4b9eb6141bc60a49944c396057270cf4
+c3-seal: c97891f35c889a9d8cc0acae26c8e46a6effae81ec024f8fe8aa2744dbf5170d
 title: transcript-payload-budgeted-paging
 type: adr
 goal: Supersede the unsafe assumption in `adr-20260401-chunked-transcript-loading` that a fixed tail window by entry count is transport-safe.
@@ -215,7 +215,6 @@ Primary | responder tests prove no chat.getTranscriptPage reply exceeds configur
 Primary | browser proof on a screenshot-heavy chat shows transcript hydration succeeds from idle snapshot without fallback_empty
 Primary | tail-first load plus backfill still preserves ordering when live JetStream events arrive during paging
 Primary | typecheck + targeted transcript tests + transport responder tests pass
-
 Secondary | stored transcript entries no longer inline large base64 image blobs for new tool results
 
 Secondary | asset-backed transcript rendering matches prior UX for images and present-content artifacts

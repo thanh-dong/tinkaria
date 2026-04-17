@@ -1,6 +1,6 @@
 ---
 id: c3-1
-c3-seal: 09dfdd40deb13e36156b84dbb050c16e072ce7cb9a3d3aac259e13c177c0e46f
+c3-seal: a437b3c1a786c21901118af651e22b8fe5fc90cc8da36abe6cfece4d121abd47
 title: client
 type: container
 boundary: service
@@ -29,8 +29,8 @@ React 19 single-page application running in the browser — chat interface, term
 | c3-113 | sidebar | Feature | active | Navigation, project groups, session lists, and route entry. |
 | c3-115 | right-sidebar | Feature | active | File explorer and adjacent workspace panel behavior. |
 | c3-117 | projects | Feature | active | Project discovery, overview, and creation surfaces. |
-| c3-118 | transcript-lifecycle | Feature | active | Transcript loading, pagination, and read/follow state. |
-| c3-119 | transcript-renderer | Feature | active | Transcript grouping and render selection for message streams. |
+| c3-118 | transcript-lifecycle | Feature | active | Transcript delivery state, projection freshness, raw-event coalescing, and ready render-unit handoff. |
+| c3-119 | transcript-renderer | Feature | active | Units-only transcript presentation, virtualization, stable measurement, and dispatch to message renderers. |
 | c3-120 | extensions | Feature | active | Project extension surfaces including C3, agents, and code views. |
 ## Responsibilities
 

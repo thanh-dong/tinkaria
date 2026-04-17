@@ -1,6 +1,6 @@
 ---
 id: c3-205
-c3-seal: a569d650aed23147578be83476386acdcecc4842f4166f61a4a17fd4e5f44995
+c3-seal: d2d4203b3e0a53e620452db832a37d25d6fb54555b5af7ecf80383d5c2be7431
 title: nats-transport
 type: component
 category: foundation
@@ -14,6 +14,7 @@ uses:
     - ref-ref-jetstream-streaming
     - ref-ref-websocket-protocol
     - ref-runtime-operational-readiness
+    - ref-transcript-render-state-machine
     - rule-bun-test-conventions
     - rule-error-extraction
     - rule-external-source-stale-handle-guards
@@ -39,7 +40,7 @@ Embedded NATS transport layer — starts nats-server subprocess (TCP + WebSocket
 | Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
 ## Purpose
 
-Provide durable agent-ready documentation for nats-transport so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+Transport snapshots, request/reply responses, and raw event notifications without changing transcript projection semantics. For transcript render delivery, NATS carries `renderUnits` and `TranscriptProjectionKey` together, preserves request tokens on render-window replies, and may dedupe identical payloads only without stripping projection metadata.
 
 ## Foundational Flow
 
@@ -61,19 +62,25 @@ Provide durable agent-ready documentation for nats-transport so generated code, 
 
 | Reference | Type | Governs | Precedence | Notes |
 | --- | --- | --- | --- | --- |
-| ref-component-identity-mapping | ref | Governs nats-transport behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+| ref-transcript-render-state-machine | ref | Transport obligations for projectionKey preservation, snapshot/render-window payload integrity, and raw-event signal boundaries. | State-machine ref governs transcript delivery payloads over generic transport prose. | NATS transports key; c3-214 derives it and c3-118 applies it. |
+| ref-ref-jetstream-streaming | ref | JetStream/KV streaming and snapshot delivery behavior. | Use alongside state-machine ref for transcript topics. | Transport ordering must not become projection freshness authority. |
+| ref-ref-websocket-protocol | ref | Browser WebSocket subscription and request/reply protocol. | Projection metadata must survive the WebSocket boundary. | Client delivery reducer consumes key from received payload. |
+| rule-graceful-fallbacks | rule | Recovery behavior when transport is disconnected or replies fail. | Failures retain visible units in client machine; transport should report failure clearly. | No blanking visible transcript on failed fetch. |
 ## Contract
 
 | Surface | Direction | Contract | Boundary | Evidence |
 | --- | --- | --- | --- | --- |
-| nats-transport input | IN | Callers must provide context that matches the component goal and parent fit. | c3-2 boundary | c3x lookup plus targeted tests or review. |
-| nats-transport output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-2 boundary | c3x check and project test suite. |
+| chat snapshot publish | OUT | Publish chat snapshots with renderUnits and TranscriptProjectionKey preserved as one payload. | Transport does not derive, compare, or rewrite projection keys. | src/server/nats-publisher.ts; src/server/nats-publisher.test.ts; src/shared/types.ts |
+| chat.getRenderUnits request/reply | IN/OUT | Return render-window units with projectionKey and preserve request/reply correlation so client can reject stale tokens. | Transport errors do not imply visible transcript should clear. | src/server/nats-responders.ts; src/server/nats-responders.test.ts; src/shared/protocol.ts |
+| raw transcript event stream | OUT | Stream raw events as staleness/progress signals only; event payloads are not visible render-unit authority. | Client must fetch/apply projected snapshot/reply before changing visible units. | src/server/transcript-consumer.ts; src/client/app/useTranscriptLifecycle.test.ts |
+| dedup/backfill | OUT | Dedup identical transport payloads without removing projectionKey; backfill/recovery replies keep key semantics intact. | Transport sequence/order is not a substitute for entryCount/contentHash freshness. | src/server/nats-publisher.test.ts; src/server/nats-responders.test.ts |
 ## Change Safety
 
 | Risk | Trigger | Detection | Required Verification |
 | --- | --- | --- | --- |
-| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
-| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+| Projection key stripped by transport | Snapshot or reply serialization omits projectionKey while renderUnits remain. | Publisher/responder protocol tests fail. | bun test src/server/nats-publisher.test.ts src/server/nats-responders.test.ts |
+| Transport sequence mistaken for freshness | Client/server logic compares NATS order instead of TranscriptProjectionKey. | Reducer and responder tests assert key-based apply/ignore. | bun test src/client/app/useTranscriptLifecycle.test.ts src/server/nats-responders.test.ts |
+| Failed render-window fetch blanks transcript | Request/reply failure causes empty visible units instead of retaining current state. | Delivery reducer projection.failed test. | bun test src/client/app/useTranscriptLifecycle.test.ts |
 ## Derived Materials
 
 | Material | Must derive from | Allowed variance | Evidence |

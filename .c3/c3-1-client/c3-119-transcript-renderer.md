@@ -1,11 +1,11 @@
 ---
 id: c3-119
-c3-seal: 54d2ebd89a92ddd520abfeafdcbdd3e18e032949651630d09ddc2b4134c27ab8
+c3-seal: d4497a1e15734b8abc0f40b2be1253a74234dda8e3b144e1b05eb544db4cc47d
 title: transcript-renderer
 type: component
 category: feature
 parent: c3-1
-goal: 'Own transcript render interaction: virtualized render items, assistant answer detection, WIP/tool grouping, dedicated-tool boundaries, scroll measurement, and dispatch into message renderers.'
+goal: 'Own transcript render-unit presentation: virtualized rows, stable measurement, scroll-facing item identity, and dispatch into message renderers from already-folded TranscriptRenderUnit input.'
 uses:
     - c3-106
     - c3-107
@@ -13,6 +13,7 @@ uses:
     - c3-118
     - recipe-agent-turn-render-flow
     - ref-live-transcript-render-contract
+    - ref-transcript-render-state-machine
     - rule-bun-test-conventions
     - rule-react-no-effects
     - rule-rule-strict-typescript
@@ -22,7 +23,7 @@ uses:
 # transcript-renderer
 ## Goal
 
-Own transcript render interaction: virtualized render items, assistant answer detection, WIP/tool grouping, dedicated-tool boundaries, scroll measurement, and dispatch into message renderers.
+Own transcript render-unit presentation: virtualized rows, stable measurement, scroll-facing item identity, and dispatch into message renderers from already-folded TranscriptRenderUnit input.
 
 ## Parent Fit
 
@@ -34,7 +35,7 @@ Own transcript render interaction: virtualized render items, assistant answer de
 | Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
 ## Purpose
 
-Provide durable agent-ready documentation for transcript-renderer so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+Render transcript units that have already been folded by the shared projection contract. This component does not derive transcript facts, group assistant/tool boundaries, fetch or hydrate messages, decide live visibility, or reinterpret raw events. It owns presentation mechanics only: virtualized row shape, scroll measurement hooks, stable React keys, and dispatch to message/present-content/rich-content renderers.
 
 ## Foundational Flow
 
@@ -56,19 +57,25 @@ Provide durable agent-ready documentation for transcript-renderer so generated c
 
 | Reference | Type | Governs | Precedence | Notes |
 | --- | --- | --- | --- | --- |
-| ref-live-transcript-render-contract | ref | Governs transcript-renderer behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+| ref-live-transcript-render-contract | ref | Provider-to-read-model-to-client transcript rendering boundaries and live transcript anti-regression expectations. | ref-transcript-render-state-machine narrows renderer ownership when live delivery is involved. | Use this for end-to-end transcript flow context. |
+| ref-transcript-render-state-machine | ref | Units-only renderer boundary, stable keys, no renderer-owned grouping, and no live fade loops. | Explicit anti-flash state-machine contract beats older renderer grouping prose. | Renderer receives ready render units from the delivery machine; it must not fetch, hydrate, group, or hide transcript facts. |
+| rule-transcript-boundary-regressions | rule | Regression coverage for assistant visibility, WIP/tool grouping output, and artifact rendering. | Rule tests are required whenever transcript rendering behavior changes. | Tests assert renderer consumes folded units and does not recreate grouping. |
+| rule-react-no-effects | rule | React component side-effect boundaries. | Effects are not used to derive render grouping or delivery state. | Renderer remains declarative over props. |
 ## Contract
 
 | Surface | Direction | Contract | Boundary | Evidence |
 | --- | --- | --- | --- | --- |
-| transcript-renderer input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
-| transcript-renderer output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+| renderUnits input | IN | Callers provide ordered TranscriptRenderUnit[] owned by the delivery machine; renderer treats unit kind/id/sourceEntryIds as authoritative. | Projection fold and delivery state machine own grouping and visibility. | src/client/app/ChatTranscript.test.tsx and src/shared/transcript-render.test.ts |
+| virtual rows | OUT | Render one stable row per supplied render unit without remount-inducing id rewrites or phase-dependent regrouping. | No raw TranscriptEntry[] handling in ChatTranscript. | src/client/app/ChatTranscript.test.tsx plus agent-browser no-flash smoke |
+| message dispatch | OUT | Dispatch existing unit payloads to message, rich-content, and present-content renderers without altering transcript semantics. | Message components render payloads; renderer does not infer missing facts. | src/client/components/messages/TextMessage.test.tsx and src/client/components/rich-content/RichContentBlock.test.tsx |
+| animation | OUT | Do not replay fade/guard animations for already-visible stable units after equivalent live projections. | Animation may decorate first appearance only when keyed by new unit identity. | src/index.css, src/client/app/ChatTranscript.test.tsx, and agent-browser no-flash smoke |
 ## Change Safety
 
 | Risk | Trigger | Detection | Required Verification |
 | --- | --- | --- | --- |
-| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
-| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+| Renderer-owned grouping returns | ChatTranscript accepts raw entries or derives assistant/tool groups. | rg in src/client/app/ChatTranscript.tsx plus src/shared/transcript-render.test.ts failures. | bun test src/shared/transcript-render.test.ts src/client/app/ChatTranscript.test.tsx |
+| Stable units remount or flash | Unit ids, React keys, or animation classes change for equivalent projections. | src/client/app/ChatTranscript.test.tsx stable-key assertions and agent-browser live-turn smoke. | bun test src/client/app/ChatTranscript.test.tsx and agent-browser no-flash smoke |
+| Boundary drift from lifecycle | Renderer fetches, hydrates, buffers, or filters live transcript events. | rg in src/client/app/ChatTranscript.tsx should not find fetchTranscript, subscribe, or setMessages for lifecycle work. | bun test src/client/app/useTranscriptLifecycle.test.ts src/client/app/ChatTranscript.test.tsx |
 ## Derived Materials
 
 | Material | Must derive from | Allowed variance | Evidence |

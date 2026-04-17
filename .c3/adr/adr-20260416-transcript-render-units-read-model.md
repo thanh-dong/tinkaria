@@ -1,6 +1,6 @@
 ---
 id: adr-20260416-transcript-render-units-read-model
-c3-seal: ee9e5ea4adbcd60eeaec83587a1949fc9d7d4b4c48e5c76d4a26f5f48203750c
+c3-seal: 90b965600ecfb46f0682dfc8d3ab4818f9b94e112b64435987f107f1b425a49f
 title: transcript-render-units-read-model
 type: adr
 goal: Simplify transcript rendering by making render units the deterministic read model for chat UI.
@@ -22,7 +22,6 @@ Decision:
 - Unknown transcript facts render visibly as unknown units.
 - Existing sessions use the one-off copy:legacy-transcripts script that invokes the existing event-store legacy transcript migration; no runtime compatibility layer is added.
 Implementation:
-
 - Added TranscriptRenderUnit shared types and ChatSnapshot.renderUnits.
 - Added shared fold tests for empty transcripts, rationale ejection, latest TodoWrite/status, artifacts, errored tools, unknown tools, pending/interrupted streams, consecutive prompts, and tool grouping.
 - Server read models and NATS responders derive render units; chat.getRenderUnits exposes deterministic render windows.

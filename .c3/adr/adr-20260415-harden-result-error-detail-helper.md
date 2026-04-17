@@ -1,6 +1,6 @@
 ---
 id: adr-20260415-harden-result-error-detail-helper
-c3-seal: 7be77b0a6dc7be5b5c33950042243fb7b562aadf37be3f97134e7d53bb8d753a
+c3-seal: 399ddce96599527a0535bab2eb4e4cd034e2e4beab6de84ac27170b3fedb57db
 title: harden-result-error-detail-helper
 type: adr
 goal: Harden the session-ended error detail normalization with direct helper coverage and self-review evidence, keeping the existing render-layer fix scoped to c3-111 messages.
@@ -19,7 +19,6 @@ Work Breakdown:
 - Prove exact trimming behavior: leading fallback title/hint removed, API detail preserved, non-leading text untouched.
 - Self-review diff for over-trimming, unnecessary blast radius, and unrelated worktree changes.
 Risks:
-
 - Exporting a helper can widen local module API. Acceptable because it is test-facing and remains colocated with ResultMessage.
 - Over-normalization could hide user detail. Direct tests cover leading-only behavior and normal API/rate-limit detail.
 Parent Delta:

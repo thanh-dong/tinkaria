@@ -1,6 +1,6 @@
 ---
 id: adr-20260415-fix-codex-chat-already-running
-c3-seal: c54cb8fedd0edb40c201e3363bf4674be8f84c3a5c1737142f1dac7ee4a80b64
+c3-seal: fe17f4e4410fda04ed2f65e9ae5c27ab0c47f1cd42cddab50f4c98d735cb1612
 title: fix-codex-chat-already-running
 type: adr
 goal: Fix the Codex session state bug where send_input against an already-running child chat surfaced as a busy/already-running error with only Dismiss available.
@@ -25,7 +25,6 @@ Work Breakdown:
 - Updated C3 docs for c3-206, c3-208, c3-210, and c3-226 to document active-state sources, queue-drain ownership, duplicate-start symptoms, and exact verification commands.
 Parent Delta: none. The server container, orchestration, agent, kit-runtime, and transcript-runtime responsibilities already cover session orchestration, queued follow-up ownership, active-turn state, runner handoff, and queue-drain triggers; this change makes those existing contracts explicit.
 Verification:
-
 - bun test src/server/runner-proxy.test.ts --test-name-pattern 'activeTurns.has() returns true immediately'
 - bun test src/server/orchestration.test.ts --test-name-pattern 'queues input if target is already running'
 - bun test src/server/orchestration.test.ts src/server/runner-proxy.test.ts src/server/codex-app-server.test.ts src/runner/runner-agent.test.ts

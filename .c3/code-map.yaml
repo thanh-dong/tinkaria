@@ -28,13 +28,17 @@ c3-108:
   - src/client/components/ui/dropdown-menu.tsx
   - src/client/lib/uiIdentityOverlay.ts
 c3-110:
+  - src/client/app/ChatNavigator.tsx
   - src/client/app/ChatPage.tsx
   - src/client/app/chatFocusPolicy.ts
   - src/client/app/derived.ts
   - src/client/app/nats-socket.ts
+  - src/client/app/scrollFollowStore.ts
   - src/client/app/socket-interface.ts
   - src/client/app/useAppState.ts
   - src/client/app/useChatCommands.ts
+  - src/client/app/useChatNavigator.ts
+  - src/client/app/useScrollSync.ts
   - src/client/app/useStickyChatFocus.ts
   - src/client/app/useTinkariaState.machine.ts
   - src/client/app/useTinkariaState.ts
@@ -70,6 +74,8 @@ c3-118:
 c3-119:
   - src/client/app/ChatTranscript.test.tsx
   - src/client/app/ChatTranscript.tsx
+  - src/client/app/chatWaypoints.test.ts
+  - src/client/app/chatWaypoints.ts
   - src/client/lib/messageHeights.test.ts
   - src/client/lib/messageHeights.ts
   - src/client/lib/useMessageHeights.ts

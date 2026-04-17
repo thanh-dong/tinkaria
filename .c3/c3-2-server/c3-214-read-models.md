@@ -1,11 +1,11 @@
 ---
 id: c3-214
-c3-seal: c25cf0768eca29c175b6bc39527cf358fe034b484dd15fc4d1be35444058facc
+c3-seal: baff32b9c35a5930fcb1b9d3d806d30269af74b225ff37732d629ad1b8872d87
 title: read-models
 type: component
 category: feature
 parent: c3-2
-goal: CQRS read-side projections — derives sidebar data, chat snapshots, and local projects snapshots from the event store state for WebSocket delivery.
+goal: CQRS read-side projections that derive sidebar data, chat snapshots, local project snapshots, transcript render units, and TranscriptProjectionKey metadata for WebSocket/request-reply delivery.
 uses:
     - recipe-project-c3-app-flow
     - recipe-project-c3-jtbd-flow
@@ -13,6 +13,7 @@ uses:
     - ref-mcp-app-jtbd
     - ref-project-c3-app-surface
     - ref-ref-event-sourcing
+    - ref-transcript-render-state-machine
     - rule-bun-test-conventions
     - rule-error-extraction
     - rule-prefixed-logging
@@ -23,7 +24,7 @@ uses:
 # read-models
 ## Goal
 
-CQRS read-side projections — derives sidebar data, chat snapshots, and local projects snapshots from the event store state for WebSocket delivery.
+CQRS read-side projections that derive sidebar data, chat snapshots, local project snapshots, transcript render units, and TranscriptProjectionKey metadata for WebSocket/request-reply delivery.
 
 ## Parent Fit
 
@@ -35,7 +36,7 @@ CQRS read-side projections — derives sidebar data, chat snapshots, and local p
 | Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
 ## Purpose
 
-Provide durable agent-ready documentation for read-models so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+Derive deterministic read-side projections from event-store state. For transcript rendering, this component folds ordered append-only transcript entries into TranscriptRenderUnit windows and derives the matching TranscriptProjectionKey from the same source window. Read models derive projection identity; they do not decide client visibility or mutate transcript facts.
 
 ## Foundational Flow
 
@@ -57,19 +58,25 @@ Provide durable agent-ready documentation for read-models so generated code, tes
 
 | Reference | Type | Governs | Precedence | Notes |
 | --- | --- | --- | --- | --- |
-| ref-component-identity-mapping | ref | Governs read-models behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+| ref-transcript-render-state-machine | ref | Projection fold output, TranscriptProjectionKey derivation, contentHash stability, and snapshot/render-window metadata. | State-machine ref governs transcript read-model projection behavior. | Read model derives key; client delivery machine applies freshness. |
+| ref-ref-event-sourcing | ref | Event-sourced read model derivation and replay determinism. | Append-only replay model must preserve deterministic projection output. | Projection key must be replay-stable. |
+| rule-bun-test-conventions | rule | Focused read-model and projection tests. | Required for projection-key changes. | Use Bun tests. |
+| rule-rule-strict-typescript | rule | Strict typing for snapshot/read-model outputs. | No loose projection metadata. | Typecheck via bunx native tsc. |
 ## Contract
 
 | Surface | Direction | Contract | Boundary | Evidence |
 | --- | --- | --- | --- | --- |
-| read-models input | IN | Callers must provide context that matches the component goal and parent fit. | c3-2 boundary | c3x lookup plus targeted tests or review. |
-| read-models output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-2 boundary | c3x check and project test suite. |
+| ordered transcript source window | IN | Consume ordered append-only TranscriptEntry windows from event-store state. | Read models do not mutate transcript entries or invent raw events. | src/server/read-models.ts; src/server/read-models.test.ts |
+| render-unit projection | OUT | Fold the ordered source window into deterministic TranscriptRenderUnit[] using shared projection logic. | Grouping/tool-boundary decisions stay in shared projection, not React. | src/shared/transcript-render.ts; src/shared/transcript-render.test.ts; src/server/read-models.test.ts |
+| TranscriptProjectionKey derivation | OUT | Derive { chatId, entryCount, lastEntryId, contentHash } from the same ordered source window and folded render units shipped to the client. | Do not use transport sequence, wall-clock time, or loading/idle UI state in contentHash. | src/server/read-models.ts; src/server/read-models.test.ts |
+| ChatSnapshot output | OUT | Emit renderUnits and projectionKey together in chat snapshots. | Snapshots without projectionKey are not ready for delivery-machine visibility. | src/shared/types.ts; src/server/read-models.test.ts |
 ## Change Safety
 
 | Risk | Trigger | Detection | Required Verification |
 | --- | --- | --- | --- |
-| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
-| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+| Projection key not derived from same window | contentHash or entryCount uses a different entry slice than renderUnits. | Read-model tests compare snapshot key against render-window key for same source. | bun test src/server/read-models.test.ts src/server/nats-responders.test.ts |
+| Volatile fields in contentHash | Hash includes timestamps outside source entries, request tokens, runtime loading flags, or object order instability. | Replay/equivalent projection tests fail same-hash assertions. | bun test src/server/read-models.test.ts src/shared/transcript-render.test.ts |
+| Read model decides visibility | Read model suppresses same-count/different-hash or stale replies instead of exposing key for client reducer. | Reducer tests lack coverage or read-model code contains client freshness decisions. | bun test src/client/app/useTranscriptLifecycle.test.ts src/server/read-models.test.ts |
 ## Derived Materials
 
 | Material | Must derive from | Allowed variance | Evidence |

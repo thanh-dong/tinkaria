@@ -1,16 +1,17 @@
 ---
 id: c3-118
-c3-seal: c97dc44f4127157bf3f0da7d04e8c0fab133be127ff8ef46b6569369f62128c2
+c3-seal: cee9fa78847ee6ff866a13adf3ad2aa10bb72ac2ae905f2a8c79ef587307240b
 title: transcript-lifecycle
 type: component
 category: feature
 parent: c3-1
-goal: 'Own live transcript ingestion on the client: cache restore, snapshot/tail fetch, backfill, event buffering, incremental hydration, RAF batching, and message-array handoff to the transcript renderer.'
+goal: 'Own client transcript delivery state: cache restore, snapshot/render-window requests, projection freshness, raw-event coalescing, route ownership, and handoff of ready render units to the transcript renderer.'
 uses:
     - c3-106
     - c3-204
     - recipe-agent-turn-render-flow
     - ref-live-transcript-render-contract
+    - ref-transcript-render-state-machine
     - rule-bun-test-conventions
     - rule-react-no-effects
     - rule-rule-strict-typescript
@@ -20,7 +21,7 @@ uses:
 # transcript-lifecycle
 ## Goal
 
-Own live transcript ingestion on the client: cache restore, snapshot/tail fetch, backfill, event buffering, incremental hydration, RAF batching, and message-array handoff to the transcript renderer.
+Own client transcript delivery state: cache restore, snapshot/render-window requests, projection freshness, raw-event coalescing, route ownership, and handoff of ready render units to the transcript renderer.
 
 ## Parent Fit
 
@@ -32,7 +33,7 @@ Own live transcript ingestion on the client: cache restore, snapshot/tail fetch,
 | Collaboration | Coordinate with cited governance and adjacent components before changing the contract. |
 ## Purpose
 
-Provide durable agent-ready documentation for transcript-lifecycle so generated code, tests, and follow-up docs preserve ownership, boundaries, governance, and verification evidence.
+Coordinate live transcript delivery for the active chat without directly deriving render semantics. Raw transcript events are stale signals: they update pending projection state and may trigger one render-window request, but they do not write visible render units. The delivery machine owns active chat identity, projection request tokens, freshness checks, visible units, and failure behavior.
 
 ## Foundational Flow
 
@@ -54,19 +55,27 @@ Provide durable agent-ready documentation for transcript-lifecycle so generated 
 
 | Reference | Type | Governs | Precedence | Notes |
 | --- | --- | --- | --- | --- |
-| ref-live-transcript-render-contract | ref | Governs transcript-lifecycle behavior, derivation, or review when applicable. | Explicit cited governance beats uncited local prose. | Migrated from legacy component form; refine during next component touch. |
+| ref-live-transcript-render-contract | ref | Provider stream, read model, snapshot, and client delivery boundaries. | ref-transcript-render-state-machine narrows client live-delivery behavior when flashing/stability is involved. | Use this for full transcript flow context. |
+| ref-transcript-render-state-machine | ref | Delivery state machine, projection freshness key, raw-event no-op visibility, request-token ownership, and monotonic apply/ignore rules. | State-machine contract beats older incremental hydration prose. | Raw events may request projection; they must not write visible units. |
+| rule-transcript-boundary-regressions | rule | Regression coverage for live assistant visibility and transcript boundary behavior. | Rule tests are required when delivery state changes. | Reducer and integration tests must cover raw-event no-op visibility. |
+| rule-react-no-effects | rule | React effects as external synchronization only. | Reducer owns state transitions; effects only subscribe/fetch/dispatch. | Lifecycle effects may observe sockets but must not derive visibility ad hoc. |
 ## Contract
 
 | Surface | Direction | Contract | Boundary | Evidence |
 | --- | --- | --- | --- | --- |
-| transcript-lifecycle input | IN | Callers must provide context that matches the component goal and parent fit. | c3-1 boundary | c3x lookup plus targeted tests or review. |
-| transcript-lifecycle output | OUT | Derived code, docs, and tests must preserve the documented behavior and governance. | c3-1 boundary | c3x check and project test suite. |
+| chat selected/cleared | IN | Route ownership resets the delivery machine, active chat id, request token, and visible-unit cache scope. | No stale snapshot or render-window reply may apply across chat ids. | src/client/app/useTranscriptLifecycle.test.ts and ref-transcript-render-state-machine |
+| snapshot received | IN | Snapshot render units apply only when projectionKey belongs to active chat and passes monotonic freshness. | Same key is ignored; same count with different hash is rejected during live delivery. | src/client/app/useTranscriptLifecycle.test.ts and src/shared/protocol.ts |
+| raw transcript event | IN | Raw event coalesces pending projection refresh and never changes visible render units directly. | No incremental hydration or message-array handoff from raw event payloads. | src/client/app/useTranscriptLifecycle.test.ts |
+| render-window response | IN | Response applies only for the current request token and newer projection key. | Late/stale replies and failed projections retain current visible units. | src/client/app/useTranscriptLifecycle.test.ts |
+| visible units handoff | OUT | Lifecycle sends only delivery-machine-owned TranscriptRenderUnit[] to ChatTranscript. | ChatTranscript receives units, not raw entries or hydration commands. | src/client/app/ChatTranscript.test.tsx and src/client/app/useTranscriptLifecycle.ts |
 ## Change Safety
 
 | Risk | Trigger | Detection | Required Verification |
 | --- | --- | --- | --- |
-| Contract drift | Goal, boundary, or derived material changes without matching component docs. | Compare Goal, Parent Fit, Contract, and Derived Materials. | Run c3x check and relevant project tests. |
-| Governance drift | Cited references, rules, or parent responsibilities change. | Re-read Governance rows and parent container docs. | Run c3x verify plus targeted lookup for changed files. |
+| Two visual writers return | Lifecycle writes visible units from both raw events/fetches and snapshots outside the reducer. | rg in src/client/app/useTranscriptLifecycle.ts for setMessages outside delivery-machine apply path. | bun test src/client/app/useTranscriptLifecycle.test.ts |
+| Stale projection flashes current chat | Late snapshot or render-window reply applies without chat id, request token, or projection key check. | Reducer tests for stale snapshot/reply ignore and chat-switch isolation. | bun test src/client/app/useTranscriptLifecycle.test.ts |
+| Same-count projection drift causes loading/idle flash | Equivalent entry window changes unit shape or hash while live delivery accepts same entryCount replacement. | Projection shape-stability tests and reducer same-count/different-hash rejection tests. | bun test src/shared/transcript-render.test.ts src/client/app/useTranscriptLifecycle.test.ts |
+| Projection failure blanks visible transcript | Fetch/render-window failure clears messages during a live turn. | Reducer projection.failed test. | bun test src/client/app/useTranscriptLifecycle.test.ts |
 ## Derived Materials
 
 | Material | Must derive from | Allowed variance | Evidence |
